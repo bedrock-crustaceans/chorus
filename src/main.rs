@@ -8,7 +8,6 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::process::exit;
 use std::str::FromStr;
 use std::time::Duration;
-use bedrockrs::core::int::{LE, VAR};
 use bedrockrs::proto::gamepackets::GamePackets;
 use bedrockrs::proto::packets::chunk_publisher_update::ChunkPublisherUpdatePacket;
 use bedrockrs::proto::packets::chunk_radius_updated::ChunkRadiusUpdatedPacket;
@@ -48,6 +47,7 @@ async fn rastra_main(_config: RAstraConfig) {
     let mut listener = listener::Listener::new_raknet(
         _config.display_name,
         _config.display_sub_name,
+        "1.21.0".to_string(),
         100,
         0,
         SocketAddr::V4(SocketAddrV4::new(
