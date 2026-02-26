@@ -1,4 +1,1 @@
-#[warn(unused)]
-fn main() {
-    // TODO
-}
+pub mod api;

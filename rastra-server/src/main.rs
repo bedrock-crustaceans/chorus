@@ -14,5 +14,7 @@ async fn main() -> anyhow::Result<()> {
 
     server.run().await.expect("Server crashed");
 
+    rastra_api::api::run().await.expect("API crashed");
+
     Ok(())
 }
