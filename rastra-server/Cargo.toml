@@ -1,0 +1,17 @@
+[package]
+name = "rastra-server"
+version.workspace = true
+description = "Server project of RAstra"
+edition = "2021"
+
+[dependencies]
+rastra-api = { path = "../rastra-api" }
+rastra-config = { path = "../rastra-config" }
+tokio = { version = "1", features = ["full"] }
+
+log = "0.4"
+fern = "0.7"
+chrono = "0.4"
+
+bedrockrs = { git = "https://github.com/bedrock-crustaceans/bedrockrs", branch = "main", features = ["full"] }
+anyhow = "1.0.102"

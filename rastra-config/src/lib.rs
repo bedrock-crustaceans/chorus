@@ -9,8 +9,11 @@ const CONFIG_PATH: &str = "rastra.toml";
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RAstraConfig {
-    pub display_name: String,
-    pub display_sub_name: String,
+    pub ip: String,
+    pub port: u32,
+    pub motd: String,
+    pub sub_motd: String,
+    pub max_players: u32,
     pub threads: usize,
     pub log_to_file: bool,
     pub logs_directory: PathBuf,
@@ -23,8 +26,11 @@ pub struct RAstraConfig {
 impl Default for RAstraConfig {
     fn default() -> Self {
         Self {
-            display_name: String::from("Dedicated Server"),
-            display_sub_name: String::from("RAstra"),
+            ip: String::from("127.0.0.1"),
+            port: 19132,
+            motd: String::from("RAstra Server"),
+            sub_motd: String::from("Powered by bedrock-rs"),
+            max_players: 50,
             threads: 4,
             log_to_file: true,
             logs_directory: PathBuf::from("logs"),

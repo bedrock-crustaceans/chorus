@@ -1,0 +1,10 @@
+[package]
+name = "rastra-api"
+version.workspace = true
+description = "API project of RAstra"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0.102"
+log = "0.4.29"
