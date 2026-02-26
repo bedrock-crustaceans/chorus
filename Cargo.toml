@@ -1,21 +1,14 @@
-[package]
+[workspace]
+resolver = "3"
+members = [
+    "rastra-api",
+    "rastra-server",
+    "rastra-config"
+]
+
+[workspace.package]
 name = "rastra"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Modern MCBE server software written in Rust"
-
-[dependencies]
-tokio = { version = "1", features = ["full"] }
-
-serde = { version = "1", features = ["derive"] }
-toml = "0.8"
-
-log = "0.4"
-fern = "0.7"
-fern_colored = "0.6"
-chrono = "0.4"
-
-bedrockrs = { git = "https://github.com/bedrock-crustaceans/bedrockrs", branch = "main", features = ["full"] }
-
-nbtx = { git = "https://github.com/bedrock-crustaceans/nbtx" }

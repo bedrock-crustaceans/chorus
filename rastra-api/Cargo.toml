@@ -1,0 +1,5 @@
+[package]
+name = "rastra-api"
+version.workspace = true
+description = "API project of RAstra"
+edition = "2021"

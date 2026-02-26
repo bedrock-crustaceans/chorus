@@ -1,0 +1,11 @@
+[package]
+name = "rastra-config"
+version.workspace = true
+description = "Config project of RAstra"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "1.0"
+
+log = "0.4"
