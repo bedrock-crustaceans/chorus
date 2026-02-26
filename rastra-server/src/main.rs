@@ -2,7 +2,6 @@ use log::debug;
 use rastra_server::server::Server;
 use rastra_server::utils::Logger;
 
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = rastra_config::setup_config();
@@ -11,9 +10,7 @@ async fn main() -> anyhow::Result<()> {
 
     debug!("Tokio runtime initialized");
 
-    let server = Server {
-        config,
-    };
+    let server = Server { config };
 
     server.run().await.expect("Server crashed");
 

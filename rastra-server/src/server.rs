@@ -5,11 +5,11 @@ use log::{debug, info};
 use rastra_config::RAstraConfig;
 
 pub struct Server {
-    pub config: RAstraConfig
+    pub config: RAstraConfig,
 }
 
 impl Server {
-    pub async fn run(&self) -> anyhow::Result<()>{
+    pub async fn run(&self) -> anyhow::Result<()> {
         let config = &self.config;
 
         let ip = &config.ip;
@@ -27,7 +27,7 @@ impl Server {
             format!("{}:{}", ip, port).parse().unwrap(),
             false,
         )
-            .await?;
+        .await?;
 
         listener.start().await?;
 
@@ -42,7 +42,10 @@ impl Server {
         }
 
         async fn handle_conn(conn: Connection) {
-            debug!("Got connection from {:?}", conn.get_socket_addr().to_string());
+            debug!(
+                "Got connection from {:?}",
+                conn.get_socket_addr().to_string()
+            );
         }
     }
 }
