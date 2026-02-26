@@ -1,9 +1,9 @@
 # RAstra
 
-RAstra is modern Minecraft Bedrock Edition server software written in Rust, built on top of [`bedrock-rs`](https://github.com/Adrian8115/bedrock-rs) - a foundational library for MCBE tooling in Rust.
+RAstra is modern Minecraft Bedrock Edition server software written in Rust, built on top of [`bedrock-rs`](https://github.com/bedrock-crustaceans/bedrock-rs) - a foundational library for MCBE tooling in Rust.
 
 > [!NOTE]
-> We are currently working on [`bedrock-rs`](https://github.com/Adrian8115/bedrock-rs).
+> We are currently working on [`bedrock-rs`](https://github.com/bedrock-crustaceans/bedrock-rs).
 > Which will provide the base for RAstra and other software written in Rust related to MCBE.
 
 ## Building
