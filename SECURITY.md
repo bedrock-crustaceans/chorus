@@ -26,11 +26,13 @@ If you discover a security issue, please report it responsibly by following the 
 
 ### How to report
 
-Email:
+To report a security issue, use GitHub’s built‑in **Private Vulnerability Reporting** feature.
 
-📧 **dev@bedrockcrustaceans.org**
+You can access it through **Security > Report a vulnerability**.
 
-Include as much detail as possible:
+This sends your report directly and privately to the maintainers.
+
+**Include as much detail as possible**:
 - Description of the vulnerability
 - Steps to reproduce
 - Affected versions
