@@ -1,5 +1,5 @@
-use bedrockrs::proto::listener::Listener;
-use bedrockrs::proto::v800;
+use bedrockrs::network::listener::Listener;
+use bedrockrs::proto::{ProtoVersion, V944};
 use rastra_config::RAstraConfig;
 use crate::network::handler::login_handler::LoginHandler;
 use std::sync::Arc;
@@ -14,13 +14,14 @@ impl Network {
         let addr = format!("{}:{}", config.ip, config.port).parse()?;
 
         let listener = Listener::new_raknet(
+            addr,
             config.motd.to_string(),
             config.sub_motd.to_string(),
-            v800::info::GAME_VERSION.to_string(),
-            v800::info::PROTOCOL_VERSION,
+            V944::GAME_VERSION.to_string(),
+            V944::PROTOCOL_VERSION,
+            V944::RAKNET_VERSION,
             config.max_players,
             0,
-            addr,
             false,
         )
             .await?;

@@ -15,3 +15,4 @@ chrono = "0.4"
 
 bedrockrs = { git = "https://github.com/bedrock-crustaceans/bedrockrs", branch = "main", features = ["full"] }
 anyhow = "1.0.102"
+uuid = { version = "1.22.0", features = ["v4"] }
