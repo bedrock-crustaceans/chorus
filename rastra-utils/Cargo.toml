@@ -9,4 +9,7 @@ rastra-api = { path = "../rastra-api" }
 
 tokio = { version = "1", features = ["full"] }
 anyhow = "1.0.102"
-log = "0.4.29"
+log = "0.4"
+fern = "0.7"
+fern_colored = { version = "0.6", features = ["colored"] }
+chrono = "0.4"

@@ -11,8 +11,6 @@ rastra-config = { path = "../rastra-config" }
 tokio = { version = "1", features = ["full"] }
 
 log = "0.4"
-fern = "0.7"
-fern_colored = { version = "0.6", features = ["colored"] }
 chrono = "0.4"
 
 bedrockrs = { git = "https://github.com/bedrock-crustaceans/bedrockrs", branch = "main", features = ["full"] }
