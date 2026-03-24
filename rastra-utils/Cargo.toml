@@ -1,0 +1,10 @@
+[package]
+name = "rastra-utils"
+version.workspace = true
+description = "Util classes needed for RAstra"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0.102"
+log = "0.4.29"

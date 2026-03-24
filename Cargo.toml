@@ -3,11 +3,11 @@ resolver = "3"
 members = [
     "rastra-api",
     "rastra-server",
-    "rastra-config"
+    "rastra-config",
+    "rastra-utils"
 ]
 
 [workspace.package]
-name = "rastra"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"

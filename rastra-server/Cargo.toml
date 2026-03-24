@@ -6,6 +6,7 @@ edition = "2021"
 
 [dependencies]
 rastra-api = { path = "../rastra-api" }
+rastra-utils = { path = "../rastra-utils" }
 rastra-config = { path = "../rastra-config" }
 tokio = { version = "1", features = ["full"] }
 
