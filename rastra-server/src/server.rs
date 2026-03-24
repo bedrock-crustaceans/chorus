@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use chrono::Utc;
 use tokio::time::sleep;
+use rastra_api::singleton;
 use rastra_utils::rolling_float_average::RollingFloatAverage;
 
 pub struct Server {
@@ -108,3 +109,5 @@ impl Server {
         Ok(())
     }
 }
+
+singleton!(SERVER_INSTANCE: Server);
