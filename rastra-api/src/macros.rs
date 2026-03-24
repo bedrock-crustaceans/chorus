@@ -18,9 +18,7 @@ macro_rules! singleton {
 
         impl $ty {
             pub fn instance() -> &'static mut $ty {
-                unsafe {
-                    $name.as_mut().expect("Singleton not initialized")
-                }
+                unsafe { $name.as_mut().expect("Singleton not initialized") }
             }
 
             pub fn init(value: $ty) {
