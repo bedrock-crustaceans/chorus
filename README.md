@@ -1,10 +1,13 @@
-# RAstra
+<div align="center" style="display:grid;place-items:center;">
+<p>
+    <a href="https://bedrock-crustaceans.org/" target="_blank"><img width="700" src="https://socialify.git.ci/bedrock-crustaceans/RAstra/image?description=1&font=Inter&forks=1&issues=1%3Fraw%3Dtrue&name=1&owner=1&pattern=Plus&pulls=1&stargazers=1&theme=Auto" alt="The RAstra logo"></a>
+</p>
+</div>
+<div align="center" style="display:grid;place-items:center;">
+
+</div>
 
 RAstra is modern Minecraft Bedrock Edition server software written in Rust, built on top of [`bedrock-rs`](https://github.com/bedrock-crustaceans/bedrock-rs) - a foundational library for MCBE tooling in Rust.
-
-> [!NOTE]
-> We are currently working on [`bedrock-rs`](https://github.com/bedrock-crustaceans/bedrock-rs).
-> Which will provide the base for RAstra and other software written in Rust related to MCBE.
 
 ## Building
 
@@ -15,7 +18,7 @@ RAstra is modern Minecraft Bedrock Edition server software written in Rust, buil
 ### Steps
 
 ```bash
-git clone https://github.com/bedrock-crustaceans/RAstra
+git clone https://github.com/bedrock-crustaceans/RAstra.git
 cd RAstra
 cargo build
 ```

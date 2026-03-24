@@ -1,0 +1,72 @@
+name: Bug report
+description: Create a report to help us improve
+title: [BUG]
+labels: bug
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: What is the problem? A clear and concise description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction Steps
+      description: |
+        Provide a self-contained, concise snippet of code that can be used to reproduce the issue.
+        For more complex issues provide a repo with the smallest sample that reproduces the bug.
+
+        Avoid including business logic or unrelated code, it makes diagnosis more difficult.
+        In short, please provide a code sample that we can copy/paste, run and reproduce.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current Behavior
+      description: |
+        What actually happened?
+
+        Please include full errors, uncaught exceptions, stack traces, and relevant logs.
+        If service/functions responses are relevant, please include wire logs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Possible Solution
+      description: Suggest a fix/reason for the bug
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Information/Context
+      description: |
+        Anything else that might be relevant for troubleshooting this bug.
+        Providing context helps us come up with a solution that is most useful in the real world.
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: RAstra version
+      description: |
+        The RAstra version.
+    validations:
+      required: true

@@ -1,0 +1,27 @@
+name: Stale
+
+on:
+  schedule:
+    - cron: '20 16 * * *'
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@b5d41d4e1d5dceea10e7104786b73624c18a190f # v10.2.0
+        with:
+          stale-pr-message: 'This PR is stale because there have been no updates in 15 days. It will close after 30 days of inactivity. Leave a comment if you want to keep it open.'
+          close-pr-message: 'This PR has been closed because it was inactive for 30 days. If you want to continue working on it, please open a new PR.'
+          days-before-stale: 15
+          days-before-close: 30
+          stale-pr-label: 'Type: Stale'
+          exempt-pr-labels: 'keep'
+          close-issue-reason: not_planned
+          ascending: true
+          operations-per-run: 300

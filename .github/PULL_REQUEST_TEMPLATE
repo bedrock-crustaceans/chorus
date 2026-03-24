@@ -1,0 +1,33 @@
+## Summary
+
+<!-- Provide a concise description of what this PR changes and why. -->
+
+## Related issues
+
+<!-- - Fixes/Closes: #<issue-number> (if applicable) -->
+
+## Type of change
+
+<!-- 
+- Bugfix
+- Feature
+- Refactor
+- Docs
+- CI / tooling
+
+## Checklist
+
+- [ ] My code follows the project style (run `cargo fmt`)
+- [ ] I ran `cargo clippy` and addressed warnings where appropriate
+- [ ] I added tests for new behavior (if applicable)
+- [ ] All CI checks pass
+- [ ] I updated relevant documentation (README, AGENTS.md, etc.)
+
+## Test Plan
+
+Describe how this change was tested locally and any steps reviewers can take to validate.
+
+## Notes for reviewers
+
+Anything the reviewer should focus on, trade-offs, or context.
+-->
