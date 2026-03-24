@@ -5,6 +5,8 @@ description = "Util classes needed for RAstra"
 edition = "2021"
 
 [dependencies]
+rastra-api = { path = "../rastra-api" }
+
 tokio = { version = "1", features = ["full"] }
 anyhow = "1.0.102"
 log = "0.4.29"

@@ -1,2 +1,3 @@
-pub mod logger;
-pub use logger::Logger;
+use rastra_api::modules;
+
+modules!(pub logger);

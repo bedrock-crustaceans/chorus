@@ -1,3 +1,7 @@
-pub mod network;
-pub mod server;
-pub mod utils;
+use rastra_api::modules;
+
+modules!(
+    pub network,
+    pub server,
+    pub utils
+);

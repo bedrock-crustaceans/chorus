@@ -1,15 +1,9 @@
 use bedrockrs::network::connection::Connection;
 use bedrockrs::proto::compression::Compression;
 use bedrockrs::proto::v662::enums::{
-    ChatRestrictionLevel, Difficulty, EditorWorldType, EducationEditionOffer, GamePublishSetting,
-    GameType, GeneratorType, PacketCompressionAlgorithm, PlayStatus, PlayerPermissionLevel,
-    SpawnBiomeType,
+    PacketCompressionAlgorithm, PlayStatus,
 };
 use bedrockrs::proto::v662::packets::{NetworkSettingsPacket, PlayStatusPacket};
-use bedrockrs::proto::v662::types::{
-    ActorRuntimeID, ActorUniqueID, BaseGameVersion, EduSharedUriResource, Experiments,
-    NetworkPermissions, SpawnSettings,
-};
 use bedrockrs::proto::{ProtoVersion, Unknown, V944};
 use log::debug;
 use crate::network::handler::resource_pack_handler::ResourcePackHandler;

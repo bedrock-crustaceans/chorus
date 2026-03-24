@@ -1,6 +1,6 @@
 use log::debug;
 use rastra_server::server::Server;
-use rastra_server::utils::Logger;
+use rastra_server::utils::logger::Logger;
 use std::sync::Arc;
 
 #[tokio::main]

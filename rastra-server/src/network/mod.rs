@@ -1,2 +1,6 @@
-pub mod handler;
-pub mod network;
+use rastra_api::modules;
+
+modules!(
+    pub handler,
+    pub network
+);
