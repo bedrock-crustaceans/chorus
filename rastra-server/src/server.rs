@@ -1,51 +1,33 @@
-use bedrockrs::proto::connection::Connection;
-use bedrockrs::proto::listener::Listener;
-use bedrockrs::proto::v786;
-use log::{debug, info};
+use std::sync::Arc;
+use log::info;
 use rastra_config::RAstraConfig;
+use crate::network::network::Network;
 
 pub struct Server {
-    pub config: RAstraConfig,
+    pub config: Arc<RAstraConfig>,
+    pub network: Option<Network>,
 }
 
 impl Server {
-    pub async fn run(&self) -> anyhow::Result<()> {
-        let config = &self.config;
+    pub fn new(config: RAstraConfig) -> Self {
+        Self {
+            config: Arc::new(config),
+            network: None,
+        }
+    }
 
-        let ip = &config.ip;
-        let port = config.port;
+    pub async fn run(&mut self) -> anyhow::Result<()> {
+        info!("Server starting on {}:{}", self.config.ip, self.config.port);
 
-        info!("Server starting on {}:{}", ip, port);
-
-        let mut listener = Listener::new_raknet(
-            config.motd.to_string(),
-            config.sub_motd.to_string(),
-            "1.21.70".to_string(),
-            v786::info::PROTOCOL_VERSION,
-            config.max_players,
-            0, // TODO
-            format!("{}:{}", ip, port).parse().unwrap(),
-            false,
-        )
-        .await?;
-
-        listener.start().await?;
+        let network = Network::new(self.config.clone()).await?;
+        self.network = Some(network);
 
         info!("Server started successfully!");
 
-        loop {
-            let conn = listener.accept().await?;
-
-            tokio::spawn(async move {
-                handle_conn(conn).await;
-            });
+        if let Some(network) = self.network.as_mut() {
+            network.run().await?;
         }
 
-        async fn handle_conn(conn: Connection) {
-            debug!(
-                "Got connection from {:?}",
-                conn.get_socket_addr().to_string()
-            );
-        }
+        Ok(())
     }
 }
