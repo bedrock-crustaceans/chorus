@@ -1,7 +1,7 @@
+use crate::network::handler::login_handler::LoginHandler;
 use bedrockrs::network::listener::Listener;
 use bedrockrs::proto::{ProtoVersion, V944};
 use rastra_config::RAstraConfig;
-use crate::network::handler::login_handler::LoginHandler;
 use std::sync::Arc;
 
 pub struct Network {
@@ -24,7 +24,7 @@ impl Network {
             0,
             false,
         )
-            .await?;
+        .await?;
 
         Ok(Self { config, listener })
     }

@@ -1,7 +1,7 @@
-use std::sync::Arc;
+use crate::network::network::Network;
 use log::info;
 use rastra_config::RAstraConfig;
-use crate::network::network::Network;
+use std::sync::Arc;
 
 pub struct Server {
     pub config: Arc<RAstraConfig>,
