@@ -1,8 +1,8 @@
 use crate::network::handler::login_handler::LoginHandler;
 use bedrockrs::network::listener::Listener;
-use bedrockrs::proto::{ProtoVersion, V944};
 use rastra_config::RAstraConfig;
 use std::sync::Arc;
+use crate::network::{GAME_VERSION, PROTOCOL_VERSION, RAK_VERSION};
 
 pub struct Network {
     pub config: Arc<RAstraConfig>,
@@ -17,9 +17,9 @@ impl Network {
             addr,
             config.motd.to_string(),
             config.sub_motd.to_string(),
-            V944::GAME_VERSION.to_string(),
-            V944::PROTOCOL_VERSION,
-            V944::RAKNET_VERSION,
+            GAME_VERSION.to_string(),
+            PROTOCOL_VERSION,
+            RAK_VERSION,
             config.max_players,
             0,
             false,

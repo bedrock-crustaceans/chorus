@@ -6,11 +6,12 @@ use bedrockrs::proto::v662::packets::PlayStatusPacket;
 use bedrockrs::proto::v662::types::{ActorRuntimeID, ActorUniqueID, BaseGameVersion, EduSharedUriResource, Experiments, NetworkPermissions, SpawnSettings};
 use bedrockrs::proto::v818::types::SyncedPlayerMovementSettings;
 use bedrockrs::proto::v924::types::{GameRuleLegacyData, LevelSettings};
-use bedrockrs::proto::{ProtoVersion, V944};
+use bedrockrs::proto::V944;
 use bedrockrs::proto::v944::packets::{StartGamePacket, VoxelShapesPacket};
 use bedrockrs::proto::v944::types::NetworkBlockPosition;
 use log::debug;
 use uuid::Uuid;
+use crate::network::GAME_VERSION;
 
 pub struct GameStartHandler;
 
@@ -86,7 +87,7 @@ impl GameStartHandler {
                     persona_disabled: false,
                     custom_skins_disabled: false,
                     emote_chat_muted: false,
-                    base_game_version: BaseGameVersion(V944::GAME_VERSION.to_string()),
+                    base_game_version: BaseGameVersion(GAME_VERSION.to_string()),
                     limited_world_width: 16,
                     limited_world_depth: 16,
                     nether_type: true,
@@ -111,7 +112,7 @@ impl GameStartHandler {
                 block_properties: vec![],
                 multiplayer_correlation_id: String::from("c5d3d2cc-27fd-4221-9de6-d22c4d423d53"),
                 enable_item_stack_net_manager: false,
-                server_version: V944::GAME_VERSION.to_string(),
+                server_version: GAME_VERSION.to_string(),
                 player_property_data: HashMap::new(),
                 server_block_type_registry_checksum: 0,
                 world_template_id: Uuid::nil(),
