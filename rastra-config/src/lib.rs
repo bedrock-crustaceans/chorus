@@ -1,3 +1,5 @@
+pub mod config;
+
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fs;
