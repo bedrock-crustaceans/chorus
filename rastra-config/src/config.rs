@@ -8,6 +8,7 @@ pub enum ConfigType {
     Yaml,
     Properties,
     Json,
+    Toml,
 }
 
 pub struct Config {
@@ -38,6 +39,10 @@ impl Config {
             }
             ConfigType::Json => {
                 serde_json::from_str(&content).unwrap_or(Value::Mapping(Default::default()))
+            }
+            ConfigType::Toml => {
+                let value: toml::Value = toml::from_str(&content).unwrap_or(toml::Value::Table(Default::default()));
+                serde_yaml::to_value(value).unwrap()
             }
         };
 
@@ -105,6 +110,11 @@ impl Config {
             }
             ConfigType::Json => {
                 let content = serde_json::to_string_pretty(&self.data).unwrap();
+                fs::write(&self.path, content).unwrap();
+            }
+            ConfigType::Toml => {
+                let value: toml::Value = serde_yaml::from_value(self.data.clone()).unwrap();
+                let content = toml::to_string_pretty(&value).unwrap();
                 fs::write(&self.path, content).unwrap();
             }
         }
