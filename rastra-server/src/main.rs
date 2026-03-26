@@ -5,10 +5,11 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    debug!("Initialized server library");
     let config = rastra_config::setup_config();
 
     Logger::setup_logger(config.log_to_file, &config.logs_directory);
-    debug!("Tokio runtime initialized");
+    debug!("Initialized config library");
 
     let server = Server::new(config);
 

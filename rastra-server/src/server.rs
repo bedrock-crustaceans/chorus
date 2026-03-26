@@ -1,13 +1,14 @@
 use std::error::Error;
 use crate::network::network::Network;
-use log::{error, info};
+use log::{error, info, warn};
 use rastra_config::RAstraConfig;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use chrono::Utc;
 use tokio::time::sleep;
-use rastra_api::singleton;
+use rastra_api::{singleton, IS_DEVELOPMENT, SERVER_NAME, SERVER_VERSION};
 use rastra_utils::rolling_float_average::RollingFloatAverage;
+use crate::network::GAME_VERSION;
 
 pub struct Server {
     pub config: Arc<RAstraConfig>,
@@ -45,12 +46,23 @@ impl Server {
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
-        info!("Server starting on {}:{}", self.config.ip, self.config.port);
+        let start = Instant::now();
 
+        if IS_DEVELOPMENT {
+            warn!("You are using development build. Be careful, your progress may be lost in future.")
+        }
+
+        info!("Starting {} version {}", SERVER_NAME, SERVER_VERSION);
+
+        info!("This server is running Minecraft: Bedrock Edition v{}", GAME_VERSION);
+
+        info!("Initializing network interface");
         let network = Network::new(self.config.clone()).await?;
         self.network = Some(network);
 
-        info!("Server started successfully!");
+        info!("Server starting on {}:{}", self.config.ip, self.config.port);
+
+        info!("Server started! ({} ms) Type /help for list of available commands.", start.elapsed().as_millis());
 
         if let Some(network) = self.network.as_mut() {
             network.run().await?;

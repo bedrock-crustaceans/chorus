@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::process::exit;
+use rastra_api::SERVER_NAME;
 
 const CONFIG_PATH: &str = "rastra.toml";
 
@@ -30,7 +31,7 @@ impl Default for RAstraConfig {
         Self {
             ip: String::from("127.0.0.1"),
             port: 19132,
-            motd: String::from("RAstra Server"),
+            motd: String::from(SERVER_NAME.to_owned() + " Server"),
             sub_motd: String::from("Powered by bedrock-rs"),
             max_players: 50,
             threads: 4,
