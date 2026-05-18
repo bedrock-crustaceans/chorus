@@ -19,12 +19,10 @@ impl ResourcePacks {
         &self.packs
     }
 
-    /// Look up a pack by its protocol ID (`{uuid}_{version}` or just `{uuid}`).
     pub fn get(&self, id: &str) -> Option<&ResourcePack> {
         if let Some(&idx) = self.by_id.get(id) {
             return Some(&self.packs[idx]);
         }
-        // Fallback: the client may send only the UUID prefix.
         let uuid_part = id.split('_').next().unwrap_or(id);
         self.packs.iter().find(|p| p.uuid.to_string() == uuid_part)
     }
@@ -50,7 +48,7 @@ impl ResourcePacks {
 
             match ResourcePack::from_zip(&path) {
                 Ok(pack) => {
-                    info!("Loaded resource pack '{}' ({})", pack.name, pack.uuid);
+                    debug!("Loaded resource pack '{}' ({})", pack.name, pack.uuid);
                     let idx = res.packs.len();
                     res.by_id.insert(pack.pack_id(), idx);
                     res.packs.push(pack);

@@ -7,7 +7,7 @@ use bedrock::addon::manifest::AddonManifest;
 use bedrock::addon::version::AddonSemanticVersion;
 use uuid::Uuid;
 
-pub const CHUNK_SIZE: u64 = 1024 * 1024; // 1 MiB per chunk
+pub const CHUNK_SIZE: u64 = 1024 * 1024;
 
 #[derive(Clone, Debug)]
 pub struct ResourcePack {
