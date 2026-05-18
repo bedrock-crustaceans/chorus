@@ -45,7 +45,11 @@ impl ResourcePack {
         let mut archive = zip::ZipArchive::new(cursor).map_err(ResourcePackError::Zip)?;
 
         let manifest_str = {
-            let mut file = archive.by_name("manifest.json").map_err(|_| ResourcePackError::MissingManifest)?;
+            let manifest_name = (0..archive.len())
+                .find(|&i| archive.by_index(i).map(|f| f.name().ends_with("manifest.json")).unwrap_or(false))
+                .ok_or(ResourcePackError::MissingManifest)?;
+
+            let mut file = archive.by_index(manifest_name).map_err(ResourcePackError::Zip)?;
             let mut s = String::new();
             file.read_to_string(&mut s).map_err(ResourcePackError::Io)?;
             s

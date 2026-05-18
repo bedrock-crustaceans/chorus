@@ -133,3 +133,7 @@ Cargo.lock
 # End of https://www.toptal.com/developers/gitignore/api/rust,
 
 run
+chorus.toml
+resource_packs
+logs
+behavior_packs
