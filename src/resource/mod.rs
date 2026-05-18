@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bevy_ecs::prelude::*;
-use tracing::{info, warn};
+use tracing::{info, warn, debug};
 
 use crate::config::Config;
 use crate::resource::resource_pack::ResourcePack;
