@@ -35,6 +35,7 @@ p384 = { version = "0.14.0-rc.8", features = ["ecdh", "ecdsa"] }
 bedrock = { git = "https://github.com/bedrock-crustaceans/bedrock-rs", branch = "main", features = ["full", "protocol-unknown", "protocol-v975"] }
 nbtx = { git = "https://github.com/bedrock-crustaceans/nbtx" }
 uuid = { version = "1.16.0", features = ["v4"] }
+zip = "2"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing-appender = "0.2.4"
 tracing = "0.1.44"
