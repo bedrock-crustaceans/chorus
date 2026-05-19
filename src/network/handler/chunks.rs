@@ -36,7 +36,7 @@ pub fn handle_sub_chunk_request(
                 (SubChunkRequestResult::LevelChunkDoesntExist, None)
             } else {
                 match chunk.unwrap().get_sub_chunk(cy as i8) {
-                    None => (SubChunkRequestResult::LevelChunkDoesntExist, None),
+                    None => (SubChunkRequestResult::SuccessAllAir, None),
                     Some(sc) if sc.is_all_air() => (SubChunkRequestResult::SuccessAllAir, None),
                     Some(sc) => (
                         SubChunkRequestResult::Success,

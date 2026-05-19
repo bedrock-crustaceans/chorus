@@ -1,4 +1,5 @@
 use crate::network::BedrockProtocol;
+use crate::network::handler::chunks::handle_sub_chunk_request;
 use crate::network::handler::handshake::handle_handshake;
 use crate::network::handler::login::handle_login;
 use crate::network::handler::play::handle_play;
@@ -29,7 +30,7 @@ impl Plugin for PacketHandlers {
     fn build(&self, app: &mut App) {
         app.add_systems(
             FixedUpdate,
-            (handle_request, handle_login, handle_handshake, handle_resource, (on_enter_setup, handle_setup).chain(), handle_play),
+            (handle_request, handle_login, handle_handshake, handle_resource, (on_enter_setup, handle_setup).chain(), handle_play, handle_sub_chunk_request),
         );
     }
 }
