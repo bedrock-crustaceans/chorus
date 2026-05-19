@@ -1,8 +1,11 @@
 use crate::entity::entity::Entity as PlayerEntity;
+use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
 use crate::network::session::state::SessionState;
+use bedrock::protocol::v662::packets::UpdateBlockPacket;
+use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::Query;
 use tracing::warn;
@@ -28,6 +31,29 @@ pub fn handle_play(mut packet_reader: MessageReader<PacketReceivedMessage>, mut 
             packet => {
                 warn!("unexpected packet received in play state: {:?}", packet);
             }
+        }
+    }
+}
+
+pub fn broadcast_block_updates(
+    mut reader: MessageReader<BlockUpdatedMessage>,
+    mut query: Query<&mut Session>,
+) {
+    for msg in reader.read() {
+        for mut session in &mut query {
+            session.send(BedrockProtocol::UpdateBlockPacket(
+                UpdateBlockPacket {
+                    block_position: NetworkBlockPosition {
+                        x: msg.x,
+                        y: msg.y,
+                        z: msg.z,
+                    },
+                    block_runtime_id: msg.block_id,
+                    flags: 0xB,
+                    layer: msg.layer as u32,
+                }
+                .into(),
+            ));
         }
     }
 }
