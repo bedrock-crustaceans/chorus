@@ -26,6 +26,7 @@ chrono = "0.4"
 strum = "0.28.0"
 strum_macros = "0.28.0"
 rand = "0.10.0"
+varint-rs = "2.2"
 vek = "0.17.1"
 
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto", "p384"] }

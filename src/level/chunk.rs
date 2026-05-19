@@ -1,4 +1,5 @@
-use crate::level::sub_chunk::{SubChunk, write_var_u32};
+use crate::level::sub_chunk::SubChunk;
+use varint_rs::VarintWriter;
 
 pub struct Chunk {
     pub x: i32,
@@ -59,7 +60,7 @@ impl Chunk {
         let mut buf = Vec::new();
         for sc in &self.sub_chunks {
             buf.push(0x01u8);  // V0 single-entry network header
-            write_var_u32(&mut buf, sc.biome);
+            buf.write_u32_varint(sc.biome).unwrap();
         }
         buf.push(0x00);  // border block count
         buf

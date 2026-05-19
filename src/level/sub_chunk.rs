@@ -1,17 +1,7 @@
 use std::collections::HashMap;
+use varint_rs::VarintWriter;
 
 const VALID_BITS: [u8; 8] = [1, 2, 3, 4, 5, 6, 8, 16];
-
-pub(crate) fn write_var_u32(buf: &mut Vec<u8>, mut value: u32) {
-    loop {
-        if value & !0x7F == 0 {
-            buf.push(value as u8);
-            return;
-        }
-        buf.push(((value & 0x7F) | 0x80) as u8);
-        value >>= 7;
-    }
-}
 
 fn sub_chunk_index(x: u8, y: u8, z: u8) -> usize {
     ((x as usize) << 8) | ((z as usize) << 4) | (y as usize)
@@ -38,7 +28,7 @@ fn encode_layer(blocks: &[u32; 4096]) -> Vec<u8> {
 
     if palette.len() == 1 {
         buf.push(0x01u8);
-        write_var_u32(&mut buf, palette[0]);
+        buf.write_u32_varint(palette[0]).unwrap();
         return buf;
     }
 
@@ -62,9 +52,9 @@ fn encode_layer(blocks: &[u32; 4096]) -> Vec<u8> {
         buf.extend_from_slice(&word.to_le_bytes());
     }
 
-    write_var_u32(&mut buf, palette.len() as u32);
+    buf.write_u32_varint(palette.len() as u32).unwrap();
     for &id in &palette {
-        write_var_u32(&mut buf, id);
+        buf.write_u32_varint(id).unwrap();
     }
 
     buf
