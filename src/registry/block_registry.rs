@@ -83,4 +83,8 @@ impl BlockRegistry {
             self.register(def);
         }
     }
+
+    pub fn get_block_id(&self, identifier: &str) -> Option<u32> {
+        self.default_hash.get(identifier).map(|&h| h as u32)
+    }
 }
