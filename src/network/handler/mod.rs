@@ -2,7 +2,7 @@ use crate::network::BedrockProtocol;
 use crate::network::handler::chunks::handle_sub_chunk_request;
 use crate::network::handler::handshake::handle_handshake;
 use crate::network::handler::login::handle_login;
-use crate::network::handler::play::{broadcast_block_updates, handle_play};
+use crate::network::handler::play::{broadcast_block_updates, handle_play, on_enter_play};
 use crate::network::handler::request::handle_request;
 use crate::network::handler::resource::handle_resource;
 use crate::network::handler::setup::{handle_setup, on_enter_setup};
@@ -30,7 +30,7 @@ impl Plugin for PacketHandlers {
     fn build(&self, app: &mut App) {
         app.add_systems(
             FixedUpdate,
-            (handle_request, handle_login, handle_handshake, handle_resource, (on_enter_setup, handle_setup).chain(), handle_play, handle_sub_chunk_request, broadcast_block_updates),
+            (handle_request, handle_login, handle_handshake, handle_resource, (on_enter_setup, handle_setup).chain(), (on_enter_play, handle_play).chain(), handle_sub_chunk_request, broadcast_block_updates),
         );
     }
 }
