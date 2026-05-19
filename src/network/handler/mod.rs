@@ -26,6 +26,9 @@ pub struct PacketHandlers;
 
 impl Plugin for PacketHandlers {
     fn build(&self, app: &mut App) {
-        app.add_systems(FixedUpdate, (handle_request, handle_login, handle_handshake, handle_resource, (on_enter_setup, handle_setup).chain(), handle_play));
+        app.add_systems(
+            FixedUpdate,
+            (handle_request, handle_login, handle_handshake, handle_resource, (on_enter_setup, handle_setup).chain(), handle_play),
+        );
     }
 }

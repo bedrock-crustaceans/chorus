@@ -6,7 +6,6 @@ use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::Player;
 use crate::server::ServerState;
-use std::sync::Arc;
 use bedrock::protocol::v662::enums::{
     ChatRestrictionLevel, Difficulty, EditorWorldType, EducationEditionOffer, GamePublishSetting, GameType, GeneratorType, PlayStatus, PlayerPermissionLevel, SpawnBiomeType,
 };
@@ -20,6 +19,7 @@ use bedrock::protocol::{ProtoVersion, ProtoVersionPackets};
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Commands, Query};
 use bevy_ecs::system::ResMut;
+use std::sync::Arc;
 use tracing::{debug, warn};
 
 pub fn on_enter_setup(mut sessions: Query<&mut Session>, mut server_state: ResMut<ServerState>, mut state_reader: MessageReader<SessionStateChangedMessage>, mut commands: Commands) {
@@ -46,11 +46,7 @@ pub fn on_enter_setup(mut sessions: Query<&mut Session>, mut server_state: ResMu
         send_start_game(&player, &session);
 
         // TODO: Level should come from a shared Bevy Resource once it holds state
-        let entity = PlayerEntity::default(
-            "minecraft:player".to_string(),
-            player.unique_id(),
-            Arc::new(Level {}),
-        );
+        let entity = PlayerEntity::default("minecraft:player".to_string(), player.unique_id(), Arc::new(Level {}));
         commands.entity(ev.entity).insert((player, entity));
 
         session.send_play_status(PlayStatus::PlayerSpawn, false);
