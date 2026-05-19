@@ -3,6 +3,7 @@ use crate::network::BedrockProtocol;
 use crate::network::handler::{PacketHandlers, PacketReceivedMessage};
 use crate::network::login::auth::LoginAuthOIDC;
 use crate::network::session::Session;
+use crate::level::BlockUpdatedMessage;
 use crate::network::session::state::SessionStateChangedMessage;
 use bedrock::network::connection::Connection;
 use bedrock::network::listener::Listener;
@@ -31,7 +32,8 @@ impl Plugin for Network {
             .add_systems(Startup, Network::init)
             .add_systems(FixedUpdate, Network::tick)
             .add_message::<PacketReceivedMessage>()
-            .add_message::<SessionStateChangedMessage>();
+            .add_message::<SessionStateChangedMessage>()
+            .add_message::<BlockUpdatedMessage>();
     }
 }
 
