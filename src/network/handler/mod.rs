@@ -30,7 +30,16 @@ impl Plugin for PacketHandlers {
     fn build(&self, app: &mut App) {
         app.add_systems(
             FixedUpdate,
-            (handle_request, handle_login, handle_handshake, handle_resource, (on_enter_setup, handle_setup).chain(), (on_enter_play, handle_play).chain(), handle_sub_chunk_request, broadcast_block_updates),
+            (
+                handle_request,
+                handle_login,
+                handle_handshake,
+                handle_resource,
+                (on_enter_setup, handle_setup).chain(),
+                (on_enter_play, handle_play).chain(),
+                handle_sub_chunk_request,
+                broadcast_block_updates,
+            ),
         );
     }
 }

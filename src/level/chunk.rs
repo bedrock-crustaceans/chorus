@@ -41,7 +41,10 @@ impl Chunk {
         let sub_y = (y >> 4) as i8;
         let local_y = (y & 0xF) as u8;
         match self.get_sub_chunk_mut(sub_y) {
-            Some(sc) => { sc.set(x, local_y, z, layer, block_id); true }
+            Some(sc) => {
+                sc.set(x, local_y, z, layer, block_id);
+                true
+            }
             None => false,
         }
     }
@@ -59,10 +62,10 @@ impl Chunk {
     pub fn serialize_biomes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
         for sc in &self.sub_chunks {
-            buf.push(0x01u8);  // V0 single-entry network header
+            buf.push(0x01u8); // V0 single-entry network header
             buf.write_u32_varint(sc.biome).unwrap();
         }
-        buf.push(0x00);  // border block count
+        buf.push(0x00); // border block count
         buf
     }
 }

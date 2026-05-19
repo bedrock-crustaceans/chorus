@@ -2,19 +2,13 @@ use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
-use bedrock::protocol::v818::packets::{
-    HeightMapDataType, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult,
-};
+use bedrock::protocol::v818::packets::{HeightMapDataType, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult};
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::Query;
 use bevy_ecs::system::Res;
 use tracing::debug;
 
-pub fn handle_sub_chunk_request(
-    mut reader: MessageReader<PacketReceivedMessage>,
-    mut query: Query<&mut Session>,
-    level: Res<Level>,
-) {
+pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>, mut query: Query<&mut Session>, level: Res<Level>) {
     for ev in reader.read() {
         let BedrockProtocol::SubChunkRequestPacket(packet) = &ev.packet else {
             continue;
@@ -23,10 +17,14 @@ pub fn handle_sub_chunk_request(
             continue;
         };
 
-        debug!("SubChunkRequestPacket: dim={} center=({},{},{}) offsets={}",
+        debug!(
+            "SubChunkRequestPacket: dim={} center=({},{},{}) offsets={}",
             packet.dimension_type,
-            packet.center_pos.x, packet.center_pos.y, packet.center_pos.z,
-            packet.sub_chunk_pos_offsets.len());
+            packet.center_pos.x,
+            packet.center_pos.y,
+            packet.center_pos.z,
+            packet.sub_chunk_pos_offsets.len()
+        );
 
         let mut entries = Vec::with_capacity(packet.sub_chunk_pos_offsets.len());
 
@@ -44,10 +42,7 @@ pub fn handle_sub_chunk_request(
                 match chunk.unwrap().get_sub_chunk(cy as i8) {
                     None => (SubChunkRequestResult::SuccessAllAir, None),
                     Some(sc) if sc.is_all_air() => (SubChunkRequestResult::SuccessAllAir, None),
-                    Some(sc) => (
-                        SubChunkRequestResult::Success,
-                        Some(sc.serialize_network(cy as i8)),
-                    ),
+                    Some(sc) => (SubChunkRequestResult::Success, Some(sc.serialize_network(cy as i8))),
                 }
             };
 

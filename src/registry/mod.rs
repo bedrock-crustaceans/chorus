@@ -10,13 +10,6 @@ pub struct Registry;
 
 impl Plugin for Registry {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Startup,
-            (
-                BlockRegistry::init,
-                ResourcePacks::load,
-                Level::init.after(BlockRegistry::init),
-            ),
-        );
+        app.add_systems(Startup, (BlockRegistry::init, ResourcePacks::load, Level::init.after(BlockRegistry::init)));
     }
 }

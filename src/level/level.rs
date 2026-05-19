@@ -1,6 +1,6 @@
+use crate::level::BlockUpdatedMessage;
 use crate::level::dimension::Dimension;
 use crate::level::generator::flat::{FlatGenerator, FlatLayer};
-use crate::level::BlockUpdatedMessage;
 use crate::registry::block_registry::BlockRegistry;
 use bevy_ecs::message::MessageWriter;
 use bevy_ecs::prelude::{Commands, Resource};
@@ -55,22 +55,20 @@ impl Level {
         self.dimension(dim)?.get_block(x, y, z, layer)
     }
 
-    pub fn set_block(
-        &mut self,
-        dim: i32,
-        x: i32,
-        y: i32,
-        z: i32,
-        layer: usize,
-        block_id: u32,
-        writer: &mut MessageWriter<BlockUpdatedMessage>,
-    ) -> bool {
+    pub fn set_block(&mut self, dim: i32, x: i32, y: i32, z: i32, layer: usize, block_id: u32, writer: &mut MessageWriter<BlockUpdatedMessage>) -> bool {
         let changed = match self.dimension_mut(dim) {
             Some(d) => d.set_block(x, y, z, layer, block_id),
             None => return false,
         };
         if changed {
-            writer.write(BlockUpdatedMessage { dimension_id: dim, x, y, z, layer, block_id });
+            writer.write(BlockUpdatedMessage {
+                dimension_id: dim,
+                x,
+                y,
+                z,
+                layer,
+                block_id,
+            });
         }
         changed
     }

@@ -12,12 +12,7 @@ pub struct Dimension {
 }
 
 impl Dimension {
-    pub fn new(
-        id: i32,
-        min_sub_chunk_y: i8,
-        max_sub_chunk_y: i8,
-        generator: Box<dyn WorldGenerator + Send + Sync>,
-    ) -> Self {
+    pub fn new(id: i32, min_sub_chunk_y: i8, max_sub_chunk_y: i8, generator: Box<dyn WorldGenerator + Send + Sync>) -> Self {
         Self {
             id,
             min_sub_chunk_y,
@@ -33,13 +28,7 @@ impl Dimension {
 
     pub fn get_or_generate_chunk(&mut self, registry: &BlockRegistry, x: i32, z: i32) -> &Chunk {
         if !self.chunks.contains_key(&(x, z)) {
-            let chunk = self.generator.generate(
-                registry,
-                x,
-                z,
-                self.min_sub_chunk_y,
-                self.max_sub_chunk_y,
-            );
+            let chunk = self.generator.generate(registry, x, z, self.min_sub_chunk_y, self.max_sub_chunk_y);
             self.chunks.insert((x, z), chunk);
         }
         self.chunks.get(&(x, z)).unwrap()
@@ -54,9 +43,7 @@ impl Dimension {
     }
 
     pub fn get_block(&self, x: i32, y: i32, z: i32, layer: usize) -> Option<u32> {
-        self.chunks
-            .get(&(x >> 4, z >> 4))
-            .and_then(|c| c.get_block((x & 0xF) as u8, y, (z & 0xF) as u8, layer))
+        self.chunks.get(&(x >> 4, z >> 4)).and_then(|c| c.get_block((x & 0xF) as u8, y, (z & 0xF) as u8, layer))
     }
 
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, layer: usize, block_id: u32) -> bool {

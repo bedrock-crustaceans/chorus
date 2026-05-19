@@ -15,12 +15,7 @@ use bevy_ecs::system::{Res, ResMut};
 use tracing::{debug, warn};
 use vek::{Vec2, Vec3};
 
-pub fn on_enter_play(
-    mut sessions: Query<&mut Session>,
-    mut state_reader: MessageReader<SessionStateChangedMessage>,
-    mut level: ResMut<Level>,
-    registry: Res<BlockRegistry>,
-) {
+pub fn on_enter_play(mut sessions: Query<&mut Session>, mut state_reader: MessageReader<SessionStateChangedMessage>, mut level: ResMut<Level>, registry: Res<BlockRegistry>) {
     for ev in state_reader.read() {
         if ev.to != SessionState::Play {
             continue;
@@ -90,19 +85,12 @@ pub fn handle_play(mut packet_reader: MessageReader<PacketReceivedMessage>, mut 
     }
 }
 
-pub fn broadcast_block_updates(
-    mut reader: MessageReader<BlockUpdatedMessage>,
-    mut query: Query<&mut Session>,
-) {
+pub fn broadcast_block_updates(mut reader: MessageReader<BlockUpdatedMessage>, mut query: Query<&mut Session>) {
     for msg in reader.read() {
         for mut session in &mut query {
             session.send(BedrockProtocol::UpdateBlockPacket(
                 UpdateBlockPacket {
-                    block_position: NetworkBlockPosition {
-                        x: msg.x,
-                        y: msg.y,
-                        z: msg.z,
-                    },
+                    block_position: NetworkBlockPosition { x: msg.x, y: msg.y, z: msg.z },
                     block_runtime_id: msg.block_id,
                     flags: 0xB,
                     layer: msg.layer as u32,

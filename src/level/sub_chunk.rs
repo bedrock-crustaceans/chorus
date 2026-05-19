@@ -32,11 +32,7 @@ fn encode_layer(blocks: &[u32; 4096]) -> Vec<u8> {
         return buf;
     }
 
-    let bits = VALID_BITS
-        .iter()
-        .copied()
-        .find(|&b| (1usize << b) >= palette.len())
-        .unwrap_or(16);
+    let bits = VALID_BITS.iter().copied().find(|&b| (1usize << b) >= palette.len()).unwrap_or(16);
 
     buf.push((bits << 1) | 1);
 
@@ -87,14 +83,13 @@ impl SubChunk {
     }
 
     pub fn is_all_air(&self) -> bool {
-        self.blocks[0].iter().all(|&b| b == self.air_id)
-            && self.blocks[1].iter().all(|&b| b == self.air_id)
+        self.blocks[0].iter().all(|&b| b == self.air_id) && self.blocks[1].iter().all(|&b| b == self.air_id)
     }
 
     pub fn serialize_network(&self, sub_chunk_y: i8) -> Vec<u8> {
         let mut buf = Vec::new();
-        buf.push(9u8);  // version = Limitless
-        buf.push(2u8);  // layer count
+        buf.push(9u8); // version = Limitless
+        buf.push(2u8); // layer count
         buf.push(sub_chunk_y as u8);
         buf.extend(encode_layer(&self.blocks[0]));
         buf.extend(encode_layer(&self.blocks[1]));
