@@ -88,15 +88,18 @@ impl SubChunk {
     }
 
     pub fn get(&self, x: u8, y: u8, z: u8, layer: usize) -> u32 {
+        debug_assert!(x < 16 && y < 16 && z < 16 && layer < 2);
         self.blocks[layer][sub_chunk_index(x, y, z)]
     }
 
     pub fn set(&mut self, x: u8, y: u8, z: u8, layer: usize, block_id: u32) {
+        debug_assert!(x < 16 && y < 16 && z < 16 && layer < 2);
         self.blocks[layer][sub_chunk_index(x, y, z)] = block_id;
     }
 
     pub fn is_all_air(&self) -> bool {
         self.blocks[0].iter().all(|&b| b == self.air_id)
+            && self.blocks[1].iter().all(|&b| b == self.air_id)
     }
 
     pub fn serialize_network(&self, sub_chunk_y: i8) -> Vec<u8> {
