@@ -1,6 +1,7 @@
 use crate::network::BedrockProtocol;
 use crate::network::handler::handshake::handle_handshake;
 use crate::network::handler::login::handle_login;
+use crate::network::handler::play::handle_play;
 use crate::network::handler::request::handle_request;
 use crate::network::handler::resource::handle_resource;
 use crate::network::handler::setup::{handle_setup, on_enter_setup};
@@ -10,6 +11,7 @@ use bevy_ecs::schedule::IntoScheduleConfigs;
 
 pub mod handshake;
 pub mod login;
+pub mod play;
 pub mod request;
 pub mod resource;
 pub mod setup;
@@ -24,6 +26,9 @@ pub struct PacketHandlers;
 
 impl Plugin for PacketHandlers {
     fn build(&self, app: &mut App) {
-        app.add_systems(FixedUpdate, (handle_request, handle_login, handle_handshake, handle_resource, (on_enter_setup, handle_setup).chain()));
+        app.add_systems(
+            FixedUpdate,
+            (handle_request, handle_login, handle_handshake, handle_resource, (on_enter_setup, handle_setup).chain(), handle_play),
+        );
     }
 }
