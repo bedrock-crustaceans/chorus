@@ -21,7 +21,6 @@ use bedrock::protocol::{ProtoVersion, ProtoVersionPackets};
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Commands, Query};
 use bevy_ecs::system::ResMut;
-use std::sync::Arc;
 use tracing::{debug, warn};
 
 pub fn on_enter_setup(mut sessions: Query<&mut Session>, mut server_state: ResMut<ServerState>, mut state_reader: MessageReader<SessionStateChangedMessage>, mut commands: Commands) {
