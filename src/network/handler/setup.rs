@@ -9,7 +9,9 @@ use crate::server::ServerState;
 use bedrock::protocol::v662::enums::{
     ChatRestrictionLevel, Difficulty, EditorWorldType, EducationEditionOffer, GamePublishSetting, GameType, GeneratorType, PlayStatus, PlayerPermissionLevel, SpawnBiomeType,
 };
-use bedrock::protocol::v662::packets::{LevelChunkPacket, NetworkChunkPublisherUpdatePacket};
+use bedrock::protocol::v662::packets::{ChunkRadiusUpdatedPacket, LevelChunkPacket, NetworkChunkPublisherUpdatePacket};
+use crate::level::level::Level;
+use crate::registry::block_registry::BlockRegistry;
 use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID, BaseGameVersion, BlockPos, ChunkPos, EduSharedUriResource, Experiments, NetworkPermissions, SpawnSettings};
 use bedrock::protocol::v818::types::SyncedPlayerMovementSettings;
 use bedrock::protocol::v924::types::{GameRuleLegacyData, LevelSettings};
@@ -18,7 +20,7 @@ use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bedrock::protocol::{ProtoVersion, ProtoVersionPackets};
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Commands, Query};
-use bevy_ecs::system::ResMut;
+use bevy_ecs::system::{Res, ResMut};
 use tracing::{debug, warn};
 
 pub fn on_enter_setup(mut sessions: Query<&mut Session>, mut server_state: ResMut<ServerState>, mut state_reader: MessageReader<SessionStateChangedMessage>, mut commands: Commands) {
@@ -137,7 +139,7 @@ fn send_start_game(player: &Player, session: &Session) {
             server_block_type_registry_checksum: 0,
             world_template_id: Default::default(),
             server_enabled_client_side_generation: false,
-            block_network_ids_are_hashes: false,
+            block_network_ids_are_hashes: true,
             network_permissions: NetworkPermissions { server_auth_sound_enabled: false },
             server_join_information: None,
             server_id: "".to_string(),
@@ -149,28 +151,39 @@ fn send_start_game(player: &Player, session: &Session) {
     ))
 }
 
-pub fn handle_setup(mut packet_reader: MessageReader<PacketReceivedMessage>, mut state_writer: MessageWriter<SessionStateChangedMessage>, mut query: Query<(&Player, &mut Session)>) {
+pub fn handle_setup(
+    mut packet_reader: MessageReader<PacketReceivedMessage>,
+    mut state_writer: MessageWriter<SessionStateChangedMessage>,
+    mut query: Query<(&Player, &mut Session)>,
+    mut level: ResMut<Level>,
+    block_registry: Res<BlockRegistry>,
+) {
     for ev in packet_reader.read() {
-        let Ok(mut query) = query.get_mut(ev.entity) else {
-            continue;
-        };
-
-        if query.1.get_state() != SessionState::Setup {
-            continue;
-        }
-
+        let Ok(mut query) = query.get_mut(ev.entity) else { continue; };
+        if query.1.get_state() != SessionState::Setup { continue; }
         match &ev.packet {
-            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(packet, &mut query.1),
-            BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => handle_set_local_player_as_initialized(packet, query.0, &mut query.1, &mut state_writer),
-            packet => {
-                warn!("unexpected packet received in setup state: {:?}", packet)
+            BedrockProtocol::RequestChunkRadiusPacket(packet) => {
+                handle_request_chunk_radius(packet, &mut query.1, &mut level, &block_registry)
             }
+            BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => {
+                handle_set_local_player_as_initialized(packet, query.0, &mut query.1, &mut state_writer)
+            }
+            packet => warn!("unexpected packet received in setup state: {:?}", packet),
         }
     }
 }
 
-fn handle_request_chunk_radius(packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, session: &mut Session) {
+fn handle_request_chunk_radius(
+    packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket,
+    session: &mut Session,
+    level: &mut Level,
+    registry: &BlockRegistry,
+) {
     let radius = packet.chunk_radius;
+
+    session.send(BedrockProtocol::ChunkRadiusUpdatedPacket(
+        ChunkRadiusUpdatedPacket { chunk_radius: radius }.into(),
+    ));
 
     session.send(BedrockProtocol::NetworkChunkPublisherUpdatePacket(
         NetworkChunkPublisherUpdatePacket {
@@ -181,23 +194,30 @@ fn handle_request_chunk_radius(packet: &<BedrockProtocol as ProtoVersionPackets>
         .into(),
     ));
 
-    for x in -radius..radius {
-        for z in -radius..radius {
+    let min_y = level.overworld().min_sub_chunk_y;
+
+    for cx in -radius..radius {
+        for cz in -radius..radius {
+            let chunk = level.overworld_mut().get_or_generate_chunk(registry, cx, cz);
+            let limit = (chunk.highest_non_air_sub_chunk_y() - min_y) as u16;
+            let biome_data = chunk.serialize_biomes();
+
             session.send(BedrockProtocol::LevelChunkPacket(
                 LevelChunkPacket {
-                    chunk_position: ChunkPos { x, z },
+                    chunk_position: ChunkPos { x: cx, z: cz },
                     dimension_id: 0,
-                    sub_chunk_count: 0,
-                    sub_chunk_limit: 0,
+                    sub_chunk_count: u32::MAX - 1,
+                    sub_chunk_limit: limit,
                     cache_enabled: false,
                     cache_blobs: vec![],
-                    serialized_chunk_data: vec![],
+                    serialized_chunk_data: biome_data,
                 }
                 .into(),
-            ))
+            ));
         }
     }
-    debug!("received {:?}", packet);
+
+    debug!("sent {} chunks for radius {}", (radius * 2).pow(2), radius);
 }
 
 fn handle_set_local_player_as_initialized(
