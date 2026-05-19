@@ -1,13 +1,9 @@
-use crate::level::level::Level;
 use bevy_ecs::prelude::Component;
 use std::collections::HashMap;
-use std::sync::Arc;
 use vek::{Vec2, Vec3};
 
 #[derive(Component)]
 pub struct Entity {
-    pub level: Arc<Level>,
-
     pub position: Vec3<f32>,
     pub rotation: Vec2<f32>,
     pub velocity: Vec3<f32>,
@@ -63,12 +59,11 @@ pub struct Entity {
 }
 
 impl Entity {
-    pub fn default(identifier: String, unique_id: i64, level: Arc<Level>) -> Self {
+    pub fn default(identifier: String, unique_id: i64) -> Self {
         Self {
             position: Vec3::zero(),
             rotation: Vec2::zero(),
             velocity: Vec3::zero(),
-            level,
             chested: false,
             color: 0,
             color2: 0,

@@ -3,16 +3,14 @@ use crate::entity::components::breedable::Breedable;
 use crate::entity::entity::Entity;
 use crate::entity::entity_id;
 use crate::entity::entity_mob::EntityMob;
-use crate::level::level::Level;
 use bevy_ecs::prelude::Component;
-use std::sync::Arc;
 
 #[derive(Component)]
 pub struct Pig;
 
 impl Pig {
-    pub fn new(level: Arc<Level>) -> (Entity, EntityMob, Pig, Ageable, Breedable) {
-        let entity = Entity::default(entity_id::PIG.to_string(), rand::random::<i64>(), level);
+    pub fn new() -> (Entity, EntityMob, Pig, Ageable, Breedable) {
+        let entity = Entity::default(entity_id::PIG.to_string(), rand::random::<i64>());
         let entity_mob = EntityMob::default();
         let pig = Pig {};
         let ageable = Ageable::default();

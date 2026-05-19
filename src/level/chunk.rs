@@ -1,149 +1,71 @@
-// use crate::block::block_permutation::BlockPermutation;
-// use crate::block::r#impl::air::Air;
-// use crate::level::chunk_state::ChunkState;
-// use crate::level::sub_chunk::SubChunk;
-// use bevy_ecs::prelude::Entity;
-// use std::collections::HashMap;
-// use std::sync::atomic::AtomicI64;
-//
-// pub struct Chunk {
-//     x: i32,
-//     z: i32,
-//     index: i64,
-//     state: ChunkState,
-//     sub_chunks: Vec<SubChunk>,
-//     height_map: [i16; 16 * 16],
-//
-//     changes: AtomicI64,
-//
-//     entities: HashMap<i64, Entity>,
-//     block_entities: HashMap<i64, Entity>,
-//
-//     min_height: i32,
-//     max_height: i32,
-// }
-//
-// impl Chunk {
-//     pub fn new(x: i32, z: i32, index: i64, state: ChunkState, sub_chunks: Vec<SubChunk>) -> Self {
-//         Self {
-//             x,
-//             z,
-//             index,
-//             state,
-//             sub_chunks,
-//             height_map: [0; 16 * 16],
-//             changes: AtomicI64::new(0),
-//             entities: HashMap::new(),
-//             block_entities: HashMap::new(),
-//
-//             min_height: -64,
-//             max_height: 319,
-//         }
-//     }
-//
-//     pub fn is_sub_chunk_empty(&self, y: usize) -> bool {
-//         if let Some(sub) = self.sub_chunks.get(y) {
-//             sub.is_empty()
-//         } else {
-//             false
-//         }
-//     }
-//
-//     pub fn get_sub_chunk(&self, chunk_y: i32) -> Option<&SubChunk> {
-//         self.sub_chunks.get(chunk_y as usize)
-//     }
-//
-//     pub fn get_mut_sub_chunk(&mut self, chunk_y: i32) -> Option<&mut SubChunk> {
-//         self.sub_chunks.get_mut(chunk_y as usize)
-//     }
-//
-//     pub fn set_sub_chunk(&mut self, chunk_y: i32, sub: SubChunk) {
-//         self.sub_chunks[chunk_y as usize] = sub;
-//     }
-//
-//     pub fn get_block_permutation(
-//         &self,
-//         x: i32,
-//         y: i32,
-//         z: i32,
-//         layer: Option<usize>,
-//     ) -> BlockPermutation {
-//         if let Some(sub_chunk) = self.get_sub_chunk(y << 4) {
-//             sub_chunk.get_block_permutation(x, y, z, layer).clone()
-//         } else {
-//             Air::TYPE.get_default_permutation().clone()
-//         }
-//     }
-//
-//     pub fn set_block_permutation(
-//         &mut self,
-//         x: i32,
-//         y: i32,
-//         z: i32,
-//         layer: Option<usize>,
-//         permutation: BlockPermutation,
-//     ) {
-//         if let Some(sub_chunk) = self.get_mut_sub_chunk(y << 4) {
-//             sub_chunk.set_block_permutation(x, y, z, layer, permutation);
-//         }
-//     }
-//
-//     pub fn get_sky_light(&self, x: i32, y: i32, z: i32) -> u8 {
-//         if let Some(sub_chunk) = self.get_sub_chunk(y << 4) {
-//             sub_chunk.get_sky_light(x, y, z)
-//         } else {
-//             0
-//         }
-//     }
-//
-//     pub fn set_sky_light(&mut self, x: i32, y: i32, z: i32, light: u8) {
-//         if let Some(sub_chunk) = self.get_mut_sub_chunk(y << 4) {
-//             sub_chunk.set_sky_light(x, y, z, light);
-//         }
-//     }
-//
-//     pub fn get_block_light(&self, x: i32, y: i32, z: i32) -> u8 {
-//         if let Some(sub_chunk) = self.get_sub_chunk(y << 4) {
-//             sub_chunk.get_block_light(x, y, z)
-//         } else {
-//             0
-//         }
-//     }
-//
-//     pub fn set_block_light(&mut self, x: i32, y: i32, z: i32, light: u8) {
-//         if let Some(sub_chunk) = self.get_mut_sub_chunk(y << 4) {
-//             sub_chunk.set_block_light(x, y, z, light);
-//         }
-//     }
-//
-//     pub fn get_height(&self, x: usize, z: usize) -> &i16 {
-//         &self.height_map[(z << 4) | x]
-//     }
-//
-//     pub fn set_height(&mut self, x: usize, z: usize, height: i16) {
-//         self.height_map[(z << 4) | x] = height
-//     }
-//
-//     pub fn recompute_height_map(&mut self) {
-//         for z in 0..16 {
-//             for x in 0..16 {
-//                 self.recompute_height(x, z)
-//             }
-//         }
-//         todo!()
-//     }
-//
-//     pub fn recompute_height(&mut self, x: i32, z: i32) {
-//         todo!()
-//     }
-//
-//     pub fn get_highest_at(&self, x: i32, z: i32) -> i32 {
-//         let air_state = Air::TYPE.get_default_permutation().clone();
-//         for y in (self.min_height..=self.max_height).rev() {
-//             if self.get_block_permutation(x, y, z, None) != air_state {
-//                 return y;
-//             }
-//         }
-//         self.min_height
-//     }
-// }
+use crate::level::sub_chunk::SubChunk;
+use varint_rs::VarintWriter;
+
+pub struct Chunk {
+    pub x: i32,
+    pub z: i32,
+    sub_chunks: Vec<SubChunk>,
+    min_sub_chunk_y: i8,
+}
+
+impl Chunk {
+    pub fn new(x: i32, z: i32, min_sub_chunk_y: i8, count: usize, air_id: u32, biome: u32) -> Self {
+        Self {
+            x,
+            z,
+            sub_chunks: (0..count).map(|_| SubChunk::new(air_id, biome)).collect(),
+            min_sub_chunk_y,
+        }
+    }
+
+    fn sub_chunk_offset(&self, sub_y: i8) -> usize {
+        sub_y.wrapping_sub(self.min_sub_chunk_y) as usize
+    }
+
+    pub fn get_sub_chunk(&self, sub_y: i8) -> Option<&SubChunk> {
+        self.sub_chunks.get(self.sub_chunk_offset(sub_y))
+    }
+
+    pub fn get_sub_chunk_mut(&mut self, sub_y: i8) -> Option<&mut SubChunk> {
+        let offset = self.sub_chunk_offset(sub_y);
+        self.sub_chunks.get_mut(offset)
+    }
+
+    pub fn get_block(&self, x: u8, y: i32, z: u8, layer: usize) -> Option<u32> {
+        let sub_y = (y >> 4) as i8;
+        let local_y = (y & 0xF) as u8;
+        Some(self.get_sub_chunk(sub_y)?.get(x, local_y, z, layer))
+    }
+
+    pub fn set_block(&mut self, x: u8, y: i32, z: u8, layer: usize, block_id: u32) -> bool {
+        let sub_y = (y >> 4) as i8;
+        let local_y = (y & 0xF) as u8;
+        match self.get_sub_chunk_mut(sub_y) {
+            Some(sc) => {
+                sc.set(x, local_y, z, layer, block_id);
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn highest_non_air_sub_chunk_y(&self) -> i8 {
+        for i in (0..self.sub_chunks.len()).rev() {
+            if !self.sub_chunks[i].is_all_air() {
+                return self.min_sub_chunk_y.wrapping_add(i as i8);
+            }
+        }
+        self.min_sub_chunk_y
+    }
+
+    /// Serializes biome data for LevelChunkPacket.serialized_chunk_data.
+    pub fn serialize_biomes(&self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        for sc in &self.sub_chunks {
+            buf.push(0x01u8); // V0 single-entry network header
+            buf.write_u32_varint(sc.biome).unwrap();
+        }
+        buf.push(0x00); // border block count
+        buf
+    }
+}
