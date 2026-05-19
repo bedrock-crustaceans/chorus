@@ -9,10 +9,10 @@ We appreciate the efforts of security researchers and community members who resp
 
 Only the latest stable release of **Chorus** is actively supported with security updates.
 
-| Version | Supported |
-|--------|-----------|
-| Latest | ✅ Yes    |
-| Older versions | ❌ No |
+| Version        | Supported |
+|----------------|-----------|
+| Latest         | Yes       |
+| Older versions | No        |
 
 Please ensure you are running the most recent version before reporting an issue.
 
