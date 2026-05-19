@@ -9,6 +9,7 @@ use bevy_app::{App, FixedUpdate, Plugin};
 use bevy_ecs::prelude::{Entity, Message};
 use bevy_ecs::schedule::IntoScheduleConfigs;
 
+pub mod chunks;
 pub mod handshake;
 pub mod login;
 pub mod play;
