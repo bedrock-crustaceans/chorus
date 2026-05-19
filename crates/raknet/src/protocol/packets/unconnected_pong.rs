@@ -17,14 +17,14 @@ impl UnconnectedPong {
     }
 }
 
-impl RakCodec<UnconnectedPong> for UnconnectedPong {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
+impl RakCodec for UnconnectedPong {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_u8(UNCONNECTED_PONG)?;
-        writer.write_u64::<BigEndian>(value.timestamp)?;
-        writer.write_u64::<BigEndian>(value.guid)?;
+        writer.write_u64::<BigEndian>(self.timestamp)?;
+        writer.write_u64::<BigEndian>(self.guid)?;
         writer.write_all(&MAGIC)?;
-        writer.write_u16::<BigEndian>(value.message.len() as u16)?;
-        writer.write_all(&value.message)?;
+        writer.write_u16::<BigEndian>(self.message.len() as u16)?;
+        writer.write_all(&self.message)?;
 
         Ok(())
     }
@@ -51,7 +51,7 @@ impl RakCodec<UnconnectedPong> for UnconnectedPong {
         Ok(Self { timestamp, guid, message })
     }
 
-    fn size_hint(value: &Self) -> usize {
-        size_of::<u8>() + size_of::<u64>() + size_of::<u64>() + MAGIC.len() + size_of::<u16>() + value.message.len()
+    fn size_hint(&self) -> usize {
+        size_of::<u8>() + size_of::<u64>() + size_of::<u64>() + MAGIC.len() + size_of::<u16>() + self.message.len()
     }
 }

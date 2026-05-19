@@ -36,11 +36,11 @@ impl Ack {
     }
 }
 
-impl RakCodec<Ack> for Ack {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
-        writer.write_u8(VALID | if value.is_nack { NACK } else { ACK })?;
+impl RakCodec for Ack {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        writer.write_u8(VALID | if self.is_nack { NACK } else { ACK })?;
 
-        let (&first, rest) = match value.sequences.split_first() {
+        let (&first, rest) = match self.sequences.split_first() {
             Some(pair) => pair,
             None => {
                 writer.write_u16::<BigEndian>(0)?;
@@ -49,7 +49,7 @@ impl RakCodec<Ack> for Ack {
         };
 
         // in worst case each sequence is written as a 4 byte single-value range
-        let mut buf: Vec<u8> = Vec::with_capacity(value.sequences.len() * 4);
+        let mut buf: Vec<u8> = Vec::with_capacity(self.sequences.len() * 4);
         let mut count: u16 = 0;
 
         let mut start: u32 = first;
@@ -100,10 +100,10 @@ impl RakCodec<Ack> for Ack {
         Ok(Self { is_nack, sequences })
     }
 
-    fn size_hint(value: &Self) -> usize {
+    fn size_hint(&self) -> usize {
         let mut size = size_of::<u8>() + size_of::<u16>();
 
-        let (&first, rest) = match value.sequences.split_first() {
+        let (&first, rest) = match self.sequences.split_first() {
             Some(pair) => pair,
             None => {
                 return size;

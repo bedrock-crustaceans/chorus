@@ -12,15 +12,15 @@ pub struct NewIncomingConnection {
     pub server_timestamp: u64,
 }
 
-impl RakCodec<NewIncomingConnection> for NewIncomingConnection {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
+impl RakCodec for NewIncomingConnection {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_u8(NEW_INCOMING_CONNECTION)?;
-        SocketAddr::serialize(&value.server_address, writer)?;
-        for addr in &value.internal_addresses {
+        SocketAddr::serialize(&self.server_address, writer)?;
+        for addr in &self.internal_addresses {
             SocketAddr::serialize(addr, writer)?;
         }
-        writer.write_u64::<BigEndian>(value.incoming_timestamp)?;
-        writer.write_u64::<BigEndian>(value.server_timestamp)?;
+        writer.write_u64::<BigEndian>(self.incoming_timestamp)?;
+        writer.write_u64::<BigEndian>(self.server_timestamp)?;
 
         Ok(())
     }
@@ -53,7 +53,7 @@ impl RakCodec<NewIncomingConnection> for NewIncomingConnection {
         })
     }
 
-    fn size_hint(value: &Self) -> usize {
-        size_of::<u8>() + SocketAddr::size_hint(&value.server_address) + value.internal_addresses.iter().fold(0, |acc, addr| acc + SocketAddr::size_hint(&addr)) + size_of::<u64>() + size_of::<u64>()
+    fn size_hint(&self) -> usize {
+        size_of::<u8>() + SocketAddr::size_hint(&self.server_address) + self.internal_addresses.iter().fold(0, |acc, addr| acc + SocketAddr::size_hint(&addr)) + size_of::<u64>() + size_of::<u64>()
     }
 }

@@ -11,19 +11,19 @@ pub struct OpenConnectionReply1 {
     pub mtu: u16,
 }
 
-impl RakCodec<OpenConnectionReply1> for OpenConnectionReply1 {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
+impl RakCodec for OpenConnectionReply1 {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_u8(OPEN_CONNECTION_REPLY_1)?;
         writer.write_all(&MAGIC)?;
-        writer.write_u64::<BigEndian>(value.guid)?;
-        match value.cookie {
+        writer.write_u64::<BigEndian>(self.guid)?;
+        match self.cookie {
             Some(cookie) => {
                 writer.write_u8(1)?;
                 writer.write_i32::<BigEndian>(cookie)?;
             }
             None => writer.write_u8(0)?,
         }
-        writer.write_u16::<BigEndian>(value.mtu)?;
+        writer.write_u16::<BigEndian>(self.mtu)?;
 
         Ok(())
     }
@@ -48,7 +48,7 @@ impl RakCodec<OpenConnectionReply1> for OpenConnectionReply1 {
         Ok(Self { guid, cookie, mtu })
     }
 
-    fn size_hint(value: &Self) -> usize {
-        size_of::<u8>() + MAGIC.len() + size_of::<u64>() + size_of::<u8>() + if matches!(&value.cookie, Some(_)) { size_of::<i32>() } else { 0 } + size_of::<u16>()
+    fn size_hint(&self) -> usize {
+        size_of::<u8>() + MAGIC.len() + size_of::<u64>() + size_of::<u8>() + if matches!(&self.cookie, Some(_)) { size_of::<i32>() } else { 0 } + size_of::<u16>()
     }
 }

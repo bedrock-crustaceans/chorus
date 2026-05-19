@@ -9,11 +9,11 @@ pub struct ConnectedPong {
     pub timestamp: u64,
 }
 
-impl RakCodec<ConnectedPong> for ConnectedPong {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
+impl RakCodec for ConnectedPong {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_u8(CONNECTED_PONG)?;
-        writer.write_u64::<BigEndian>(value.ping_timestamp)?;
-        writer.write_u64::<BigEndian>(value.timestamp)?;
+        writer.write_u64::<BigEndian>(self.ping_timestamp)?;
+        writer.write_u64::<BigEndian>(self.timestamp)?;
 
         Ok(())
     }
@@ -30,7 +30,7 @@ impl RakCodec<ConnectedPong> for ConnectedPong {
         Ok(Self { ping_timestamp, timestamp })
     }
 
-    fn size_hint(_: &Self) -> usize {
+    fn size_hint(&self) -> usize {
         size_of::<u8>() + size_of::<u64>() + size_of::<u64>()
     }
 }

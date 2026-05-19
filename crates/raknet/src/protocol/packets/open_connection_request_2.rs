@@ -13,20 +13,20 @@ pub struct OpenConnectionRequest2 {
     pub client: u64,
 }
 
-impl RakCodec<OpenConnectionRequest2> for OpenConnectionRequest2 {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
+impl RakCodec for OpenConnectionRequest2 {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_u8(OPEN_CONNECTION_REQUEST_2)?;
         writer.write_all(&MAGIC)?;
-        match value.cookie {
+        match self.cookie {
             Some(cookie) => {
                 writer.write_i32::<BigEndian>(cookie)?;
                 writer.write_u8(0)?; // no security challenge
             }
             None => (),
         }
-        SocketAddr::serialize(&value.addr, writer)?;
-        writer.write_u16::<BigEndian>(value.mtu)?;
-        writer.write_u64::<BigEndian>(value.client)?;
+        SocketAddr::serialize(&self.addr, writer)?;
+        writer.write_u16::<BigEndian>(self.mtu)?;
+        writer.write_u64::<BigEndian>(self.client)?;
 
         Ok(())
     }
@@ -81,14 +81,14 @@ impl RakCodec<OpenConnectionRequest2> for OpenConnectionRequest2 {
         Ok(Self { cookie, addr: address, mtu, client })
     }
 
-    fn size_hint(value: &Self) -> usize {
+    fn size_hint(&self) -> usize {
         size_of::<u8>()
             + MAGIC.len()
-            + match value.cookie {
+            + match self.cookie {
                 Some(_) => size_of::<i32>() + size_of::<u8>(),
                 None => 0,
             }
-            + SocketAddr::size_hint(&value.addr)
+            + SocketAddr::size_hint(&self.addr)
             + size_of::<u16>()
             + size_of::<u64>()
     }

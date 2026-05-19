@@ -3,9 +3,9 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Error, ErrorKind, Read, Write};
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
-impl RakCodec<SocketAddr> for SocketAddr {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
-        match value {
+impl RakCodec for SocketAddr {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        match self {
             SocketAddr::V4(addr) => {
                 writer.write_u8(4)?;
                 writer.write_all(&addr.ip().octets())?;
@@ -49,9 +49,9 @@ impl RakCodec<SocketAddr> for SocketAddr {
         }
     }
 
-    fn size_hint(value: &Self) -> usize {
+    fn size_hint(&self) -> usize {
         size_of::<u8>()
-            + match value {
+            + match self {
                 SocketAddr::V4(..) => 4 + size_of::<u16>(),
                 SocketAddr::V6(..) => size_of::<u16>() + size_of::<u16>() + size_of::<u32>() + 16 + size_of::<u32>(),
             }

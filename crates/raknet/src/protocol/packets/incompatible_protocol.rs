@@ -10,12 +10,12 @@ pub struct IncompatibleProtocol {
     pub guid: u64,
 }
 
-impl RakCodec<IncompatibleProtocol> for IncompatibleProtocol {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
+impl RakCodec for IncompatibleProtocol {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_u8(INCOMPATIBLE_PROTOCOL)?;
-        writer.write_u8(value.protocol)?;
+        writer.write_u8(self.protocol)?;
         writer.write_all(&MAGIC)?;
-        writer.write_u64::<BigEndian>(value.guid)?;
+        writer.write_u64::<BigEndian>(self.guid)?;
 
         Ok(())
     }
@@ -40,7 +40,7 @@ impl RakCodec<IncompatibleProtocol> for IncompatibleProtocol {
         Ok(Self { protocol, guid })
     }
 
-    fn size_hint(_: &Self) -> usize {
+    fn size_hint(&self) -> usize {
         size_of::<u8>() + size_of::<u8>() + MAGIC.len() + size_of::<u64>()
     }
 }

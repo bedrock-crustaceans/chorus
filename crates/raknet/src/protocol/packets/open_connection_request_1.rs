@@ -10,14 +10,14 @@ pub struct OpenConnectionRequest1 {
     pub mtu: u16,
 }
 
-impl RakCodec<OpenConnectionRequest1> for OpenConnectionRequest1 {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
-        let mut buf: Vec<u8> = Vec::with_capacity(value.mtu as usize);
+impl RakCodec for OpenConnectionRequest1 {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        let mut buf: Vec<u8> = Vec::with_capacity(self.mtu as usize);
 
         buf.write_u8(OPEN_CONNECTION_REQUEST_1)?;
         buf.write_all(&MAGIC)?;
-        buf.write_u8(value.protocol)?;
-        buf.resize(value.mtu as usize, 0);
+        buf.write_u8(self.protocol)?;
+        buf.resize(self.mtu as usize, 0);
 
         writer.write_all(&buf)?;
 
@@ -49,7 +49,7 @@ impl RakCodec<OpenConnectionRequest1> for OpenConnectionRequest1 {
         Ok(Self { protocol, mtu })
     }
 
-    fn size_hint(value: &Self) -> usize {
-        value.mtu as usize
+    fn size_hint(&self) -> usize {
+        self.mtu as usize
     }
 }
