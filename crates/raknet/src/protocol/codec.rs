@@ -1,9 +1,9 @@
 use std::io::{Error, Read, Write};
 
-pub trait RakCodec<T>: Sized {
-    fn serialize<W: Write>(value: &T, writer: &mut W) -> Result<(), Error>;
+pub trait RakCodec: Sized {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error>;
 
-    fn deserialize<R: Read>(reader: &mut R) -> Result<T, Error>;
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error>;
 
-    fn size_hint(value: &T) -> usize;
+    fn size_hint(&self) -> usize;
 }

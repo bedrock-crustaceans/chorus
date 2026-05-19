@@ -10,12 +10,12 @@ pub struct UnconnectedPing {
     pub client: u64,
 }
 
-impl RakCodec<UnconnectedPing> for UnconnectedPing {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
+impl RakCodec for UnconnectedPing {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_u8(UNCONNECTED_PING)?;
-        writer.write_u64::<BigEndian>(value.timestamp)?;
+        writer.write_u64::<BigEndian>(self.timestamp)?;
         writer.write_all(&MAGIC)?;
-        writer.write_u64::<BigEndian>(value.client)?;
+        writer.write_u64::<BigEndian>(self.client)?;
 
         Ok(())
     }
@@ -39,7 +39,7 @@ impl RakCodec<UnconnectedPing> for UnconnectedPing {
         Ok(Self { timestamp, client })
     }
 
-    fn size_hint(_: &Self) -> usize {
+    fn size_hint(&self) -> usize {
         size_of::<u8>() + size_of::<u64>() + MAGIC.len() + size_of::<u64>()
     }
 }

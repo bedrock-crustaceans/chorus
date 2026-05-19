@@ -37,36 +37,36 @@ impl Frame {
     }
 }
 
-impl RakCodec<Frame> for Frame {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
-        let mut flags = (value.reliability as u8) << 5;
-        if value.is_split() {
+impl RakCodec for Frame {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        let mut flags = (self.reliability as u8) << 5;
+        if self.is_split() {
             flags |= SPLIT;
         }
         writer.write_u8(flags)?;
 
-        writer.write_u16::<BigEndian>((value.payload.len() as u16) << 3)?;
+        writer.write_u16::<BigEndian>((self.payload.len() as u16) << 3)?;
 
-        if value.reliability.is_reliable() {
-            writer.write_u24::<LittleEndian>(value.reliable_index)?;
+        if self.reliability.is_reliable() {
+            writer.write_u24::<LittleEndian>(self.reliable_index)?;
         }
 
-        if value.reliability.is_sequenced() {
-            writer.write_u24::<LittleEndian>(value.sequence_index)?;
+        if self.reliability.is_sequenced() {
+            writer.write_u24::<LittleEndian>(self.sequence_index)?;
         }
 
-        if value.reliability.is_ordered() || value.reliability.is_sequenced() {
-            writer.write_u24::<LittleEndian>(value.order_index)?;
-            writer.write_u8(value.order_channel)?;
+        if self.reliability.is_ordered() || self.reliability.is_sequenced() {
+            writer.write_u24::<LittleEndian>(self.order_index)?;
+            writer.write_u8(self.order_channel)?;
         }
 
-        if value.is_split() {
-            writer.write_u32::<BigEndian>(value.split_size)?;
-            writer.write_u16::<BigEndian>(value.split_id)?;
-            writer.write_u32::<BigEndian>(value.split_index)?;
+        if self.is_split() {
+            writer.write_u32::<BigEndian>(self.split_size)?;
+            writer.write_u16::<BigEndian>(self.split_id)?;
+            writer.write_u32::<BigEndian>(self.split_index)?;
         }
 
-        writer.write_all(&value.payload)?;
+        writer.write_all(&self.payload)?;
 
         Ok(())
     }
@@ -114,17 +114,17 @@ impl RakCodec<Frame> for Frame {
         })
     }
 
-    fn size_hint(value: &Self) -> usize {
+    fn size_hint(&self) -> usize {
         size_of::<u8>()
             + size_of::<u16>()
-            + if value.reliability.is_reliable() { 3 } else { 0 }
-            + if value.reliability.is_sequenced() { 3 } else { 0 }
-            + if value.reliability.is_ordered() || value.reliability.is_sequenced() {
+            + if self.reliability.is_reliable() { 3 } else { 0 }
+            + if self.reliability.is_sequenced() { 3 } else { 0 }
+            + if self.reliability.is_ordered() || self.reliability.is_sequenced() {
                 3 + size_of::<u8>()
             } else {
                 0
             }
-            + if value.is_split() { size_of::<u32>() + size_of::<u16>() + size_of::<u32>() } else { 0 }
-            + value.payload.len()
+            + if self.is_split() { size_of::<u32>() + size_of::<u16>() + size_of::<u32>() } else { 0 }
+            + self.payload.len()
     }
 }

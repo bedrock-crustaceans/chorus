@@ -10,12 +10,12 @@ pub struct ConnectionRequest {
     pub security: bool,
 }
 
-impl RakCodec<ConnectionRequest> for ConnectionRequest {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
+impl RakCodec for ConnectionRequest {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_u8(CONNECTION_REQUEST)?;
-        writer.write_u64::<BigEndian>(value.client_guid)?;
-        writer.write_u64::<BigEndian>(value.client_timestamp)?;
-        writer.write_u8(value.security as u8)?;
+        writer.write_u64::<BigEndian>(self.client_guid)?;
+        writer.write_u64::<BigEndian>(self.client_timestamp)?;
+        writer.write_u8(self.security as u8)?;
 
         Ok(())
     }
@@ -37,7 +37,7 @@ impl RakCodec<ConnectionRequest> for ConnectionRequest {
         })
     }
 
-    fn size_hint(_: &Self) -> usize {
+    fn size_hint(&self) -> usize {
         size_of::<u8>() + size_of::<u64>() + size_of::<u64>() + size_of::<u8>()
     }
 }

@@ -13,16 +13,16 @@ pub struct ConnectionRequestAccepted {
     pub timestamp: u64,
 }
 
-impl RakCodec<ConnectionRequestAccepted> for ConnectionRequestAccepted {
-    fn serialize<W: Write>(value: &Self, writer: &mut W) -> Result<(), Error> {
+impl RakCodec for ConnectionRequestAccepted {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_u8(CONNECTION_REQUEST_ACCEPTED)?;
-        SocketAddr::serialize(&value.client_address, writer)?;
-        writer.write_u16::<BigEndian>(value.system_index)?;
-        for addr in &value.system_addresses {
+        SocketAddr::serialize(&self.client_address, writer)?;
+        writer.write_u16::<BigEndian>(self.system_index)?;
+        for addr in &self.system_addresses {
             SocketAddr::serialize(addr, writer)?;
         }
-        writer.write_u64::<BigEndian>(value.request_timestamp)?;
-        writer.write_u64::<BigEndian>(value.timestamp)?;
+        writer.write_u64::<BigEndian>(self.request_timestamp)?;
+        writer.write_u64::<BigEndian>(self.timestamp)?;
 
         Ok(())
     }
@@ -58,11 +58,11 @@ impl RakCodec<ConnectionRequestAccepted> for ConnectionRequestAccepted {
         })
     }
 
-    fn size_hint(value: &Self) -> usize {
+    fn size_hint(&self) -> usize {
         size_of::<u8>()
-            + SocketAddr::size_hint(&value.client_address)
+            + SocketAddr::size_hint(&self.client_address)
             + size_of::<u16>()
-            + value.system_addresses.iter().fold(0, |acc, addr| acc + SocketAddr::size_hint(&addr))
+            + self.system_addresses.iter().fold(0, |acc, addr| acc + SocketAddr::size_hint(&addr))
             + size_of::<u64>()
             + size_of::<u64>()
     }
