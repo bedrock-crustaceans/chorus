@@ -2,15 +2,14 @@ use std::collections::HashMap;
 
 const VALID_BITS: [u8; 8] = [1, 2, 3, 4, 5, 6, 8, 16];
 
-pub(crate) fn write_zigzag_var_i32(buf: &mut Vec<u8>, value: i32) {
-    let mut v = ((value << 1) ^ (value >> 31)) as u32;
+pub(crate) fn write_var_u32(buf: &mut Vec<u8>, mut value: u32) {
     loop {
-        if v & !0x7F == 0 {
-            buf.push(v as u8);
+        if value & !0x7F == 0 {
+            buf.push(value as u8);
             return;
         }
-        buf.push(((v & 0x7F) | 0x80) as u8);
-        v >>= 7;
+        buf.push(((value & 0x7F) | 0x80) as u8);
+        value >>= 7;
     }
 }
 
@@ -39,7 +38,7 @@ fn encode_layer(blocks: &[u32; 4096]) -> Vec<u8> {
 
     if palette.len() == 1 {
         buf.push(0x01u8);
-        write_zigzag_var_i32(&mut buf, palette[0] as i32);
+        write_var_u32(&mut buf, palette[0]);
         return buf;
     }
 
@@ -63,9 +62,9 @@ fn encode_layer(blocks: &[u32; 4096]) -> Vec<u8> {
         buf.extend_from_slice(&word.to_le_bytes());
     }
 
-    write_zigzag_var_i32(&mut buf, palette.len() as i32);
+    write_var_u32(&mut buf, palette.len() as u32);
     for &id in &palette {
-        write_zigzag_var_i32(&mut buf, id as i32);
+        write_var_u32(&mut buf, id);
     }
 
     buf

@@ -1,4 +1,4 @@
-use crate::level::sub_chunk::{SubChunk, write_zigzag_var_i32};
+use crate::level::sub_chunk::{SubChunk, write_var_u32};
 
 pub struct Chunk {
     pub x: i32,
@@ -59,7 +59,7 @@ impl Chunk {
         let mut buf = Vec::new();
         for sc in &self.sub_chunks {
             buf.push(0x01u8);  // V0 single-entry network header
-            write_zigzag_var_i32(&mut buf, sc.biome as i32);
+            write_var_u32(&mut buf, sc.biome);
         }
         buf.push(0x00);  // border block count
         buf
