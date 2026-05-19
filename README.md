@@ -53,8 +53,7 @@ If you're unsure where to start or want to discuss ideas before building, join t
 
 ## Community
 
-Join our Discord to follow development, ask questions, and get involved:
-👉 [discord.com/invite/VCVcrvt3JC](https://discord.com/invite/VCVcrvt3JC)
+Join our Discord to follow development, ask questions, and get involved: [discord.com/invite/VCVcrvt3JC](https://discord.com/invite/VCVcrvt3JC)
 
 ## License
 
