@@ -1,9 +1,12 @@
+use crate::entity::entity::Entity as PlayerEntity;
+use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::Player;
 use crate::server::ServerState;
+use std::sync::Arc;
 use bedrock::protocol::v662::enums::{
     ChatRestrictionLevel, Difficulty, EditorWorldType, EducationEditionOffer, GamePublishSetting, GameType, GeneratorType, PlayStatus, PlayerPermissionLevel, SpawnBiomeType,
 };
@@ -42,7 +45,13 @@ pub fn on_enter_setup(mut sessions: Query<&mut Session>, mut server_state: ResMu
 
         send_start_game(&player, &session);
 
-        commands.entity(ev.entity).insert(player);
+        // TODO: Level should come from a shared Bevy Resource once it holds state
+        let entity = PlayerEntity::default(
+            "minecraft:player".to_string(),
+            player.unique_id(),
+            Arc::new(Level {}),
+        );
+        commands.entity(ev.entity).insert((player, entity));
 
         session.send_play_status(PlayStatus::PlayerSpawn, false);
     }
@@ -151,6 +160,10 @@ pub fn handle_setup(mut packet_reader: MessageReader<PacketReceivedMessage>, mut
         let Ok(mut query) = query.get_mut(ev.entity) else {
             continue;
         };
+
+        if query.1.get_state() != SessionState::Setup {
+            continue;
+        }
 
         match &ev.packet {
             BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(packet, &mut query.1),
