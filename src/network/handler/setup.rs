@@ -196,6 +196,16 @@ fn handle_request_chunk_radius(
 
     let min_y = level.overworld().min_sub_chunk_y;
 
+    // Log the first chunk's values so we can verify limit and block placement
+    {
+        let sample = level.overworld_mut().get_or_generate_chunk(registry, 0, 0);
+        let sample_limit = (sample.highest_non_air_sub_chunk_y() - min_y) as u16;
+        debug!("chunk (0,0): highest_non_air_sub_chunk_y={}, min_y={}, sub_chunk_limit={}",
+            sample.highest_non_air_sub_chunk_y(), min_y, sample_limit);
+        // Check a known block position: bedrock at (0, 0, 0)
+        debug!("chunk (0,0) block at world (0,0,0) layer0 = {:?}", sample.get_block(0, 0, 0, 0));
+    }
+
     for cx in -radius..radius {
         for cz in -radius..radius {
             let chunk = level.overworld_mut().get_or_generate_chunk(registry, cx, cz);

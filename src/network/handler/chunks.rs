@@ -8,6 +8,7 @@ use bedrock::protocol::v818::packets::{
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::Query;
 use bevy_ecs::system::Res;
+use tracing::debug;
 
 pub fn handle_sub_chunk_request(
     mut reader: MessageReader<PacketReceivedMessage>,
@@ -21,6 +22,11 @@ pub fn handle_sub_chunk_request(
         let Ok(mut session) = query.get_mut(ev.entity) else {
             continue;
         };
+
+        debug!("SubChunkRequestPacket: dim={} center=({},{},{}) offsets={}",
+            packet.dimension_type,
+            packet.center_pos.x, packet.center_pos.y, packet.center_pos.z,
+            packet.sub_chunk_pos_offsets.len());
 
         let mut entries = Vec::with_capacity(packet.sub_chunk_pos_offsets.len());
 
