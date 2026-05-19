@@ -31,8 +31,6 @@ pub struct RakSessionInner {
     state: Mutex<RakSessionState>,
 
     last_update: Mutex<SystemTime>,
-
-    curr_ping: Mutex<SystemTime>,
     last_ping: Mutex<SystemTime>,
     last_pong: Mutex<SystemTime>,
 
@@ -59,8 +57,6 @@ impl RakSessionInner {
             state: Mutex::new(RakSessionState::Connecting),
 
             last_update: Mutex::new(SystemTime::now()),
-
-            curr_ping: Mutex::new(SystemTime::UNIX_EPOCH),
             last_ping: Mutex::new(SystemTime::UNIX_EPOCH),
             last_pong: Mutex::new(SystemTime::UNIX_EPOCH),
 
@@ -122,24 +118,28 @@ impl RakSessionInner {
     }
 
     pub async fn run_update_loop(self: Arc<Self>, mut in_rx: UnboundedReceiver<Vec<u8>>, mut out_rx: UnboundedReceiver<(Frame, RakPriority)>) {
-        let mut last_tick = SystemTime::now();
+        let mut tick_interval = tokio::time::interval(Duration::from_millis(10));
+        let mut ping_interval = tokio::time::interval(Duration::from_millis(2000));
+
         loop {
-            while let Ok((_, _)) = out_rx.try_recv() {}
-            while let Ok(_) = in_rx.try_recv() {}
+            tokio::select! {
+                Some((_, _)) = out_rx.recv() => {
 
-            let now = SystemTime::now();
-            if last_tick + Duration::from_millis(10) <= now {
-                // tick()
-                last_tick = now;
-            }
+                },
+                Some(_) = in_rx.recv() => {
 
-            if self.curr_ping.lock().await.add(Duration::from_millis(2000)) <= now {
-                let ping = ConnectedPing {
-                    timestamp: now.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64,
-                };
+                },
+                _ = tick_interval.tick() => {
+                    // tick()
+                },
+                _ = ping_interval.tick() => {
+                    let ping = ConnectedPing {
+                        timestamp: UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
+                    };
 
-                let mut buf = Vec::with_capacity(ConnectedPing::size_hint(&ping));
-                ConnectedPing::serialize(&ping, &mut buf).unwrap();
+                    let mut buf = Vec::with_capacity(ConnectedPing::size_hint(&ping));
+                    ConnectedPing::serialize(&ping, &mut buf).unwrap();
+                },
             }
         }
     }
