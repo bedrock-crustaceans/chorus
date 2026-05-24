@@ -40,7 +40,7 @@ pub fn on_enter_play(mut sessions: Query<&mut Session>, mut state_reader: Messag
             for cz in -radius..radius {
                 let chunk = level.overworld_mut().get_or_generate_chunk(&registry, cx, cz);
                 let limit = (chunk.highest_non_air_sub_chunk_y() - min_y) as u16;
-                let biome_data = chunk.serialize_biomes();
+                let biome_data = chunk.serialize();
 
                 session.send(BedrockProtocol::LevelChunkPacket(
                     LevelChunkPacket {

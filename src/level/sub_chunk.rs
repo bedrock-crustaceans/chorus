@@ -59,7 +59,7 @@ fn encode_layer(blocks: &[u32; 4096]) -> Vec<u8> {
 pub struct SubChunk {
     // blocks[layer][index], index = (x<<8)|(z<<4)|y
     blocks: [[u32; 4096]; 2],
-    pub biome: u32,
+    biomes: [u32; 4096],
     air_id: u32,
 }
 
@@ -67,7 +67,7 @@ impl SubChunk {
     pub fn new(air_id: u32, biome: u32) -> Self {
         Self {
             blocks: [[air_id; 4096]; 2],
-            biome,
+            biomes: [biome; 4096],
             air_id,
         }
     }
@@ -93,6 +93,12 @@ impl SubChunk {
         buf.push(sub_chunk_y as u8);
         buf.extend(encode_layer(&self.blocks[0]));
         buf.extend(encode_layer(&self.blocks[1]));
+        buf
+    }
+
+    pub fn serialize_biomes(&self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.extend(encode_layer(&self.biomes));
         buf
     }
 }

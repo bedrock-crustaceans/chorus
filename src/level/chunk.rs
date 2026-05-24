@@ -1,5 +1,4 @@
 use crate::level::sub_chunk::SubChunk;
-use varint_rs::VarintWriter;
 
 pub struct Chunk {
     pub x: i32,
@@ -58,14 +57,21 @@ impl Chunk {
         self.min_sub_chunk_y
     }
 
-    /// Serializes biome data for LevelChunkPacket.serialized_chunk_data.
-    pub fn serialize_biomes(&self) -> Vec<u8> {
+    pub fn serialize(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        for sc in &self.sub_chunks {
-            buf.push(0x01u8); // V0 single-entry network header
-            buf.write_u32_varint(sc.biome).unwrap();
+        for (i, sc) in self.sub_chunks.iter().enumerate() {
+            buf.extend(sc.serialize_network(i as i8))
         }
-        buf.push(0x00); // border block count
+
+        for sc in &self.sub_chunks {
+            buf.extend(sc.serialize_biomes())
+        }
+
+        buf.push(0u8); // edu border blocks
+
+        let block_entities = nbtx::Value::List(vec![]);
+        buf.extend(nbtx::to_net_bytes(&block_entities).unwrap());
+
         buf
     }
 }
