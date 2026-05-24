@@ -3,7 +3,6 @@ use crate::protocol::types::frame::Frame;
 use crate::util::flags::{CONTINUOUS_SEND, NEEDS_B_AND_AS, PAIR, VALID};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Error, ErrorKind, Read, Write};
-use std::time::SystemTime;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrameSet {
@@ -12,9 +11,6 @@ pub struct FrameSet {
     pub continuous_send: bool,
     pub needs_b_and_as: bool,
     pub is_pair: bool,
-
-    pub sent: SystemTime,
-    pub resend: SystemTime,
 }
 
 impl FrameSet {
@@ -25,8 +21,6 @@ impl FrameSet {
             continuous_send,
             needs_b_and_as,
             is_pair,
-            sent: SystemTime::now(),
-            resend: SystemTime::UNIX_EPOCH,
         }
     }
 }

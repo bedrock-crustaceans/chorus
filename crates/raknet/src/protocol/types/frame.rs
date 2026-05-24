@@ -6,15 +6,15 @@ use std::io::{Error, ErrorKind, Read, Write};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Frame {
-    reliability: RakReliability,
-    payload: Vec<u8>,
-    reliable_index: u32,
-    sequence_index: u32,
-    order_index: u32,
-    order_channel: u8,
-    split_size: u32,
-    split_id: u16,
-    split_index: u32,
+    pub reliability: RakReliability,
+    pub payload: Vec<u8>,
+    pub reliable_index: u32,
+    pub sequence_index: u32,
+    pub order_index: u32,
+    pub order_channel: u8,
+    pub split_size: u32,
+    pub split_id: u16,
+    pub split_index: u32,
 }
 
 impl Frame {
