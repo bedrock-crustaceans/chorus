@@ -51,3 +51,18 @@ impl TryFrom<u8> for RakReliability {
         }
     }
 }
+
+impl From<RakReliability> for u8 {
+    fn from(value: RakReliability) -> Self {
+        match value {
+            RakReliability::Unreliable => 0,
+            RakReliability::UnreliableSequenced => 1,
+            RakReliability::Reliable => 2,
+            RakReliability::ReliableOrdered => 3,
+            RakReliability::ReliableSequenced => 4,
+            RakReliability::UnreliableWithAckReceipt => 5,
+            RakReliability::ReliableWithAckReceipt => 6,
+            RakReliability::ReliableOrderedWithAckReceipt => 7,
+        }
+    }
+}

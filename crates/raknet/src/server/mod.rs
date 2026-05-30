@@ -2,109 +2,74 @@ use crate::server::config::RakServerConfig;
 use crate::server::inner::RakServerInner;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::net::UdpSocket;
-use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
-use tokio::sync::{Mutex, Notify};
+use tokio::sync::mpsc::unbounded_channel;
 
 mod config;
 mod inner;
 
 #[derive(Clone)]
 pub struct RakServer {
-    addr: SocketAddr,
-
     inner: Arc<RakServerInner>,
-    out_rx: Arc<Mutex<UnboundedReceiver<(Vec<u8>, SocketAddr)>>>,
-
-    started_notify: Arc<Notify>,
-    stopped_notify: Arc<Notify>,
 }
 
 impl RakServer {
-    pub async fn new<F>(addr: SocketAddr, conf: F) -> Self
+    pub async fn start<F>(addr: SocketAddr, conf: F) -> Self
     where
         F: FnOnce(&mut RakServerConfig),
     {
         let mut config = RakServerConfig::default();
         conf(&mut config);
 
-        let (tx, rx) = unbounded_channel::<(Vec<u8>, SocketAddr)>();
+        let (packet_tx, packet_rx) = unbounded_channel();
+        let (event_tx, event_rx) = unbounded_channel();
 
-        Self {
-            addr,
+        let inner = Arc::new(RakServerInner::new(config, addr, packet_tx, event_tx));
 
-            inner: Arc::new(RakServerInner::new(config, addr, tx)),
-            out_rx: Arc::new(Mutex::new(rx)),
-
-            started_notify: Arc::new(Notify::new()),
-            stopped_notify: Arc::new(Notify::new()),
-        }
-    }
-
-    pub async fn start(&mut self, block: bool) -> &mut Self {
-        let server_task = tokio::spawn({
-            let addr = self.addr;
-            let inner = self.inner.clone();
-            let out_rx = self.out_rx.clone();
-
-            let started_notify = self.started_notify.clone();
-            let stopped_notify = self.stopped_notify.clone();
-
+        tokio::spawn({
+            let inner = inner.clone();
             async move {
-                let socket = Arc::new(UdpSocket::bind(addr).await.unwrap());
-
-                tokio::spawn({
-                    let stopped_notify = stopped_notify.clone();
-                    let socket = socket.clone();
-                    let mtu = inner.config.max_mtu_size;
-                    async move {
-                        let mut buf = vec![0u8; mtu as usize];
-
-                        loop {
-                            tokio::select! {
-                                _ = stopped_notify.notified() => { break; }
-                                recv = socket.recv_from(&mut buf) => {
-                                    if let Ok((len, addr)) = recv {
-                                        inner.handle(&buf[..len], addr).await;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-
-                tokio::spawn({
-                    let stopped_notify = stopped_notify.clone();
-                    let socket = socket.clone();
-                    let rx = out_rx.clone();
-                    async move {
-                        let mut rx = rx.lock().await;
-                        loop {
-                            tokio::select! {
-                                _ = stopped_notify.notified() => { break; }
-                                packet = rx.recv() => {
-                                    if let Some(packet) = packet {
-                                        socket.send_to(&packet.0, &packet.1).await.unwrap();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-
-                started_notify.notify_waiters();
-                stopped_notify.notified().await;
+                inner.run_update_loop(packet_rx, event_rx).await;
             }
         });
 
-        self.started_notify.notified().await;
-        if block {
-            server_task.await.unwrap();
-        }
-        self
+        Self { inner }
     }
 
     pub async fn stop(&mut self) {
-        self.stopped_notify.notify_waiters();
+        // TODO
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::future::pending;
+    use std::net::{Ipv4Addr, SocketAddrV4};
+
+    #[tokio::test]
+    async fn rak_server() {
+        let _ = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::DEBUG)
+            .with_target(true)
+            .with_thread_ids(true)
+            .with_line_number(true)
+            .with_test_writer()
+            .compact()
+            .try_init();
+
+        RakServer::start(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 19132)), |config| {
+            config.message = {
+                let mut buf = Vec::new();
+
+                let str = ["MCPE", "Chorus", "0", "1.0.0", "0", "-1", "123456789", "Chorus", "Survival"].join(";");
+
+                buf.extend(str.as_bytes());
+                buf
+            };
+            config.guid = 123456789;
+        })
+        .await;
+
+        pending().await
     }
 }

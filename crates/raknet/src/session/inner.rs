@@ -1,8 +1,10 @@
 use crate::protocol::codec::RakCodec;
 use crate::protocol::packets::ack::Ack;
 use crate::protocol::packets::connected_ping::ConnectedPing;
+use crate::protocol::packets::connected_pong::ConnectedPong;
 use crate::protocol::packets::connection_request::ConnectionRequest;
 use crate::protocol::packets::connection_request_accepted::ConnectionRequestAccepted;
+use crate::protocol::packets::disconnect::Disconnect;
 use crate::protocol::packets::frame_set::FrameSet;
 use crate::protocol::packets::new_incoming_connection::NewIncomingConnection;
 use crate::protocol::types::frame::Frame;
@@ -12,14 +14,16 @@ use crate::session::event::RakSessionEvent;
 use crate::session::state::RakSessionState;
 use crate::types::priority::RakPriority;
 use crate::types::reliability::RakReliability;
-use crate::util::constants::{DGRAM_HEADER_SIZE, UDP_HEADER_SIZE};
+use crate::util::constants::{DGRAM_HEADER_SIZE, DGRAM_MTU_OVERHEAD, UDP_HEADER_SIZE};
 use crate::util::socket_addr::get_overhead;
-use std::any::Any;
-use std::cmp::Reverse;
+use crate::util::{flags, packet_id};
+use std::array::from_fn;
+use std::cmp::{Reverse, min};
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::io::Cursor;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -36,9 +40,9 @@ pub struct RakSessionInner {
     state: Mutex<RakSessionState>,
     congestion_controller: Mutex<RakCongestionController>,
 
-    last_update: Mutex<SystemTime>,
-    last_ping: Mutex<SystemTime>,
-    last_pong: Mutex<SystemTime>,
+    last_update: Mutex<Instant>,
+    last_ping: AtomicU64,
+    last_pong: AtomicU64,
 
     in_tx: UnboundedSender<Vec<u8>>,
     out_tx: UnboundedSender<(Frame, RakPriority)>,
@@ -48,10 +52,20 @@ pub struct RakSessionInner {
     sequences_recv: Mutex<HashSet<u32>>,
     sequences_lost: Mutex<HashSet<u32>>,
 
-    outbound_seq: Mutex<u32>,
+    outbound_seq: AtomicU32,
+    outbound_spl: AtomicU16,
+    outbound_rel: AtomicU32,
     outbound_queue: Mutex<VecDeque<Frame>>,
     outbound_cache: Mutex<HashMap<u32, FrameSet>>,
     outbound_resend: Mutex<BinaryHeap<(Reverse<Instant>, u32)>>,
+    outbound_ord_idx: [AtomicU32; 32],
+    outbound_seq_idx: [AtomicU32; 32],
+
+    inbound_seq: AtomicU32,
+    inbound_spl_queue: Mutex<HashMap<u16, HashMap<u32, Frame>>>,
+    inbound_ord_queue: Mutex<HashMap<u8, HashMap<u32, Frame>>>,
+    inbound_ord_idx: [AtomicU32; 32],
+    inbound_seq_idx: [AtomicU32; 32],
 }
 
 impl RakSessionInner {
@@ -73,9 +87,9 @@ impl RakSessionInner {
             state: Mutex::new(RakSessionState::Connecting),
             congestion_controller: Mutex::new(RakCongestionController::new(mtu as usize)),
 
-            last_update: Mutex::new(SystemTime::now()),
-            last_ping: Mutex::new(SystemTime::UNIX_EPOCH),
-            last_pong: Mutex::new(SystemTime::UNIX_EPOCH),
+            last_update: Mutex::new(Instant::now()),
+            last_ping: AtomicU64::new(0),
+            last_pong: AtomicU64::new(0),
 
             in_tx,
             out_tx,
@@ -85,10 +99,20 @@ impl RakSessionInner {
 
             queue: Mutex::new(VecDeque::new()),
 
-            outbound_seq: Mutex::new(0),
+            outbound_seq: AtomicU32::new(0),
+            outbound_spl: AtomicU16::new(0),
+            outbound_rel: AtomicU32::new(0),
             outbound_queue: Mutex::new(VecDeque::new()),
             outbound_cache: Mutex::new(HashMap::new()),
             outbound_resend: Mutex::new(BinaryHeap::new()),
+            outbound_ord_idx: from_fn(|_| AtomicU32::new(0)),
+            outbound_seq_idx: from_fn(|_| AtomicU32::new(0)),
+
+            inbound_seq: AtomicU32::new(0),
+            inbound_spl_queue: Mutex::new(HashMap::new()),
+            inbound_ord_queue: Mutex::new(HashMap::new()),
+            inbound_ord_idx: from_fn(|_| AtomicU32::new(0)),
+            inbound_seq_idx: from_fn(|_| AtomicU32::new(0)),
         }
     }
 
@@ -110,6 +134,15 @@ impl RakSessionInner {
             match *state {
                 RakSessionState::Disconnecting | RakSessionState::Disconnected => return,
                 _ => {}
+            }
+        };
+
+        {
+            let last_update = self.last_update.lock().await;
+            if last_update.elapsed() >= Duration::from_millis(15000) {
+                debug!("detected stale connection from {}, disconnecting...", self.addr);
+
+                return self.disconnect_internal(true, true).await;
             }
         };
 
@@ -221,8 +254,6 @@ impl RakSessionInner {
         let mut batch = Vec::new();
         let mut size = DGRAM_HEADER_SIZE as usize;
 
-        let mut outbound_seq = self.outbound_seq.lock().await;
-
         for frame in frames {
             let frame_size = frame.size_hint();
 
@@ -234,14 +265,13 @@ impl RakSessionInner {
                 let continuous_send = batch.iter().any(Frame::is_split);
 
                 sets.push(FrameSet {
-                    sequence: *outbound_seq,
+                    sequence: self.outbound_seq.fetch_add(1, Ordering::Relaxed),
                     frames: batch.clone(),
                     continuous_send,
                     needs_b_and_as: true,
                     is_pair: false,
                 });
 
-                *outbound_seq += 1;
                 batch.clear();
                 size = DGRAM_HEADER_SIZE as usize;
             }
@@ -254,14 +284,12 @@ impl RakSessionInner {
             let continuous_send = batch.iter().any(Frame::is_split);
 
             sets.push(FrameSet {
-                sequence: *outbound_seq,
+                sequence: self.outbound_seq.fetch_add(1, Ordering::Relaxed),
                 frames: batch.clone(),
                 continuous_send,
                 needs_b_and_as: true,
                 is_pair: false,
             });
-
-            *outbound_seq += 1;
         }
 
         sets
@@ -302,6 +330,263 @@ impl RakSessionInner {
         }
     }
 
+    async fn send_frame(&self, frame: Frame, priority: RakPriority) {
+        let max_size = (self.mtu - DGRAM_MTU_OVERHEAD) as usize;
+
+        let order_channel = frame.order_channel;
+
+        let mut reliability = frame.reliability;
+        let mut split_id = 0u16;
+
+        let payloads = if frame.size_hint() > max_size {
+            reliability = match reliability {
+                RakReliability::Unreliable => RakReliability::Reliable,
+                RakReliability::UnreliableSequenced => RakReliability::ReliableSequenced,
+                RakReliability::UnreliableWithAckReceipt => RakReliability::ReliableWithAckReceipt,
+                val => val,
+            };
+            split_id = self.outbound_spl.fetch_add(1, Ordering::Relaxed);
+
+            let split_size = (frame.payload.len() + max_size - 1) / max_size;
+
+            let mut payloads = Vec::with_capacity(split_size);
+            for i in 0..split_size {
+                let start = i * max_size;
+                let end = min(start + max_size, frame.payload.len());
+
+                payloads.push(frame.payload[start..end].to_vec());
+            }
+            payloads
+        } else {
+            vec![frame.payload]
+        };
+
+        let mut ord_idx = 0;
+        let mut seq_idx = 0;
+        if frame.reliability.is_sequenced() {
+            ord_idx = self.outbound_ord_idx[order_channel as usize].load(Ordering::Relaxed);
+            seq_idx = self.outbound_seq_idx[order_channel as usize].fetch_add(1, Ordering::Relaxed);
+        } else if frame.reliability.is_ordered() {
+            ord_idx = self.outbound_ord_idx[order_channel as usize].fetch_add(1, Ordering::Relaxed);
+            self.outbound_seq_idx[order_channel as usize].store(0, Ordering::Relaxed);
+        }
+
+        let split_size = payloads.len();
+        let frames = payloads
+            .into_iter()
+            .enumerate()
+            .map(|(i, payload)| Frame {
+                reliability,
+                payload,
+                reliable_index: match reliability.is_reliable() {
+                    true => self.outbound_rel.fetch_add(1, Ordering::Relaxed),
+                    false => 0,
+                },
+                sequence_index: seq_idx,
+                order_index: ord_idx,
+                order_channel,
+                split_size: split_size as u32,
+                split_id,
+                split_index: i as u32,
+            })
+            .collect();
+
+        self.queue_frames(frames, priority).await;
+    }
+
+    async fn queue_frames(&self, frames: Vec<Frame>, priority: RakPriority) {
+        match priority {
+            RakPriority::Immediate => {
+                let sets = self.make_sets(frames).await;
+                for set in sets {
+                    self.send_frame_set(set, true).await;
+                }
+            }
+            _ => {
+                let mut outbound_queue = self.outbound_queue.lock().await;
+                outbound_queue.extend(frames);
+            }
+        }
+    }
+
+    async fn handle_ack(&self, buf: &mut Cursor<&[u8]>) {
+        let Ok(ack) = Ack::deserialize(buf) else {
+            return debug!("failed to deserialize Ack from {}", self.addr);
+        };
+
+        debug!("handling ack from {}; {:#?}", self.addr, ack);
+
+        let now = Instant::now();
+        for seq in ack.sequences {
+            let set = {
+                let mut outbound_cache = self.outbound_cache.lock().await;
+                outbound_cache.remove(&seq)
+            };
+            let Some(set) = set else {
+                continue;
+            };
+            match ack.is_nack {
+                true => {
+                    self.queue_frames(set.frames, RakPriority::Immediate).await;
+                    self.congestion_controller.lock().await.nacked();
+                }
+                false => {
+                    self.congestion_controller
+                        .lock()
+                        .await
+                        .acked(now, set.sequence, set.size_hint(), self.inbound_seq.load(Ordering::Relaxed));
+                }
+            }
+        }
+    }
+
+    async fn handle_frame_set(&self, buf: &mut Cursor<&[u8]>) {
+        let Ok(set) = FrameSet::deserialize(buf) else {
+            return debug!("failed to deserialize FrameSet from {}", self.addr);
+        };
+
+        {
+            let mut sequences_recv = self.sequences_recv.lock().await;
+            if sequences_recv.contains(&set.sequence) {
+                debug!("received duplicate FrameSet {} from {}", set.sequence, self.addr);
+            }
+            sequences_recv.insert(set.sequence);
+        };
+
+        {
+            let mut sequences_lost = self.sequences_lost.lock().await;
+            sequences_lost.remove(&set.sequence);
+
+            let inbound_seq = self.inbound_seq.swap(set.sequence + 1, Ordering::Relaxed);
+            if set.sequence < inbound_seq {
+                debug!("received out of order FrameSet {} from {}, expected {}", set.sequence, self.addr, inbound_seq);
+            }
+
+            if set.sequence > inbound_seq {
+                sequences_lost.extend(inbound_seq..set.sequence);
+            }
+        };
+
+        for frame in set.frames {
+            self.handle_frame(frame).await;
+        }
+    }
+
+    async fn handle_frame(&self, frame: Frame) {
+        match frame.is_split() {
+            true => self.handle_split_frame(frame).await,
+            false => self.handle_full_frame(frame).await,
+        }
+    }
+
+    async fn handle_full_frame(&self, frame: Frame) {
+        if frame.reliability.is_sequenced() {
+            if frame.sequence_index < self.inbound_seq_idx[frame.order_channel as usize].load(Ordering::Relaxed)
+                || frame.order_index < self.inbound_ord_idx[frame.order_channel as usize].load(Ordering::Relaxed)
+            {
+                debug!("received out of order FrameSet {} from {}", frame.order_channel, self.addr);
+            }
+
+            self.inbound_seq_idx[frame.order_channel as usize].store(frame.sequence_index + 1, Ordering::Relaxed);
+
+            return self.handle_packet(frame.payload).await;
+        }
+
+        if frame.reliability.is_ordered() {
+            if frame.order_index == self.inbound_ord_idx[frame.order_channel as usize].load(Ordering::Relaxed) {
+                self.inbound_seq_idx[frame.order_channel as usize].store(0, Ordering::Relaxed);
+                self.inbound_ord_idx[frame.order_channel as usize].store(frame.order_index + 1, Ordering::Relaxed);
+
+                self.handle_packet(frame.payload).await;
+
+                let mut idx = self.inbound_ord_idx[frame.order_channel as usize].load(Ordering::Relaxed);
+
+                let mut packets = Vec::new();
+                {
+                    let mut inbound_ord_queue = self.inbound_ord_queue.lock().await;
+                    let unord_queue = inbound_ord_queue.entry(frame.order_channel).or_default();
+
+                    loop {
+                        let Some(unord_frame) = unord_queue.remove(&idx) else {
+                            break;
+                        };
+
+                        packets.push(unord_frame.payload);
+
+                        idx += 1;
+                    }
+                }
+                self.inbound_ord_idx[frame.order_channel as usize].store(idx, Ordering::Relaxed);
+
+                for packet in packets {
+                    self.handle_packet(packet).await;
+                }
+                return;
+            }
+
+            if frame.order_index > self.inbound_ord_idx[frame.order_channel as usize].load(Ordering::Relaxed) {
+                {
+                    let mut inbound_ord_queue = self.inbound_ord_queue.lock().await;
+                    let unord_queue = inbound_ord_queue.entry(frame.order_channel).or_default();
+
+                    unord_queue.insert(frame.order_index, frame);
+                }
+                return;
+            }
+            return;
+        }
+
+        self.handle_packet(frame.payload).await;
+    }
+
+    async fn handle_split_frame(&self, frame: Frame) {
+        let mut frame = frame;
+
+        let mut inbound_spl_queue = self.inbound_spl_queue.lock().await;
+
+        let fragments = inbound_spl_queue.entry(frame.split_id).or_default();
+        fragments.insert(frame.split_index, frame.clone());
+
+        if fragments.len() as u32 == frame.split_size {
+            let mut payload = Vec::new();
+
+            for i in 0..frame.split_size {
+                let frag = match fragments.get(&i) {
+                    Some(f) => f,
+                    None => return,
+                };
+                payload.extend_from_slice(&frag.payload);
+            }
+
+            inbound_spl_queue.remove(&frame.split_id);
+
+            frame.payload = payload;
+            frame.split_size = 0;
+            frame.split_id = 0;
+            frame.split_index = 0;
+
+            drop(inbound_spl_queue);
+
+            self.handle_full_frame(frame).await;
+        }
+    }
+
+    async fn handle_packet(&self, buf: Vec<u8>) {
+        let Some(&b) = buf.first() else {
+            return;
+        };
+
+        debug!("handling packet from {}", self.addr);
+
+        let mut cursor = Cursor::new(buf.as_slice());
+        match b {
+            packet_id::CONNECTED_PING => self.handle_connected_ping(&mut cursor).await,
+            packet_id::CONNECTED_PONG => self.handle_connected_pong(&mut cursor).await,
+            packet_id::DISCONNECT => self.handle_disconnect(&mut cursor).await,
+            _ => self.event_tx.send(RakSessionEvent::Inbound(buf, self.addr)).unwrap(),
+        }
+    }
+
     pub async fn handle_connection_request(&self, buf: &mut Cursor<&[u8]>) {
         let state = self.state.lock().await;
         match *state {
@@ -312,6 +597,8 @@ impl RakSessionInner {
         let Ok(request) = ConnectionRequest::deserialize(buf) else {
             return debug!("failed to deserialize ConnectionRequest from {}", self.addr);
         };
+
+        debug!("handling connection request from {}", self.addr);
 
         let accepted = ConnectionRequestAccepted {
             client_address: self.addr,
@@ -330,7 +617,7 @@ impl RakSessionInner {
     pub async fn handle_new_incoming_connection(&self, buf: &mut Cursor<&[u8]>) {
         let mut state = self.state.lock().await;
         match *state {
-            RakSessionState::Connecting => (),
+            RakSessionState::Connecting => {}
             _ => return debug!("unexpected NewIncomingConnection from {}", self.addr),
         }
 
@@ -338,8 +625,91 @@ impl RakSessionInner {
             return debug!("failed to deserialize NewIncomingConnection from {}", self.addr);
         };
 
+        debug!("handling new incoming connection from {}", self.addr);
+
         *state = RakSessionState::Connected;
         _ = self.event_tx.send(RakSessionEvent::Connected(self.addr));
+    }
+
+    async fn handle_connected_ping(&self, buf: &mut Cursor<&[u8]>) {
+        let Ok(ping) = ConnectedPing::deserialize(buf) else {
+            return debug!("failed to deserialize ConnectedPing from {}", self.addr);
+        };
+
+        let pong = ConnectedPong {
+            ping_timestamp: ping.timestamp,
+            timestamp: UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
+        };
+
+        let mut buf = Vec::with_capacity(pong.size_hint());
+        pong.serialize(&mut buf).unwrap();
+
+        self.send(buf, RakReliability::Unreliable, RakPriority::Immediate);
+    }
+
+    async fn handle_connected_pong(&self, buf: &mut Cursor<&[u8]>) {
+        let Ok(pong) = ConnectedPong::deserialize(buf) else {
+            return debug!("failed to deserialize ConnectedPong from {}", self.addr);
+        };
+
+        if pong.ping_timestamp >= self.last_ping.load(Ordering::Relaxed) {
+            self.last_pong.store(UNIX_EPOCH.elapsed().unwrap().as_millis() as u64, Ordering::Relaxed);
+        }
+    }
+
+    async fn handle_disconnect(&self, buf: &mut Cursor<&[u8]>) {
+        let Ok(_) = Disconnect::deserialize(buf) else {
+            return debug!("failed to deserialize Disconnect from {}", self.addr);
+        };
+
+        debug!("session closed by {}", self.addr);
+
+        self.disconnect_internal(false, true).await;
+    }
+
+    pub async fn disconnect(&self) {
+        let connected = { *self.state.lock().await == RakSessionState::Connected };
+
+        self.disconnect_internal(connected, connected).await;
+    }
+
+    async fn disconnect_internal(&self, send: bool, connected: bool) {
+        let mut state = self.state.lock().await;
+        match *state {
+            RakSessionState::Disconnecting | RakSessionState::Disconnected => {
+                return;
+            }
+            _ => {}
+        }
+        *state = RakSessionState::Disconnecting;
+
+        if send {
+            let disconnect = Disconnect {};
+
+            let frame = Frame {
+                reliability: RakReliability::ReliableOrdered,
+                payload: {
+                    let mut buf = Vec::with_capacity(disconnect.size_hint());
+                    disconnect.serialize(&mut buf).unwrap();
+                    buf
+                },
+                reliable_index: 0,
+                sequence_index: 0,
+                order_index: 0,
+                order_channel: 0,
+                split_size: 0,
+                split_id: 0,
+                split_index: 0,
+            };
+
+            self.send_frame(frame, RakPriority::Immediate).await;
+        }
+
+        *state = RakSessionState::Disconnected;
+
+        if connected {
+            self.event_tx.send(RakSessionEvent::Disconnected(self.addr)).unwrap();
+        }
     }
 
     pub async fn run_update_loop(self: Arc<Self>, mut in_rx: UnboundedReceiver<Vec<u8>>, mut out_rx: UnboundedReceiver<(Frame, RakPriority)>) {
@@ -348,11 +718,22 @@ impl RakSessionInner {
 
         loop {
             tokio::select! {
-                Some((_, _)) = out_rx.recv() => {
-
+                Some(out) = out_rx.recv() => {
+                    self.send_frame(out.0, out.1).await;
                 },
-                Some(_) = in_rx.recv() => {
+                Some(buf) = in_rx.recv() => {
+                    let Some(&b) = buf.first() else { continue; };
 
+                    {
+                        *self.last_update.lock().await = Instant::now();
+                    };
+
+                    let mut cursor = Cursor::new(buf.as_slice());
+                    match b {
+                        _ if b & flags::VALID == 0 => debug!("received unknown online packet {:02X} from {}", b, self.addr),
+                        _ if b & (flags::ACK | flags::NACK) != 0 => self.handle_ack(&mut cursor).await,
+                        _ => self.handle_frame_set(&mut cursor).await,
+                    }
                 },
                 _ = tick_interval.tick() => {
                     self.tick().await;

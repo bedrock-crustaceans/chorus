@@ -17,7 +17,8 @@ use dashmap::DashMap;
 use std::io::Cursor;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
+use tokio::net::UdpSocket;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tracing::debug;
 
 pub struct RakServerInner {
@@ -26,16 +27,18 @@ pub struct RakServerInner {
 
     sessions: Arc<DashMap<SocketAddr, RakSession>>,
 
-    pub out_tx: UnboundedSender<(Vec<u8>, SocketAddr)>,
+    packet_tx: UnboundedSender<(Vec<u8>, SocketAddr)>,
+    event_tx: UnboundedSender<RakSessionEvent>,
 }
 
 impl RakServerInner {
-    pub fn new(config: RakServerConfig, addr: SocketAddr, out_tx: UnboundedSender<(Vec<u8>, SocketAddr)>) -> Self {
+    pub fn new(config: RakServerConfig, addr: SocketAddr, packet_tx: UnboundedSender<(Vec<u8>, SocketAddr)>, event_tx: UnboundedSender<RakSessionEvent>) -> Self {
         Self {
             config,
             addr,
             sessions: Arc::new(DashMap::new()),
-            out_tx,
+            packet_tx,
+            event_tx,
         }
     }
 
@@ -80,8 +83,6 @@ impl RakServerInner {
         UnconnectedPong::serialize(&pong, &mut buf).unwrap();
 
         self.send((buf, addr));
-
-        debug!("ponged {} with {:?}", addr, pong)
     }
 
     async fn handle_open_connection_request_1(&self, cursor: &mut Cursor<&[u8]>, addr: SocketAddr) {
@@ -123,8 +124,8 @@ impl RakServerInner {
             return debug!("failed to deserialize OpenConnectionRequest2 from {}", addr);
         };
 
-        if request.addr != self.addr {
-            return debug!("refusing connection from {} due to address mismatch", addr);
+        if request.addr.port() != self.addr.port() {
+            return debug!("refusing connection from {} due to port mismatch", addr);
         }
 
         let mtu = request.mtu;
@@ -146,39 +147,48 @@ impl RakServerInner {
 
         self.send((buf, addr));
 
-        let (event_tx, mut event_rx) = unbounded_channel();
-
-        self.sessions.insert(addr, RakSession::new(event_tx, addr, request.client, request.mtu, |_| ()));
-
-        tokio::spawn({
-            let sessions = self.sessions.clone();
-            async move {
-                while let Some(event) = event_rx.recv().await {
-                    match event {
-                        RakSessionEvent::Connected(_) => {}
-                        RakSessionEvent::Inbound(buf, addr) => {
-                            if let Some(&b) = buf.first()
-                                && let Some(session) = sessions.get(&addr)
-                            {
-                                let mut cursor = Cursor::new(buf.as_slice());
-                                match b {
-                                    packet_id::CONNECTION_REQUEST => session.handle_connection_request(&mut cursor).await,
-                                    packet_id::NEW_INCOMING_CONNECTION => session.handle_new_incoming_connection(&mut cursor).await,
-                                    _ => debug!("packet from {}, id: {:#04X}", addr, b),
-                                }
-                            }
-                        }
-                        RakSessionEvent::Outbound(_, _) => {}
-                        RakSessionEvent::Disconnected(addr) => {
-                            sessions.remove(&addr);
-                        }
-                    }
-                }
-            }
-        });
+        self.sessions.insert(addr, RakSession::new(self.event_tx.clone(), addr, request.client, request.mtu, |_| ()));
     }
 
     fn send(&self, packet: (Vec<u8>, SocketAddr)) {
-        _ = self.out_tx.send(packet);
+        _ = self.packet_tx.send(packet);
+    }
+
+    pub async fn run_update_loop(self: Arc<Self>, mut packet_rx: UnboundedReceiver<(Vec<u8>, SocketAddr)>, mut event_rx: UnboundedReceiver<RakSessionEvent>) {
+        let socket = UdpSocket::bind(self.addr).await.unwrap();
+
+        let mut buf = vec![0u8; self.config.max_mtu_size as usize];
+
+        loop {
+            tokio::select! {
+                recv = socket.recv_from(&mut buf) => {
+                    if let Ok((len, addr)) = recv {
+                        self.handle(&buf[..len], addr).await;
+                    }
+                }
+                Some(packet) = packet_rx.recv() => {
+                    socket.send_to(&packet.0, &packet.1).await.unwrap();
+                }
+                Some(event) = event_rx.recv() => {
+                    match event {
+                        RakSessionEvent::Disconnected(addr) => {
+                            self.sessions.remove(&addr);
+                        }
+                        RakSessionEvent::Inbound(buf, addr) => {
+                            if let Some(session) = self.sessions.get_mut(&addr) &&
+                                let Some(&b) = buf.first() {
+                                    let mut cursor = Cursor::new(buf.as_slice());
+                                    match b {
+                                        packet_id::CONNECTION_REQUEST => session.handle_connection_request(&mut cursor).await,
+                                        packet_id::NEW_INCOMING_CONNECTION => session.handle_new_incoming_connection(&mut cursor).await,
+                                        _ => debug!("packet from {}, id: {:#04X}", addr, b),
+                                    }
+                                }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
     }
 }
