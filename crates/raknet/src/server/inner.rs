@@ -185,6 +185,9 @@ impl RakServerInner {
                                     }
                                 }
                         }
+                        RakSessionEvent::Outbound(buf, addr) => {
+                            socket.send_to(&buf, addr).await.unwrap();
+                        }
                         _ => {}
                     }
                 }

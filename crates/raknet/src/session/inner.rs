@@ -233,12 +233,14 @@ impl RakSessionInner {
         let frames = {
             let mut frames = Vec::new();
             let mut outbound_queue = self.outbound_queue.lock().await;
-            while let Some(frame) = outbound_queue.pop_front_if(|f| f.size_hint() > bandwidth) {
+            while let Some(frame) = outbound_queue.pop_front_if(|f| f.size_hint() <= bandwidth) {
                 bandwidth -= frame.size_hint();
                 frames.push(frame);
             }
             frames
         };
+        
+        if frames.is_empty() { return; };
 
         let sets = self.make_sets(frames).await;
         for set in sets {
@@ -336,7 +338,7 @@ impl RakSessionInner {
         let order_channel = frame.order_channel;
 
         let mut reliability = frame.reliability;
-        let mut split_id = 0u16;
+        let mut split_id = 0;
 
         let payloads = if frame.size_hint() > max_size {
             reliability = match reliability {
@@ -385,7 +387,7 @@ impl RakSessionInner {
                 sequence_index: seq_idx,
                 order_index: ord_idx,
                 order_channel,
-                split_size: split_size as u32,
+                split_size: if split_size > 1 { split_size as u32 } else { 0 },
                 split_id,
                 split_index: i as u32,
             })
@@ -413,8 +415,6 @@ impl RakSessionInner {
         let Ok(ack) = Ack::deserialize(buf) else {
             return debug!("failed to deserialize Ack from {}", self.addr);
         };
-
-        debug!("handling ack from {}; {:#?}", self.addr, ack);
 
         let now = Instant::now();
         for seq in ack.sequences {
@@ -576,8 +576,6 @@ impl RakSessionInner {
             return;
         };
 
-        debug!("handling packet from {}", self.addr);
-
         let mut cursor = Cursor::new(buf.as_slice());
         match b {
             packet_id::CONNECTED_PING => self.handle_connected_ping(&mut cursor).await,
@@ -605,7 +603,7 @@ impl RakSessionInner {
             system_index: 0,
             system_addresses: vec![],
             request_timestamp: request.client_timestamp,
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64,
+            timestamp: UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
         };
 
         let mut buf = Vec::with_capacity(ConnectionRequestAccepted::size_hint(&accepted));

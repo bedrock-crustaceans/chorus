@@ -98,7 +98,7 @@ impl RakCodec for Frame {
             (0, 0, 0)
         };
 
-        let mut payload = Vec::with_capacity(length);
+        let mut payload = vec![0; length];
         reader.read_exact(&mut payload)?;
 
         Ok(Self {
