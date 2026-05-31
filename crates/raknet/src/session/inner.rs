@@ -239,8 +239,10 @@ impl RakSessionInner {
             }
             frames
         };
-        
-        if frames.is_empty() { return; };
+
+        if frames.is_empty() {
+            return;
+        };
 
         let sets = self.make_sets(frames).await;
         for set in sets {
