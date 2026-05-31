@@ -17,6 +17,8 @@ bevy_ecs = { version = "0.18.1", features = ["debug"] }
 bevy_time = "0.18.1"
 bevy_tasks = "0.18.1"
 
+# raknet = { path = "crates/raknet" }
+
 crossbeam-channel = "0.5.15"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

@@ -42,6 +42,40 @@ impl Network {
         let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(config.threads).enable_all().build().unwrap();
 
         let mut listener = runtime.block_on(async {
+            // let mut raknet_server = RakServer::start(
+            //     SocketAddr::new(
+            //         IpAddr::V4(Ipv4Addr::from_str(config.ip.as_str()).unwrap_or_else(|err| {
+            //             error!("{}: {}", err, config.ip);
+            //
+            //             Ipv4Addr::UNSPECIFIED
+            //         })),
+            //         config.port,
+            //     ),
+            //     |conf| {
+            //         let guid: u64 = random();
+            //
+            //         conf.message = {
+            //             let mut buf = Vec::new();
+            //
+            //             let str = [
+            //                 "MCPE",
+            //                 config.name.as_str(),
+            //                 BedrockProtocol::PROTOCOL_VERSION.to_string().as_str(),
+            //                 BedrockProtocol::GAME_VERSION,
+            //                 0.to_string().as_str(),
+            //                 config.max_players.to_string().as_str(),
+            //                 guid.to_string().as_str(),
+            //                 config.sub_name.as_str(),
+            //                 "Survival"
+            //             ].join(";");
+            //
+            //             buf.extend(str.as_bytes());
+            //             buf
+            //         };
+            //         conf.guid = guid;
+            //     }
+            // );
+
             let mut listener = Listener::new_raknet(
                 SocketAddr::new(
                     IpAddr::V4(Ipv4Addr::from_str(config.ip.as_str()).unwrap_or_else(|err| {
