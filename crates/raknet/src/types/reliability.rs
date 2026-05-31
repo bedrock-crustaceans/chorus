@@ -13,24 +13,18 @@ pub enum RakReliability {
 
 impl RakReliability {
     pub fn is_reliable(&self) -> bool {
-        match self {
-            RakReliability::Reliable | RakReliability::ReliableOrdered | RakReliability::ReliableWithAckReceipt | RakReliability::ReliableOrderedWithAckReceipt => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            RakReliability::Reliable | RakReliability::ReliableOrdered | RakReliability::ReliableWithAckReceipt | RakReliability::ReliableOrderedWithAckReceipt
+        )
     }
 
     pub fn is_sequenced(&self) -> bool {
-        match self {
-            RakReliability::ReliableSequenced | RakReliability::UnreliableSequenced => true,
-            _ => false,
-        }
+        matches!(self, RakReliability::ReliableSequenced | RakReliability::UnreliableSequenced)
     }
 
     pub fn is_ordered(&self) -> bool {
-        match self {
-            RakReliability::ReliableOrdered | RakReliability::ReliableOrderedWithAckReceipt => true,
-            _ => false,
-        }
+        matches!(self, RakReliability::ReliableOrdered | RakReliability::ReliableOrderedWithAckReceipt)
     }
 }
 

@@ -2,6 +2,7 @@ pub mod config;
 pub mod congestion_controller;
 pub mod event;
 pub mod inner;
+pub mod message;
 pub mod state;
 
 use crate::session::config::RakSessionConfig;
@@ -23,15 +24,14 @@ impl RakSession {
     where
         F: FnOnce(&mut RakSessionConfig),
     {
-        let (in_tx, in_rx) = unbounded_channel();
-        let (out_tx, out_rx) = unbounded_channel();
+        let (msg_tx, msg_rx) = unbounded_channel();
 
-        let inner = Arc::new(RakSessionInner::new(event_tx, in_tx, out_tx, addr, guid, mtu, conf));
+        let inner = Arc::new(RakSessionInner::new(event_tx, msg_tx, addr, guid, mtu, conf));
 
         tokio::spawn({
             let inner = inner.clone();
             async move {
-                inner.run_update_loop(in_rx, out_rx).await;
+                inner.run_update_loop(msg_rx).await;
             }
         });
 

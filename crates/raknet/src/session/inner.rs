@@ -11,6 +11,7 @@ use crate::protocol::types::frame::Frame;
 use crate::session::config::RakSessionConfig;
 use crate::session::congestion_controller::RakCongestionController;
 use crate::session::event::RakSessionEvent;
+use crate::session::message::RakSessionMessage;
 use crate::session::state::RakSessionState;
 use crate::types::priority::RakPriority;
 use crate::types::reliability::RakReliability;
@@ -24,13 +25,14 @@ use std::io::Cursor;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU64, Ordering};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tracing::debug;
 
 pub struct RakSessionInner {
     event_tx: UnboundedSender<RakSessionEvent>,
+    msg_tx: UnboundedSender<RakSessionMessage>,
 
     addr: SocketAddr,
     guid: u64,
@@ -43,10 +45,6 @@ pub struct RakSessionInner {
     last_update: Mutex<Instant>,
     last_ping: AtomicU64,
     last_pong: AtomicU64,
-
-    in_tx: UnboundedSender<Vec<u8>>,
-    out_tx: UnboundedSender<(Frame, RakPriority)>,
-
     queue: Mutex<VecDeque<(Vec<u8>, SocketAddr)>>,
 
     sequences_recv: Mutex<HashSet<u32>>,
@@ -69,7 +67,7 @@ pub struct RakSessionInner {
 }
 
 impl RakSessionInner {
-    pub fn new<F>(event_tx: UnboundedSender<RakSessionEvent>, in_tx: UnboundedSender<Vec<u8>>, out_tx: UnboundedSender<(Frame, RakPriority)>, addr: SocketAddr, guid: u64, mtu: u16, conf: F) -> Self
+    pub fn new<F>(event_tx: UnboundedSender<RakSessionEvent>, msg_tx: UnboundedSender<RakSessionMessage>, addr: SocketAddr, guid: u64, mtu: u16, conf: F) -> Self
     where
         F: FnOnce(&mut RakSessionConfig),
     {
@@ -79,6 +77,8 @@ impl RakSessionInner {
 
         Self {
             event_tx,
+            msg_tx,
+
             addr,
             guid,
             mtu,
@@ -90,9 +90,6 @@ impl RakSessionInner {
             last_update: Mutex::new(Instant::now()),
             last_ping: AtomicU64::new(0),
             last_pong: AtomicU64::new(0),
-
-            in_tx,
-            out_tx,
 
             sequences_recv: Mutex::new(HashSet::new()),
             sequences_lost: Mutex::new(HashSet::new()),
@@ -121,11 +118,11 @@ impl RakSessionInner {
     }
 
     pub fn send(&self, buf: Vec<u8>, reliability: RakReliability, priority: RakPriority) {
-        _ = self.out_tx.send((Frame::new(reliability, buf), priority));
+        _ = self.msg_tx.send(RakSessionMessage::OutFrame(Frame::new(reliability, buf), priority));
     }
 
     pub fn inbound(&self, buf: Vec<u8>) {
-        _ = self.in_tx.send(buf);
+        _ = self.msg_tx.send(RakSessionMessage::InBuf(buf));
     }
 
     pub async fn tick(&self) {
@@ -351,7 +348,7 @@ impl RakSessionInner {
             };
             split_id = self.outbound_spl.fetch_add(1, Ordering::Relaxed);
 
-            let split_size = (frame.payload.len() + max_size - 1) / max_size;
+            let split_size = frame.payload.len().div_ceil(max_size);
 
             let mut payloads = Vec::with_capacity(split_size);
             for i in 0..split_size {
@@ -712,27 +709,29 @@ impl RakSessionInner {
         }
     }
 
-    pub async fn run_update_loop(self: Arc<Self>, mut in_rx: UnboundedReceiver<Vec<u8>>, mut out_rx: UnboundedReceiver<(Frame, RakPriority)>) {
+    pub async fn run_update_loop(self: Arc<Self>, mut msg_rx: UnboundedReceiver<RakSessionMessage>) {
         let mut tick_interval = tokio::time::interval(Duration::from_millis(10));
         let mut ping_interval = tokio::time::interval(Duration::from_millis(2000));
 
         loop {
             tokio::select! {
-                Some(out) = out_rx.recv() => {
-                    self.send_frame(out.0, out.1).await;
-                },
-                Some(buf) = in_rx.recv() => {
-                    let Some(&b) = buf.first() else { continue; };
-
-                    {
-                        *self.last_update.lock().await = Instant::now();
-                    };
-
-                    let mut cursor = Cursor::new(buf.as_slice());
-                    match b {
-                        _ if b & flags::VALID == 0 => debug!("received unknown online packet {:02X} from {}", b, self.addr),
-                        _ if b & (flags::ACK | flags::NACK) != 0 => self.handle_ack(&mut cursor).await,
-                        _ => self.handle_frame_set(&mut cursor).await,
+                Some(msg) = msg_rx.recv() => {
+                    match msg {
+                        RakSessionMessage::InBuf(buf) => {
+                            let Some(&b) = buf.first() else { continue; };
+                            {
+                                *self.last_update.lock().await = Instant::now();
+                            };
+                            let mut cursor = Cursor::new(buf.as_slice());
+                            match b {
+                                _ if b & flags::VALID == 0 => debug!("received unknown online packet {:02X} from {}", b, self.addr),
+                                _ if b & (flags::ACK | flags::NACK) != 0 => self.handle_ack(&mut cursor).await,
+                                _ => self.handle_frame_set(&mut cursor).await,
+                            }
+                        },
+                        RakSessionMessage::OutFrame(frame, priority) => {
+                            self.send_frame(frame, priority).await;
+                        }
                     }
                 },
                 _ = tick_interval.tick() => {

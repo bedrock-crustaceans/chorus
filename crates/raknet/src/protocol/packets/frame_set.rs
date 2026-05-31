@@ -41,7 +41,7 @@ impl RakCodec for FrameSet {
         writer.write_u8(flags)?;
         writer.write_u24::<LittleEndian>(self.sequence)?;
         for frame in &self.frames {
-            Frame::serialize(&frame, writer)?;
+            Frame::serialize(frame, writer)?;
         }
 
         Ok(())
@@ -76,6 +76,6 @@ impl RakCodec for FrameSet {
     }
 
     fn size_hint(&self) -> usize {
-        size_of::<u8>() + 3 + self.frames.iter().fold(0, |acc, frame| acc + Frame::size_hint(&frame))
+        size_of::<u8>() + 3 + self.frames.iter().fold(0, |acc, frame| acc + Frame::size_hint(frame))
     }
 }

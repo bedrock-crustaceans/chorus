@@ -17,12 +17,9 @@ impl RakCodec for OpenConnectionRequest2 {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_u8(OPEN_CONNECTION_REQUEST_2)?;
         writer.write_all(&MAGIC)?;
-        match self.cookie {
-            Some(cookie) => {
-                writer.write_i32::<BigEndian>(cookie)?;
-                writer.write_u8(0)?; // no security challenge
-            }
-            None => (),
+        if let Some(cookie) = self.cookie {
+            writer.write_i32::<BigEndian>(cookie)?;
+            writer.write_u8(0)?; // no security challenge
         }
         SocketAddr::serialize(&self.addr, writer)?;
         writer.write_u16::<BigEndian>(self.mtu)?;

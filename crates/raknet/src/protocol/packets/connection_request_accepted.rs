@@ -62,7 +62,7 @@ impl RakCodec for ConnectionRequestAccepted {
         size_of::<u8>()
             + SocketAddr::size_hint(&self.client_address)
             + size_of::<u16>()
-            + self.system_addresses.iter().fold(0, |acc, addr| acc + SocketAddr::size_hint(&addr))
+            + self.system_addresses.iter().fold(0, |acc, addr| acc + SocketAddr::size_hint(addr))
             + size_of::<u64>()
             + size_of::<u64>()
     }

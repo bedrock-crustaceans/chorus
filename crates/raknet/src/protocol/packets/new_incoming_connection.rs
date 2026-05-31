@@ -54,6 +54,6 @@ impl RakCodec for NewIncomingConnection {
     }
 
     fn size_hint(&self) -> usize {
-        size_of::<u8>() + SocketAddr::size_hint(&self.server_address) + self.internal_addresses.iter().fold(0, |acc, addr| acc + SocketAddr::size_hint(&addr)) + size_of::<u64>() + size_of::<u64>()
+        size_of::<u8>() + SocketAddr::size_hint(&self.server_address) + self.internal_addresses.iter().fold(0, |acc, addr| acc + SocketAddr::size_hint(addr)) + size_of::<u64>() + size_of::<u64>()
     }
 }

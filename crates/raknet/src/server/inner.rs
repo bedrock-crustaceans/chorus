@@ -48,7 +48,7 @@ impl RakServerInner {
                 0 => self.handle_offline(buf, addr).await,
                 _ => {
                     if let Some(s) = self.sessions.get(&addr) {
-                        _ = s.inbound(buf.to_vec());
+                        s.inbound(buf.to_vec());
                     }
                 }
             }

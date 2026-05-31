@@ -49,6 +49,6 @@ impl RakCodec for OpenConnectionReply1 {
     }
 
     fn size_hint(&self) -> usize {
-        size_of::<u8>() + MAGIC.len() + size_of::<u64>() + size_of::<u8>() + if matches!(&self.cookie, Some(_)) { size_of::<i32>() } else { 0 } + size_of::<u16>()
+        size_of::<u8>() + MAGIC.len() + size_of::<u64>() + size_of::<u8>() + if self.cookie.is_some() { size_of::<i32>() } else { 0 } + size_of::<u16>()
     }
 }
