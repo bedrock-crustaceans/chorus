@@ -120,7 +120,7 @@ impl RakServer {
             match b {
                 packet_id::CONNECTION_REQUEST => return self.handle_connection_request(addr, &mut cursor, now),
                 packet_id::NEW_INCOMING_CONNECTION => return self.handle_new_incoming_connection(addr, &mut cursor),
-                _ => debug!("packet from {}, id: {:#04X}", addr, b),
+                _ => {},
             }
         }
 

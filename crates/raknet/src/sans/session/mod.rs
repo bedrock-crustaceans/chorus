@@ -693,7 +693,7 @@ impl RakSession {
         self.state = RakSessionState::Disconnected;
 
         if connected {
-            self.eout.push_back(Eout::Disconnected(self.addr));
+            self.eout.push_back(Eout::Disconnected(self.id));
         }
     }
 }

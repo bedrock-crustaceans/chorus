@@ -1,6 +1,5 @@
-use std::net::SocketAddr;
+use crate::sans::session::RakSessionId;
 
 pub enum Eout {
-    Connected(SocketAddr),
-    Disconnected(SocketAddr),
+    Disconnected(RakSessionId),
 }

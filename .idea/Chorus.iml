@@ -5,6 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/protocol/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/raknet/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/raknet-tokio/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/protocol/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/crates/raknet/target" />

@@ -9,7 +9,7 @@ authors = ["OmniacDev"]
 path = "src/lib.rs"
 
 [workspace]
-members = ["crates/raknet"]
+members = ["crates/raknet", "crates/raknet-tokio"]
 
 [dependencies]
 bevy_app = "0.18.1"
