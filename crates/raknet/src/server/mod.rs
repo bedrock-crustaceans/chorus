@@ -4,8 +4,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::mpsc::unbounded_channel;
 
-mod config;
-mod inner;
+pub mod config;
+pub mod inner;
 
 #[derive(Clone)]
 pub struct RakServer {

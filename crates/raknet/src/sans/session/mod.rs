@@ -28,13 +28,18 @@ use sansio::Protocol;
 use std::cmp::{Reverse, min};
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::io::Cursor;
-use std::mem::replace;
+use std::mem::{replace, take};
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::debug;
 
+#[derive(Default, Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct RakSessionId(pub u64);
+
 pub struct RakSession {
-    addr: SocketAddr,
+    pub id: RakSessionId,
+    pub addr: SocketAddr,
+    pub state: RakSessionState,
     guid: u64,
     mtu: u16,
     config: RakSessionConfig,
@@ -44,7 +49,6 @@ pub struct RakSession {
     last_recv: SystemTime,
     last_pong: SystemTime,
 
-    state: RakSessionState,
     congestion_controller: RakCongestionController,
 
     queue: VecDeque<(Vec<u8>, SocketAddr)>,
@@ -148,7 +152,7 @@ impl Protocol<Rin, Win, ()> for RakSession {
 }
 
 impl RakSession {
-    pub fn new<F>(addr: SocketAddr, guid: u64, mtu: u16, conf: F) -> Self
+    pub fn new<F>(id: RakSessionId, addr: SocketAddr, guid: u64, mtu: u16, conf: F) -> Self
     where
         F: FnOnce(&mut RakSessionConfig),
     {
@@ -159,6 +163,7 @@ impl RakSession {
         let now = SystemTime::now();
 
         Self {
+            id,
             addr,
             guid,
             mtu,
@@ -319,19 +324,18 @@ impl RakSession {
 
                 sets.push(FrameSet {
                     sequence: self.outbound_seq,
-                    frames: batch.clone(),
+                    frames: take(&mut batch),
                     continuous_send,
                     needs_b_and_as: true,
                     is_pair: false,
                 });
                 self.outbound_seq += 1;
 
-                batch.clear();
                 size = DGRAM_HEADER_SIZE as usize;
             }
 
             size += frame_size;
-            batch.push(frame.clone());
+            batch.push(frame);
         }
 
         if !batch.is_empty() {
@@ -339,7 +343,7 @@ impl RakSession {
 
             sets.push(FrameSet {
                 sequence: self.outbound_seq,
-                frames: batch.clone(),
+                frames: batch,
                 continuous_send,
                 needs_b_and_as: true,
                 is_pair: false,
@@ -623,48 +627,6 @@ impl RakSession {
         }
     }
 
-    pub fn handle_connection_request(&mut self, buf: &mut Cursor<&[u8]>, now: SystemTime) {
-        match self.state {
-            RakSessionState::Connecting => (),
-            _ => return debug!("unexpected ConnectionRequest from {}", self.addr),
-        }
-
-        let Ok(request) = ConnectionRequest::deserialize(buf) else {
-            return debug!("failed to deserialize ConnectionRequest from {}", self.addr);
-        };
-
-        debug!("handling connection request from {}", self.addr);
-
-        let accepted = ConnectionRequestAccepted {
-            client_address: self.addr,
-            system_index: 0,
-            system_addresses: vec![],
-            request_timestamp: request.client_timestamp,
-            timestamp: UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
-        };
-
-        let mut buf = Vec::with_capacity(ConnectionRequestAccepted::size_hint(&accepted));
-        ConnectionRequestAccepted::serialize(&accepted, &mut buf).unwrap();
-
-        self.send(buf, RakReliability::ReliableOrdered, RakPriority::Normal, now);
-    }
-
-    pub fn handle_new_incoming_connection(&mut self, buf: &mut Cursor<&[u8]>) {
-        match self.state {
-            RakSessionState::Connecting => {}
-            _ => return debug!("unexpected NewIncomingConnection from {}", self.addr),
-        }
-
-        let Ok(_) = NewIncomingConnection::deserialize(buf) else {
-            return debug!("failed to deserialize NewIncomingConnection from {}", self.addr);
-        };
-
-        debug!("handling new incoming connection from {}", self.addr);
-
-        self.state = RakSessionState::Connected;
-        self.eout.push_back(Eout::Connected(self.addr));
-    }
-
     fn handle_connected_ping(&mut self, buf: &mut Cursor<&[u8]>, now: SystemTime) {
         let Ok(ping) = ConnectedPing::deserialize(buf) else {
             return debug!("failed to deserialize ConnectedPing from {}", self.addr);
@@ -717,23 +679,13 @@ impl RakSession {
         self.state = RakSessionState::Disconnecting;
 
         if send {
-            let disconnect = Disconnect {};
+            let disconnect = Disconnect;
 
-            let frame = Frame {
-                reliability: RakReliability::ReliableOrdered,
-                payload: {
-                    let mut buf = Vec::with_capacity(disconnect.size_hint());
-                    disconnect.serialize(&mut buf).unwrap();
-                    buf
-                },
-                reliable_index: 0,
-                sequence_index: 0,
-                order_index: 0,
-                order_channel: 0,
-                split_size: 0,
-                split_id: 0,
-                split_index: 0,
-            };
+            let frame = Frame::new(RakReliability::ReliableOrdered, {
+                let mut buf = Vec::with_capacity(disconnect.size_hint());
+                disconnect.serialize(&mut buf).unwrap();
+                buf
+            });
 
             self.send_frame(frame, RakPriority::Immediate, now);
         }
