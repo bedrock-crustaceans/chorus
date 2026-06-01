@@ -1,0 +1,10 @@
+[package]
+name = "raknet-tokio"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = "1.52.3"
+sansio = "1.0.1"
+tracing = "0.1.44"
+raknet = { path = "../raknet" }
