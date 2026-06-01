@@ -11,6 +11,7 @@ byteorder = "1.5.0"
 rand = "0.10.0-rc.0"
 tracing = "0.1.44"
 dashmap = "6.1.0"
+sansio = "1.0.1"
 
 [dev-dependencies]
 tracing-subscriber = "0.3.23"
