@@ -1,5 +1,5 @@
-use raknet::sans::server::read::{Rin as ServerRin, Rout as ServerRout};
 use raknet::sans::server::RakServer;
+use raknet::sans::server::read::{Rin as ServerRin, Rout as ServerRout};
 use raknet::sans::session::read::Rin as SessionRin;
 use raknet::sans::session::{RakSession, RakSessionId};
 use raknet::server::config::RakServerConfig;
@@ -17,27 +17,27 @@ pub struct RakServerTokio {
 impl RakServerTokio {
     pub fn new<F>(addr: SocketAddr, conf: F) -> Self
     where
-        F: FnOnce(&mut RakServerConfig), 
+        F: FnOnce(&mut RakServerConfig),
     {
         let mut config = RakServerConfig::default();
         conf(&mut config);
-        
+
         let handle = tokio::spawn(async move {
             let mut sessions: HashMap<RakSessionId, RakSession> = HashMap::new();
-            
+
             let socket = UdpSocket::bind(addr).await.unwrap();
 
             let mut buf = vec![0u8; config.max_mtu_size as usize];
-            
+
             let mut server = RakServer::new(config, addr);
-            
+
             loop {
                 tokio::select! {
                     Ok((len, addr)) = socket.recv_from(&mut buf) => {
                         let now = SystemTime::now();
-                    
+
                         server.handle_read(ServerRin::Datagram(buf[..len].to_vec(), addr, now)).unwrap();
-                        
+
                         while let Some(msg) = server.poll_read() {
                             match msg {
                                 ServerRout::SocketDatagram(buf, addr) => {
@@ -46,7 +46,7 @@ impl RakServerTokio {
                                 ServerRout::SessionDatagram(buf, id) => {
                                     if let Some(session) = sessions.get_mut(&id) {
                                         let now = SystemTime::now();
-                                        
+
                                         session.handle_read(SessionRin::Datagram(buf, now)).unwrap();
                                     }
                                 },
@@ -59,13 +59,9 @@ impl RakServerTokio {
                 }
             }
         });
-        
-        Self {
-            handle
-        }
+
+        Self { handle }
     }
-    
-    pub async fn start(self) {
-        
-    }
+
+    pub async fn start(self) {}
 }

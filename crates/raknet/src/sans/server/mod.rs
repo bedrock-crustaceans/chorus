@@ -110,7 +110,7 @@ impl RakServer {
             match b {
                 packet_id::CONNECTION_REQUEST => return self.read_connection_request(addr, &mut cursor, now),
                 packet_id::NEW_INCOMING_CONNECTION => return self.read_new_incoming_connection(addr, &mut cursor),
-                _ => {},
+                _ => {}
             }
         }
 
