@@ -1,9 +1,5 @@
-use crate::sans::session::{RakSession, RakSessionId};
+use crate::sans::session::RakSessionId;
 
 pub enum Ein {
     Disconnected(RakSessionId),
-}
-
-pub enum Eout {
-    Connected(RakSessionId, RakSession),
 }

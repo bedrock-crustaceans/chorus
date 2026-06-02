@@ -93,8 +93,8 @@ impl Protocol<Rin, Win, ()> for RakSession {
                 let mut cursor = Cursor::new(buf.as_slice());
                 match b {
                     _ if b & flags::VALID == 0 => debug!("received unknown online packet {:02X} from {}", b, self.addr),
-                    _ if b & (flags::ACK | flags::NACK) != 0 => self.handle_ack(&mut cursor, now),
-                    _ => self.handle_frame_set(&mut cursor, now),
+                    _ if b & (flags::ACK | flags::NACK) != 0 => self.read_ack(&mut cursor, now),
+                    _ => self.read_frame_set(&mut cursor, now),
                 }
             }
         }
@@ -476,7 +476,7 @@ impl RakSession {
         }
     }
 
-    fn handle_ack(&mut self, buf: &mut Cursor<&[u8]>, now: SystemTime) {
+    fn read_ack(&mut self, buf: &mut Cursor<&[u8]>, now: SystemTime) {
         let Ok(ack) = Ack::deserialize(buf) else {
             return debug!("failed to deserialize Ack from {}", self.addr);
         };
@@ -497,7 +497,7 @@ impl RakSession {
         }
     }
 
-    fn handle_frame_set(&mut self, buf: &mut Cursor<&[u8]>, now: SystemTime) {
+    fn read_frame_set(&mut self, buf: &mut Cursor<&[u8]>, now: SystemTime) {
         let Ok(set) = FrameSet::deserialize(buf) else {
             return debug!("failed to deserialize FrameSet from {}", self.addr);
         };
@@ -519,18 +519,18 @@ impl RakSession {
         }
 
         for frame in set.frames {
-            self.handle_frame(frame, now);
+            self.read_frame(frame, now);
         }
     }
 
-    fn handle_frame(&mut self, frame: Frame, now: SystemTime) {
+    fn read_frame(&mut self, frame: Frame, now: SystemTime) {
         match frame.is_split() {
-            true => self.handle_split_frame(frame, now),
-            false => self.handle_full_frame(frame, now),
+            true => self.read_split_frame(frame, now),
+            false => self.read_full_frame(frame, now),
         }
     }
 
-    fn handle_full_frame(&mut self, frame: Frame, now: SystemTime) {
+    fn read_full_frame(&mut self, frame: Frame, now: SystemTime) {
         if frame.reliability.is_sequenced() {
             if frame.sequence_index < self.inbound_seq_idx[frame.order_channel as usize] || frame.order_index < self.inbound_ord_idx[frame.order_channel as usize] {
                 debug!("received out of order FrameSet {} from {}", frame.order_channel, self.addr);
@@ -538,7 +538,7 @@ impl RakSession {
 
             self.inbound_seq_idx[frame.order_channel as usize] = frame.sequence_index + 1;
 
-            return self.handle_packet(frame.payload, now);
+            return self.read_packet(frame.payload, now);
         }
 
         if frame.reliability.is_ordered() {
@@ -546,7 +546,7 @@ impl RakSession {
                 self.inbound_seq_idx[frame.order_channel as usize] = 0;
                 self.inbound_ord_idx[frame.order_channel as usize] = frame.order_index + 1;
 
-                self.handle_packet(frame.payload, now);
+                self.read_packet(frame.payload, now);
 
                 let mut idx = self.inbound_ord_idx[frame.order_channel as usize];
 
@@ -566,7 +566,7 @@ impl RakSession {
                 self.inbound_ord_idx[frame.order_channel as usize] = idx;
 
                 for packet in packets {
-                    self.handle_packet(packet, now);
+                    self.read_packet(packet, now);
                 }
                 return;
             }
@@ -582,10 +582,10 @@ impl RakSession {
             return;
         }
 
-        self.handle_packet(frame.payload, now);
+        self.read_packet(frame.payload, now);
     }
 
-    fn handle_split_frame(&mut self, frame: Frame, now: SystemTime) {
+    fn read_split_frame(&mut self, frame: Frame, now: SystemTime) {
         let mut frame = frame;
 
         let fragments = self.inbound_spl_queue.entry(frame.split_id).or_default();
@@ -609,25 +609,25 @@ impl RakSession {
             frame.split_id = 0;
             frame.split_index = 0;
 
-            self.handle_full_frame(frame, now);
+            self.read_full_frame(frame, now);
         }
     }
 
-    fn handle_packet(&mut self, buf: Vec<u8>, now: SystemTime) {
+    fn read_packet(&mut self, buf: Vec<u8>, now: SystemTime) {
         let Some(&b) = buf.first() else {
             return;
         };
 
         let mut cursor = Cursor::new(buf.as_slice());
         match b {
-            packet_id::CONNECTED_PING => self.handle_connected_ping(&mut cursor, now),
-            packet_id::CONNECTED_PONG => self.handle_connected_pong(&mut cursor, now),
-            packet_id::DISCONNECT => self.handle_disconnect(&mut cursor, now),
+            packet_id::CONNECTED_PING => self.read_connected_ping(&mut cursor, now),
+            packet_id::CONNECTED_PONG => self.read_connected_pong(&mut cursor, now),
+            packet_id::DISCONNECT => self.read_disconnect(&mut cursor, now),
             _ => self.rout.push_back(Rout::Datagram(buf)),
         }
     }
 
-    fn handle_connected_ping(&mut self, buf: &mut Cursor<&[u8]>, now: SystemTime) {
+    fn read_connected_ping(&mut self, buf: &mut Cursor<&[u8]>, now: SystemTime) {
         let Ok(ping) = ConnectedPing::deserialize(buf) else {
             return debug!("failed to deserialize ConnectedPing from {}", self.addr);
         };
@@ -643,7 +643,7 @@ impl RakSession {
         self.send(buf, RakReliability::Unreliable, RakPriority::Immediate, now);
     }
 
-    fn handle_connected_pong(&mut self, buf: &mut Cursor<&[u8]>, now: SystemTime) {
+    fn read_connected_pong(&mut self, buf: &mut Cursor<&[u8]>, now: SystemTime) {
         let Ok(pong) = ConnectedPong::deserialize(buf) else {
             return debug!("failed to deserialize ConnectedPong from {}", self.addr);
         };
@@ -653,7 +653,7 @@ impl RakSession {
         }
     }
 
-    fn handle_disconnect(&mut self, buf: &mut Cursor<&[u8]>, now: SystemTime) {
+    fn read_disconnect(&mut self, buf: &mut Cursor<&[u8]>, now: SystemTime) {
         let Ok(_) = Disconnect::deserialize(buf) else {
             return debug!("failed to deserialize Disconnect from {}", self.addr);
         };
@@ -663,6 +663,7 @@ impl RakSession {
         self.disconnect_internal(false, true, now);
     }
 
+    // TODO: should be a write
     pub fn disconnect(&mut self, now: SystemTime) {
         let connected = self.state == RakSessionState::Connected;
 

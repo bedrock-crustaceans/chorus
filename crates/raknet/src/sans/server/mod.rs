@@ -13,9 +13,7 @@ use crate::protocol::packets::open_connection_request_1::OpenConnectionRequest1;
 use crate::protocol::packets::open_connection_request_2::OpenConnectionRequest2;
 use crate::protocol::packets::unconnected_ping::UnconnectedPing;
 use crate::protocol::packets::unconnected_pong::UnconnectedPong;
-use crate::sans::server::event::Eout;
 use crate::sans::server::read::{Rin, Rout};
-use crate::sans::server::write::Wout;
 use crate::sans::session::{RakSession, RakSessionId};
 use crate::server::config::RakServerConfig;
 use crate::session::state::RakSessionState;
@@ -31,22 +29,20 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::debug;
 
 pub struct RakServer {
-    config: RakServerConfig,
     addr: SocketAddr,
+    config: RakServerConfig,
 
     session_id: RakSessionId,
     session_map: HashMap<SocketAddr, RakSessionId>,
     session_temp: HashMap<SocketAddr, RakSession>,
 
     rout: VecDeque<Rout>,
-    wout: VecDeque<Wout>,
-    eout: VecDeque<Eout>,
 }
 
 impl Protocol<Rin, (), ()> for RakServer {
     type Rout = Rout;
-    type Wout = Wout;
-    type Eout = Eout;
+    type Wout = ();
+    type Eout = ();
     type Error = ();
     type Time = ();
 
@@ -58,8 +54,8 @@ impl Protocol<Rin, (), ()> for RakServer {
                 };
 
                 match header & flags::VALID {
-                    0 => self.handle_offline(&buf, addr),
-                    _ => self.handle_online(buf, addr, now),
+                    0 => self.read_offline(&buf, addr),
+                    _ => self.read_online(buf, addr, now),
                 }
             }
         }
@@ -75,11 +71,7 @@ impl Protocol<Rin, (), ()> for RakServer {
     }
 
     fn poll_write(&mut self) -> Option<Self::Wout> {
-        self.wout.pop_front()
-    }
-
-    fn poll_event(&mut self) -> Option<Self::Eout> {
-        self.eout.pop_front()
+        None
     }
 }
 
@@ -94,42 +86,40 @@ impl RakServer {
             session_temp: HashMap::new(),
 
             rout: VecDeque::new(),
-            wout: VecDeque::new(),
-            eout: VecDeque::new(),
         }
     }
 
-    fn handle_offline(&mut self, buf: &[u8], addr: SocketAddr) {
+    fn read_offline(&mut self, buf: &[u8], addr: SocketAddr) {
         if let Some(&id) = buf.first() {
             let mut cursor = Cursor::new(buf);
             match id {
-                packet_id::UNCONNECTED_PING => self.handle_unconnected_ping(&mut cursor, addr),
-                packet_id::OPEN_CONNECTION_REQUEST_1 => self.handle_open_connection_request_1(&mut cursor, addr),
-                packet_id::OPEN_CONNECTION_REQUEST_2 => self.handle_open_connection_request_2(&mut cursor, addr),
+                packet_id::UNCONNECTED_PING => self.read_unconnected_ping(&mut cursor, addr),
+                packet_id::OPEN_CONNECTION_REQUEST_1 => self.read_open_connection_request_1(&mut cursor, addr),
+                packet_id::OPEN_CONNECTION_REQUEST_2 => self.read_open_connection_request_2(&mut cursor, addr),
 
                 _ => debug!("received unknown offline packet from {}, id: {:#04X}", addr, id),
             }
         }
     }
 
-    fn handle_online(&mut self, buf: Vec<u8>, addr: SocketAddr, now: SystemTime) {
+    fn read_online(&mut self, buf: Vec<u8>, addr: SocketAddr, now: SystemTime) {
         if self.session_temp.contains_key(&addr)
             && let Some(&b) = buf.first()
         {
             let mut cursor = Cursor::new(buf.as_slice());
             match b {
-                packet_id::CONNECTION_REQUEST => return self.handle_connection_request(addr, &mut cursor, now),
-                packet_id::NEW_INCOMING_CONNECTION => return self.handle_new_incoming_connection(addr, &mut cursor),
+                packet_id::CONNECTION_REQUEST => return self.read_connection_request(addr, &mut cursor, now),
+                packet_id::NEW_INCOMING_CONNECTION => return self.read_new_incoming_connection(addr, &mut cursor),
                 _ => {},
             }
         }
 
         if let Some(&id) = self.session_map.get(&addr) {
-            self.rout.push_back(Rout::Datagram(buf, id));
+            self.rout.push_back(Rout::SessionDatagram(buf, id));
         }
     }
 
-    fn handle_unconnected_ping(&mut self, cursor: &mut Cursor<&[u8]>, addr: SocketAddr) {
+    fn read_unconnected_ping(&mut self, cursor: &mut Cursor<&[u8]>, addr: SocketAddr) {
         let Ok(ping) = UnconnectedPing::deserialize(cursor) else {
             return debug!("failed to deserialize UnconnectedPing from {}", addr);
         };
@@ -143,10 +133,10 @@ impl RakServer {
         let mut buf = Vec::with_capacity(UnconnectedPong::size_hint(&pong));
         UnconnectedPong::serialize(&pong, &mut buf).unwrap();
 
-        self.wout.push_back(Wout::Datagram(buf, addr));
+        self.rout.push_back(Rout::SocketDatagram(buf, addr));
     }
 
-    fn handle_open_connection_request_1(&mut self, cursor: &mut Cursor<&[u8]>, addr: SocketAddr) {
+    fn read_open_connection_request_1(&mut self, cursor: &mut Cursor<&[u8]>, addr: SocketAddr) {
         let Ok(request) = OpenConnectionRequest1::deserialize(cursor) else {
             return debug!("failed to deserialize OpenConnectionRequest1 from {}", addr);
         };
@@ -163,7 +153,7 @@ impl RakServer {
             let mut buf = Vec::with_capacity(IncompatibleProtocol::size_hint(&incompatible));
             IncompatibleProtocol::serialize(&incompatible, &mut buf).unwrap();
 
-            self.wout.push_back(Wout::Datagram(buf, addr));
+            self.rout.push_back(Rout::SocketDatagram(buf, addr));
 
             return;
         }
@@ -177,10 +167,10 @@ impl RakServer {
         let mut buf = Vec::with_capacity(OpenConnectionReply1::size_hint(&reply));
         OpenConnectionReply1::serialize(&reply, &mut buf).unwrap();
 
-        self.wout.push_back(Wout::Datagram(buf, addr));
+        self.rout.push_back(Rout::SocketDatagram(buf, addr));
     }
 
-    fn handle_open_connection_request_2(&mut self, cursor: &mut Cursor<&[u8]>, addr: SocketAddr) {
+    fn read_open_connection_request_2(&mut self, cursor: &mut Cursor<&[u8]>, addr: SocketAddr) {
         let Ok(request) = OpenConnectionRequest2::deserialize(cursor) else {
             return debug!("failed to deserialize OpenConnectionRequest2 from {}", addr);
         };
@@ -206,7 +196,7 @@ impl RakServer {
         let mut buf = Vec::with_capacity(OpenConnectionReply2::size_hint(&reply));
         OpenConnectionReply2::serialize(&reply, &mut buf).unwrap();
 
-        self.wout.push_back(Wout::Datagram(buf, addr));
+        self.rout.push_back(Rout::SocketDatagram(buf, addr));
 
         let id = self.session_id;
         self.session_id.0 += 1;
@@ -215,7 +205,7 @@ impl RakServer {
         self.session_temp.insert(addr, RakSession::new(id, addr, request.client, request.mtu, |_| ()));
     }
 
-    fn handle_connection_request(&mut self, addr: SocketAddr, buf: &mut Cursor<&[u8]>, now: SystemTime) {
+    fn read_connection_request(&mut self, addr: SocketAddr, buf: &mut Cursor<&[u8]>, now: SystemTime) {
         let Ok(request) = ConnectionRequest::deserialize(buf) else {
             return debug!("failed to deserialize ConnectionRequest from {}", self.addr);
         };
@@ -240,7 +230,7 @@ impl RakServer {
         session.send(buf, RakReliability::ReliableOrdered, RakPriority::Normal, now);
     }
 
-    fn handle_new_incoming_connection(&mut self, addr: SocketAddr, buf: &mut Cursor<&[u8]>) {
+    fn read_new_incoming_connection(&mut self, addr: SocketAddr, buf: &mut Cursor<&[u8]>) {
         let Ok(_) = NewIncomingConnection::deserialize(buf) else {
             return debug!("failed to deserialize NewIncomingConnection from {}", addr);
         };
@@ -251,6 +241,6 @@ impl RakServer {
 
         session.state = RakSessionState::Connected;
 
-        self.eout.push_back(Eout::Connected(session.id, session))
+        self.rout.push_back(Rout::SessionConnected(session))
     }
 }
