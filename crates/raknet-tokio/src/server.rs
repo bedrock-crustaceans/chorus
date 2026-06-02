@@ -7,9 +7,7 @@ use raknet::session::input::RakSessionInput;
 use raknet::session::output::RakSessionOutput;
 use raknet::session::{RakSession, RakSessionId};
 use std::collections::HashMap;
-use std::future::pending;
 use std::net::SocketAddr;
-use std::pin::Pin;
 use std::time::{Duration, SystemTime};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
@@ -124,6 +122,7 @@ impl RakServerTokio {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::future::pending;
     use std::net::{Ipv4Addr, SocketAddrV4};
 
     #[tokio::test]
