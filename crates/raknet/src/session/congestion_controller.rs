@@ -3,6 +3,7 @@ use std::cmp::max;
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
+#[derive(Clone, Debug)]
 pub struct RakCongestionController {
     mtu: usize,
 

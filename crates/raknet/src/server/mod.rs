@@ -29,6 +29,8 @@ use std::io::Cursor;
 use std::net::SocketAddr;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::debug;
+use crate::session::input::RakSessionInput;
+use crate::session::output::RakSessionOutput;
 
 pub struct RakServer {
     addr: SocketAddr,
@@ -95,15 +97,29 @@ impl RakServer {
     }
 
     fn handle_online_datagram(&mut self, buf: Vec<u8>, addr: SocketAddr, now: SystemTime) {
-        if self.session_temp.contains_key(&addr)
-            && let Some(&b) = buf.first()
-        {
-            let mut cursor = Cursor::new(buf.as_slice());
-            match b {
-                packet_id::CONNECTION_REQUEST => return self.handle_connection_request(addr, &mut cursor, now),
-                packet_id::NEW_INCOMING_CONNECTION => return self.handle_new_incoming_connection(addr, &mut cursor),
-                _ => {}
+        if let Some(session) = self.session_temp.get_mut(&addr) {
+            session.handle(RakSessionInput::Datagram(buf, now)).unwrap();
+            
+            while let Some(msg) = session.poll() {
+                match msg {
+                    RakSessionOutput::Datagram(buf, addr) => {
+                        self.output.push_back(RakServerOutput::SocketDatagram(buf, addr))
+                    },
+                    RakSessionOutput::Packet(buf) => {
+                        if let Some(&b) = buf.first()
+                        {
+                            let mut cursor = Cursor::new(buf.as_slice());
+                            match b {
+                                packet_id::CONNECTION_REQUEST => return self.handle_connection_request(addr, &mut cursor, now),
+                                packet_id::NEW_INCOMING_CONNECTION => return self.handle_new_incoming_connection(addr, &mut cursor),
+                                _ => { debug!("unexpected packet {:02X} received from {} during connection phase", b, addr); }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
             }
+            return;
         }
 
         if let Some(&id) = self.session_map.get(&addr) {
@@ -219,7 +235,7 @@ impl RakServer {
         let mut buf = Vec::with_capacity(ConnectionRequestAccepted::size_hint(&accepted));
         ConnectionRequestAccepted::serialize(&accepted, &mut buf).unwrap();
 
-        session.send(buf, RakReliability::ReliableOrdered, RakPriority::Normal, now);
+        session.send(buf, RakReliability::ReliableOrdered, RakPriority::Immediate, now);
     }
 
     fn handle_new_incoming_connection(&mut self, addr: SocketAddr, buf: &mut Cursor<&[u8]>) {
@@ -230,6 +246,8 @@ impl RakServer {
         let Some(mut session) = self.session_temp.remove(&addr) else {
             return debug!("unexpected NewIncomingConnection from {}", addr);
         };
+        
+        debug!("handling new incoming connection from {}", addr);
 
         session.state = RakSessionState::Connected;
 

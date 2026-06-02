@@ -33,6 +33,7 @@ use tracing::debug;
 #[derive(Default, Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct RakSessionId(pub u64);
 
+#[derive(Clone, Debug)]
 pub struct RakSession {
     pub id: RakSessionId,
     pub addr: SocketAddr,
@@ -87,7 +88,7 @@ impl Sans for RakSession {
 
                 let mut cursor = Cursor::new(buf.as_slice());
                 match b {
-                    _ if b & flags::VALID == 0 => debug!("received unknown online packet {:02X} from {}", b, self.addr),
+                    _ if b & flags::VALID == 0 => debug!("received unknown online packet 0x{:02X} from {}", b, self.addr),
                     _ if b & (flags::ACK | flags::NACK) != 0 => self.read_ack(&mut cursor, now),
                     _ => self.read_frame_set(&mut cursor, now),
                 }

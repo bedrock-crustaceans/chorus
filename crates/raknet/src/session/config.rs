@@ -1,7 +1,7 @@
 use crate::util::constants::{AUTOFLUSH, AUTOFLUSH_INTERVAL_MS, MAX_ORDERING_CHANNELS, MAX_QUEUED_BYTES};
 use std::time::Duration;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RakSessionConfig {
     pub ordering_channels: i32,
     pub autoflush: bool,

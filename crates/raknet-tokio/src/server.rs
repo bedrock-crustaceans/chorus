@@ -10,11 +10,11 @@ use std::collections::HashMap;
 use std::future::pending;
 use std::net::SocketAddr;
 use std::pin::Pin;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 use tokio::task::JoinHandle;
-use tokio::time::sleep;
+use tokio::time::{sleep, Instant};
 use tracing::debug;
 
 pub struct RakServerTokio {
@@ -63,6 +63,8 @@ impl RakServerTokio {
                             }
                         }
                         RakServerOutput::SessionConnected(session) => {
+                            debug!("session {:?} connected", session.id);
+                            
                             sessions.insert(session.id, Self::spawn_session(tx.clone(), session));
                         }
                     }
@@ -82,7 +84,8 @@ impl RakServerTokio {
             let mut rx = rx;
             let mut session = session;
 
-            let mut timeout: Pin<Box<dyn Future<Output = ()> + Send>> = Box::pin(pending());
+            let timeout = sleep(Duration::ZERO);
+            tokio::pin!(timeout);
 
             loop {
                 tokio::select! {
@@ -91,14 +94,14 @@ impl RakServerTokio {
                     }
                     _ = &mut timeout => {
                         let now = SystemTime::now();
-
+                        
                         session.handle(RakSessionInput::Timeout(now)).unwrap();
                     }
                 }
 
                 while let Some(msg) = session.poll() {
                     match msg {
-                        RakSessionOutput::Timeout(when) => timeout = Box::pin(sleep(when)),
+                        RakSessionOutput::Timeout(when) => timeout.as_mut().reset(Instant::now() + when),
                         RakSessionOutput::Datagram(buf, addr) => {
                             datagram_tx.send((buf, addr)).unwrap();
                         }
@@ -106,7 +109,7 @@ impl RakServerTokio {
                             let Some(&b) = buf.first() else {
                                 continue;
                             };
-                            debug!("received packet {:02X} from {}", b, session.addr)
+                            debug!("received packet 0x{:02X} from {}", b, session.addr)
                         }
                         RakSessionOutput::Disconnected(..) => return,
                     }
