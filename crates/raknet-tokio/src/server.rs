@@ -1,9 +1,10 @@
+use raknet::sans::Sans;
 use raknet::sans::server::RakServer;
-use raknet::sans::server::read::{Rin as ServerRin, Rout as ServerRout};
-use raknet::sans::session::read::Rin as SessionRin;
+use raknet::sans::server::input::RakServerInput;
+use raknet::sans::server::output::RakServerOutput;
+use raknet::sans::session::input::RakSessionInput;
 use raknet::sans::session::{RakSession, RakSessionId};
 use raknet::server::config::RakServerConfig;
-use sansio::Protocol;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::SystemTime;
@@ -36,24 +37,24 @@ impl RakServerTokio {
                     Ok((len, addr)) = socket.recv_from(&mut buf) => {
                         let now = SystemTime::now();
 
-                        server.handle_read(ServerRin::Datagram(buf[..len].to_vec(), addr, now)).unwrap();
+                        server.handle(RakServerInput::Datagram(buf[..len].to_vec(), addr, now)).unwrap();
+                    }
+                }
 
-                        while let Some(msg) = server.poll_read() {
-                            match msg {
-                                ServerRout::SocketDatagram(buf, addr) => {
-                                    socket.send_to(&buf, addr).await.unwrap();
-                                },
-                                ServerRout::SessionDatagram(buf, id) => {
-                                    if let Some(session) = sessions.get_mut(&id) {
-                                        let now = SystemTime::now();
+                while let Some(msg) = server.poll() {
+                    match msg {
+                        RakServerOutput::SocketDatagram(buf, addr) => {
+                            socket.send_to(&buf, addr).await.unwrap();
+                        }
+                        RakServerOutput::SessionDatagram(buf, id) => {
+                            if let Some(session) = sessions.get_mut(&id) {
+                                let now = SystemTime::now();
 
-                                        session.handle_read(SessionRin::Datagram(buf, now)).unwrap();
-                                    }
-                                },
-                                ServerRout::SessionConnected(session) => {
-                                    sessions.insert(session.id, session);
-                                }
+                                session.handle(RakSessionInput::Datagram(buf, now)).unwrap();
                             }
+                        }
+                        RakServerOutput::SessionConnected(session) => {
+                            sessions.insert(session.id, session);
                         }
                     }
                 }

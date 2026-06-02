@@ -1,22 +1,18 @@
 pub mod congestion_controller;
-pub mod event;
-pub mod read;
-pub mod write;
+pub mod input;
+pub mod output;
 
 use crate::protocol::codec::RakCodec;
 use crate::protocol::packets::ack::Ack;
 use crate::protocol::packets::connected_ping::ConnectedPing;
 use crate::protocol::packets::connected_pong::ConnectedPong;
-use crate::protocol::packets::connection_request::ConnectionRequest;
-use crate::protocol::packets::connection_request_accepted::ConnectionRequestAccepted;
 use crate::protocol::packets::disconnect::Disconnect;
 use crate::protocol::packets::frame_set::FrameSet;
-use crate::protocol::packets::new_incoming_connection::NewIncomingConnection;
 use crate::protocol::types::frame::Frame;
+use crate::sans::Sans;
 use crate::sans::session::congestion_controller::RakCongestionController;
-use crate::sans::session::event::Eout;
-use crate::sans::session::read::{Rin, Rout};
-use crate::sans::session::write::{Win, Wout};
+use crate::sans::session::input::RakSessionInput;
+use crate::sans::session::output::RakSessionOutput;
 use crate::session::config::RakSessionConfig;
 use crate::session::state::RakSessionState;
 use crate::types::priority::RakPriority;
@@ -24,7 +20,6 @@ use crate::types::reliability::RakReliability;
 use crate::util::constants::{DGRAM_HEADER_SIZE, DGRAM_MTU_OVERHEAD, UDP_HEADER_SIZE};
 use crate::util::socket_addr::get_overhead;
 use crate::util::{flags, packet_id};
-use sansio::Protocol;
 use std::cmp::{Reverse, min};
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::io::Cursor;
@@ -71,21 +66,19 @@ pub struct RakSession {
     inbound_ord_idx: [u32; 32],
     inbound_seq_idx: [u32; 32],
 
-    rout: VecDeque<Rout>,
-    wout: VecDeque<Wout>,
-    eout: VecDeque<Eout>,
+    output: VecDeque<RakSessionOutput>,
 }
 
-impl Protocol<Rin, Win, ()> for RakSession {
-    type Rout = Rout;
-    type Wout = Wout;
-    type Eout = Eout;
+impl Sans for RakSession {
+    type Input = RakSessionInput;
+    type Output = RakSessionOutput;
     type Error = ();
-    type Time = SystemTime;
 
-    fn handle_read(&mut self, msg: Rin) -> Result<(), Self::Error> {
+    fn handle(&mut self, msg: Self::Input) -> Result<(), Self::Error> {
         match msg {
-            Rin::Datagram(buf, now) => {
+            RakSessionInput::Datagram(buf, now) => {
+                self.last_recv = now;
+
                 let Some(&b) = buf.first() else {
                     return Ok(());
                 };
@@ -97,57 +90,14 @@ impl Protocol<Rin, Win, ()> for RakSession {
                     _ => self.read_frame_set(&mut cursor, now),
                 }
             }
+            RakSessionInput::SendFrame(frame, priority, now) => self.send_frame(frame, priority, now),
+            RakSessionInput::Timeout(now) => self.handle_timeout(now),
         }
         Ok(())
     }
 
-    fn poll_read(&mut self) -> Option<Self::Rout> {
-        self.rout.pop_front()
-    }
-
-    fn handle_write(&mut self, msg: Win) -> Result<(), Self::Error> {
-        match msg {
-            Win::Frame(frame, priority, now) => self.send_frame(frame, priority, now),
-        }
-        Ok(())
-    }
-
-    fn poll_write(&mut self) -> Option<Self::Wout> {
-        self.wout.pop_front()
-    }
-
-    fn handle_timeout(&mut self, now: Self::Time) -> Result<(), Self::Error> {
-        if now >= self.last_recv + Duration::from_millis(15000) {
-            debug!("detected stale connection from {}, disconnecting...", self.addr);
-
-            self.disconnect_internal(true, true, now);
-            return Ok(());
-        }
-
-        if now >= self.last_tick + Duration::from_millis(10) {
-            self.tick(now);
-        }
-
-        if now >= self.last_ping + Duration::from_millis(2000) {
-            let ping = ConnectedPing {
-                timestamp: now.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64,
-            };
-
-            let mut buf = Vec::with_capacity(ConnectedPing::size_hint(&ping));
-            ConnectedPing::serialize(&ping, &mut buf).unwrap();
-        }
-
-        Ok(())
-    }
-
-    fn poll_timeout(&mut self) -> Option<Self::Time> {
-        [
-            self.last_tick + Duration::from_millis(10),
-            self.last_ping + Duration::from_millis(2000),
-            self.last_recv + Duration::from_millis(15000),
-        ]
-        .into_iter()
-        .min()
+    fn poll(&mut self) -> Option<Self::Output> {
+        self.output.pop_front()
     }
 }
 
@@ -197,9 +147,7 @@ impl RakSession {
             inbound_ord_idx: [0; 32],
             inbound_seq_idx: [0; 32],
 
-            rout: VecDeque::new(),
-            wout: VecDeque::new(),
-            eout: VecDeque::new(),
+            output: VecDeque::new(),
         }
     }
 
@@ -208,11 +156,49 @@ impl RakSession {
     }
 
     pub fn send(&mut self, buf: Vec<u8>, reliability: RakReliability, priority: RakPriority, now: SystemTime) {
-        _ = self.handle_write(Win::Frame(Frame::new(reliability, buf), priority, now));
+        _ = self.handle(RakSessionInput::SendFrame(Frame::new(reliability, buf), priority, now));
     }
 
     pub fn inbound(&mut self, buf: Vec<u8>, now: SystemTime) {
-        _ = self.handle_read(Rin::Datagram(buf, now));
+        _ = self.handle(RakSessionInput::Datagram(buf, now));
+    }
+
+    fn handle_timeout(&mut self, now: SystemTime) {
+        if now >= self.last_recv + Duration::from_millis(15000) {
+            debug!("detected stale connection from {}, disconnecting...", self.addr);
+
+            self.disconnect_internal(true, true, now);
+            return;
+        }
+
+        if now >= self.last_tick + Duration::from_millis(10) {
+            self.tick(now);
+
+            self.last_tick = now;
+        }
+
+        if now >= self.last_ping + Duration::from_millis(2000) {
+            let ping = ConnectedPing {
+                timestamp: now.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64,
+            };
+
+            let mut buf = Vec::with_capacity(ConnectedPing::size_hint(&ping));
+            ConnectedPing::serialize(&ping, &mut buf).unwrap();
+
+            self.last_ping = now;
+        }
+
+        let Some(next) = [
+            self.last_tick + Duration::from_millis(10),
+            self.last_ping + Duration::from_millis(2000),
+            self.last_recv + Duration::from_millis(15000),
+        ]
+        .into_iter()
+        .min() else {
+            return;
+        };
+
+        self.output.push_back(RakSessionOutput::Timeout(next));
     }
 
     pub fn tick(&mut self, now: SystemTime) {
@@ -359,7 +345,7 @@ impl RakSession {
         frameset.serialize(&mut buf).unwrap();
 
         match immediate {
-            true => self.wout.push_back(Wout::Datagram(buf, self.addr)),
+            true => self.output.push_back(RakSessionOutput::Datagram(buf, self.addr)),
             false => {
                 self.queue.push_back((buf, self.addr));
             }
@@ -379,7 +365,7 @@ impl RakSession {
 
     fn flush(&mut self) {
         for (buf, addr) in self.queue.drain(..) {
-            self.wout.push_back(Wout::Datagram(buf, addr));
+            self.output.push_back(RakSessionOutput::Datagram(buf, addr));
         }
     }
 
@@ -623,7 +609,7 @@ impl RakSession {
             packet_id::CONNECTED_PING => self.read_connected_ping(&mut cursor, now),
             packet_id::CONNECTED_PONG => self.read_connected_pong(&mut cursor, now),
             packet_id::DISCONNECT => self.read_disconnect(&mut cursor, now),
-            _ => self.rout.push_back(Rout::Datagram(buf)),
+            _ => self.output.push_back(RakSessionOutput::Packet(buf)),
         }
     }
 
@@ -694,7 +680,7 @@ impl RakSession {
         self.state = RakSessionState::Disconnected;
 
         if connected {
-            self.eout.push_back(Eout::Disconnected(self.id));
+            self.output.push_back(RakSessionOutput::Disconnected(self.id));
         }
     }
 }
