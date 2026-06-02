@@ -11,12 +11,6 @@ pub struct UnconnectedPong {
     pub message: Vec<u8>,
 }
 
-impl UnconnectedPong {
-    pub fn new(timestamp: u64, guid: u64, message: Vec<u8>) -> Self {
-        Self { timestamp, guid, message }
-    }
-}
-
 impl RakCodec for UnconnectedPong {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_u8(UNCONNECTED_PONG)?;

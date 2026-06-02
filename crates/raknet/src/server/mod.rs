@@ -1,5 +1,4 @@
 pub mod config;
-pub mod event;
 pub mod input;
 pub mod output;
 
@@ -250,6 +249,6 @@ impl RakServer {
 
         session.state = RakSessionState::Connected;
 
-        self.output.push_back(RakServerOutput::SessionConnected(session))
+        self.output.push_back(RakServerOutput::SessionConnected(Box::new(session)))
     }
 }

@@ -97,7 +97,7 @@ impl RakCodec for Ack {
             }
         }
 
-        Ok(Self { is_nack, sequences })
+        Ok(Self::new(sequences, is_nack))
     }
 
     fn size_hint(&self) -> usize {

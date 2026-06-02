@@ -1,6 +1,12 @@
-pub mod protocol;
-pub mod sans;
-pub mod server;
-pub mod session;
-pub mod types;
-pub mod util;
+mod protocol;
+mod sans;
+mod server;
+mod session;
+mod types;
+mod util;
+
+pub mod prelude {
+    pub use crate::sans::Sans;
+    pub use crate::server::{RakServer, config::RakServerConfig, input::RakServerInput, output::RakServerOutput};
+    pub use crate::session::{RakSession, RakSessionId, config::RakSessionConfig, input::RakSessionInput, output::RakSessionOutput};
+}

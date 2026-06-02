@@ -213,10 +213,7 @@ impl RakSession {
         }
 
         if !self.sequences_recv.is_empty() {
-            let ack = Ack {
-                is_nack: false,
-                sequences: self.sequences_recv.drain().collect(),
-            };
+            let ack = Ack::new(self.sequences_recv.drain().collect(), false);
 
             let mut buf = Vec::with_capacity(ack.size_hint());
             ack.serialize(&mut buf).unwrap();
@@ -225,10 +222,7 @@ impl RakSession {
         }
 
         if !self.sequences_lost.is_empty() {
-            let nack = Ack {
-                is_nack: true,
-                sequences: self.sequences_lost.drain().collect(),
-            };
+            let nack = Ack::new(self.sequences_lost.drain().collect(), true);
 
             let mut buf = Vec::with_capacity(nack.size_hint());
             nack.serialize(&mut buf).unwrap();
