@@ -16,6 +16,8 @@ use crate::protocol::packets::unconnected_ping::UnconnectedPing;
 use crate::protocol::packets::unconnected_pong::UnconnectedPong;
 use crate::sans::Sans;
 use crate::server::input::RakServerInput;
+use crate::session::input::RakSessionInput;
+use crate::session::output::RakSessionOutput;
 use crate::session::state::RakSessionState;
 use crate::session::{RakSession, RakSessionId};
 use crate::types::priority::RakPriority;
@@ -29,8 +31,6 @@ use std::io::Cursor;
 use std::net::SocketAddr;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::debug;
-use crate::session::input::RakSessionInput;
-use crate::session::output::RakSessionOutput;
 
 pub struct RakServer {
     addr: SocketAddr,
@@ -99,20 +99,19 @@ impl RakServer {
     fn handle_online_datagram(&mut self, buf: Vec<u8>, addr: SocketAddr, now: SystemTime) {
         if let Some(session) = self.session_temp.get_mut(&addr) {
             session.handle(RakSessionInput::Datagram(buf, now)).unwrap();
-            
+
             while let Some(msg) = session.poll() {
                 match msg {
-                    RakSessionOutput::Datagram(buf, addr) => {
-                        self.output.push_back(RakServerOutput::SocketDatagram(buf, addr))
-                    },
+                    RakSessionOutput::Datagram(buf, addr) => self.output.push_back(RakServerOutput::SocketDatagram(buf, addr)),
                     RakSessionOutput::Packet(buf) => {
-                        if let Some(&b) = buf.first()
-                        {
+                        if let Some(&b) = buf.first() {
                             let mut cursor = Cursor::new(buf.as_slice());
                             match b {
                                 packet_id::CONNECTION_REQUEST => return self.handle_connection_request(addr, &mut cursor, now),
                                 packet_id::NEW_INCOMING_CONNECTION => return self.handle_new_incoming_connection(addr, &mut cursor),
-                                _ => { debug!("unexpected packet {:02X} received from {} during connection phase", b, addr); }
+                                _ => {
+                                    debug!("unexpected packet {:02X} received from {} during connection phase", b, addr);
+                                }
                             }
                         }
                     }
@@ -246,7 +245,7 @@ impl RakServer {
         let Some(mut session) = self.session_temp.remove(&addr) else {
             return debug!("unexpected NewIncomingConnection from {}", addr);
         };
-        
+
         debug!("handling new incoming connection from {}", addr);
 
         session.state = RakSessionState::Connected;

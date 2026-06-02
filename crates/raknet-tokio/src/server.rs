@@ -14,7 +14,7 @@ use std::time::{Duration, SystemTime};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 use tokio::task::JoinHandle;
-use tokio::time::{sleep, Instant};
+use tokio::time::{Instant, sleep};
 use tracing::debug;
 
 pub struct RakServerTokio {
@@ -64,7 +64,7 @@ impl RakServerTokio {
                         }
                         RakServerOutput::SessionConnected(session) => {
                             debug!("session {:?} connected", session.id);
-                            
+
                             sessions.insert(session.id, Self::spawn_session(tx.clone(), session));
                         }
                     }
@@ -94,7 +94,7 @@ impl RakServerTokio {
                     }
                     _ = &mut timeout => {
                         let now = SystemTime::now();
-                        
+
                         session.handle(RakSessionInput::Timeout(now)).unwrap();
                     }
                 }
