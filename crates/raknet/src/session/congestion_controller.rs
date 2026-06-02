@@ -1,7 +1,7 @@
 use crate::util::constants::{CC_ADDITIONAL_VARIANCE, CC_MAX_THRESHOLD};
 use std::cmp::max;
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime};
 
 pub struct RakCongestionController {
     mtu: usize,
@@ -16,7 +16,7 @@ pub struct RakCongestionController {
 
     bytes_not_acknowledged: usize,
 
-    sent_times: HashMap<u32, Instant>,
+    sent_times: HashMap<u32, SystemTime>,
 }
 
 impl RakCongestionController {
@@ -84,9 +84,9 @@ impl RakCongestionController {
         }
     }
 
-    pub fn acked(&mut self, now: Instant, seq: u32, size: usize, last_sequence: u32) {
+    pub fn acked(&mut self, now: SystemTime, seq: u32, size: usize, last_sequence: u32) {
         if let Some(sent_at) = self.sent_times.remove(&seq) {
-            let rtt_ms = now.duration_since(sent_at).as_secs_f64() * 1000.0;
+            let rtt_ms = now.duration_since(sent_at).unwrap().as_secs_f64() * 1000.0;
             self.bytes_not_acknowledged -= size;
 
             if self.rtt_estimate_ms.is_infinite() {
@@ -121,8 +121,8 @@ impl RakCongestionController {
         }
     }
 
-    pub fn sent(&mut self, seq: u32, size: usize) {
+    pub fn sent(&mut self, seq: u32, size: usize, now: SystemTime) {
         self.bytes_not_acknowledged += size;
-        self.sent_times.insert(seq, Instant::now());
+        self.sent_times.insert(seq, now);
     }
 }

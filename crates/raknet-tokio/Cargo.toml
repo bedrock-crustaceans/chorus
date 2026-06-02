@@ -7,3 +7,4 @@ edition = "2024"
 tokio = "1.52.3"
 tracing = "0.1.44"
 raknet = { path = "../raknet" }
+tracing-subscriber = "0.3.23"

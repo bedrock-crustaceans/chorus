@@ -1,4 +1,4 @@
-use crate::sans::session::RakSessionId;
+use crate::session::RakSessionId;
 
 pub enum Ein {
     Disconnected(RakSessionId),
