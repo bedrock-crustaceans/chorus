@@ -4,8 +4,8 @@ use std::time::Duration;
 
 #[derive(Clone, Debug)]
 pub enum RakSessionOutput {
-    Packet(Vec<u8>),
-    Datagram(Vec<u8>, SocketAddr),
+    Packet(Box<[u8]>),
+    Datagram(Box<[u8]>, SocketAddr),
     Disconnected(RakSessionId),
     Timeout(Duration),
 }

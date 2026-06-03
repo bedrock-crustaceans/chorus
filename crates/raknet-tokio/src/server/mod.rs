@@ -54,17 +54,17 @@ impl RakServer<Initialized> {
             let mut buf = vec![0u8; config.max_mtu_size as usize];
             let mut server = RakServerIntl::new(config, addr);
 
-            let (tx, mut rx) = unbounded_channel::<(Vec<u8>, SocketAddr)>();
+            let (tx, mut rx) = unbounded_channel::<(Box<[u8]>, SocketAddr)>();
 
             loop {
                 tokio::select! {
                     Ok((len, addr)) = socket.recv_from(&mut buf) => {
                         let now = SystemTime::now();
 
-                        server.handle(RakServerInput::Datagram(buf[..len].to_vec(), addr, now)).unwrap();
+                        server.handle(RakServerInput::Datagram(buf[..len].into(), addr, now)).unwrap();
                     }
                     Some((buf, addr)) = rx.recv() => {
-                        socket.send_to(&buf, addr).await.unwrap();
+                        socket.send_to(buf.as_ref(), addr).await.unwrap();
                     }
                 }
 
@@ -122,7 +122,6 @@ impl RakServer<Running> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::future::pending;
 
     #[tokio::test]
     #[ignore]

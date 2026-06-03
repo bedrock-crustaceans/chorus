@@ -1,10 +1,10 @@
-use crate::protocol::types::frame::Frame;
+use crate::types::RakReliability;
 use crate::types::priority::RakPriority;
 use std::time::SystemTime;
 
 #[derive(Clone, Debug)]
 pub enum RakSessionInput {
-    Datagram(Vec<u8>, SystemTime),
-    SendFrame(Frame, RakPriority, SystemTime),
+    Datagram(Box<[u8]>, SystemTime),
+    Send(Box<[u8]>, RakReliability, RakPriority, SystemTime),
     Timeout(SystemTime),
 }

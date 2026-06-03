@@ -95,7 +95,7 @@ impl RakServer {
         }
     }
 
-    fn handle_online_datagram(&mut self, buf: Vec<u8>, addr: SocketAddr, now: SystemTime) {
+    fn handle_online_datagram(&mut self, buf: Box<[u8]>, addr: SocketAddr, now: SystemTime) {
         if let Some(session) = self.session_temp.get_mut(&addr) {
             session.handle(RakSessionInput::Datagram(buf, now)).unwrap();
 
@@ -104,7 +104,7 @@ impl RakServer {
                     RakSessionOutput::Datagram(buf, addr) => self.output.push_back(RakServerOutput::SocketDatagram(buf, addr)),
                     RakSessionOutput::Packet(buf) => {
                         if let Some(&b) = buf.first() {
-                            let mut cursor = Cursor::new(buf.as_slice());
+                            let mut cursor = Cursor::new(buf.as_ref());
                             match b {
                                 packet_id::CONNECTION_REQUEST => return self.handle_connection_request(addr, &mut cursor, now),
                                 packet_id::NEW_INCOMING_CONNECTION => return self.handle_new_incoming_connection(addr, &mut cursor),
@@ -138,6 +138,7 @@ impl RakServer {
 
         let mut buf = Vec::with_capacity(UnconnectedPong::size_hint(&pong));
         UnconnectedPong::serialize(&pong, &mut buf).unwrap();
+        let buf = buf.into_boxed_slice();
 
         self.output.push_back(RakServerOutput::SocketDatagram(buf, addr));
     }
@@ -158,6 +159,7 @@ impl RakServer {
 
             let mut buf = Vec::with_capacity(IncompatibleProtocol::size_hint(&incompatible));
             IncompatibleProtocol::serialize(&incompatible, &mut buf).unwrap();
+            let buf = buf.into_boxed_slice();
 
             self.output.push_back(RakServerOutput::SocketDatagram(buf, addr));
 
@@ -172,6 +174,7 @@ impl RakServer {
 
         let mut buf = Vec::with_capacity(OpenConnectionReply1::size_hint(&reply));
         OpenConnectionReply1::serialize(&reply, &mut buf).unwrap();
+        let buf = buf.into_boxed_slice();
 
         self.output.push_back(RakServerOutput::SocketDatagram(buf, addr));
     }
@@ -201,6 +204,7 @@ impl RakServer {
 
         let mut buf = Vec::with_capacity(OpenConnectionReply2::size_hint(&reply));
         OpenConnectionReply2::serialize(&reply, &mut buf).unwrap();
+        let buf = buf.into_boxed_slice();
 
         self.output.push_back(RakServerOutput::SocketDatagram(buf, addr));
 
@@ -232,8 +236,11 @@ impl RakServer {
 
         let mut buf = Vec::with_capacity(ConnectionRequestAccepted::size_hint(&accepted));
         ConnectionRequestAccepted::serialize(&accepted, &mut buf).unwrap();
+        let buf = buf.into_boxed_slice();
 
-        session.send(buf, RakReliability::ReliableOrdered, RakPriority::Immediate, now);
+        let reliability = RakReliability::ReliableOrdered;
+        let priority = RakPriority::Immediate;
+        _ = session.handle(RakSessionInput::Send(buf, reliability, priority, now));
     }
 
     fn handle_new_incoming_connection(&mut self, addr: SocketAddr, buf: &mut Cursor<&[u8]>) {

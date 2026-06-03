@@ -7,7 +7,7 @@ use std::io::{Error, ErrorKind, Read, Write};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Frame {
     pub reliability: RakReliability,
-    pub payload: Vec<u8>,
+    pub payload: Box<[u8]>,
     pub reliable_index: u32,
     pub sequence_index: u32,
     pub order_index: u32,
@@ -18,7 +18,7 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn new(reliability: RakReliability, payload: Vec<u8>) -> Self {
+    pub fn new(reliability: RakReliability, payload: Box<[u8]>) -> Self {
         Self {
             reliability,
             payload,
@@ -98,7 +98,7 @@ impl RakCodec for Frame {
             (0, 0, 0)
         };
 
-        let mut payload = vec![0; length];
+        let mut payload = vec![0; length].into_boxed_slice();
         reader.read_exact(&mut payload)?;
 
         Ok(Self {

@@ -29,7 +29,7 @@ pub fn on_enter_setup(mut sessions: Query<&mut Session>, mut server_state: ResMu
             continue;
         }
 
-        let Ok(mut session) = sessions.get_mut(ev.entity) else {
+        let Ok(session) = sessions.get_mut(ev.entity) else {
             continue;
         };
 

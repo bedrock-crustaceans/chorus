@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 
 #[derive(Clone, Debug)]
 pub enum RakServerOutput {
-    SocketDatagram(Vec<u8>, SocketAddr),
-    SessionDatagram(Vec<u8>, RakSessionId),
+    SocketDatagram(Box<[u8]>, SocketAddr),
+    SessionDatagram(Box<[u8]>, RakSessionId),
     SessionConnected(Box<RakSession>),
 }
