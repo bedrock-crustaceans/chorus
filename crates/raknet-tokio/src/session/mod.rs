@@ -78,37 +78,37 @@ impl RakSession {
     }
 
     pub async fn recv<T>(&mut self) -> Option<T>
-    where 
-        Box<[u8]>: Into<T>
+    where
+        Box<[u8]>: Into<T>,
     {
         self.buf_rx.recv().await.map(Into::into)
     }
-    
+
     pub fn try_recv<T>(&mut self) -> Option<T>
     where
-        Box<[u8]>: Into<T>
+        Box<[u8]>: Into<T>,
     {
         self.buf_rx.try_recv().ok().map(Into::into)
     }
 
     pub fn send<T>(&self, buf: T, reliability: RakReliability, priority: RakPriority)
-    where 
-        T: Into<Box<[u8]>>
+    where
+        T: Into<Box<[u8]>>,
     {
         let _ = self.msg_tx.send(RakSessionMsg::Send(buf.into(), reliability, priority));
     }
-    
+
     pub async fn close(&self) {
         let (tx, rx) = oneshot::channel();
-        if self.msg_tx.send(RakSessionMsg::Close(tx)).is_err() { 
-            return; 
+        if self.msg_tx.send(RakSessionMsg::Close(tx)).is_err() {
+            return;
         }
         let _ = rx.await;
     }
-    
+
     pub async fn is_closed(&self) -> bool {
         let (tx, rx) = oneshot::channel();
-        if self.msg_tx.send(RakSessionMsg::IsClosed(tx)).is_err() { 
+        if self.msg_tx.send(RakSessionMsg::IsClosed(tx)).is_err() {
             return true;
         }
         rx.await.unwrap_or_else(|_| true)
