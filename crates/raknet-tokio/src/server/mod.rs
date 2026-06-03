@@ -1,8 +1,9 @@
+use raknet::prelude::Sans;
 mod state;
 
 use crate::server::state::Shutdown;
-use crate::session::spawn_session;
-use raknet::prelude::{RakServer as RakServerIntl, *};
+use crate::session::RakSession;
+use raknet::prelude::{RakServer as RakServerIntl, RakServerConfig, RakServerInput, RakServerOutput, RakSessionId, RakSessionInput};
 use state::{Initialized, Running};
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -44,6 +45,8 @@ impl RakServer<Initialized> {
     pub fn start(self) -> RakServer<Running> {
         let Initialized { config, addr } = self.state;
 
+        let (session_tx, session_rx) = unbounded_channel();
+
         let handle = tokio::spawn(async move {
             let mut sessions: HashMap<RakSessionId, UnboundedSender<RakSessionInput>> = HashMap::new();
 
@@ -78,16 +81,24 @@ impl RakServer<Initialized> {
                             }
                         }
                         RakServerOutput::SessionConnected(session) => {
-                            debug!("session {:?} connected", session.id);
+                            let id = session.id;
 
-                            sessions.insert(session.id, spawn_session(tx.clone(), *session));
+                            debug!("session {:?} connected", id);
+
+                            let (session, tx) = RakSession::spawn(*session, tx.clone());
+
+                            sessions.insert(id, tx);
+
+                            session_tx.send(session).unwrap();
                         }
                     }
                 }
             }
         });
 
-        RakServer { state: Running { handle } }
+        RakServer {
+            state: Running { handle, session_rx },
+        }
     }
 }
 
@@ -97,6 +108,14 @@ impl RakServer<Running> {
         self.state.handle.abort();
 
         RakServer { state: Shutdown {} }
+    }
+
+    pub async fn recv(&mut self) -> Option<RakSession> {
+        self.state.session_rx.recv().await
+    }
+
+    pub fn try_recv(&mut self) -> Option<RakSession> {
+        self.state.session_rx.try_recv().ok()
     }
 }
 
@@ -123,8 +142,17 @@ mod tests {
         config.guid = 123456789;
         config.message = b"MCPE;Chorus;0;1.0.0;0;-1;123456789;Chorus;Survival".to_vec();
 
-        let _server = server.start();
+        let mut server = server.start();
 
-        pending().await
+        let mut sessions = Vec::new();
+
+        loop {
+            tokio::select! {
+                Some(recv) = server.recv() => {
+                    sessions.push(recv);
+                    debug!("received session")
+                }
+            }
+        }
     }
 }

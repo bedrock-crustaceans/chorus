@@ -213,17 +213,17 @@ impl RakServer {
 
     fn handle_connection_request(&mut self, addr: SocketAddr, buf: &mut Cursor<&[u8]>, now: SystemTime) {
         let Ok(request) = ConnectionRequest::deserialize(buf) else {
-            return debug!("failed to deserialize ConnectionRequest from {}", self.addr);
+            return debug!("failed to deserialize ConnectionRequest from {}", addr);
         };
 
         let Some(session) = self.session_temp.get_mut(&addr) else {
-            return debug!("unexpected ConnectionRequest from {}", self.addr);
+            return debug!("unexpected ConnectionRequest from {}", addr);
         };
 
-        debug!("handling connection request from {}", self.addr);
+        debug!("handling connection request from {}", addr);
 
         let accepted = ConnectionRequestAccepted {
-            client_address: self.addr,
+            client_address: addr,
             system_index: 0,
             system_addresses: vec![],
             request_timestamp: request.client_timestamp,
