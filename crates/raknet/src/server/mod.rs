@@ -59,6 +59,12 @@ impl Sans for RakServer {
                     _ => self.handle_online_datagram(buf, addr, now),
                 }
             }
+            RakServerInput::SetMaxConnections(n) => {
+                self.config.max_connections = n;
+            }
+            RakServerInput::SetMessage(msg) => {
+                self.config.message = msg;
+            }
         }
         Ok(())
     }

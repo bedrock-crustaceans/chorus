@@ -1,7 +1,9 @@
 use raknet::prelude::Sans;
+pub mod msg;
 mod state;
 
-use crate::server::state::Shutdown;
+use crate::server::msg::RakServerMsg;
+use crate::server::state::RakServerState;
 use crate::session::RakSession;
 use raknet::prelude::{RakServer as RakServerIntl, RakServerConfig, RakServerInput, RakServerOutput, RakSessionId, RakSessionInput};
 use state::{Initialized, Running};
@@ -12,110 +14,152 @@ use tokio::net::UdpSocket;
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 use tracing::debug;
 
-pub struct RakServer<S> {
-    state: S,
+pub struct RakServer {
+    state: RakServerState,
 }
 
-impl RakServer<Initialized> {
+impl RakServer {
     pub fn new(addr: SocketAddr) -> Self {
         RakServer {
-            state: Initialized {
+            state: RakServerState::Initialized(Initialized {
                 addr,
                 config: RakServerConfig::default(),
-            },
+            }),
         }
     }
 
-    pub fn config(&self) -> &RakServerConfig {
-        &self.state.config
+    pub fn set_guid(&mut self, val: u64) {
+        let RakServerState::Initialized(Initialized { config, .. }) = &mut self.state else {
+            return;
+        };
+
+        config.guid = val;
     }
 
-    pub fn addr(&self) -> SocketAddr {
-        self.state.addr
+    pub fn set_message<T>(&mut self, val: T)
+    where
+        T: Into<Box<[u8]>>,
+    {
+        let buf = val.into();
+        match &mut self.state {
+            RakServerState::Initialized(Initialized { config, .. }) => {
+                config.message = buf;
+            }
+            RakServerState::Running(Running { msg_tx, .. }) => {
+                msg_tx.send(RakServerMsg::SetMessage(buf)).unwrap();
+            }
+            _ => {}
+        }
     }
 
-    pub fn config_mut(&mut self) -> &mut RakServerConfig {
-        &mut self.state.config
+    pub fn set_max_connections(&mut self, val: usize) {
+        match &mut self.state {
+            RakServerState::Initialized(Initialized { config, .. }) => {
+                config.max_connections = val;
+            }
+            RakServerState::Running(Running { msg_tx, .. }) => {
+                msg_tx.send(RakServerMsg::SetMaxConnections(val)).unwrap();
+            }
+            _ => {}
+        }
     }
 
-    pub fn addr_mut(&mut self) -> &mut SocketAddr {
-        &mut self.state.addr
-    }
-
-    pub fn start(self) -> RakServer<Running> {
-        let Initialized { config, addr } = self.state;
+    pub fn start(&mut self) {
+        let RakServerState::Initialized(Initialized { config, addr }) = &self.state else {
+            return;
+        };
 
         let (session_tx, session_rx) = unbounded_channel();
+        let (msg_tx, msg_rx) = unbounded_channel();
 
-        let handle = tokio::spawn(async move {
-            let mut sessions: HashMap<RakSessionId, UnboundedSender<RakSessionInput>> = HashMap::new();
+        let handle = tokio::spawn({
+            let config = config.clone();
+            let addr = addr.clone();
 
-            let socket = UdpSocket::bind(addr).await.unwrap();
-            let mut buf = vec![0u8; config.max_mtu_size as usize];
-            let mut server = RakServerIntl::new(config, addr);
+            async move {
+                let mut msg_rx = msg_rx;
 
-            let (tx, mut rx) = unbounded_channel::<(Box<[u8]>, SocketAddr)>();
+                let mut sessions: HashMap<RakSessionId, UnboundedSender<RakSessionInput>> = HashMap::new();
 
-            loop {
-                tokio::select! {
-                    Ok((len, addr)) = socket.recv_from(&mut buf) => {
-                        let now = SystemTime::now();
+                let socket = UdpSocket::bind(addr).await.unwrap();
+                let mut buf = vec![0u8; config.max_mtu_size as usize];
+                let mut server = RakServerIntl::new(config, addr);
 
-                        server.handle(RakServerInput::Datagram(buf[..len].into(), addr, now)).unwrap();
-                    }
-                    Some((buf, addr)) = rx.recv() => {
-                        socket.send_to(buf.as_ref(), addr).await.unwrap();
-                    }
-                }
+                let (dgram_tx, mut dgram_rx) = unbounded_channel::<(Box<[u8]>, SocketAddr)>();
 
-                while let Some(msg) = server.poll() {
-                    match msg {
-                        RakServerOutput::SocketDatagram(buf, addr) => {
-                            socket.send_to(&buf, addr).await.unwrap();
+                loop {
+                    tokio::select! {
+                        Ok((len, addr)) = socket.recv_from(&mut buf) => {
+                            let now = SystemTime::now();
+
+                            server.handle(RakServerInput::Datagram(buf[..len].into(), addr, now)).unwrap();
                         }
-                        RakServerOutput::SessionDatagram(buf, id) => {
-                            if let Some(session) = sessions.get_mut(&id) {
-                                let now = SystemTime::now();
-
-                                session.send(RakSessionInput::Datagram(buf, now)).unwrap();
+                        Some((buf, addr)) = dgram_rx.recv() => {
+                            socket.send_to(buf.as_ref(), addr).await.unwrap();
+                        }
+                        Some(msg) = msg_rx.recv() => {
+                            match msg {
+                                RakServerMsg::SetMessage(msg) => {
+                                    server.handle(RakServerInput::SetMessage(msg)).unwrap();
+                                },
+                                RakServerMsg::SetMaxConnections(n) => {
+                                    server.handle(RakServerInput::SetMaxConnections(n)).unwrap();
+                                }
                             }
                         }
-                        RakServerOutput::SessionConnected(session) => {
-                            let id = session.id;
+                    }
 
-                            debug!("session {:?} connected", id);
+                    while let Some(msg) = server.poll() {
+                        match msg {
+                            RakServerOutput::SocketDatagram(buf, addr) => {
+                                socket.send_to(&buf, addr).await.unwrap();
+                            }
+                            RakServerOutput::SessionDatagram(buf, id) => {
+                                if let Some(session) = sessions.get_mut(&id) {
+                                    let now = SystemTime::now();
 
-                            let (session, tx) = RakSession::spawn(*session, tx.clone());
+                                    session.send(RakSessionInput::Datagram(buf, now)).unwrap();
+                                }
+                            }
+                            RakServerOutput::SessionConnected(session) => {
+                                let id = session.id;
 
-                            sessions.insert(id, tx);
+                                debug!("session {:?} connected", id);
 
-                            session_tx.send(session).unwrap();
+                                let (session, tx) = RakSession::spawn(*session, dgram_tx.clone());
+
+                                sessions.insert(id, tx);
+
+                                session_tx.send(session).unwrap();
+                            }
                         }
                     }
                 }
             }
         });
 
-        RakServer {
-            state: Running { handle, session_rx },
-        }
+        self.state = RakServerState::Running(Running { handle, session_rx, msg_tx });
     }
 }
 
-impl RakServer<Running> {
-    pub fn stop(self) -> RakServer<Shutdown> {
+impl RakServer {
+    pub fn stop(&mut self) {
+        let RakServerState::Running(Running { handle, .. }) = &self.state else {
+            return;
+        };
+
         // TODO
-        self.state.handle.abort();
+        handle.abort();
 
-        RakServer { state: Shutdown {} }
+        self.state = RakServerState::Shutdown;
     }
 
-    pub async fn recv(&mut self) -> Option<RakSession> {
-        self.state.session_rx.recv().await
-    }
+    pub async fn accept(&mut self) -> Option<RakSession> {
+        let RakServerState::Running(Running { session_rx, .. }) = &mut self.state else {
+            return None;
+        };
 
-    pub fn try_recv(&mut self) -> Option<RakSession> {
-        self.state.session_rx.try_recv().ok()
+        session_rx.recv().await
     }
 }
 
@@ -137,18 +181,17 @@ mod tests {
 
         let mut server = RakServer::new("127.0.0.1:19132".parse().unwrap());
 
-        let config = server.config_mut();
-        config.guid = 123456789;
-        config.message = b"MCPE;Chorus;0;1.0.0;0;-1;123456789;Chorus;Survival".to_vec();
+        server.set_guid(123456789);
+        server.set_message(*b"MCPE;Chorus;0;1.0.0;0;-1;123456789;Chorus;Survival");
 
-        let mut server = server.start();
+        server.start();
 
         let mut sessions = Vec::new();
 
         loop {
             tokio::select! {
-                Some(recv) = server.recv() => {
-                    sessions.push(recv);
+                Some(session) = server.accept() => {
+                    sessions.push(session);
                     debug!("received session")
                 }
             }

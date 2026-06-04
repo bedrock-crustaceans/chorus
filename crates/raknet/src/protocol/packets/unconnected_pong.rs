@@ -8,7 +8,7 @@ use std::io::{Error, ErrorKind, Read, Write};
 pub struct UnconnectedPong {
     pub timestamp: u64,
     pub guid: u64,
-    pub message: Vec<u8>,
+    pub message: Box<[u8]>,
 }
 
 impl RakCodec for UnconnectedPong {
@@ -39,7 +39,7 @@ impl RakCodec for UnconnectedPong {
         }
 
         let message_len = reader.read_u16::<BigEndian>()?;
-        let mut message = vec![0u8; message_len as usize];
+        let mut message = vec![0u8; message_len as usize].into_boxed_slice();
         reader.read_exact(&mut message)?;
 
         Ok(Self { timestamp, guid, message })
