@@ -4,12 +4,12 @@
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/protocol/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/crates/raknet/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/crates/raknet-tokio/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../raknet/raknet-tokio/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../raknet/raknet/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/protocol/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
-      <excludeFolder url="file://$MODULE_DIR$/crates/raknet/target" />
       <excludeFolder url="file://$MODULE_DIR$/run" />
+      <excludeFolder url="file://$MODULE_DIR$/../raknet/raknet/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

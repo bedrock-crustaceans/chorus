@@ -8,16 +8,11 @@ authors = ["OmniacDev"]
 [lib]
 path = "src/lib.rs"
 
-[workspace]
-members = ["crates/raknet", "crates/raknet-tokio"]
-
 [dependencies]
 bevy_app = "0.18.1"
 bevy_ecs = { version = "0.18.1", features = ["debug"] }
 bevy_time = "0.18.1"
 bevy_tasks = "0.18.1"
-
-# raknet = { path = "crates/raknet" }
 
 crossbeam-channel = "0.5.15"
 tokio = { version = "1", features = ["full"] }
