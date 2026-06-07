@@ -14,7 +14,7 @@ pub struct Config {
     pub port: u16,
     pub name: String,
     pub sub_name: String,
-    pub max_players: u32,
+    pub max_players: i32,
     pub threads: usize,
     pub log_to_file: bool,
     pub logs_directory: PathBuf,
