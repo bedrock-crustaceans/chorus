@@ -2,6 +2,7 @@ use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
+use bedrock::protocol::v662::types::SubChunkPos;
 use bedrock::protocol::v818::packets::{HeightMapDataType, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult};
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::Query;
@@ -20,18 +21,18 @@ pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>
         debug!(
             "SubChunkRequestPacket: dim={} center=({},{},{}) offsets={}",
             packet.dimension_type,
-            packet.center_pos.x,
-            packet.center_pos.y,
-            packet.center_pos.z,
+            packet.center_pos.0,
+            packet.center_pos.1,
+            packet.center_pos.2,
             packet.sub_chunk_pos_offsets.len()
         );
 
         let mut entries = Vec::with_capacity(packet.sub_chunk_pos_offsets.len());
 
         for offset in &packet.sub_chunk_pos_offsets {
-            let cx = packet.center_pos.x + offset.offset_x as i32;
-            let cy = packet.center_pos.y + offset.offset_y as i32;
-            let cz = packet.center_pos.z + offset.offset_z as i32;
+            let cx = packet.center_pos.0 + offset.offset_x as i32;
+            let cy = packet.center_pos.1 + offset.offset_y as i32;
+            let cz = packet.center_pos.2 + offset.offset_z as i32;
 
             let dim = level.dimension(packet.dimension_type);
             let chunk = dim.and_then(|d| d.get_chunk(cx, cz));
@@ -62,7 +63,11 @@ pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>
             SubChunkPacket {
                 cache_enabled: false,
                 dimension_type: packet.dimension_type,
-                center_pos: packet.center_pos.clone(),
+                center_pos: SubChunkPos {
+                    x: packet.center_pos.0,
+                    y: packet.center_pos.1,
+                    z: packet.center_pos.2,
+                },
                 sub_chunk_data: entries,
             }
             .into(),

@@ -1,8 +1,8 @@
-use bedrock::protocol::V975;
+use bedrock::protocol::V1001;
 
 pub mod handler;
 pub mod login;
 pub mod network;
 pub mod session;
 
-pub type BedrockProtocol = V975;
+pub type BedrockProtocol = V1001;

@@ -41,11 +41,13 @@ pub fn handle_request(mut reader: MessageReader<PacketReceivedMessage>, mut writ
                 });
             }
 
+            let compression_threshold: u16 = 1;
+
             // TODO: IP Bans
             session.send_immediate(BedrockProtocol::NetworkSettingsPacket(
                 NetworkSettingsPacket {
-                    compression_threshold: 1,
-                    compression_algorithm: PacketCompressionAlgorithm::None,
+                    compression_threshold,
+                    compression_algorithm: PacketCompressionAlgorithm::ZLib,
                     client_throttle_enabled: false,
                     client_throttle_threshold: 0,
                     client_throttle_scalar: 0.0,
@@ -53,7 +55,10 @@ pub fn handle_request(mut reader: MessageReader<PacketReceivedMessage>, mut writ
                 .into(),
             ));
 
-            session.set_compression(Some(Compression::None));
+            session.set_compression(Some(Compression::Zlib {
+                compression_level: 6,
+                threshold: compression_threshold,
+            }));
 
             session.set_state(SessionState::Login, &mut writer);
         } else {

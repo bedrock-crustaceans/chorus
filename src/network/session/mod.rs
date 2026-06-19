@@ -4,9 +4,10 @@ use bedrock::network::compression::Compression;
 use bedrock::network::connection::Connection;
 use bedrock::network::encryption::Encryption;
 use bedrock::protocol::Unknown;
-use bedrock::protocol::v662::enums::{ConnectionFailReason, PlayStatus};
+use bedrock::protocol::v662::enums::PlayStatus;
 use bedrock::protocol::v662::packets::PlayStatusPacket;
 use bedrock::protocol::v712::packets::{DisconnectMessage, DisconnectPacket};
+use bedrock::protocol::v1001::enums::ConnectionFailReason;
 use bevy_ecs::prelude::{Component, Entity, MessageWriter};
 use bevy_tasks::futures::now_or_never;
 use std::mem::take;
@@ -157,6 +158,8 @@ impl Session {
         });
 
         self.state = state;
+
+        debug!("set session state to {:?}", self.state);
     }
 
     pub fn get_state(&self) -> SessionState {

@@ -14,9 +14,10 @@ use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID, BaseGameVers
 use bedrock::protocol::v776::packets::CreativeContentPacket;
 use bedrock::protocol::v800::packets::BiomeDefinitionListPacket;
 use bedrock::protocol::v818::types::SyncedPlayerMovementSettings;
-use bedrock::protocol::v924::types::{GameRuleLegacyData, LevelSettings};
-use bedrock::protocol::v944::packets::{StartGamePacket, VoxelShapesPacket};
+use bedrock::protocol::v944::packets::VoxelShapesPacket;
 use bedrock::protocol::v944::types::NetworkBlockPosition;
+use bedrock::protocol::v1001::packets::StartGamePacket;
+use bedrock::protocol::v1001::types::{GameRuleLegacyData, LevelSettings};
 use bedrock::protocol::{ProtoVersion, ProtoVersionPackets};
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Commands, Query};
@@ -118,6 +119,8 @@ fn send_start_game(player: &Player, session: &Session) {
                 override_force_experimental_gameplay: None,
                 chat_restriction_level: ChatRestrictionLevel::None,
                 disable_player_interactions: false,
+                server_editor_connection_policy: 0,
+                allow_anonymous_block_drops_in_editor_worlds: false,
             },
             level_id: "".to_string(),
             level_name: "".to_string(),
@@ -139,6 +142,7 @@ fn send_start_game(player: &Player, session: &Session) {
             server_enabled_client_side_generation: false,
             block_network_ids_are_hashes: true,
             network_permissions: NetworkPermissions { server_auth_sound_enabled: false },
+            is_logging_chat: false,
             server_join_information: None,
             server_id: "".to_string(),
             world_id: "".to_string(),
