@@ -42,11 +42,11 @@ impl Dimension {
         self.chunks.get_mut(&(x, z))
     }
 
-    pub fn get_block(&self, x: i32, y: i32, z: i32, layer: usize) -> Option<u32> {
+    pub fn get_block(&self, x: i32, y: i32, z: i32, layer: usize) -> Option<i32> {
         self.chunks.get(&(x >> 4, z >> 4)).and_then(|c| c.get_block((x & 0xF) as u8, y, (z & 0xF) as u8, layer))
     }
 
-    pub fn set_block(&mut self, x: i32, y: i32, z: i32, layer: usize, block_id: u32) -> bool {
+    pub fn set_block(&mut self, x: i32, y: i32, z: i32, layer: usize, block_id: i32) -> bool {
         match self.chunks.get_mut(&(x >> 4, z >> 4)) {
             Some(chunk) => chunk.set_block((x & 0xF) as u8, y, (z & 0xF) as u8, layer, block_id),
             None => false,

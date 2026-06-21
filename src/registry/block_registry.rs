@@ -84,7 +84,7 @@ impl BlockRegistry {
         }
     }
 
-    pub fn get_block_id(&self, identifier: &str) -> Option<u32> {
-        self.default_hash.get(identifier).map(|&h| h as u32)
+    pub fn get_block_id(&self, identifier: &str) -> Option<i32> {
+        self.default_hash.get(identifier).map(|&h| h)
     }
 }

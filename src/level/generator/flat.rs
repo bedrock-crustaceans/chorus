@@ -3,13 +3,13 @@ use crate::level::generator::WorldGenerator;
 use crate::registry::block_registry::BlockRegistry;
 
 pub struct FlatLayer {
-    pub block_id: u32,
+    pub block_id: i32,
     pub height: u32,
 }
 
 pub struct FlatGenerator {
     pub layers: Vec<FlatLayer>,
-    pub biome: u32,
+    pub biome: i32,
 }
 
 impl WorldGenerator for FlatGenerator {

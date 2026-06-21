@@ -153,7 +153,7 @@ fn send_start_game(player: &Player, session: &Session) {
     ))
 }
 
-pub fn handle_setup(mut packet_reader: MessageReader<PacketReceivedMessage>, mut state_writer: MessageWriter<SessionStateChangedMessage>, mut query: Query<(&Player, &mut Session)>) {
+pub fn handle_setup(mut packet_reader: MessageReader<PacketReceivedMessage>, mut state_writer: MessageWriter<SessionStateChangedMessage>, mut query: Query<(&mut Player, &mut Session)>) {
     for ev in packet_reader.read() {
         let Ok(mut query) = query.get_mut(ev.entity) else {
             continue;
@@ -162,16 +162,23 @@ pub fn handle_setup(mut packet_reader: MessageReader<PacketReceivedMessage>, mut
             continue;
         }
         match &ev.packet {
-            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(packet, &mut query.1),
-            BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => handle_set_local_player_as_initialized(packet, query.0, &mut query.1, &mut state_writer),
+            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(packet, &mut query.0, &mut query.1),
+            BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => handle_set_local_player_as_initialized(packet, &query.0, &mut query.1, &mut state_writer),
             packet => warn!("unexpected packet received in setup state: {:?}", packet),
         }
     }
 }
 
-fn handle_request_chunk_radius(packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, session: &mut Session) {
+fn handle_request_chunk_radius(packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, player: &mut Player, session: &mut Session) {
     let radius = packet.chunk_radius.min(8);
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
+    
+    player.chunks_radius = radius;
+    player.chunks_pending.extend(
+        (-radius..radius).flat_map(|x| 
+            (-radius..radius).map(move |z| (x, z))
+        )
+    );
 
     session.send(BedrockProtocol::ChunkRadiusUpdatedPacket(ChunkRadiusUpdatedPacket { chunk_radius: radius }.into()));
 

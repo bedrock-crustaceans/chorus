@@ -7,9 +7,9 @@ fn sub_chunk_index(x: u8, y: u8, z: u8) -> usize {
     ((x as usize) << 8) | ((z as usize) << 4) | (y as usize)
 }
 
-fn encode_layer(blocks: &[u32; 4096]) -> Vec<u8> {
-    let mut palette: Vec<u32> = Vec::new();
-    let mut index_map: HashMap<u32, u16> = HashMap::new();
+fn encode_layer(blocks: &[i32; 4096]) -> Vec<u8> {
+    let mut palette: Vec<i32> = Vec::new();
+    let mut index_map: HashMap<i32, u16> = HashMap::new();
     let mut indices = [0u16; 4096];
 
     for (i, &block) in blocks.iter().enumerate() {
@@ -28,7 +28,7 @@ fn encode_layer(blocks: &[u32; 4096]) -> Vec<u8> {
 
     if palette.len() == 1 {
         buf.push(0x01u8);
-        buf.write_u32_varint(palette[0]).unwrap();
+        buf.write_i32_varint(palette[0]).unwrap();
         return buf;
     }
 
@@ -48,9 +48,9 @@ fn encode_layer(blocks: &[u32; 4096]) -> Vec<u8> {
         buf.extend_from_slice(&word.to_le_bytes());
     }
 
-    buf.write_u32_varint(palette.len() as u32).unwrap();
+    buf.write_i32_varint(palette.len() as i32).unwrap();
     for &id in &palette {
-        buf.write_u32_varint(id).unwrap();
+        buf.write_i32_varint(id).unwrap();
     }
 
     buf
@@ -58,13 +58,13 @@ fn encode_layer(blocks: &[u32; 4096]) -> Vec<u8> {
 
 pub struct SubChunk {
     // blocks[layer][index], index = (x<<8)|(z<<4)|y
-    blocks: [[u32; 4096]; 2],
-    biomes: [u32; 4096],
-    air_id: u32,
+    blocks: [[i32; 4096]; 2],
+    biomes: [i32; 4096],
+    air_id: i32,
 }
 
 impl SubChunk {
-    pub fn new(air_id: u32, biome: u32) -> Self {
+    pub fn new(air_id: i32, biome: i32) -> Self {
         Self {
             blocks: [[air_id; 4096]; 2],
             biomes: [biome; 4096],
@@ -72,12 +72,12 @@ impl SubChunk {
         }
     }
 
-    pub fn get(&self, x: u8, y: u8, z: u8, layer: usize) -> u32 {
+    pub fn get(&self, x: u8, y: u8, z: u8, layer: usize) -> i32 {
         debug_assert!(x < 16 && y < 16 && z < 16 && layer < 2);
         self.blocks[layer][sub_chunk_index(x, y, z)]
     }
 
-    pub fn set(&mut self, x: u8, y: u8, z: u8, layer: usize, block_id: u32) {
+    pub fn set(&mut self, x: u8, y: u8, z: u8, layer: usize, block_id: i32) {
         debug_assert!(x < 16 && y < 16 && z < 16 && layer < 2);
         self.blocks[layer][sub_chunk_index(x, y, z)] = block_id;
     }

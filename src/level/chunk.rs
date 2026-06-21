@@ -8,7 +8,7 @@ pub struct Chunk {
 }
 
 impl Chunk {
-    pub fn new(x: i32, z: i32, min_sub_chunk_y: i8, count: usize, air_id: u32, biome: u32) -> Self {
+    pub fn new(x: i32, z: i32, min_sub_chunk_y: i8, count: usize, air_id: i32, biome: i32) -> Self {
         Self {
             x,
             z,
@@ -30,13 +30,13 @@ impl Chunk {
         self.sub_chunks.get_mut(offset)
     }
 
-    pub fn get_block(&self, x: u8, y: i32, z: u8, layer: usize) -> Option<u32> {
+    pub fn get_block(&self, x: u8, y: i32, z: u8, layer: usize) -> Option<i32> {
         let sub_y = (y >> 4) as i8;
         let local_y = (y & 0xF) as u8;
         Some(self.get_sub_chunk(sub_y)?.get(x, local_y, z, layer))
     }
 
-    pub fn set_block(&mut self, x: u8, y: i32, z: u8, layer: usize, block_id: u32) -> bool {
+    pub fn set_block(&mut self, x: u8, y: i32, z: u8, layer: usize, block_id: i32) -> bool {
         let sub_y = (y >> 4) as i8;
         let local_y = (y & 0xF) as u8;
         match self.get_sub_chunk_mut(sub_y) {
@@ -67,10 +67,10 @@ impl Chunk {
             buf.extend(sc.serialize_biomes())
         }
 
-        buf.push(0u8); // edu border blocks
+        buf.push(0u8); // border blocks
 
-        let block_entities = nbtx::Value::List(vec![]);
-        buf.extend(nbtx::to_net_bytes(&block_entities).unwrap());
+        // let block_entities = nbtx::Value::List(vec![]);
+        // buf.extend(nbtx::to_net_bytes(&block_entities).unwrap());
 
         buf
     }

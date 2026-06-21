@@ -20,5 +20,5 @@ pub struct BlockUpdatedMessage {
     pub y: i32,
     pub z: i32,
     pub layer: usize,
-    pub block_id: u32,
+    pub block_id: i32,
 }
