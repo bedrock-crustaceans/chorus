@@ -1,0 +1,2 @@
+[env]
+CFLAGS = "-DHAVE_UNISTD_H -DSTDC -std=gnu11"
