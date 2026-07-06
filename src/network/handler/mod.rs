@@ -1,5 +1,5 @@
 use crate::network::BedrockProtocol;
-use crate::network::handler::chunks::handle_sub_chunk_request;
+use crate::network::handler::chunks::{handle_sub_chunk_request, send_pending_chunks};
 use crate::network::handler::handshake::handle_handshake;
 use crate::network::handler::login::handle_login;
 use crate::network::handler::play::{broadcast_block_updates, handle_play, on_enter_play};
@@ -37,6 +37,7 @@ impl Plugin for PacketHandlers {
                 handle_resource,
                 (on_enter_setup, handle_setup).chain(),
                 (on_enter_play, handle_play).chain(),
+                send_pending_chunks,
                 handle_sub_chunk_request,
                 broadcast_block_updates,
             ),

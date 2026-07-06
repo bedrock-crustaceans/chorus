@@ -41,7 +41,7 @@ impl Plugin for Server {
             tick: 0,
             tick_instant: Instant::now(),
 
-            runtime_id: 0,
+            runtime_id: 1,
         })
         .insert_resource(ServerMetrics {
             tps_min: 20.0,

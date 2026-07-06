@@ -51,11 +51,11 @@ impl Level {
         self.dimensions.get_mut(&0).expect("overworld dimension not initialised")
     }
 
-    pub fn get_block(&self, dim: i32, x: i32, y: i32, z: i32, layer: usize) -> Option<u32> {
+    pub fn get_block(&self, dim: i32, x: i32, y: i32, z: i32, layer: usize) -> Option<i32> {
         self.dimension(dim)?.get_block(x, y, z, layer)
     }
 
-    pub fn set_block(&mut self, dim: i32, x: i32, y: i32, z: i32, layer: usize, block_id: u32, writer: &mut MessageWriter<BlockUpdatedMessage>) -> bool {
+    pub fn set_block(&mut self, dim: i32, x: i32, y: i32, z: i32, layer: usize, block_id: i32, writer: &mut MessageWriter<BlockUpdatedMessage>) -> bool {
         let changed = match self.dimension_mut(dim) {
             Some(d) => d.set_block(x, y, z, layer, block_id),
             None => return false,
