@@ -58,8 +58,8 @@ fn send_start_game(player: &Player, session: &Session) {
             target_actor_id: ActorUniqueID(player.unique_id()),
             target_runtime_id: ActorRuntimeID(player.runtime_id()),
             actor_game_type: GameType::Survival,
-            position: Default::default(),
-            rotation: Default::default(),
+            position: (0.5, 6.0, 0.5), // TODO: those shouldn't be hardcoded, maybe player db?
+            rotation: Default::default(), 
             settings: LevelSettings {
                 seed: 0,
                 spawn_settings: SpawnSettings {
@@ -71,7 +71,7 @@ fn send_start_game(player: &Player, session: &Session) {
                 game_type: GameType::Survival,
                 is_hardcore_enabled: false,
                 game_difficulty: Difficulty::Peaceful,
-                default_spawn_block_position: NetworkBlockPosition { x: 0, y: 0, z: 0 },
+                default_spawn_block_position: NetworkBlockPosition { x: 0, y: 4, z: 0 },
                 achievements_disabled: false,
                 editor_world_type: EditorWorldType::NonEditor,
                 is_created_in_editor: false,

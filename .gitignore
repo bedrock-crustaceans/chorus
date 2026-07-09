@@ -134,6 +134,7 @@ Cargo.lock
 
 run
 chorus.toml
+.cargo/
 resource_packs
 logs
 behavior_packs

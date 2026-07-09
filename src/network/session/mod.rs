@@ -66,8 +66,7 @@ impl Session {
                                         }
                                     }
                                     Err(err) => {
-                                        error!("error receiving packets from connection {:?}", err);
-                                        break 'l;
+                                        error!("error receiving packets from connection, dropping batch {:?}", err);
                                     }
                                 }
                             }

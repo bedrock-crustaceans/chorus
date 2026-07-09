@@ -23,13 +23,14 @@ pub fn send_pending_chunks(mut query: Query<(&mut Session, &mut Player)>, mut le
         
         let chunk = overworld.get_or_generate_chunk(&registry, x, z);
         let limit = (chunk.highest_non_air_sub_chunk_y() - min_y) as u16;
+        let sub_chunk_count = chunk.sub_chunk_count() as u32;
         let serialized_chunk_data = chunk.serialize();
 
         session.send(BedrockProtocol::LevelChunkPacket(
             LevelChunkPacket {
                 chunk_position: ChunkPos { x, z },
                 dimension_id: 0,
-                sub_chunk_count: u32::MAX - 1,
+                sub_chunk_count,
                 sub_chunk_limit: limit,
                 cache_enabled: false,
                 cache_blobs: vec![],
@@ -94,7 +95,7 @@ pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>
             entries.push(SubChunkDataEntry {
                 sub_chunk_pos_offset: offset.clone(),
                 sub_chunk_request_result: result,
-                serialized_sub_chunk: data,
+                serialized_sub_chunk: Some(data.unwrap_or_default()),
                 height_map_data_type: HeightMapDataType::NoData,
                 height_map_data: None,
                 render_height_map_data_type: HeightMapDataType::NoData,
