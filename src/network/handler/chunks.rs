@@ -13,6 +13,8 @@ use bevy_ecs::prelude::Query;
 use bevy_ecs::system::Res;
 use tracing::debug;
 
+const MAX_CHUNKS_PER_TICK: usize = 16;
+
 pub fn send_pending_chunks(mut query: Query<(&mut Session, &mut Player)>, mut level: ResMut<Level>, registry: Res<BlockRegistry>) {
     let overworld = level.overworld_mut();
     let min_y = overworld.min_sub_chunk_y;
@@ -21,30 +23,35 @@ pub fn send_pending_chunks(mut query: Query<(&mut Session, &mut Player)>, mut le
             continue;
         };
 
-        let Some((x, z)) = player.chunks_pending.pop_front() else { continue };
+        let mut sent_this_tick = false;
+        for _ in 0..MAX_CHUNKS_PER_TICK {
+            let Some((x, z)) = player.chunks_pending.pop_front() else { break };
+            sent_this_tick = true;
 
-        let chunk = overworld.get_or_generate_chunk(&registry, x, z);
-        let limit = (chunk.highest_non_air_sub_chunk_y() - min_y) as u16;
-        let serialized_chunk_data = chunk.serialize();
+            let chunk = overworld.get_or_generate_chunk(&registry, x, z);
+            let limit = (chunk.highest_non_air_sub_chunk_y() - min_y) as u16;
+            let sub_chunk_count = chunk.sub_chunk_count() as u32;
+            let serialized_chunk_data = chunk.serialize();
 
-        session.send(BedrockProtocol::LevelChunkPacket(
-            LevelChunkPacket {
-                chunk_position: ChunkPos { x, z },
-                dimension_id: 0,
-                sub_chunk_count: u32::MAX - 1,
-                sub_chunk_limit: limit,
-                cache_enabled: false,
-                cache_blobs: vec![],
-                serialized_chunk_data,
-            }
-            .into(),
-        ));
+            session.send(BedrockProtocol::LevelChunkPacket(
+                LevelChunkPacket {
+                    chunk_position: ChunkPos { x, z },
+                    dimension_id: 0,
+                    sub_chunk_count,
+                    sub_chunk_limit: limit,
+                    cache_enabled: false,
+                    cache_blobs: vec![],
+                    serialized_chunk_data,
+                }
+                .into(),
+            ));
 
-        debug!("sent chunk {}, {}", x, z);
+            debug!("sent chunk {}, {}", x, z);
 
-        player.chunks_sent.insert((x, z));
+            player.chunks_sent.insert((x, z));
+        }
 
-        if player.chunks_pending.is_empty() {
+        if sent_this_tick && player.chunks_pending.is_empty() {
             session.send(BedrockProtocol::NetworkChunkPublisherUpdatePacket(
                 NetworkChunkPublisherUpdatePacket {
                     new_view_position: BlockPos { x: 0, y: 0, z: 0 },
@@ -98,7 +105,7 @@ pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>
             entries.push(SubChunkDataEntry {
                 sub_chunk_pos_offset: offset.clone(),
                 sub_chunk_request_result: result,
-                serialized_sub_chunk: data,
+                serialized_sub_chunk: Some(data.unwrap_or_default()),
                 height_map_data_type: HeightMapDataType::NoData,
                 height_map_data: None,
                 render_height_map_data_type: HeightMapDataType::NoData,

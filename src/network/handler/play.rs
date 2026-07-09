@@ -4,23 +4,102 @@ use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
-use bedrock::protocol::v662::packets::UpdateBlockPacket;
+use crate::player::Player;
+use bedrock::protocol::v662::enums::{ActorFlags, CommandPermissionLevel, DataItemType};
+use bedrock::protocol::v662::packets::{SetActorDataPacket, UpdateAbilitiesPacket, UpdateBlockPacket};
+use bedrock::protocol::v662::types::{ActorRuntimeID, DataItem, PropertySyncData};
+use bedrock::protocol::v729::packets::{AttributeData, UpdateAttributesPacket};
+use bedrock::protocol::v776::enums::AbilitiesIndex;
+use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitiesLayer, SerializedLayer};
 use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::Query;
 use tracing::{debug, warn};
 use vek::{Vec2, Vec3};
 
-pub fn on_enter_play(mut sessions: Query<&mut Session>, mut state_reader: MessageReader<SessionStateChangedMessage>) {
+pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, mut state_reader: MessageReader<SessionStateChangedMessage>) {
     for ev in state_reader.read() {
         if ev.to != SessionState::Play {
             continue;
         }
-        let Ok(_session) = sessions.get_mut(ev.entity) else {
+        let Ok((mut session, player)) = sessions.get_mut(ev.entity) else {
             continue;
         };
 
         debug!("on_enter_play");
+
+        let flags = (1i64 << ActorFlags::HasGravity as i64) | (1i64 << ActorFlags::HasCollision as i64) | (1i64 << ActorFlags::Breathing as i64);
+
+        session.send(BedrockProtocol::SetActorDataPacket(
+            SetActorDataPacket {
+                target_runtime_id: ActorRuntimeID(player.runtime_id()),
+                actor_data: vec![DataItem {
+                    data_item_id: 0,
+                    data_item_type: DataItemType::Int64(flags),
+                }],
+                synced_properties: PropertySyncData {
+                    int_entries_list: vec![],
+                    float_entries_list: vec![],
+                },
+                tick: 0,
+            }
+            .into(),
+        ));
+
+        let ability_values = (1u32 << AbilitiesIndex::Build as u32)
+            | (1u32 << AbilitiesIndex::Mine as u32)
+            | (1u32 << AbilitiesIndex::DoorsAndSwitches as u32)
+            | (1u32 << AbilitiesIndex::OpenContainers as u32)
+            | (1u32 << AbilitiesIndex::AttackPlayers as u32)
+            | (1u32 << AbilitiesIndex::AttackMobs as u32);
+
+        session.send(BedrockProtocol::UpdateAbilitiesPacket(
+            UpdateAbilitiesPacket {
+                data: SerializedAbilitiesData {
+                    target_player_raw_id: player.unique_id(),
+                    player_permissions: 1,
+                    command_permissions: CommandPermissionLevel::Any,
+                    layers: vec![SerializedLayer {
+                        serialized_layer: SerializedAbilitiesLayer::Base,
+                        abilities_set: 0xFFFFF,
+                        ability_values,
+                        fly_speed: 0.05,
+                        vertical_fly_speed: 1.0,
+                        walk_speed: 0.1,
+                    }],
+                },
+            }
+            .into(),
+        ));
+
+        let attribute = |name: &str, min: f32, max: f32, value: f32| AttributeData {
+            min_value: min,
+            max_value: max,
+            current_value: value,
+            default_min: min,
+            default_max: max,
+            default_value: value,
+            attribute_name: name.to_string(),
+            attribute_modifiers: vec![],
+        };
+
+        session.send(BedrockProtocol::UpdateAttributesPacket(
+            UpdateAttributesPacket {
+                target_runtime_id: ActorRuntimeID(player.runtime_id()),
+                attribute_list: vec![
+                    attribute("minecraft:movement", 0.0, f32::MAX, 0.1),
+                    attribute("minecraft:underwater_movement", 0.0, f32::MAX, 0.02),
+                    attribute("minecraft:lava_movement", 0.0, f32::MAX, 0.02),
+                    attribute("minecraft:health", 0.0, 20.0, 20.0),
+                    attribute("minecraft:player.hunger", 0.0, 20.0, 20.0),
+                    attribute("minecraft:player.saturation", 0.0, 20.0, 20.0),
+                    attribute("minecraft:player.level", 0.0, 24791.0, 0.0),
+                    attribute("minecraft:player.experience", 0.0, 1.0, 0.0),
+                ],
+                ticks_since_sim_started: 0,
+            }
+            .into(),
+        ));
     }
 }
 

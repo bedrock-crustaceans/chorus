@@ -57,10 +57,14 @@ impl Chunk {
         self.min_sub_chunk_y
     }
 
+    pub fn sub_chunk_count(&self) -> usize {
+        self.sub_chunks.len()
+    }
+
     pub fn serialize(&self) -> Vec<u8> {
         let mut buf = Vec::new();
         for (i, sc) in self.sub_chunks.iter().enumerate() {
-            buf.extend(sc.serialize_network(i as i8))
+            buf.extend(sc.serialize_network(self.min_sub_chunk_y.wrapping_add(i as i8)))
         }
 
         for sc in &self.sub_chunks {
