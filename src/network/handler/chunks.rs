@@ -1,8 +1,10 @@
-use bedrock::protocol::v662::packets::{LevelChunkPacket, NetworkChunkPublisherUpdatePacket};
 use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
+use crate::player::Player;
+use crate::registry::block_registry::BlockRegistry;
+use bedrock::protocol::v662::packets::{LevelChunkPacket, NetworkChunkPublisherUpdatePacket};
 use bedrock::protocol::v662::types::{BlockPos, ChunkPos, SubChunkPos};
 use bedrock::protocol::v818::packets::{HeightMapDataType, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult};
 use bevy_ecs::change_detection::ResMut;
@@ -10,17 +12,17 @@ use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::Query;
 use bevy_ecs::system::Res;
 use tracing::debug;
-use crate::player::Player;
-use crate::registry::block_registry::BlockRegistry;
 
 pub fn send_pending_chunks(mut query: Query<(&mut Session, &mut Player)>, mut level: ResMut<Level>, registry: Res<BlockRegistry>) {
     let overworld = level.overworld_mut();
     let min_y = overworld.min_sub_chunk_y;
     for (mut session, mut player) in query.iter_mut() {
-        if player.chunks_radius == 0 { continue; };
-        
-        let Some((x , z)) = player.chunks_pending.pop_front() else { continue };
-        
+        if player.chunks_radius == 0 {
+            continue;
+        };
+
+        let Some((x, z)) = player.chunks_pending.pop_front() else { continue };
+
         let chunk = overworld.get_or_generate_chunk(&registry, x, z);
         let limit = (chunk.highest_non_air_sub_chunk_y() - min_y) as u16;
         let sub_chunk_count = chunk.sub_chunk_count() as u32;
@@ -35,20 +37,22 @@ pub fn send_pending_chunks(mut query: Query<(&mut Session, &mut Player)>, mut le
                 cache_enabled: false,
                 cache_blobs: vec![],
                 serialized_chunk_data,
-            }.into(),
+            }
+            .into(),
         ));
 
         debug!("sent chunk {}, {}", x, z);
-        
+
         player.chunks_sent.insert((x, z));
-        
+
         if player.chunks_pending.is_empty() {
             session.send(BedrockProtocol::NetworkChunkPublisherUpdatePacket(
                 NetworkChunkPublisherUpdatePacket {
                     new_view_position: BlockPos { x: 0, y: 0, z: 0 },
                     new_view_radius: (player.chunks_radius as u32) << 4,
                     server_built_chunks: player.chunks_sent.iter().map(|&(x, z)| ChunkPos { x, z }).collect(),
-                }.into(),
+                }
+                .into(),
             ));
         }
     }

@@ -4,7 +4,7 @@ use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
-use bedrock::protocol::v662::packets::{UpdateBlockPacket};
+use bedrock::protocol::v662::packets::UpdateBlockPacket;
 use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::Query;

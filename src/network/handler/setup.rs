@@ -59,7 +59,7 @@ fn send_start_game(player: &Player, session: &Session) {
             target_runtime_id: ActorRuntimeID(player.runtime_id()),
             actor_game_type: GameType::Survival,
             position: (0.5, 6.0, 0.5), // TODO: those shouldn't be hardcoded, maybe player db?
-            rotation: Default::default(), 
+            rotation: Default::default(),
             settings: LevelSettings {
                 seed: 0,
                 spawn_settings: SpawnSettings {
@@ -172,13 +172,9 @@ pub fn handle_setup(mut packet_reader: MessageReader<PacketReceivedMessage>, mut
 fn handle_request_chunk_radius(packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, player: &mut Player, session: &mut Session) {
     let radius = packet.chunk_radius.min(8);
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
-    
+
     player.chunks_radius = radius;
-    player.chunks_pending.extend(
-        (-radius..radius).flat_map(|x| 
-            (-radius..radius).map(move |z| (x, z))
-        )
-    );
+    player.chunks_pending.extend((-radius..radius).flat_map(|x| (-radius..radius).map(move |z| (x, z))));
 
     session.send(BedrockProtocol::ChunkRadiusUpdatedPacket(ChunkRadiusUpdatedPacket { chunk_radius: radius }.into()));
 
