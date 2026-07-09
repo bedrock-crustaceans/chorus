@@ -1,85 +1,83 @@
-use crate::level::bit_array::bit_array::BitArray;
-use crate::level::bit_array::padded_bit_array::PaddedBitArray;
-use crate::level::bit_array::pow2_bit_array::Pow2BitArray;
-use crate::level::bit_array::singleton_bit_array::SingletonBitArray;
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct BitArrayVersion {
-    pub bits: u8,
-    pub entries_per_word: u8,
-    pub next: Option<&'static BitArrayVersion>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BitArrayVersion {
+    V0,
+    V1,
+    V2,
+    V3,
+    V4,
+    V5,
+    V6,
+    V8,
+    V16,
 }
 
 impl BitArrayVersion {
-    pub const V16: BitArrayVersion = BitArrayVersion {
-        bits: 16,
-        entries_per_word: 2,
-        next: None,
-    };
-    pub const V8: BitArrayVersion = BitArrayVersion {
-        bits: 8,
-        entries_per_word: 4,
-        next: Some(&Self::V16),
-    };
-    pub const V6: BitArrayVersion = BitArrayVersion {
-        bits: 6,
-        entries_per_word: 5,
-        next: Some(&Self::V8),
-    };
-    pub const V5: BitArrayVersion = BitArrayVersion {
-        bits: 5,
-        entries_per_word: 6,
-        next: Some(&Self::V6),
-    };
-    pub const V4: BitArrayVersion = BitArrayVersion {
-        bits: 4,
-        entries_per_word: 8,
-        next: Some(&Self::V5),
-    };
-    pub const V3: BitArrayVersion = BitArrayVersion {
-        bits: 3,
-        entries_per_word: 10,
-        next: Some(&Self::V4),
-    };
-    pub const V2: BitArrayVersion = BitArrayVersion {
-        bits: 2,
-        entries_per_word: 16,
-        next: Some(&Self::V3),
-    };
-    pub const V1: BitArrayVersion = BitArrayVersion {
-        bits: 1,
-        entries_per_word: 32,
-        next: Some(&Self::V2),
-    };
-    pub const V0: BitArrayVersion = BitArrayVersion {
-        bits: 0,
-        entries_per_word: 2,
-        next: Some(&Self::V1),
-    };
-
-    pub const VALUES: [&'static BitArrayVersion; 9] = [&Self::V16, &Self::V8, &Self::V6, &Self::V5, &Self::V4, &Self::V3, &Self::V2, &Self::V1, &Self::V0];
-
-    pub fn get_words_for_size(&self, size: usize) -> i32 {
-        (size as f32 / self.entries_per_word as f32).ceil() as i32
-    }
-
-    pub fn get_max_entry_value(&self) -> i32 {
-        (1 << self.bits) - 1
-    }
-
-    pub fn create_array(&self, size: usize, words: Option<Vec<i32>>) -> BitArray {
-        let words = words.unwrap_or(vec![0; self.get_words_for_size(size) as usize]);
-
+    pub fn bits(self) -> usize {
         match self {
-            &BitArrayVersion::V3 | &BitArrayVersion::V5 | &BitArrayVersion::V6 => BitArray::PaddedBitArray(PaddedBitArray::new(self.clone(), size, words)),
-
-            &BitArrayVersion::V0 => BitArray::SingletonBitArray(SingletonBitArray::new()),
-
-            _ => BitArray::Pow2BitArray(Pow2BitArray::new(self.clone(), size, words)),
+            Self::V0 => 0,
+            Self::V1 => 1,
+            Self::V2 => 2,
+            Self::V3 => 3,
+            Self::V4 => 4,
+            Self::V5 => 5,
+            Self::V6 => 6,
+            Self::V8 => 8,
+            Self::V16 => 16,
         }
     }
 
-    pub fn get(version: u8, read: bool) -> Option<&'static BitArrayVersion> {
-        Self::VALUES.iter().find(|&ver| (!read && ver.entries_per_word <= version) || (read && ver.bits == version)).map(|v| *v)
+    pub fn entries(self) -> usize {
+        match self {
+            Self::V0 => 2,
+            Self::V1 => 32,
+            Self::V2 => 16,
+            Self::V3 => 10,
+            Self::V4 => 8,
+            Self::V5 => 6,
+            Self::V6 => 5,
+            Self::V8 => 4,
+            Self::V16 => 2,
+        }
+    }
+
+    pub fn next(self) -> Option<Self> {
+        match self {
+            Self::V0 => Some(Self::V1),
+            Self::V1 => Some(Self::V2),
+            Self::V2 => Some(Self::V3),
+            Self::V3 => Some(Self::V4),
+            Self::V4 => Some(Self::V5),
+            Self::V5 => Some(Self::V6),
+            Self::V6 => Some(Self::V8),
+            Self::V8 => Some(Self::V16),
+            Self::V16 => None,
+        }
+    }
+
+    pub fn is_padded(self) -> bool {
+        matches!(self, Self::V3 | Self::V5 | Self::V6)
+    }
+
+    pub fn max_value(self) -> u32 {
+        (1u32 << self.bits()) - 1
+    }
+
+    pub fn get_version(val: u8) -> Option<Self> {
+        match val {
+            0 => Some(Self::V0),
+            1 => Some(Self::V1),
+            2 => Some(Self::V2),
+            3 => Some(Self::V3),
+            4 => Some(Self::V4),
+            5 => Some(Self::V5),
+            6 => Some(Self::V6),
+            8 => Some(Self::V8),
+            16 => Some(Self::V16),
+            _ => None,
+        }
+    }
+
+    pub fn get_words_for_size(self, size: usize) -> i32 {
+        (size as f32 / self.entries() as f32).ceil() as i32
     }
 }

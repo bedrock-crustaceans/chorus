@@ -1,61 +1,55 @@
-use crate::level::bit_array::bit_array_version::BitArrayVersion;
-use crate::level::bit_array::padded_bit_array::PaddedBitArray;
-use crate::level::bit_array::pow2_bit_array::Pow2BitArray;
-use crate::level::bit_array::singleton_bit_array::SingletonBitArray;
+use super::bit_array_version::BitArrayVersion;
 
-pub trait BitArrayTrait {
-    fn set(&mut self, index: usize, value: i32);
-    fn get(&self, index: usize) -> i32;
-
-    fn get_size(&self) -> usize;
-    fn get_words(&self) -> Vec<i32>;
-    fn get_version(&self) -> &BitArrayVersion;
+pub struct BitArray {
+    pub version: BitArrayVersion,
+    pub size: usize,
+    pub chunks: Vec<u32>,
 }
 
-pub enum BitArray {
-    PaddedBitArray(PaddedBitArray),
-    Pow2BitArray(Pow2BitArray),
-    SingletonBitArray(SingletonBitArray),
-}
+impl BitArray {
+    pub fn new(version: BitArrayVersion, size: usize) -> Self {
+        Self { version, size, chunks: vec![] }
+    }
 
-impl BitArrayTrait for BitArray {
-    fn set(&mut self, index: usize, value: i32) {
-        match self {
-            BitArray::PaddedBitArray(p) => p.set(index, value),
-            BitArray::Pow2BitArray(p) => p.set(index, value),
-            BitArray::SingletonBitArray(p) => p.set(index, value),
+    fn chunk_count(&self) -> usize {
+        (self.size as f32 / self.version.entries() as f32).ceil() as usize
+    }
+
+    fn mask(&self) -> u32 {
+        self.version.max_value()
+    }
+
+    pub fn get(&self, index: usize) -> u32 {
+        match self.version.is_padded() {
+            true => {
+                let word = index / self.version.entries();
+                let offset = (index % self.version.entries()) * self.version.bits();
+                (self.chunks[word] >> offset) & self.mask()
+            }
+            false => {
+                let bit_index = index * self.version.bits();
+                let word = bit_index >> 5;
+                let offset = bit_index & 31;
+                (self.chunks[word] >> offset) & self.mask()
+            }
         }
     }
 
-    fn get(&self, index: usize) -> i32 {
-        match self {
-            BitArray::PaddedBitArray(p) => p.get(index),
-            BitArray::Pow2BitArray(p) => p.get(index),
-            BitArray::SingletonBitArray(p) => p.get(index),
-        }
-    }
-
-    fn get_size(&self) -> usize {
-        match self {
-            BitArray::PaddedBitArray(p) => p.get_size(),
-            BitArray::Pow2BitArray(p) => p.get_size(),
-            BitArray::SingletonBitArray(p) => p.get_size(),
-        }
-    }
-
-    fn get_words(&self) -> Vec<i32> {
-        match self {
-            BitArray::PaddedBitArray(p) => p.get_words(),
-            BitArray::Pow2BitArray(p) => p.get_words(),
-            BitArray::SingletonBitArray(p) => p.get_words(),
-        }
-    }
-
-    fn get_version(&self) -> &BitArrayVersion {
-        match self {
-            BitArray::PaddedBitArray(p) => p.get_version(),
-            BitArray::Pow2BitArray(p) => p.get_version(),
-            BitArray::SingletonBitArray(p) => p.get_version(),
+    pub fn set(&mut self, index: usize, value: u32) {
+        match self.version.is_padded() {
+            true => {
+                let word = index / self.version.entries();
+                let offset = (index % self.version.entries()) * self.version.bits();
+                let mask = self.mask() << offset;
+                self.chunks[word] = (self.chunks[word] & !mask) | ((value & self.mask()) << offset);
+            }
+            false => {
+                let bit_index = index * self.version.bits();
+                let word = bit_index >> 5;
+                let offset = bit_index & 31;
+                let mask = self.mask() << offset;
+                self.chunks[word] = (self.chunks[word] & !mask) | ((value & self.mask()) << offset);
+            }
         }
     }
 }
