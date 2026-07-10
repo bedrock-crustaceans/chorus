@@ -2,9 +2,11 @@ use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
+use crate::network::handler::chat::{PlayerChatMessage, handle_text};
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::Player;
+use crate::player::identity::PlayerIdentity;
 use bedrock::protocol::v662::enums::{ActorFlags, CommandPermissionLevel, DataItemType};
 use bedrock::protocol::v662::packets::{SetActorDataPacket, UpdateAbilitiesPacket, UpdateBlockPacket};
 use bedrock::protocol::v662::types::{ActorRuntimeID, DataItem, PropertySyncData};
@@ -12,7 +14,7 @@ use bedrock::protocol::v729::packets::{AttributeData, UpdateAttributesPacket};
 use bedrock::protocol::v776::enums::AbilitiesIndex;
 use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitiesLayer, SerializedLayer};
 use bedrock::protocol::v944::types::NetworkBlockPosition;
-use bevy_ecs::message::MessageReader;
+use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::Query;
 use tracing::{debug, warn};
 use vek::{Vec2, Vec3};
@@ -103,9 +105,9 @@ pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, mut state_rea
     }
 }
 
-pub fn handle_play(mut packet_reader: MessageReader<PacketReceivedMessage>, mut query: Query<(&mut PlayerEntity, &Session)>) {
+pub fn handle_play(mut packet_reader: MessageReader<PacketReceivedMessage>, mut chat_writer: MessageWriter<PlayerChatMessage>, mut query: Query<(&mut PlayerEntity, &Session, &PlayerIdentity)>) {
     for ev in packet_reader.read() {
-        let Ok((mut entity, session)) = query.get_mut(ev.entity) else {
+        let Ok((mut entity, session, identity)) = query.get_mut(ev.entity) else {
             continue;
         };
 
@@ -120,6 +122,7 @@ pub fn handle_play(mut packet_reader: MessageReader<PacketReceivedMessage>, mut 
                 let (pitch, yaw) = packet.player_rotation;
                 entity.rotation = Vec2::new(pitch, yaw);
             }
+            BedrockProtocol::TextPacket(packet) => handle_text(packet, identity, &mut chat_writer),
             packet => {
                 warn!("unexpected packet received in play state: {:?}", packet);
             }

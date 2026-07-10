@@ -5,6 +5,7 @@ use crate::network::login::auth::Auth;
 use crate::network::login::encryption::get_handshake_jwt;
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
+use crate::player::identity::PlayerIdentity;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use bedrock::auth::auth_identity::{AuthData, AuthDataClaims};
@@ -13,7 +14,7 @@ use bedrock::protocol::ProtoCodecLE;
 use bedrock::protocol::v662::enums::PlayStatus;
 use bedrock::protocol::v662::packets::ServerToClientHandshakePacket;
 use bevy_ecs::message::MessageReader;
-use bevy_ecs::prelude::{MessageWriter, Query, Res};
+use bevy_ecs::prelude::{Commands, MessageWriter, Query, Res};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use p384::elliptic_curve::Generate;
 use p384::pkcs8::DecodePublicKey;
@@ -28,6 +29,7 @@ pub fn handle_login(
     mut reader: MessageReader<PacketReceivedMessage>,
     mut writer: MessageWriter<SessionStateChangedMessage>,
     mut sessions: Query<&mut Session>,
+    mut commands: Commands,
 ) {
     for ev in reader.read() {
         let Ok(mut session) = sessions.get_mut(ev.entity) else {
@@ -50,6 +52,8 @@ pub fn handle_login(
             session.close(Some("disconnectionScreen.notAuthenticated"));
             continue;
         }
+
+        commands.entity(ev.entity).insert(PlayerIdentity::new(request.auth_data.xname.clone(), request.auth_data.xid.clone()));
 
         if config.encryption {
             let mut token = [0u8; 16];

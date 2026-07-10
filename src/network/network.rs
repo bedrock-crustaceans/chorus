@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
+use crate::network::handler::chat::PlayerChatMessage;
 use crate::network::handler::{PacketHandlers, PacketReceivedMessage};
 use crate::network::login::auth::LoginAuthOIDC;
 use crate::network::session::Session;
@@ -33,7 +34,8 @@ impl Plugin for Network {
             .add_systems(FixedUpdate, Network::tick)
             .add_message::<PacketReceivedMessage>()
             .add_message::<SessionStateChangedMessage>()
-            .add_message::<BlockUpdatedMessage>();
+            .add_message::<BlockUpdatedMessage>()
+            .add_message::<PlayerChatMessage>();
     }
 }
 

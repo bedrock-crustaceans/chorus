@@ -1,6 +1,8 @@
 use bevy_ecs::prelude::*;
 use std::collections::{HashSet, VecDeque};
 
+pub mod identity;
+
 #[derive(Component)]
 pub struct Player {
     unique_id: i64,

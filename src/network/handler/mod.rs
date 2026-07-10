@@ -1,4 +1,5 @@
 use crate::network::BedrockProtocol;
+use crate::network::handler::chat::broadcast_chat;
 use crate::network::handler::chunks::{handle_sub_chunk_request, send_pending_chunks};
 use crate::network::handler::handshake::handle_handshake;
 use crate::network::handler::login::handle_login;
@@ -10,6 +11,7 @@ use bevy_app::{App, FixedUpdate, Plugin};
 use bevy_ecs::prelude::{Entity, Message};
 use bevy_ecs::schedule::IntoScheduleConfigs;
 
+pub mod chat;
 pub mod chunks;
 pub mod handshake;
 pub mod login;
@@ -36,7 +38,7 @@ impl Plugin for PacketHandlers {
                 handle_handshake,
                 handle_resource,
                 (on_enter_setup, handle_setup).chain(),
-                (on_enter_play, handle_play).chain(),
+                (on_enter_play, handle_play, broadcast_chat).chain(),
                 send_pending_chunks,
                 handle_sub_chunk_request,
                 broadcast_block_updates,
