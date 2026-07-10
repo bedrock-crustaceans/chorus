@@ -1,20 +1,24 @@
-use varint_rs::VarintWriter;
+use bedrock::protocol::error::ProtoCodecError;
+use bedrock::protocol::{ProtoCodec, ProtoCodecLE, ProtoCodecVAR};
+use indexmap::IndexSet;
+use std::io::{Read, Write};
+use vek::num_traits::Zero;
 
-const VALID_BITS: [u8; 8] = [1, 2, 3, 4, 5, 6, 8, 16];
-
-fn sub_chunk_index(x: u8, y: u8, z: u8) -> usize {
-    ((x as usize) << 8) | ((z as usize) << 4) | (y as usize)
-}
-
-pub struct PalettedLayer {
-    palette: Vec<i32>,
+pub struct Palette {
+    palette: IndexSet<i32>,
     indices: Option<Box<[u16; 4096]>>,
 }
 
-impl PalettedLayer {
+impl Palette {
+    pub const VALID_BITS: [u8; 8] = [1, 2, 3, 4, 5, 6, 8, 16];
+
     pub fn new(value: i32) -> Self {
         Self {
-            palette: vec![value],
+            palette: {
+                let mut set = IndexSet::new();
+                set.insert(value);
+                set
+            },
             indices: None,
         }
     }
@@ -27,32 +31,28 @@ impl PalettedLayer {
     }
 
     pub fn set(&mut self, index: usize, value: i32) {
-        let palette_index = match self.palette.iter().position(|&v| v == value) {
-            Some(i) => i,
-            None => {
-                self.palette.push(value);
-                self.palette.len() - 1
-            }
-        };
+        let (palette_index, _) = self.palette.insert_full(value);
 
-        if palette_index == 0 && self.indices.is_none() {
+        if palette_index.is_zero() && self.indices.is_none() {
             return;
         }
 
         let indices = self.indices.get_or_insert_with(|| Box::new([0u16; 4096]));
         indices[index] = palette_index as u16;
     }
+}
 
-    pub fn serialize(&self, buf: &mut Vec<u8>) {
+impl ProtoCodec for Palette {
+    fn serialize<W: Write>(&self, stream: &mut W) -> Result<(), ProtoCodecError> {
         match &self.indices {
             None => {
-                buf.push(0x01);
-                buf.write_i32_varint(self.palette[0]).unwrap();
+                u8::serialize(&0x01, stream)?;
+                <i32 as ProtoCodecVAR>::serialize(&self.palette[0], stream)?;
             }
             Some(indices) => {
-                let bits = VALID_BITS.iter().copied().find(|&b| (1usize << b) >= self.palette.len()).unwrap_or(16);
+                let bits = *Self::VALID_BITS.iter().find(|&b| (1usize << b) >= self.palette.len()).unwrap_or(&16);
 
-                buf.push((bits << 1) | 1);
+                u8::serialize(&((bits << 1) | 1), stream)?;
 
                 let entries_per_word = (32 / bits) as usize;
                 let word_count = (4096 + entries_per_word - 1) / entries_per_word;
@@ -63,21 +63,30 @@ impl PalettedLayer {
                     words[word] |= (idx as u32) << bit_offset;
                 }
                 for word in &words {
-                    buf.extend_from_slice(&word.to_le_bytes());
+                    <u32 as ProtoCodecLE>::serialize(word, stream)?;
                 }
 
-                buf.write_i32_varint(self.palette.len() as i32).unwrap();
-                for &id in &self.palette {
-                    buf.write_i32_varint(id).unwrap();
+                <i32 as ProtoCodecVAR>::serialize(&(self.palette.len() as i32), stream)?;
+                for id in &self.palette {
+                    <i32 as ProtoCodecVAR>::serialize(id, stream)?;
                 }
             }
         }
+        Ok(())
+    }
+
+    fn deserialize<R: Read>(_stream: &mut R) -> Result<Self, ProtoCodecError> {
+        unimplemented!()
+    }
+
+    fn size_hint(&self) -> usize {
+        unimplemented!()
     }
 }
 
 pub struct SubChunk {
-    blocks: [PalettedLayer; 2],
-    biomes: PalettedLayer,
+    blocks: Vec<Palette>,
+    biomes: Palette,
     air_id: i32,
     non_air_count: u32,
 }
@@ -85,8 +94,8 @@ pub struct SubChunk {
 impl SubChunk {
     pub fn new(air_id: i32, biome: i32) -> Self {
         Self {
-            blocks: [PalettedLayer::new(air_id), PalettedLayer::new(air_id)],
-            biomes: PalettedLayer::new(biome),
+            blocks: vec![Palette::new(air_id), Palette::new(air_id)],
+            biomes: Palette::new(biome),
             air_id,
             non_air_count: 0,
         }
@@ -94,12 +103,12 @@ impl SubChunk {
 
     pub fn get(&self, x: u8, y: u8, z: u8, layer: usize) -> i32 {
         debug_assert!(x < 16 && y < 16 && z < 16 && layer < 2);
-        self.blocks[layer].get(sub_chunk_index(x, y, z))
+        self.blocks[layer].get(Self::index(x, y, z))
     }
 
     pub fn set(&mut self, x: u8, y: u8, z: u8, layer: usize, block_id: i32) {
         debug_assert!(x < 16 && y < 16 && z < 16 && layer < 2);
-        let index = sub_chunk_index(x, y, z);
+        let index = Self::index(x, y, z);
 
         let old = self.blocks[layer].get(index);
         if old == block_id {
@@ -122,16 +131,21 @@ impl SubChunk {
     pub fn serialize_network(&self, sub_chunk_y: i8) -> Vec<u8> {
         let mut buf = Vec::new();
         buf.push(9u8); // version = Limitless
-        buf.push(2u8); // layer count
+        buf.push(self.blocks.len() as u8);
         buf.push(sub_chunk_y as u8);
-        self.blocks[0].serialize(&mut buf);
-        self.blocks[1].serialize(&mut buf);
+        for palette in &self.blocks {
+            palette.serialize(&mut buf).unwrap();
+        }
         buf
     }
 
     pub fn serialize_biomes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        self.biomes.serialize(&mut buf);
+        self.biomes.serialize(&mut buf).unwrap();
         buf
+    }
+
+    fn index(x: u8, y: u8, z: u8) -> usize {
+        ((x as usize) << 8) | ((z as usize) << 4) | (y as usize)
     }
 }
