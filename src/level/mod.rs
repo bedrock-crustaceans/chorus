@@ -1,12 +1,12 @@
 pub mod biome;
+mod bit_array;
 pub mod chunk;
 pub mod chunk_state;
 pub mod dimension;
 pub mod generator;
 pub mod level;
-pub mod sub_chunk;
-mod bit_array;
 mod palette;
+pub mod sub_chunk;
 
 use bevy_ecs::prelude::{Component, Message};
 

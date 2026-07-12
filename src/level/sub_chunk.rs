@@ -1,5 +1,5 @@
-use bedrock::protocol::ProtoCodec;
 use crate::level::palette::Palette;
+use bedrock::protocol::ProtoCodec;
 
 pub struct SubChunk {
     blocks: Vec<Palette>,

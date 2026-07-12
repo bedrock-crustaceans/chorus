@@ -1,9 +1,9 @@
-use std::io::{Read, Write};
-use bedrock::protocol::{ProtoCodec, ProtoCodecLE, ProtoCodecVAR};
-use bedrock::protocol::error::ProtoCodecError;
-use indexmap::IndexSet;
-use vek::num_traits::Zero;
 use crate::level::bit_array::BitArray;
+use bedrock::protocol::error::ProtoCodecError;
+use bedrock::protocol::{ProtoCodec, ProtoCodecLE, ProtoCodecVAR};
+use indexmap::IndexSet;
+use std::io::{Read, Write};
+use vek::num_traits::Zero;
 
 pub struct Palette {
     palette: IndexSet<i32>,

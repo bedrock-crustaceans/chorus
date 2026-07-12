@@ -18,11 +18,11 @@ impl<const N: usize> BitArray<N> {
             blocks: vec![0u32; N.div_ceil(32)].into_boxed_slice(),
         }
     }
-    
+
     pub fn get_blocks(&self) -> &[u32] {
         &self.blocks
     }
-    
+
     pub fn get_bits(&self) -> u8 {
         self.bits
     }
@@ -73,7 +73,7 @@ impl<const N: usize> BitArray<N> {
         self.blocks = vec![0u32; words].into_boxed_slice();
 
         let old_per_word = 32 / old_bits as usize;
-        let old_mask = (1 << old_bits) - 1 ;
+        let old_mask = (1 << old_bits) - 1;
 
         for i in 0..N {
             let old_word = i / old_per_word;
