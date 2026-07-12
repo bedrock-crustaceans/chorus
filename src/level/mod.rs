@@ -5,6 +5,8 @@ pub mod dimension;
 pub mod generator;
 pub mod level;
 pub mod sub_chunk;
+mod bit_array;
+mod palette;
 
 use bevy_ecs::prelude::{Component, Message};
 

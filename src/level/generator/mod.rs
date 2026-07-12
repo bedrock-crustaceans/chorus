@@ -1,4 +1,5 @@
 pub mod flat;
+pub mod void;
 
 use crate::level::chunk::Chunk;
 use crate::registry::block_registry::BlockRegistry;
