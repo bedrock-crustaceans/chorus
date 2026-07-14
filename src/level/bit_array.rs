@@ -35,7 +35,7 @@ impl<const N: usize> BitArray<N> {
         (1 << self.bits) - 1
     }
 
-    pub fn set(&mut self, index: usize, value: u16) {
+    pub fn set(&mut self, index: usize, value: u16) -> u16 {
         if value > self.max_value() as u16 {
             let bits = Self::bits_for(value);
 
@@ -48,20 +48,26 @@ impl<const N: usize> BitArray<N> {
         let v = value as u32;
         let mask = self.max_value() << offset;
 
+        let old = (self.blocks[word] & mask) >> offset;
+
         self.blocks[word] = (self.blocks[word] & !mask) | ((v << offset) & mask);
+
+        old as u16
     }
 
-    pub fn get(&self, index: usize) -> u32 {
+    pub fn get(&self, index: usize) -> u16 {
         let word = index / self.per_word();
         let offset = (index % self.per_word()) * self.bits as usize;
-        (self.blocks[word] >> offset) & self.max_value()
+        let val = (self.blocks[word] >> offset) & self.max_value();
+
+        val as u16
     }
 
-    fn bits_for(value: u16) -> u8 {
+    pub fn bits_for(value: u16) -> u8 {
         Self::VALID_BITS.iter().copied().find(|&n| value < (1 << n)).unwrap_or(16)
     }
 
-    fn resize(&mut self, bits: u8) {
+    pub fn resize(&mut self, bits: u8) {
         let old_bits = self.bits;
         let old_data = std::mem::take(&mut self.blocks);
 
