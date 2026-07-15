@@ -63,15 +63,32 @@ impl Palette {
                     return;
                 }
 
-                // TODO: remove this guard once/if remapping is implemented
-                // if the old index isn't last, then return, as removing this index
-                // will swap the last index into its old position, which requires a
-                // remap of the indices in the bitarray
-                if old != values.len() - 1 {
+                // This guard prevents removal of a dead palette entry unless every entry from
+                // `old` to the end of the palette is also dead. Removing a middle entry normally
+                // requires remapping all bitarray indices, because `swap_remove_index` moves the
+                // last palette entry into the removed slot. However, if the entire tail is dead,
+                // none of those palette indices appear in the bitarray, so removing them does
+                // not change the meaning of any stored block. This allows safe, remap‑free
+                // cleanup of dead palette entries at the end, while leaving dead middle entries
+                // in place until they naturally drift to the tail.
+                if !{
+                    let mut dead = true;
+                    for i in old..values.len() {
+                        let (_, count) = values.get_index(i).expect("index is in bounds");
+                        if *count > 0 {
+                            dead = false;
+                            break;
+                        }
+                    }
+                    dead
+                } {
                     return;
                 }
 
-                values.swap_remove_index(old);
+                // remove all the dead tail entries
+                while old < values.len() {
+                    values.swap_remove_index(old);
+                }
 
                 match values.len() {
                     1 => {
@@ -87,7 +104,7 @@ impl Palette {
                         }
                     }
                     _ => {
-                        // TODO: maybe remap bitarray indices & attempt bitarray resize?
+                        // maybe remap bitarray indices & attempt bitarray resize?
                         // not necessarily required, currently values that aren't the last index will just become "dead"
                         // and eventually be removed once/if all the other indices after it are removed, essentially acting as a lazy-removal
                     }
