@@ -1,6 +1,8 @@
 use crate::block::block_definition::BlockDefinition;
 use crate::block::block_permutation::BlockPermutation;
 use crate::block::component::block_components::BlockComponents;
+use crate::block::r#impl::acacia_button::ACACIA_BUTTON;
+use crate::block::r#impl::acacia_door::ACACIA_DOOR;
 use crate::block::r#impl::air::AIR;
 use crate::block::r#impl::bedrock::BEDROCK;
 use crate::block::r#impl::dirt::DIRT;
@@ -43,7 +45,14 @@ impl BlockRegistry {
     pub fn init(mut commands: Commands) {
         let mut registry = Self::new();
 
-        registry.register_all([&AIR, &BEDROCK, &DIRT, &GRASS_BLOCK]);
+        registry.register_all([
+            &ACACIA_BUTTON,
+            &ACACIA_DOOR,
+            &AIR,
+            &BEDROCK,
+            &DIRT,
+            &GRASS_BLOCK, //
+        ]);
 
         commands.insert_resource(registry);
     }
