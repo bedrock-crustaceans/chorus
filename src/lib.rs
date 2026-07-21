@@ -5,6 +5,7 @@ use bevy_app::{App, PreStartup, ScheduleRunnerPlugin, TaskPoolOptions, TaskPoolP
 use bevy_time::TimePlugin;
 
 pub mod block;
+pub mod command;
 pub mod config;
 pub mod entity;
 pub mod error;

@@ -87,7 +87,7 @@ fn send_start_game(player: &Player, session: &Session) {
                 lan_broadcasting_enabled: false,
                 xbox_live_broadcast_setting: GamePublishSetting::Public,
                 platform_broadcast_setting: GamePublishSetting::Public,
-                commands_enabled: false,
+                commands_enabled: true,
                 texture_packs_required: false,
                 rule_data: GameRuleLegacyData { rules_list: vec![] },
                 experiments: Experiments {
