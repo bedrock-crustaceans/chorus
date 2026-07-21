@@ -1,3 +1,5 @@
+use crate::command::registry::CommandRegistry;
+use crate::command::sender::CommandSender;
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
@@ -15,11 +17,11 @@ use bedrock::protocol::v776::enums::AbilitiesIndex;
 use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitiesLayer, SerializedLayer};
 use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bevy_ecs::message::{MessageReader, MessageWriter};
-use bevy_ecs::prelude::Query;
+use bevy_ecs::prelude::{Query, Res};
 use tracing::{debug, warn};
 use vek::{Vec2, Vec3};
 
-pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, mut state_reader: MessageReader<SessionStateChangedMessage>) {
+pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, commands: Res<CommandRegistry>, mut state_reader: MessageReader<SessionStateChangedMessage>) {
     for ev in state_reader.read() {
         if ev.to != SessionState::Play {
             continue;
@@ -29,6 +31,8 @@ pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, mut state_rea
         };
 
         debug!("on_enter_play");
+
+        session.send(BedrockProtocol::AvailableCommandsPacket(commands.to_packet().into()));
 
         let flags = (1i64 << ActorFlags::HasGravity as i64) | (1i64 << ActorFlags::HasCollision as i64) | (1i64 << ActorFlags::Breathing as i64);
 
@@ -105,9 +109,14 @@ pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, mut state_rea
     }
 }
 
-pub fn handle_play(mut packet_reader: MessageReader<PacketReceivedMessage>, mut chat_writer: MessageWriter<PlayerChatMessage>, mut query: Query<(&mut PlayerEntity, &Session, &PlayerIdentity)>) {
+pub fn handle_play(
+    mut packet_reader: MessageReader<PacketReceivedMessage>,
+    mut chat_writer: MessageWriter<PlayerChatMessage>,
+    commands: Res<CommandRegistry>,
+    mut query: Query<(&mut PlayerEntity, &mut Session, &PlayerIdentity)>,
+) {
     for ev in packet_reader.read() {
-        let Ok((mut entity, session, identity)) = query.get_mut(ev.entity) else {
+        let Ok((mut entity, mut session, identity)) = query.get_mut(ev.entity) else {
             continue;
         };
 
@@ -123,6 +132,10 @@ pub fn handle_play(mut packet_reader: MessageReader<PacketReceivedMessage>, mut 
                 entity.rotation = Vec2::new(pitch, yaw);
             }
             BedrockProtocol::TextPacket(packet) => handle_text(packet, identity, &mut chat_writer),
+            BedrockProtocol::CommandRequestPacket(packet) => {
+                let mut sender = CommandSender::new(&mut session, identity.name().to_string());
+                commands.dispatch(&packet.command, &mut sender);
+            }
             packet => {
                 warn!("unexpected packet received in play state: {:?}", packet);
             }
