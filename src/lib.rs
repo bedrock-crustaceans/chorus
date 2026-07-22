@@ -9,6 +9,7 @@ pub mod command;
 pub mod config;
 pub mod entity;
 pub mod error;
+pub mod form;
 pub mod info;
 pub mod level;
 pub mod logger;
@@ -19,7 +20,6 @@ pub mod registry;
 pub mod resource;
 pub mod server;
 pub mod utils;
-pub mod form;
 
 pub struct Chorus;
 

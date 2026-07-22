@@ -13,13 +13,13 @@ use bevy_ecs::schedule::IntoScheduleConfigs;
 
 pub mod chat;
 pub mod chunks;
+pub mod form;
 pub mod handshake;
 pub mod login;
 pub mod play;
 pub mod request;
 pub mod resource;
 pub mod setup;
-pub mod form;
 
 #[derive(Message)]
 pub struct PacketReceivedMessage {

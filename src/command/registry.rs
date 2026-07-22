@@ -1,4 +1,5 @@
 use crate::command::command::Command;
+use crate::command::r#impl::dev::DevCommand;
 use crate::command::r#impl::help::HelpCommand;
 use crate::command::r#impl::ping::PingCommand;
 use crate::command::sender::CommandSender;
@@ -6,7 +7,6 @@ use bedrock::protocol::v898::packets::{AvailableCommandsPacket, CommandsEntry};
 use bevy_ecs::prelude::{Commands, Resource};
 use std::collections::HashMap;
 use tracing::debug;
-use crate::command::r#impl::dev::DevCommand;
 
 #[derive(Resource, Default)]
 pub struct CommandRegistry {

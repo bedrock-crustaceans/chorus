@@ -5,6 +5,7 @@ use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::handler::chat::{PlayerChatMessage, handle_text};
+use crate::network::handler::form::handle_modal_form_response;
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::Player;
@@ -20,7 +21,6 @@ use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Query, Res};
 use tracing::{debug, warn};
 use vek::{Vec2, Vec3};
-use crate::network::handler::form::handle_modal_form_response;
 
 pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, commands: Res<CommandRegistry>, mut state_reader: MessageReader<SessionStateChangedMessage>) {
     for ev in state_reader.read() {
@@ -136,7 +136,7 @@ pub fn handle_play(
             BedrockProtocol::CommandRequestPacket(packet) => {
                 let mut sender = CommandSender::new(&mut session, identity.name().to_string(), Some(&mut player));
                 commands.dispatch(&packet.command, &mut sender);
-            },
+            }
             BedrockProtocol::ModalFormResponsePacket(packet) => handle_modal_form_response(packet, &mut player),
             packet => {
                 warn!("unexpected packet received in play state: {:?}", packet);
