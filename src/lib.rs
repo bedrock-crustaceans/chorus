@@ -19,6 +19,7 @@ pub mod registry;
 pub mod resource;
 pub mod server;
 pub mod utils;
+pub mod form;
 
 pub struct Chorus;
 

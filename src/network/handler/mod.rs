@@ -19,6 +19,7 @@ pub mod play;
 pub mod request;
 pub mod resource;
 pub mod setup;
+pub mod form;
 
 #[derive(Message)]
 pub struct PacketReceivedMessage {

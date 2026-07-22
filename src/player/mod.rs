@@ -1,5 +1,9 @@
+use crate::network::session::Session;
+use crate::network::BedrockProtocol;
+use bedrock::form::forms::Form;
+use bedrock::protocol::v662::packets::ModalFormRequestPacket;
 use bevy_ecs::prelude::*;
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 pub mod identity;
 
@@ -12,6 +16,9 @@ pub struct Player {
     pub chunks_center: (i32, i32),
     pub chunks_pending: VecDeque<(i32, i32)>,
     pub chunks_sent: HashSet<(i32, i32)>,
+    
+    pub forms_id: u32,
+    pub forms_pending: HashMap<u32, (Form, Box<dyn FnOnce() + Send + Sync>)>
 }
 
 impl Player {
@@ -24,6 +31,9 @@ impl Player {
             chunks_center: (0, 0),
             chunks_pending: VecDeque::new(),
             chunks_sent: HashSet::new(),
+            
+            forms_id: 0,
+            forms_pending: HashMap::new(),
         }
     }
 
@@ -33,5 +43,21 @@ impl Player {
 
     pub fn runtime_id(&self) -> u64 {
         self.runtime_id
+    }
+    
+    pub fn send_form<F>(&mut self, session: &mut Session, form: Form, on_response: F)
+    where F: FnOnce() + Send + Sync + 'static 
+    {
+        let Ok(json) = serde_json::to_string(&form) else { return; };
+        
+        let id = self.forms_id;
+        self.forms_id += 1;
+
+        session.send(BedrockProtocol::ModalFormRequestPacket(ModalFormRequestPacket {
+            form_id: id,
+            form_ui_json: json,
+        }.into()));
+        
+        self.forms_pending.insert(id, (form, Box::new(on_response)));
     }
 }

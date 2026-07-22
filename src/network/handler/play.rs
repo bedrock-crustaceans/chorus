@@ -20,6 +20,7 @@ use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Query, Res};
 use tracing::{debug, warn};
 use vek::{Vec2, Vec3};
+use crate::network::handler::form::handle_modal_form_response;
 
 pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, commands: Res<CommandRegistry>, mut state_reader: MessageReader<SessionStateChangedMessage>) {
     for ev in state_reader.read() {
@@ -113,10 +114,10 @@ pub fn handle_play(
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     mut chat_writer: MessageWriter<PlayerChatMessage>,
     commands: Res<CommandRegistry>,
-    mut query: Query<(&mut PlayerEntity, &mut Session, &PlayerIdentity)>,
+    mut query: Query<(&mut PlayerEntity, &mut Player, &mut Session, &PlayerIdentity)>,
 ) {
     for ev in packet_reader.read() {
-        let Ok((mut entity, mut session, identity)) = query.get_mut(ev.entity) else {
+        let Ok((mut entity, mut player, mut session, identity)) = query.get_mut(ev.entity) else {
             continue;
         };
 
@@ -133,9 +134,10 @@ pub fn handle_play(
             }
             BedrockProtocol::TextPacket(packet) => handle_text(packet, identity, &mut chat_writer),
             BedrockProtocol::CommandRequestPacket(packet) => {
-                let mut sender = CommandSender::new(&mut session, identity.name().to_string());
+                let mut sender = CommandSender::new(&mut session, identity.name().to_string(), Some(&mut player));
                 commands.dispatch(&packet.command, &mut sender);
-            }
+            },
+            BedrockProtocol::ModalFormResponsePacket(packet) => handle_modal_form_response(packet, &mut player),
             packet => {
                 warn!("unexpected packet received in play state: {:?}", packet);
             }

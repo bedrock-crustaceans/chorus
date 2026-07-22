@@ -6,6 +6,7 @@ use bedrock::protocol::v898::packets::{AvailableCommandsPacket, CommandsEntry};
 use bevy_ecs::prelude::{Commands, Resource};
 use std::collections::HashMap;
 use tracing::debug;
+use crate::command::r#impl::dev::DevCommand;
 
 #[derive(Resource, Default)]
 pub struct CommandRegistry {
@@ -23,6 +24,7 @@ impl CommandRegistry {
 
         registry.register(HelpCommand);
         registry.register(PingCommand);
+        registry.register(DevCommand);
 
         commands.insert_resource(registry);
     }
