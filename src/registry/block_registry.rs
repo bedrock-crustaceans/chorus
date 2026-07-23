@@ -1,10 +1,7 @@
 use crate::block::block_definition::BlockDefinition;
 use crate::block::block_permutation::BlockPermutation;
 use crate::block::component::block_components::BlockComponents;
-use crate::block::r#impl::air::AIR;
-use crate::block::r#impl::bedrock::BEDROCK;
-use crate::block::r#impl::dirt::DIRT;
-use crate::block::r#impl::grass_block::GRASS_BLOCK;
+use crate::block::r#impl::DEFINITIONS;
 use atomicow::CowArc;
 use bevy_ecs::prelude::{Commands, Resource};
 use std::collections::HashMap;
@@ -43,7 +40,7 @@ impl BlockRegistry {
     pub fn init(mut commands: Commands) {
         let mut registry = Self::new();
 
-        registry.register_all([&AIR, &BEDROCK, &DIRT, &GRASS_BLOCK]);
+        registry.register_all(DEFINITIONS.iter().copied());
 
         commands.insert_resource(registry);
     }
