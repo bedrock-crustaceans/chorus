@@ -4,6 +4,7 @@ use crate::block::component::block_components::BlockComponents;
 use crate::block::r#impl::DEFINITIONS;
 use atomicow::CowArc;
 use bevy_ecs::prelude::{Commands, Resource};
+use rand::prelude::IteratorRandom;
 use std::collections::HashMap;
 use tracing::{info, warn};
 
@@ -85,5 +86,9 @@ impl BlockRegistry {
 
     pub fn get_block_id(&self, identifier: &str) -> Option<i32> {
         self.default_hash.get(identifier).map(|&h| h)
+    }
+
+    pub fn get_random(&self) -> i32 {
+        *self.default_hash.values().choose(&mut rand::rng()).expect("no hash found")
     }
 }

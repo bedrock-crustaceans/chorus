@@ -1,6 +1,7 @@
 use crate::level::BlockUpdatedMessage;
 use crate::level::dimension::Dimension;
-use crate::level::generator::flat::{FlatGenerator, FlatLayer};
+// use crate::level::generator::flat::{FlatGenerator, FlatLayer};
+use crate::level::generator::random::RandomGenerator;
 use crate::registry::block_registry::BlockRegistry;
 use bevy_ecs::message::MessageWriter;
 use bevy_ecs::prelude::{Commands, Resource};
@@ -13,19 +14,21 @@ pub struct Level {
 }
 
 impl Level {
-    pub fn init(mut commands: Commands, registry: Res<BlockRegistry>) {
-        let bedrock_id = registry.get_block_id("minecraft:bedrock").unwrap_or(0);
-        let dirt_id = registry.get_block_id("minecraft:dirt").unwrap_or(0);
-        let grass_id = registry.get_block_id("minecraft:grass_block").unwrap_or(0);
+    pub fn init(mut commands: Commands, _registry: Res<BlockRegistry>) {
+        // let bedrock_id = registry.get_block_id("minecraft:bedrock").unwrap_or(0);
+        // let dirt_id = registry.get_block_id("minecraft:dirt").unwrap_or(0);
+        // let grass_id = registry.get_block_id("minecraft:grass_block").unwrap_or(0);
+        //
+        // let generator = FlatGenerator {
+        //     layers: vec![
+        //         FlatLayer { block_id: bedrock_id, height: 1 },
+        //         FlatLayer { block_id: dirt_id, height: 2 },
+        //         FlatLayer { block_id: grass_id, height: 1 },
+        //     ],
+        //     biome: 1,
+        // };
 
-        let generator = FlatGenerator {
-            layers: vec![
-                FlatLayer { block_id: bedrock_id, height: 1 },
-                FlatLayer { block_id: dirt_id, height: 2 },
-                FlatLayer { block_id: grass_id, height: 1 },
-            ],
-            biome: 1,
-        };
+        let generator = RandomGenerator { biome: 1 };
 
         let overworld = Dimension::new(0, -4, 19, Box::new(generator));
 

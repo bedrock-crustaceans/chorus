@@ -1,4 +1,5 @@
 pub mod flat;
+pub mod random;
 pub mod void;
 
 use crate::level::chunk::Chunk;
