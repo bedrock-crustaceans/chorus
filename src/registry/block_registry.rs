@@ -5,7 +5,7 @@ use crate::block::r#impl::DEFINITIONS;
 use atomicow::CowArc;
 use bevy_ecs::prelude::{Commands, Resource};
 use std::collections::HashMap;
-use tracing::{debug, warn};
+use tracing::{info, warn};
 
 #[derive(Resource)]
 pub struct BlockRegistry {
@@ -66,8 +66,6 @@ impl BlockRegistry {
         self.permutations.extend(permutations);
         self.components.extend(components);
 
-        debug!("registered {:?}", definition.identifier);
-
         self.definitions.insert(definition.identifier.clone(), definition);
     }
 
@@ -76,9 +74,13 @@ impl BlockRegistry {
         I: IntoIterator<Item = D>,
         D: Into<CowArc<'static, BlockDefinition>>,
     {
+        let before = self.definitions.len();
+
         for def in definitions {
             self.register(def);
         }
+
+        info!("registered {} blocks", self.definitions.len() - before);
     }
 
     pub fn get_block_id(&self, identifier: &str) -> Option<i32> {
