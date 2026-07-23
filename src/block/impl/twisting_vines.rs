@@ -22,7 +22,7 @@ pub const TWISTING_VINES: BlockDefinition = const_block! {
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(0.0),
         MoveableComponent { movement: Movement::Break, sticky: false },
-        CollisionBoxComponent::new(Vec3::new(0.25, 0.0, 0.25), Vec3::new(0.5, 0.9375, 0.5)),
+        CollisionBoxComponent { origin: Vec3::new(0.25, 0.0, 0.25), size: Vec3::new(0.5, 0.9375, 0.5), enabled: false },
     ],
     permutations: [],
 };

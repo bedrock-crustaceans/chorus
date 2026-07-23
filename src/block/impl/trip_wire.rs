@@ -16,7 +16,7 @@ pub const TRIP_WIRE: BlockDefinition = const_block! {
         InternalFrictionComponent { internal_friction: 0.95 },
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(0.0),
-        CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.5, 1.0)),
+        CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.5, 1.0), enabled: false },
     ],
     permutations: [],
 };

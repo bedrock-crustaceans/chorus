@@ -18,7 +18,7 @@ pub const ACTIVATOR_RAIL: BlockDefinition = const_block! {
         InternalFrictionComponent { internal_friction: 0.95 },
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(0.5),
-        CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.125, 1.0)),
+        CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.125, 1.0), enabled: false },
     ],
     permutations: [],
 };

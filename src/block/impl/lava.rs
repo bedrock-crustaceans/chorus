@@ -26,36 +26,36 @@ pub const LAVA: BlockDefinition = const_block! {
         ReplaceableComponent { replaceable: true },
         MineableComponent::hardness(100.0),
         MoveableComponent { movement: Movement::Break, sticky: false },
-        CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.8888888880610466, 1.0)),
+        CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.8888888880610466, 1.0), enabled: false },
     ],
     permutations: [
         const_permutation! {
             condition: |it| it["liquid_depth"] == 1,
-            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.7777777761220932, 1.0))]
+            components: [CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.7777777761220932, 1.0), enabled: false }]
         },
         const_permutation! {
             condition: |it| it["liquid_depth"] == 2,
-            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.6666666567325592, 1.0))]
+            components: [CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.6666666567325592, 1.0), enabled: false }]
         },
         const_permutation! {
             condition: |it| it["liquid_depth"] == 3,
-            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.5555555522441864, 1.0))]
+            components: [CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.5555555522441864, 1.0), enabled: false }]
         },
         const_permutation! {
             condition: |it| it["liquid_depth"] == 4,
-            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.4444444179534912, 1.0))]
+            components: [CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.4444444179534912, 1.0), enabled: false }]
         },
         const_permutation! {
             condition: |it| it["liquid_depth"] == 5,
-            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.3333333134651184, 1.0))]
+            components: [CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.3333333134651184, 1.0), enabled: false }]
         },
         const_permutation! {
             condition: |it| it["liquid_depth"] == 6,
-            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.2222222089767456, 1.0))]
+            components: [CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.2222222089767456, 1.0), enabled: false }]
         },
         const_permutation! {
             condition: |it| it["liquid_depth"] == 7,
-            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.1111111044883728, 1.0))]
+            components: [CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.1111111044883728, 1.0), enabled: false }]
         },
     ],
 };

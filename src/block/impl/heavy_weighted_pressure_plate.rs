@@ -22,7 +22,7 @@ pub const HEAVY_WEIGHTED_PRESSURE_PLATE: BlockDefinition = const_block! {
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(0.5),
         MoveableComponent { movement: Movement::Break, sticky: false },
-        CollisionBoxComponent::new(Vec3::new(0.0625, 0.0, 0.0625), Vec3::new(0.875, 0.25, 0.875)),
+        CollisionBoxComponent { origin: Vec3::new(0.0625, 0.0, 0.0625), size: Vec3::new(0.875, 0.25, 0.875), enabled: false },
     ],
     permutations: [],
 };

@@ -18,20 +18,20 @@ pub const FRAME: BlockDefinition = const_block! {
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(0.25),
         MoveableComponent { movement: Movement::Break, sticky: false },
-        CollisionBoxComponent::new(Vec3::new(0.125, 0.125, 0.125), Vec3::new(0.75, 0.75, 0.75)),
+        CollisionBoxComponent { origin: Vec3::new(0.125, 0.125, 0.125), size: Vec3::new(0.75, 0.75, 0.75), enabled: false },
     ],
     permutations: [
         const_permutation! {
             condition: |it| it["facing_direction"] == 1,
-            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.125, 0.125), Vec3::new(0.0625, 0.75, 0.75))]
+            components: [CollisionBoxComponent { origin: Vec3::new(0.0, 0.125, 0.125), size: Vec3::new(0.0625, 0.75, 0.75), enabled: false }]
         },
         const_permutation! {
             condition: |it| it["facing_direction"] == 3,
-            components: [CollisionBoxComponent::new(Vec3::new(0.125, 0.125, 0.0), Vec3::new(0.75, 0.75, 0.0625))]
+            components: [CollisionBoxComponent { origin: Vec3::new(0.125, 0.125, 0.0), size: Vec3::new(0.75, 0.75, 0.0625), enabled: false }]
         },
         const_permutation! {
             condition: |it| it["facing_direction"] == 5,
-            components: [CollisionBoxComponent::new(Vec3::new(0.125, 0.0, 0.125), Vec3::new(0.75, 0.0625, 0.75))]
+            components: [CollisionBoxComponent { origin: Vec3::new(0.125, 0.0, 0.125), size: Vec3::new(0.75, 0.0625, 0.75), enabled: false }]
         },
     ],
 };

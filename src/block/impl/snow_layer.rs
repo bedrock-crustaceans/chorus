@@ -22,16 +22,16 @@ pub const SNOW_LAYER: BlockDefinition = const_block! {
         ReplaceableComponent { replaceable: true },
         MineableComponent::hardness(0.2),
         MoveableComponent { movement: Movement::Break, sticky: false },
-        CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.125, 1.0)),
+        CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.125, 1.0), enabled: false },
     ],
     permutations: [
         const_permutation! {
             condition: |it| it["height"] == 1,
-            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.25, 1.0))]
+            components: [CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.25, 1.0), enabled: false }]
         },
         const_permutation! {
             condition: |it| it["height"] == 2,
-            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.375, 1.0))]
+            components: [CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.375, 1.0), enabled: false }]
         },
         const_permutation! {
             condition: |it| (it["height"] == 3) || (it["height"] == 4) || (it["height"] == 5) || (it["height"] == 6) || (it["height"] == 7),

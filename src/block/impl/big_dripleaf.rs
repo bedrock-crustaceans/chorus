@@ -24,7 +24,7 @@ pub const BIG_DRIPLEAF: BlockDefinition = const_block! {
         FlammableComponent { catch_chance: 15, destroy_chance: 100 },
         MineableComponent::hardness(0.0),
         MoveableComponent { movement: Movement::Break, sticky: false },
-        CollisionBoxComponent::new(Vec3::new(0.0, 0.6875, 0.0), Vec3::new(1.0, 0.3125, 1.0)),
+        CollisionBoxComponent { origin: Vec3::new(0.0, 0.6875, 0.0), size: Vec3::new(1.0, 0.3125, 1.0), enabled: false },
     ],
     permutations: [
         const_permutation! {
