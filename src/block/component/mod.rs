@@ -1,8 +1,11 @@
 pub mod block_component;
 pub mod block_components;
 pub mod collision_box_component;
+pub mod flammable_component;
+pub mod friction_component;
 pub mod internal_friction_component;
 pub mod light_dampening_component;
+pub mod light_emission_component;
 pub mod map_color_component;
 pub mod mineable_component;
 pub mod moveable_component;

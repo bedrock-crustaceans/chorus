@@ -1,5 +1,4 @@
 use crate::block::block_definition::BlockDefinition;
-use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -7,15 +6,12 @@ use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::moveable_component::{MoveableComponent, Movement};
 use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
-use crate::block::state::common;
+use crate::block::state::common::{BUTTON_PRESSED_BIT, FACING_DIRECTION};
 use crate::const_block;
 
 pub const ACACIA_BUTTON: BlockDefinition = const_block! {
-    identifier: block_id::ACACIA_BUTTON,
-    states: [
-        common::BUTTON_PRESSED_BIT,
-        common::FACING_DIRECTION,
-    ],
+    identifier: "minecraft:acacia_button",
+    states: [BUTTON_PRESSED_BIT, FACING_DIRECTION],
     components: [
         SolidComponent { solid: false },
         TransparentComponent { transparent: true },
@@ -25,5 +21,5 @@ pub const ACACIA_BUTTON: BlockDefinition = const_block! {
         MoveableComponent { movement: Movement::Break, sticky: false },
         CollisionBoxComponent::enabled(false),
     ],
-    permutations: []
+    permutations: [],
 };

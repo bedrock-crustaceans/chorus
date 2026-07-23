@@ -13,8 +13,8 @@ impl BlockComponent for CollisionBoxComponent {}
 impl CollisionBoxComponent {
     pub const fn default() -> CollisionBoxComponent {
         Self {
-            origin: Vec3::new(-8.0, 0.0, -8.0),
-            size: Vec3::new(16.0, 16.0, 16.0),
+            origin: Vec3::new(0.0, 0.0, 0.0),
+            size: Vec3::new(1.0, 1.0, 1.0),
             enabled: true,
         }
     }
@@ -25,8 +25,8 @@ impl CollisionBoxComponent {
 
     pub const fn enabled(enabled: bool) -> CollisionBoxComponent {
         Self {
-            origin: Vec3::new(-8.0, 0.0, -8.0),
-            size: Vec3::new(16.0, 16.0, 16.0),
+            origin: Vec3::new(0.0, 0.0, 0.0),
+            size: Vec3::new(1.0, 1.0, 1.0),
             enabled,
         }
     }
