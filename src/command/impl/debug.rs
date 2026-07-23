@@ -1,4 +1,5 @@
 use crate::command::command::{Command, CommandResult};
+use crate::command::parameter::{CommandOverload, CommandParameter, CommandParameterType};
 use crate::command::registry::CommandRegistry;
 use crate::command::sender::CommandSender;
 use bedrock::form::elems::button::Button;
@@ -6,15 +7,19 @@ use bedrock::form::forms::Form;
 use bedrock::form::forms::simple::SimpleForm;
 use tracing::info;
 
-pub struct DevCommand;
+pub struct DebugCommand;
 
-impl Command for DevCommand {
+impl Command for DebugCommand {
     fn name(&self) -> &str {
-        "dev"
+        "debug"
     }
 
     fn description(&self) -> &str {
-        "Used for testing of internal features"
+        "Used for debugging"
+    }
+
+    fn overloads(&self) -> Vec<CommandOverload> {
+        vec![CommandOverload::new(vec![CommandParameter::new("feature", CommandParameterType::String, false)])]
     }
 
     fn execute(&self, _registry: &CommandRegistry, sender: &mut CommandSender, _args: &[&str]) -> CommandResult {

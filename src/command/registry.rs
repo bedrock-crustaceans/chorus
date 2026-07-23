@@ -1,5 +1,5 @@
 use crate::command::command::Command;
-use crate::command::r#impl::dev::DevCommand;
+use crate::command::r#impl::debug::DebugCommand;
 use crate::command::r#impl::help::HelpCommand;
 use crate::command::r#impl::ping::PingCommand;
 use crate::command::sender::CommandSender;
@@ -24,7 +24,7 @@ impl CommandRegistry {
 
         registry.register(HelpCommand);
         registry.register(PingCommand);
-        registry.register(DevCommand);
+        registry.register(DebugCommand);
 
         commands.insert_resource(registry);
     }
