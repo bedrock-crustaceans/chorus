@@ -10,6 +10,7 @@ use bedrock::protocol::v712::packets::{DisconnectMessage, DisconnectPacket};
 use bedrock::protocol::v1001::enums::ConnectionFailReason;
 use bevy_ecs::prelude::{Component, Entity, MessageWriter};
 use bevy_tasks::futures::now_or_never;
+use std::collections::HashMap;
 use std::mem::take;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -38,6 +39,8 @@ pub struct Session {
 
     conn_tx: UnboundedSender<ConnectionEvent>,
     conn_task: JoinHandle<()>,
+
+    pub unhandled_packets: HashMap<&'static str, usize>,
 }
 
 impl Session {
@@ -107,6 +110,8 @@ impl Session {
 
             conn_tx,
             conn_task,
+
+            unhandled_packets: HashMap::new(),
         }
     }
 

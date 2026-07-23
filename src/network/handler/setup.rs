@@ -155,16 +155,19 @@ fn send_start_game(player: &Player, session: &Session) {
 
 pub fn handle_setup(mut packet_reader: MessageReader<PacketReceivedMessage>, mut state_writer: MessageWriter<SessionStateChangedMessage>, mut query: Query<(&mut Player, &mut Session)>) {
     for ev in packet_reader.read() {
-        let Ok(mut query) = query.get_mut(ev.entity) else {
+        let Ok((mut player, mut session)) = query.get_mut(ev.entity) else {
             continue;
         };
-        if query.1.get_state() != SessionState::Setup {
+        if session.get_state() != SessionState::Setup {
             continue;
         }
         match &ev.packet {
-            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(packet, &mut query.0, &mut query.1),
-            BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => handle_set_local_player_as_initialized(packet, &query.0, &mut query.1, &mut state_writer),
-            packet => warn!("unexpected packet received in setup state: {:?}", packet),
+            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(packet, &mut player, &mut session),
+            BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => handle_set_local_player_as_initialized(packet, &player, &mut session, &mut state_writer),
+            packet => {
+                let count = session.unhandled_packets.entry(packet.as_ref().meta().name).or_insert(0);
+                *count = count.saturating_add(1);
+            }
         }
     }
 }

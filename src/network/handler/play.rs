@@ -19,6 +19,7 @@ use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitie
 use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Query, Res};
+use std::ops::Deref;
 use tracing::{debug, warn};
 use vek::{Vec2, Vec3};
 
@@ -139,7 +140,8 @@ pub fn handle_play(
             }
             BedrockProtocol::ModalFormResponsePacket(packet) => handle_modal_form_response(packet, &mut player),
             packet => {
-                warn!("unexpected packet received in play state: {:?}", packet);
+                let count = session.unhandled_packets.entry(packet.as_ref().meta().name).or_insert(0);
+                *count = count.saturating_add(1);
             }
         }
     }

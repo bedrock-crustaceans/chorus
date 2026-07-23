@@ -22,32 +22,37 @@ impl Command for DebugCommand {
         vec![CommandOverload::new(vec![CommandParameter::new("feature", CommandParameterType::String, false)])]
     }
 
-    fn execute(&self, _registry: &CommandRegistry, sender: &mut CommandSender, _args: &[&str]) -> CommandResult {
-        let name = sender.name().to_owned();
-        let (session, player) = sender.split();
+    fn execute(&self, _registry: &CommandRegistry, sender: &mut CommandSender, args: &[&str]) -> CommandResult {
+        match args.first() {
+            Some(&"unhandled") => sender.reply(format!("Unhandled Packets: {:#?}", sender.session().unhandled_packets)),
+            Some(&"form") => {
+                let name = sender.name().to_owned();
+                let (session, player) = sender.split();
 
-        let Some(player) = player else {
-            return Err("must be sent by player!".to_owned());
-        };
+                let Some(player) = player else {
+                    return Err("must be sent by player!".to_owned());
+                };
 
-        player.send_form(
-            session,
-            Form::Simple(SimpleForm {
-                body: format!("Hello {}!", name),
-                buttons: vec![
-                    Button { text: "Hey!".to_owned(), image: None },
-                    Button {
-                        text: "Fuck you".to_owned(),
-                        image: None,
+                player.send_form(
+                    session,
+                    Form::Simple(SimpleForm {
+                        body: format!("Hello {}!", name),
+                        buttons: vec![
+                            Button { text: "Hey!".to_owned(), image: None },
+                            Button {
+                                text: "Fuck you".to_owned(),
+                                image: None,
+                            },
+                        ],
+                        title: "Simple Form".to_owned(),
+                    }),
+                    move || {
+                        info!("{} responded!", name);
                     },
-                ],
-                title: "Simple Form".to_owned(),
-            }),
-            move || {
-                info!("{} responded!", name);
-            },
-        );
-
+                );
+            }
+            _ => {}
+        }
         Ok(())
     }
 }
