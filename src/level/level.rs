@@ -75,4 +75,19 @@ impl Level {
         }
         changed
     }
+
+    pub fn break_block(&mut self, dim: i32, x: i32, y: i32, z: i32, air_id: i32, writer: &mut MessageWriter<BlockUpdatedMessage>) -> Option<i32> {
+        let previous = self.get_block(dim, x, y, z, 0)?;
+        if previous == air_id {
+            return None;
+        }
+        if self.set_block(dim, x, y, z, 0, air_id, writer) { Some(previous) } else { None }
+    }
+
+    pub fn place_block(&mut self, dim: i32, x: i32, y: i32, z: i32, block_id: i32, air_id: i32, writer: &mut MessageWriter<BlockUpdatedMessage>) -> bool {
+        match self.get_block(dim, x, y, z, 0) {
+            Some(current) if current == air_id => self.set_block(dim, x, y, z, 0, block_id, writer),
+            _ => false,
+        }
+    }
 }

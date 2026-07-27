@@ -1,5 +1,6 @@
 use crate::config::Config;
-use crate::level::BlockUpdatedMessage;
+use crate::item::ItemTakenMessage;
+use crate::level::{BlockDestroyedMessage, BlockUpdatedMessage};
 use crate::network::BedrockProtocol;
 use crate::network::handler::chat::PlayerChatMessage;
 use crate::network::handler::{PacketHandlers, PacketReceivedMessage};
@@ -35,6 +36,8 @@ impl Plugin for Network {
             .add_message::<PacketReceivedMessage>()
             .add_message::<SessionStateChangedMessage>()
             .add_message::<BlockUpdatedMessage>()
+            .add_message::<BlockDestroyedMessage>()
+            .add_message::<ItemTakenMessage>()
             .add_message::<PlayerChatMessage>();
     }
 }

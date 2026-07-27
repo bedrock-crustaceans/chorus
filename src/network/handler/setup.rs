@@ -1,4 +1,5 @@
 use crate::entity::entity::Entity as PlayerEntity;
+use crate::item::inventory::Inventory;
 use crate::level::DimensionId;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
@@ -48,7 +49,7 @@ pub fn on_enter_setup(mut sessions: Query<&mut Session>, mut server_state: ResMu
         send_start_game(&player, &session);
 
         let entity = PlayerEntity::default("minecraft:player".to_string(), player.unique_id());
-        commands.entity(ev.entity).insert((player, entity, DimensionId(0)));
+        commands.entity(ev.entity).insert((player, entity, DimensionId(0), Inventory::default()));
     }
 }
 

@@ -22,3 +22,12 @@ pub struct BlockUpdatedMessage {
     pub layer: usize,
     pub block_id: i32,
 }
+
+#[derive(Message, Clone)]
+pub struct BlockDestroyedMessage {
+    pub dimension_id: i32,
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+    pub block_id: i32,
+}
