@@ -1,6 +1,6 @@
 use crate::entity::entity::Entity as PlayerEntity;
+use crate::inventory::Inventory;
 use crate::item::ItemTakenMessage;
-use crate::item::inventory::Inventory;
 use crate::item::item_entity::ItemEntity;
 use crate::item::item_stack::ItemStack;
 use crate::network::BedrockProtocol;

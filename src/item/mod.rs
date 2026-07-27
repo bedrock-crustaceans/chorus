@@ -1,4 +1,3 @@
-pub mod inventory;
 pub mod item_entity;
 pub mod item_stack;
 

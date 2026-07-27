@@ -1,5 +1,5 @@
 use crate::entity::entity::Entity as PlayerEntity;
-use crate::item::inventory::Inventory;
+use crate::inventory::Inventory;
 use crate::level::DimensionId;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
