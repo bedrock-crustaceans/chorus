@@ -30,7 +30,7 @@ jsonwebtoken = { version = "10.3.0", features = ["rust_crypto", "p384"] }
 base64 = "0.22.1"
 p384 = { version = "0.14.0-rc.8", features = ["ecdh", "ecdsa"] }
 
-bedrock = { git = "https://github.com/bedrock-crustaceans/bedrock-rs", branch = "fix/network-item-stack-descriptor-fields", features = ["full", "form", "protocol-packet-meta", "protocol-packet-dyn", "protocol-unknown", "protocol-v1001"] }
+bedrock = { git = "https://github.com/bedrock-crustaceans/bedrock-rs", branch = "main", features = ["full", "form", "protocol-packet-meta", "protocol-packet-dyn", "protocol-unknown", "protocol-v1001"] }
 nbtx = { git = "https://github.com/bedrock-crustaceans/nbtx" }
 uuid = { version = "1.16.0", features = ["v4"] }
 zip = "8"
