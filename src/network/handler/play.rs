@@ -1,4 +1,3 @@
-use crate::command::command_registry::CommandRegistry;
 use crate::command::sender::CommandSender;
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::BlockUpdatedMessage;
@@ -10,6 +9,7 @@ use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::Player;
 use crate::player::identity::PlayerIdentity;
+use crate::registry::command_registry::CommandRegistry;
 use bedrock::protocol::v662::enums::{ActorFlags, CommandPermissionLevel, DataItemType};
 use bedrock::protocol::v662::packets::{SetActorDataPacket, UpdateAbilitiesPacket, UpdateBlockPacket};
 use bedrock::protocol::v662::types::{ActorRuntimeID, DataItem, PropertySyncData};

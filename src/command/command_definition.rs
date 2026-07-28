@@ -1,7 +1,7 @@
-use crate::command::command_registry::CommandRegistry;
 use crate::command::command_result::CommandResult;
 use crate::command::parameter::CommandOverload;
 use crate::command::sender::CommandSender;
+use crate::registry::command_registry::CommandRegistry;
 use atomicow::CowArc;
 use bedrock::protocol::v898::packets::CommandPermissionLevelString;
 

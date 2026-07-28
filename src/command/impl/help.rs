@@ -1,9 +1,8 @@
 use crate::command::command_definition::CommandDefinition;
-use crate::command::command_registry::CommandRegistry;
-use crate::command::command_result::CommandResult;
 use crate::command::parameter::{CommandOverload, CommandParameter, CommandParameterType};
 use crate::command::sender::CommandSender;
 use crate::const_command;
+use crate::registry::command_registry::CommandRegistry;
 use atomicow::CowArc;
 use bedrock::protocol::v898::packets::CommandPermissionLevelString;
 
@@ -34,33 +33,31 @@ pub const HELP_COMMAND: CommandDefinition = const_command! {
             ])
         },
     ],
-    execute: execute,
+    execute: |registry, sender, args| {
+        let mut name_parts = args.to_vec();
+        let mut page = 1;
+
+        if let Some(last) = name_parts.last()
+            && let Ok(parsed) = last.parse::<usize>()
+        {
+            page = parsed.max(1);
+            name_parts.pop();
+        }
+
+        let name = name_parts.join(" ");
+        if name.is_empty() {
+            list(registry, sender, page);
+            return Ok(());
+        }
+
+        let Some(command) = registry.get(&name) else {
+            return Err(format!("No command matching \"{name}\" found."));
+        };
+
+        describe(command, sender);
+        Ok(())
+    }
 };
-
-fn execute(registry: &CommandRegistry, sender: &mut CommandSender, args: &[&str]) -> CommandResult {
-    let mut name_parts = args.to_vec();
-    let mut page = 1;
-
-    if let Some(last) = name_parts.last()
-        && let Ok(parsed) = last.parse::<usize>()
-    {
-        page = parsed.max(1);
-        name_parts.pop();
-    }
-
-    let name = name_parts.join(" ");
-    if name.is_empty() {
-        list(registry, sender, page);
-        return Ok(());
-    }
-
-    let Some(command) = registry.get(&name) else {
-        return Err(format!("No command matching \"{name}\" found."));
-    };
-
-    describe(command, sender);
-    Ok(())
-}
 
 fn list(registry: &CommandRegistry, sender: &mut CommandSender, page: usize) {
     let mut commands: Vec<&CommandDefinition> = registry.commands().collect();
