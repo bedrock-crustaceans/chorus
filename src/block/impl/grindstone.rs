@@ -24,15 +24,15 @@ pub const GRINDSTONE: BlockDefinition = const_block! {
             components: [CollisionBoxComponent::new(Vec3::new(0.125, 0.125, 0.0), Vec3::new(0.75, 0.75, 0.875))]
         },
         const_permutation! {
-            condition: |it| (it["attachment"] == "multiple" && it["direction"] == 1) || (it["attachment"] == "side" && it["direction"] == 1),
+            condition: |it| !(it["direction"] != 1 || it["attachment"] != "multiple" && it["attachment"] != "side"),
             components: [CollisionBoxComponent::new(Vec3::new(0.125, 0.125, 0.125), Vec3::new(0.875, 0.75, 0.75))]
         },
         const_permutation! {
-            condition: |it| (it["attachment"] == "multiple" && it["direction"] == 2) || (it["attachment"] == "side" && it["direction"] == 2),
+            condition: |it| !(it["direction"] != 2 || it["attachment"] != "multiple" && it["attachment"] != "side"),
             components: [CollisionBoxComponent::new(Vec3::new(0.125, 0.125, 0.125), Vec3::new(0.75, 0.75, 0.875))]
         },
         const_permutation! {
-            condition: |it| (it["attachment"] == "multiple" && it["direction"] == 3) || (it["attachment"] == "side" && it["direction"] == 3),
+            condition: |it| !(it["direction"] != 3 || it["attachment"] != "multiple" && it["attachment"] != "side"),
             components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.125, 0.125), Vec3::new(0.875, 0.75, 0.75))]
         },
         const_permutation! {

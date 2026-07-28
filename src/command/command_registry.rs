@@ -1,8 +1,9 @@
-use crate::command::command::Command;
-use crate::command::r#impl::debug::DebugCommand;
-use crate::command::r#impl::help::HelpCommand;
-use crate::command::r#impl::ping::PingCommand;
+use crate::command::command_definition::CommandDefinition;
+use crate::command::r#impl::debug::DEBUG_COMMAND;
+use crate::command::r#impl::help::HELP_COMMAND;
+use crate::command::r#impl::ping::PING_COMMAND;
 use crate::command::sender::CommandSender;
+use atomicow::CowArc;
 use bedrock::protocol::v898::packets::{AvailableCommandsPacket, CommandsEntry};
 use bevy_ecs::prelude::{Commands, Resource};
 use std::collections::HashMap;
@@ -10,8 +11,8 @@ use tracing::debug;
 
 #[derive(Resource, Default)]
 pub struct CommandRegistry {
-    commands: Vec<Box<dyn Command>>,
-    index: HashMap<String, usize>,
+    commands: Vec<CowArc<'static, CommandDefinition>>,
+    index: HashMap<CowArc<'static, str>, usize>,
 }
 
 impl CommandRegistry {
@@ -22,35 +23,37 @@ impl CommandRegistry {
     pub fn init(mut commands: Commands) {
         let mut registry = Self::new();
 
-        registry.register(HelpCommand);
-        registry.register(PingCommand);
-        registry.register(DebugCommand);
+        registry.register(&HELP_COMMAND);
+        registry.register(&PING_COMMAND);
+        registry.register(&DEBUG_COMMAND);
 
         commands.insert_resource(registry);
     }
 
     pub fn register<C>(&mut self, command: C)
     where
-        C: Command + 'static,
+        C: Into<CowArc<'static, CommandDefinition>>,
     {
+        let command = command.into();
+
         let position = self.commands.len();
 
-        self.index.insert(command.name().to_string(), position);
-        for alias in command.aliases() {
-            self.index.insert(alias.to_string(), position);
+        self.index.insert(command.name.clone(), position);
+        for alias in command.aliases.iter() {
+            self.index.insert(alias.clone(), position);
         }
 
-        debug!("registered command {:?}", command.name());
+        debug!("registered command {:?}", command.name);
 
-        self.commands.push(Box::new(command));
+        self.commands.push(command);
     }
 
-    pub fn get(&self, name: &str) -> Option<&dyn Command> {
-        self.index.get(name).map(|&position| self.commands[position].as_ref())
+    pub fn get(&self, name: &str) -> Option<&CommandDefinition> {
+        self.index.get(name).and_then(|&position| self.commands.get(position).map(|c| c.as_ref()))
     }
 
-    pub fn commands(&self) -> impl Iterator<Item = &dyn Command> {
-        self.commands.iter().map(|command| command.as_ref())
+    pub fn commands(&self) -> impl Iterator<Item = &CommandDefinition> {
+        self.commands.iter().map(|c| c.as_ref())
     }
 
     pub fn dispatch(&self, line: &str, sender: &mut CommandSender) {
@@ -67,7 +70,7 @@ impl CommandRegistry {
             return;
         };
 
-        if let Err(err) = command.execute(self, sender, &args) {
+        if let Err(err) = (command.execute)(self, sender, &args) {
             sender.reply(format!("§c{err}"));
         }
     }
@@ -77,13 +80,13 @@ impl CommandRegistry {
             .commands
             .iter()
             .map(|command| CommandsEntry {
-                name: command.name().to_string(),
-                description: command.description().to_string(),
+                name: command.name.to_string(),
+                description: command.description.to_string(),
                 flags: 0,
-                permission_level: command.permission(),
+                permission_level: command.permission.clone(),
                 alias_enum: -1,
                 chained_sub_command_indices: vec![],
-                overloads: command.overloads().iter().map(|overload| overload.to_entry()).collect(),
+                overloads: command.overloads.iter().map(|overload| overload.to_entry()).collect(),
             })
             .collect();
 

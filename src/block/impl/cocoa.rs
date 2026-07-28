@@ -38,15 +38,15 @@ pub const COCOA: BlockDefinition = const_block! {
             components: [CollisionBoxComponent::new(Vec3::new(0.3125, 0.3125, 0.5625), Vec3::new(0.375, 0.4375, 0.375))]
         },
         const_permutation! {
-            condition: |it| (it["age"] == 1 && it["direction"] == 1) || (it["age"] == 2 && it["direction"] == 1),
+            condition: |it| !(it["direction"] != 1 || it["age"] != 1 && it["age"] != 2),
             components: [CollisionBoxComponent::new(Vec3::new(0.0625, 0.3125, 0.3125), Vec3::new(0.375, 0.4375, 0.375))]
         },
         const_permutation! {
-            condition: |it| (it["age"] == 1 && it["direction"] == 2) || (it["age"] == 2 && it["direction"] == 2),
+            condition: |it| !(it["direction"] != 2 || it["age"] != 1 && it["age"] != 2),
             components: [CollisionBoxComponent::new(Vec3::new(0.3125, 0.3125, 0.0625), Vec3::new(0.375, 0.4375, 0.375))]
         },
         const_permutation! {
-            condition: |it| (it["age"] == 1 && it["direction"] == 3) || (it["age"] == 2 && it["direction"] == 3),
+            condition: |it| !(it["direction"] != 3 || it["age"] != 1 && it["age"] != 2),
             components: [CollisionBoxComponent::new(Vec3::new(0.5625, 0.3125, 0.3125), Vec3::new(0.375, 0.4375, 0.375))]
         },
     ],

@@ -1,4 +1,4 @@
-use crate::command::registry::CommandRegistry;
+use crate::command::command_registry::CommandRegistry;
 use crate::command::sender::CommandSender;
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::BlockUpdatedMessage;
@@ -19,8 +19,7 @@ use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitie
 use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Query, Res};
-use std::ops::Deref;
-use tracing::{debug, warn};
+use tracing::debug;
 use vek::{Vec2, Vec3};
 
 pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, commands: Res<CommandRegistry>, mut state_reader: MessageReader<SessionStateChangedMessage>) {

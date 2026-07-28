@@ -18,11 +18,11 @@ impl<'a> CommandSender<'a> {
     }
 
     pub fn session(&self) -> &Session {
-        &self.session
+        self.session
     }
 
     pub fn session_mut(&mut self) -> &mut Session {
-        &mut self.session
+        self.session
     }
 
     pub fn name(&self) -> &str {

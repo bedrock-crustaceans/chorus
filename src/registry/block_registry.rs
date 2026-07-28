@@ -85,7 +85,7 @@ impl BlockRegistry {
     }
 
     pub fn get_block_id(&self, identifier: &str) -> Option<i32> {
-        self.default_hash.get(identifier).map(|&h| h)
+        self.default_hash.get(identifier).copied()
     }
 
     pub fn get_random(&self) -> i32 {

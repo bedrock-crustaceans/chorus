@@ -17,7 +17,7 @@ pub const CAULDRON: BlockDefinition = const_block! {
         MapColorComponent { r: 112, g: 112, b: 112, a: 255 },
         LightDampeningComponent { dampening: 3 },
         MineableComponent::hardness(2.0),
-        CollisionBoxComponent::new(Vec3::new(0.3, 0.3, 0.3), Vec3::new(0.39999999999999997, 0.39999999999999997, 0.39999999999999997)),
+        CollisionBoxComponent::new(Vec3::new(0.3, 0.3, 0.3), Vec3::new(0.4, 0.4, 0.4)),
     ],
     permutations: [
         const_permutation! {

@@ -1,4 +1,4 @@
-use crate::command::registry::CommandRegistry;
+use crate::command::command_registry::CommandRegistry;
 use crate::level::level::Level;
 use crate::registry::block_registry::BlockRegistry;
 use crate::resource::ResourcePacks;

@@ -1,7 +1,10 @@
+use atomicow::CowArc;
 use bedrock::protocol::v898::packets::{OverloadsEntry, ParameterDataEntry};
+use std::sync::Arc;
 
 const ARG_FLAG_VALID: u32 = 0x100000;
 
+#[derive(Debug)]
 pub enum CommandParameterType {
     Int,
     Float,
@@ -51,20 +54,25 @@ impl CommandParameterType {
     }
 }
 
+#[derive(Debug)]
 pub struct CommandParameter {
-    name: String,
-    kind: CommandParameterType,
-    optional: bool,
+    pub name: CowArc<'static, str>,
+    pub kind: CommandParameterType,
+    pub optional: bool,
 }
 
 impl CommandParameter {
     pub fn new(name: impl Into<String>, kind: CommandParameterType, optional: bool) -> Self {
-        Self { name: name.into(), kind, optional }
+        Self {
+            name: CowArc::Owned(Arc::from(name.into())),
+            kind,
+            optional,
+        }
     }
 
     fn to_entry(&self) -> ParameterDataEntry {
         ParameterDataEntry {
-            name: self.name.clone(),
+            name: self.name.to_string(),
             parse_symbol: self.kind.parse_symbol(),
             is_optional: self.optional,
             options: 0,
@@ -77,13 +85,16 @@ impl CommandParameter {
     }
 }
 
+#[derive(Debug)]
 pub struct CommandOverload {
-    parameters: Vec<CommandParameter>,
+    pub parameters: CowArc<'static, [CommandParameter]>,
 }
 
 impl CommandOverload {
     pub fn new(parameters: Vec<CommandParameter>) -> Self {
-        Self { parameters }
+        Self {
+            parameters: CowArc::Owned(parameters.into()),
+        }
     }
 
     pub fn to_entry(&self) -> OverloadsEntry {
