@@ -92,14 +92,13 @@ pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>
             let dim = level.dimension(packet.dimension_type);
             let chunk = dim.and_then(|d| d.get_chunk(cx, cz));
 
-            let (result, data) = if dim.is_none() || chunk.is_none() {
-                (SubChunkRequestResult::LevelChunkDoesntExist, None)
-            } else {
-                match chunk.unwrap().get_sub_chunk(cy as i8) {
+            let (result, data) = match (chunk, dim) {
+                (Some(chunk), Some(_)) => match chunk.get_sub_chunk(cy as i8) {
                     None => (SubChunkRequestResult::SuccessAllAir, None),
                     Some(sc) if sc.is_all_air() => (SubChunkRequestResult::SuccessAllAir, None),
                     Some(sc) => (SubChunkRequestResult::Success, Some(sc.serialize_network(cy as i8))),
-                }
+                },
+                _ => (SubChunkRequestResult::LevelChunkDoesntExist, None),
             };
 
             entries.push(SubChunkDataEntry {

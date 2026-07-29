@@ -1,4 +1,3 @@
-use crate::command::registry::CommandRegistry;
 use crate::command::sender::CommandSender;
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::BlockUpdatedMessage;
@@ -10,6 +9,7 @@ use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::Player;
 use crate::player::identity::PlayerIdentity;
+use crate::registry::command_registry::CommandRegistry;
 use bedrock::protocol::v662::enums::{ActorFlags, CommandPermissionLevel, DataItemType};
 use bedrock::protocol::v662::packets::{SetActorDataPacket, UpdateAbilitiesPacket, UpdateBlockPacket};
 use bedrock::protocol::v662::types::{ActorRuntimeID, DataItem, PropertySyncData};
@@ -19,8 +19,7 @@ use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitie
 use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Query, Res};
-use std::ops::Deref;
-use tracing::{debug, warn};
+use tracing::debug;
 use vek::{Vec2, Vec3};
 
 pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, commands: Res<CommandRegistry>, mut state_reader: MessageReader<SessionStateChangedMessage>) {

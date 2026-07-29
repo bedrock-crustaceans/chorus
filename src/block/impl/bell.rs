@@ -16,40 +16,40 @@ pub const BELL: BlockDefinition = const_block! {
         MapColorComponent { r: 250, g: 238, b: 77, a: 255 },
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(1.0),
-        CollisionBoxComponent::new(Vec3::new(0.249999, 0.249999, 0.249999), Vec3::new(0.5000020000000001, 0.750002, 0.5000020000000001)),
+        CollisionBoxComponent::new(Vec3::new(0.25, 0.25, 0.25), Vec3::new(0.5, 0.75, 0.5)),
     ],
     permutations: [
         const_permutation! {
             condition: |it| it["attachment"] == "multiple",
-            components: [CollisionBoxComponent::new(Vec3::new(0.249999, 0.249999, -1.0E-6), Vec3::new(0.5000020000000001, 0.5000020000000001, 1.0000019999999998))]
+            components: [CollisionBoxComponent::new(Vec3::new(0.25, 0.25, 0.0), Vec3::new(0.5, 0.5, 1.0))]
         },
         const_permutation! {
-            condition: |it| (it["attachment"] == "multiple" && it["direction"] == 1) || (it["attachment"] == "multiple" && it["direction"] == 3),
-            components: [CollisionBoxComponent::new(Vec3::new(-1.0E-6, 0.249999, 0.249999), Vec3::new(1.0000019999999998, 0.5000020000000001, 0.5000020000000001))]
+            condition: |it| !(it["attachment"] != "multiple" || it["direction"] != 1 && it["direction"] != 3),
+            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.25, 0.25), Vec3::new(1.0, 0.5, 0.5))]
         },
         const_permutation! {
             condition: |it| it["attachment"] == "side",
-            components: [CollisionBoxComponent::new(Vec3::new(0.249999, 0.249999, -1.0E-6), Vec3::new(0.5000020000000001, 0.5000020000000001, 0.7500020000000001))]
+            components: [CollisionBoxComponent::new(Vec3::new(0.25, 0.25, 0.0), Vec3::new(0.5, 0.5, 0.75))]
         },
         const_permutation! {
             condition: |it| it["attachment"] == "side" && it["direction"] == 1,
-            components: [CollisionBoxComponent::new(Vec3::new(0.249999, 0.249999, 0.249999), Vec3::new(0.750002, 0.5000020000000001, 0.5000020000000001))]
+            components: [CollisionBoxComponent::new(Vec3::new(0.25, 0.25, 0.25), Vec3::new(0.75, 0.5, 0.5))]
         },
         const_permutation! {
             condition: |it| it["attachment"] == "side" && it["direction"] == 2,
-            components: [CollisionBoxComponent::new(Vec3::new(0.249999, 0.249999, 0.249999), Vec3::new(0.5000020000000001, 0.5000020000000001, 0.750002))]
+            components: [CollisionBoxComponent::new(Vec3::new(0.25, 0.25, 0.25), Vec3::new(0.5, 0.5, 0.75))]
         },
         const_permutation! {
             condition: |it| it["attachment"] == "side" && it["direction"] == 3,
-            components: [CollisionBoxComponent::new(Vec3::new(-1.0E-6, 0.249999, 0.249999), Vec3::new(0.7500020000000001, 0.5000020000000001, 0.5000020000000001))]
+            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.25, 0.25), Vec3::new(0.75, 0.5, 0.5))]
         },
         const_permutation! {
             condition: |it| it["attachment"] == "standing",
-            components: [CollisionBoxComponent::new(Vec3::new(-1.0E-6, -1.0E-6, 0.249999), Vec3::new(1.0000019999999998, 0.7500020000000001, 0.5000020000000001))]
+            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.25), Vec3::new(1.0, 0.75, 0.5))]
         },
         const_permutation! {
-            condition: |it| (it["attachment"] == "standing" && it["direction"] == 1) || (it["attachment"] == "standing" && it["direction"] == 3),
-            components: [CollisionBoxComponent::new(Vec3::new(0.249999, -1.0E-6, -1.0E-6), Vec3::new(0.5000020000000001, 0.7500020000000001, 1.0000019999999998))]
+            condition: |it| !(it["attachment"] != "standing" || it["direction"] != 1 && it["direction"] != 3),
+            components: [CollisionBoxComponent::new(Vec3::new(0.25, 0.0, 0.0), Vec3::new(0.5, 0.75, 1.0))]
         },
     ],
 };

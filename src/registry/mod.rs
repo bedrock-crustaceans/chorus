@@ -1,11 +1,12 @@
-use crate::command::registry::CommandRegistry;
 use crate::level::level::Level;
 use crate::registry::block_registry::BlockRegistry;
 use crate::resource::ResourcePacks;
 use bevy_app::{App, Plugin, Startup};
 use bevy_ecs::prelude::IntoScheduleConfigs;
+use command_registry::CommandRegistry;
 
 pub mod block_registry;
+pub mod command_registry;
 
 pub struct Registry;
 

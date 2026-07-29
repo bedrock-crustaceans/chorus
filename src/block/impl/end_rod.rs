@@ -16,7 +16,7 @@ pub const END_ROD: BlockDefinition = const_block! {
         LightEmissionComponent { emission: 14 },
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(0.0),
-        CollisionBoxComponent::new(Vec3::new(0.4, 0.0, 0.4), Vec3::new(0.19999999999999996, 1.0, 0.19999999999999996)),
+        CollisionBoxComponent::new(Vec3::new(0.4, 0.0, 0.4), Vec3::new(0.2, 1.0, 0.2)),
     ],
     permutations: [],
 };
