@@ -7,7 +7,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{RAIL_DATA_BIT, RAIL_DIRECTION_6};
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const ACTIVATOR_RAIL: BlockDefinition = const_block! {
     identifier: "minecraft:activator_rail",

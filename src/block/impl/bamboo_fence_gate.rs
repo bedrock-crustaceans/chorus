@@ -7,7 +7,7 @@ use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{IN_WALL_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT};
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const BAMBOO_FENCE_GATE: BlockDefinition = const_block! {
     identifier: "minecraft:bamboo_fence_gate",

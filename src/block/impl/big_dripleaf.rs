@@ -10,7 +10,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{BIG_DRIPLEAF_HEAD, BIG_DRIPLEAF_TILT, MINECRAFT_CARDINAL_DIRECTION};
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const BIG_DRIPLEAF: BlockDefinition = const_block! {
     identifier: "minecraft:big_dripleaf",

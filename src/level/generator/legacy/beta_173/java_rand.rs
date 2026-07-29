@@ -61,4 +61,12 @@ impl JavaRand {
         let lo = self.next(27);
         (((hi << 27) | lo) as f64) / ((1i64 << 53) as f64)
     }
+    
+    pub fn get_seed(&self) -> i64 {
+        self.seed.0    
+    }
+    
+    pub fn set_seed(&mut self, seed: i64) {
+        *self = JavaRand::new(seed);
+    }
 }

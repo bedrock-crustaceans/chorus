@@ -6,7 +6,7 @@ use crate::block::component::moveable_component::{MoveableComponent, Movement};
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::BITE_COUNTER;
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const CAKE: BlockDefinition = const_block! {
     identifier: "minecraft:cake",

@@ -7,7 +7,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::UPDATE_BIT;
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const FLOWER_POT: BlockDefinition = const_block! {
     identifier: "minecraft:flower_pot",

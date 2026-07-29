@@ -6,7 +6,7 @@ use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const SPRUCE_FENCE: BlockDefinition = const_block! {
     identifier: "minecraft:spruce_fence",

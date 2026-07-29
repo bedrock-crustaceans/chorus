@@ -8,7 +8,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{DOOR_HINGE_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT, UPPER_BLOCK_BIT};
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const PALE_OAK_DOOR: BlockDefinition = const_block! {
     identifier: "minecraft:pale_oak_door",

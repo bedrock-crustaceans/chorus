@@ -8,7 +8,7 @@ use crate::block::component::moveable_component::{MoveableComponent, Movement};
 use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const END_PORTAL: BlockDefinition = const_block! {
     identifier: "minecraft:end_portal",

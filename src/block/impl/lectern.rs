@@ -6,7 +6,7 @@ use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{MINECRAFT_CARDINAL_DIRECTION, POWERED_BIT};
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const LECTERN: BlockDefinition = const_block! {
     identifier: "minecraft:lectern",

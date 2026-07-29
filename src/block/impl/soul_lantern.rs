@@ -9,7 +9,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::HANGING;
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const SOUL_LANTERN: BlockDefinition = const_block! {
     identifier: "minecraft:soul_lantern",

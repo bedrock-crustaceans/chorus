@@ -6,7 +6,7 @@ use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::MINECRAFT_VERTICAL_HALF;
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const END_STONE_BRICK_SLAB: BlockDefinition = const_block! {
     identifier: "minecraft:end_stone_brick_slab",

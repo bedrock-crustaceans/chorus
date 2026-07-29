@@ -8,7 +8,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{BREWING_STAND_SLOT_A_BIT, BREWING_STAND_SLOT_B_BIT, BREWING_STAND_SLOT_C_BIT};
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const BREWING_STAND: BlockDefinition = const_block! {
     identifier: "minecraft:brewing_stand",

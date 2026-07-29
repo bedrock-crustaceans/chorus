@@ -6,7 +6,7 @@ use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{DIRECTION, OPEN_BIT, UPSIDE_DOWN_BIT};
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const WAXED_COPPER_TRAPDOOR: BlockDefinition = const_block! {
     identifier: "minecraft:waxed_copper_trapdoor",

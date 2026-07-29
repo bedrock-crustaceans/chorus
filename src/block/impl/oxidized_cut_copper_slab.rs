@@ -6,7 +6,7 @@ use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::MINECRAFT_VERTICAL_HALF;
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const OXIDIZED_CUT_COPPER_SLAB: BlockDefinition = const_block! {
     identifier: "minecraft:oxidized_cut_copper_slab",

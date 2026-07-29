@@ -7,7 +7,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{MINECRAFT_CARDINAL_DIRECTION, OUTPUT_LIT_BIT, OUTPUT_SUBTRACT_BIT};
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const UNPOWERED_COMPARATOR: BlockDefinition = const_block! {
     identifier: "minecraft:unpowered_comparator",

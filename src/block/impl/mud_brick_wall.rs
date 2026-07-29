@@ -7,7 +7,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{WALL_CONNECTION_TYPE_EAST, WALL_CONNECTION_TYPE_NORTH, WALL_CONNECTION_TYPE_SOUTH, WALL_CONNECTION_TYPE_WEST, WALL_POST_BIT};
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const MUD_BRICK_WALL: BlockDefinition = const_block! {
     identifier: "minecraft:mud_brick_wall",

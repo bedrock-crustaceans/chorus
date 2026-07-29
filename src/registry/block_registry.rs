@@ -87,6 +87,10 @@ impl BlockRegistry {
     pub fn get_block_id(&self, identifier: &str) -> Option<i32> {
         self.default_hash.get(identifier).copied()
     }
+    
+    pub fn get_permutation(&self, hash: i32) -> Option<&BlockPermutation> {
+        self.permutations.get(&hash)
+    }
 
     pub fn get_random(&self) -> i32 {
         *self.default_hash.values().choose(&mut rand::rng()).expect("no hash found")

@@ -9,7 +9,7 @@ use crate::block::component::replaceable_component::ReplaceableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{COVERED_BIT, HEIGHT};
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const SNOW_LAYER: BlockDefinition = const_block! {
     identifier: "minecraft:snow_layer",

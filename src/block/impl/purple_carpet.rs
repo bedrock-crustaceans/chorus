@@ -7,7 +7,7 @@ use crate::block::component::moveable_component::{MoveableComponent, Movement};
 use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const PURPLE_CARPET: BlockDefinition = const_block! {
     identifier: "minecraft:purple_carpet",

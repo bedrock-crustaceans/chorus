@@ -11,7 +11,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::LIQUID_DEPTH;
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const FLOWING_LAVA: BlockDefinition = const_block! {
     identifier: "minecraft:flowing_lava",

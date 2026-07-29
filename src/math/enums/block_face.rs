@@ -5,7 +5,7 @@ use crate::math::enums::compass_rose_direction::CompassRoseDirection;
 use crate::math::enums::plane::Plane;
 use std::collections::HashSet;
 use strum_macros::{Display, EnumString, VariantNames};
-use vek::Vec3;
+use glam::Vec3;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, EnumString, VariantNames, Display)]
 #[strum(serialize_all = "snake_case")]
@@ -121,7 +121,7 @@ impl BlockFace {
         }
     }
 
-    pub fn get_unit_vec(&self) -> Vec3<f32> {
+    pub fn get_unit_vec(&self) -> Vec3 {
         match self {
             BlockFace::Down => Vec3::new(0.0, -1.0, 0.0),
             BlockFace::Up => Vec3::new(0.0, 1.0, 0.0),

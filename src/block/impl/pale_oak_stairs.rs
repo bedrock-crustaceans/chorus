@@ -7,7 +7,7 @@ use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{UPSIDE_DOWN_BIT, WEIRDO_DIRECTION};
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const PALE_OAK_STAIRS: BlockDefinition = const_block! {
     identifier: "minecraft:pale_oak_stairs",

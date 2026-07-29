@@ -8,7 +8,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{PALE_MOSS_CARPET_SIDE_EAST, PALE_MOSS_CARPET_SIDE_NORTH, PALE_MOSS_CARPET_SIDE_SOUTH, PALE_MOSS_CARPET_SIDE_WEST, UPPER_BLOCK_BIT};
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const PALE_MOSS_CARPET: BlockDefinition = const_block! {
     identifier: "minecraft:pale_moss_carpet",

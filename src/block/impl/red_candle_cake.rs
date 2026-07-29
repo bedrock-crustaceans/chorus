@@ -6,7 +6,7 @@ use crate::block::component::moveable_component::{MoveableComponent, Movement};
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::LIT;
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const RED_CANDLE_CAKE: BlockDefinition = const_block! {
     identifier: "minecraft:red_candle_cake",

@@ -7,7 +7,7 @@ use crate::block::component::moveable_component::{MoveableComponent, Movement};
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{FACING_DIRECTION, ITEM_FRAME_MAP_BIT, ITEM_FRAME_PHOTO_BIT};
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const GLOW_FRAME: BlockDefinition = const_block! {
     identifier: "minecraft:glow_frame",

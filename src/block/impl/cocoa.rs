@@ -7,7 +7,7 @@ use crate::block::component::moveable_component::{MoveableComponent, Movement};
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{AGE_3, DIRECTION};
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const COCOA: BlockDefinition = const_block! {
     identifier: "minecraft:cocoa",

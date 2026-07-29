@@ -8,7 +8,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{STABILITY, STABILITY_CHECK};
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const SCAFFOLDING: BlockDefinition = const_block! {
     identifier: "minecraft:scaffolding",

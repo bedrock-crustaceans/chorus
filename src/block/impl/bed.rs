@@ -6,7 +6,7 @@ use crate::block::component::moveable_component::{MoveableComponent, Movement};
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{DIRECTION, HEAD_PIECE_BIT, OCCUPIED_BIT};
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const BED: BlockDefinition = const_block! {
     identifier: "minecraft:bed",

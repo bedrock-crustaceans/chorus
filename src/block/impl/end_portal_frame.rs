@@ -8,7 +8,7 @@ use crate::block::component::moveable_component::{MoveableComponent, Movement};
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{END_PORTAL_EYE_BIT, MINECRAFT_CARDINAL_DIRECTION};
 use crate::{const_block, const_permutation};
-use vek::Vec3;
+use glam::Vec3;
 
 pub const END_PORTAL_FRAME: BlockDefinition = const_block! {
     identifier: "minecraft:end_portal_frame",

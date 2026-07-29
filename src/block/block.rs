@@ -1,10 +1,10 @@
+use glam::IVec3;
 use crate::block::block_permutation::BlockPermutation;
 use crate::level::level::Level;
-use vek::Vec3;
 
 pub struct Block {
     permutation: BlockPermutation,
-    position: Vec3<i32>,
+    position: IVec3,
     layer: i32,
     level: Level,
 }

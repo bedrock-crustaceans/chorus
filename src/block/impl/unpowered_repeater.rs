@@ -7,7 +7,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{MINECRAFT_CARDINAL_DIRECTION, REPEATER_DELAY};
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const UNPOWERED_REPEATER: BlockDefinition = const_block! {
     identifier: "minecraft:unpowered_repeater",

@@ -1,12 +1,12 @@
 use bevy_ecs::prelude::Component;
 use std::collections::HashMap;
-use vek::{Vec2, Vec3};
+use glam::{Vec2, Vec3};
 
 #[derive(Component)]
 pub struct Entity {
-    pub position: Vec3<f32>,
-    pub rotation: Vec2<f32>,
-    pub velocity: Vec3<f32>,
+    pub position: Vec3,
+    pub rotation: Vec2,
+    pub velocity: Vec3,
 
     // NBT fields
     pub chested: bool,
@@ -61,9 +61,9 @@ pub struct Entity {
 impl Entity {
     pub fn default(identifier: String, unique_id: i64) -> Self {
         Self {
-            position: Vec3::zero(),
-            rotation: Vec2::zero(),
-            velocity: Vec3::zero(),
+            position: Vec3::ZERO,
+            rotation: Vec2::ZERO,
+            velocity: Vec3::ZERO,
             chested: false,
             color: 0,
             color2: 0,

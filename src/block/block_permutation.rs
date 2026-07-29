@@ -27,6 +27,10 @@ impl BlockPermutation {
 
         Self { identifier, states, index, hash }
     }
+    
+    pub fn get_identifier(&self) -> &str {
+        &self.identifier
+    }
 
     pub fn get_hash(&self) -> i32 {
         self.hash

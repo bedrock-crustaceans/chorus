@@ -6,7 +6,7 @@ use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{ATTACHED_BIT, DISARMED_BIT, POWERED_BIT, SUSPENDED_BIT};
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const TRIP_WIRE: BlockDefinition = const_block! {
     identifier: "minecraft:trip_wire",

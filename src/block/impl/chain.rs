@@ -5,7 +5,7 @@ use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::PILLAR_AXIS;
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const CHAIN: BlockDefinition = const_block! {
     identifier: "minecraft:chain",

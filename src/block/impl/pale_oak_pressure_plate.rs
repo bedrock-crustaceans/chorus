@@ -9,7 +9,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::REDSTONE_SIGNAL;
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const PALE_OAK_PRESSURE_PLATE: BlockDefinition = const_block! {
     identifier: "minecraft:pale_oak_pressure_plate",

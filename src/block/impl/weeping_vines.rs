@@ -9,7 +9,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::WEEPING_VINES_AGE;
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const WEEPING_VINES: BlockDefinition = const_block! {
     identifier: "minecraft:weeping_vines",

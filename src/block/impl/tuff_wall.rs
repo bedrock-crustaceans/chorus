@@ -7,7 +7,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{WALL_CONNECTION_TYPE_EAST, WALL_CONNECTION_TYPE_NORTH, WALL_CONNECTION_TYPE_SOUTH, WALL_CONNECTION_TYPE_WEST, WALL_POST_BIT};
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const TUFF_WALL: BlockDefinition = const_block! {
     identifier: "minecraft:tuff_wall",

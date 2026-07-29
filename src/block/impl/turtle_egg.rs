@@ -8,7 +8,7 @@ use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
 use crate::block::state::common::{CRACKED_STATE, TURTLE_EGG_COUNT};
 use crate::const_block;
-use vek::Vec3;
+use glam::Vec3;
 
 pub const TURTLE_EGG: BlockDefinition = const_block! {
     identifier: "minecraft:turtle_egg",
