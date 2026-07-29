@@ -12,13 +12,16 @@ pub struct Dimension {
 }
 
 impl Dimension {
-    pub fn new(id: i32, min_sub_chunk_y: i8, max_sub_chunk_y: i8, generator: Box<dyn WorldGenerator + Send + Sync>) -> Self {
+    pub fn new<G>(id: i32, min_sub_chunk_y: i8, max_sub_chunk_y: i8, generator: G) -> Self
+    where 
+        G: WorldGenerator + Send + Sync + 'static 
+    {
         Self {
             id,
             min_sub_chunk_y,
             max_sub_chunk_y,
             chunks: HashMap::new(),
-            generator,
+            generator: Box::new(generator),
         }
     }
 
@@ -28,7 +31,10 @@ impl Dimension {
 
     pub fn get_or_generate_chunk(&mut self, registry: &BlockRegistry, x: i32, z: i32) -> &Chunk {
         if !self.chunks.contains_key(&(x, z)) {
-            let chunk = self.generator.generate(registry, x, z, self.min_sub_chunk_y, self.max_sub_chunk_y);
+            let mut chunk = Self::empty_chunk(registry, x, z, self.min_sub_chunk_y, self.max_sub_chunk_y, 0);
+            
+            self.generator.generate(registry, x, z, &mut chunk);
+            
             self.chunks.insert((x, z), chunk);
         }
         self.chunks.get(&(x, z)).unwrap()
@@ -51,5 +57,12 @@ impl Dimension {
             Some(chunk) => chunk.set_block((x & 0xF) as u8, y, (z & 0xF) as u8, layer, block_id),
             None => false,
         }
+    }
+    
+    fn empty_chunk(registry: &BlockRegistry,  x: i32, z: i32, min_sub_chunk_y: i8, max_sub_chunk_y: i8, biome: i32) -> Chunk {
+        let air_id = registry.get_block_id("minecraft:air").unwrap_or(0);
+        let count = (max_sub_chunk_y as i32 - min_sub_chunk_y as i32 + 1) as usize;
+        
+        Chunk::new(x, z, min_sub_chunk_y, count, air_id, biome)
     }
 }

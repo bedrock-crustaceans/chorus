@@ -13,11 +13,7 @@ pub struct FlatGenerator {
 }
 
 impl WorldGenerator for FlatGenerator {
-    fn generate(&self, registry: &BlockRegistry, x: i32, z: i32, min_sub_chunk_y: i8, max_sub_chunk_y: i8) -> Chunk {
-        let air_id = registry.get_block_id("minecraft:air").unwrap_or(0);
-        let count = (max_sub_chunk_y as i32 - min_sub_chunk_y as i32 + 1) as usize;
-        let mut chunk = Chunk::new(x, z, min_sub_chunk_y, count, air_id, self.biome);
-
+    fn generate(&self, _registry: &BlockRegistry, _x: i32, _z: i32, chunk: &mut Chunk) {
         let mut y = 0i32;
         for layer in &self.layers {
             for _ in 0..layer.height {
@@ -29,6 +25,5 @@ impl WorldGenerator for FlatGenerator {
                 y += 1;
             }
         }
-        chunk
     }
 }

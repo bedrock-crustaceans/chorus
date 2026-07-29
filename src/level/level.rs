@@ -30,7 +30,7 @@ impl Level {
 
         let generator = RandomGenerator { biome: 1 };
 
-        let overworld = Dimension::new(0, -4, 19, Box::new(generator));
+        let overworld = Dimension::new(0, -4, 19, generator);
 
         let mut level = Level { dimensions: HashMap::new() };
         level.dimensions.insert(0, overworld);
