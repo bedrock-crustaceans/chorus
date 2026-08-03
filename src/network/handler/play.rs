@@ -3,7 +3,7 @@ use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
-use crate::network::handler::chat::{PlayerChatMessage, handle_text};
+use crate::network::handler::chat::{BroadcastMessage, PlayerChatMessage, handle_text};
 use crate::network::handler::form::handle_modal_form_response;
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
@@ -20,18 +20,27 @@ use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Query, Res};
 use glam::{Vec2, Vec3};
-use tracing::debug;
+use tracing::{debug, info};
 
-pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, commands: Res<CommandRegistry>, mut state_reader: MessageReader<SessionStateChangedMessage>) {
+pub fn on_enter_play(
+    mut sessions: Query<(&mut Session, &Player, &PlayerIdentity)>,
+    commands: Res<CommandRegistry>,
+    mut state_reader: MessageReader<SessionStateChangedMessage>,
+    mut broadcast_writer: MessageWriter<BroadcastMessage>,
+) {
     for ev in state_reader.read() {
         if ev.to != SessionState::Play {
             continue;
         }
-        let Ok((mut session, player)) = sessions.get_mut(ev.entity) else {
+        let Ok((mut session, player, identity)) = sessions.get_mut(ev.entity) else {
             continue;
         };
 
         debug!("on_enter_play");
+
+        info!("{} joined the game", identity.name());
+
+        broadcast_writer.write(BroadcastMessage::translate("§e%multiplayer.player.joined", vec![identity.name().to_string()]));
 
         session.send(BedrockProtocol::AvailableCommandsPacket(commands.to_packet().into()));
 
@@ -107,6 +116,18 @@ pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, commands: Res
             }
             .into(),
         ));
+    }
+}
+
+pub fn on_quit(sessions: Query<(&Session, &PlayerIdentity)>, mut broadcast_writer: MessageWriter<BroadcastMessage>) {
+    for (session, identity) in &sessions {
+        if !session.is_closed() || session.get_state() != SessionState::Play {
+            continue;
+        }
+
+        info!("{} left the game", identity.name());
+
+        broadcast_writer.write(BroadcastMessage::translate("§e%multiplayer.player.left", vec![identity.name().to_string()]));
     }
 }
 
