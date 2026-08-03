@@ -1,6 +1,6 @@
 use crate::command::dispatch::CommandRequestedMessage;
 use crate::config::Config;
-use crate::level::BlockUpdatedMessage;
+use crate::level::{BlockUpdatedMessage, LevelEventMessage, LevelSoundMessage};
 use crate::network::BedrockProtocol;
 use crate::network::bandwidth::BandwidthTracker;
 use crate::network::handler::chat::{BroadcastMessage, PlayerChatMessage};
@@ -42,7 +42,9 @@ impl Plugin for Network {
             .add_message::<BlockUpdatedMessage>()
             .add_message::<PlayerChatMessage>()
             .add_message::<CommandRequestedMessage>()
-            .add_message::<BroadcastMessage>();
+            .add_message::<BroadcastMessage>()
+            .add_message::<LevelEventMessage>()
+            .add_message::<LevelSoundMessage>();
     }
 }
 

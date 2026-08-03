@@ -1,3 +1,4 @@
+use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::dimension::Dimension;
 use crate::level::level::Level;
 use crate::network::BedrockProtocol;
@@ -13,7 +14,7 @@ use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::{Entity, Query};
 use bevy_ecs::system::Res;
 use bevy_tasks::ComputeTaskPool;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use tracing::debug;
 
 const MAX_CHUNKS_PER_TICK: usize = 16;
@@ -24,10 +25,51 @@ struct ChunkPayload {
     data: Vec<u8>,
 }
 
-pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &mut Player)>, mut level: ResMut<Level>, registry: Res<BlockRegistry>) {
+pub fn update_chunk_order(mut query: Query<(&mut Session, &PlayerEntity, &mut Player)>) {
+    for (mut session, entity, mut player) in query.iter_mut() {
+        if player.chunks_radius == 0 {
+            continue;
+        }
+
+        let center = (entity.position.x.floor() as i32 >> 4, entity.position.z.floor() as i32 >> 4);
+        if player.chunks_center == Some(center) {
+            continue;
+        }
+
+        player.chunks_center = Some(center);
+
+        let radius = player.chunks_radius;
+        let mut wanted: Vec<(i32, i32)> = Vec::new();
+
+        for dx in -radius..=radius {
+            for dz in -radius..=radius {
+                if dx * dx + dz * dz > radius * radius {
+                    continue;
+                }
+
+                wanted.push((center.0 + dx, center.1 + dz));
+            }
+        }
+
+        // nearest first, so the ground under the player fills in before the edges of the view
+        wanted.sort_unstable_by_key(|&(x, z)| (x - center.0).pow(2) + (z - center.1).pow(2));
+
+        // the client drops whatever falls outside the published radius, so it has to be re-sent
+        // if the player ever comes back
+        let in_view: HashSet<(i32, i32)> = wanted.iter().copied().collect();
+        player.chunks_sent.retain(|position| in_view.contains(position));
+
+        let pending: VecDeque<(i32, i32)> = wanted.into_iter().filter(|position| !player.chunks_sent.contains(position)).collect();
+        player.chunks_pending = pending;
+
+        send_publisher_update(&mut session, entity, &player);
+    }
+}
+
+pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity, &mut Player)>, mut level: ResMut<Level>, registry: Res<BlockRegistry>) {
     let mut batches: HashMap<Entity, Vec<(i32, i32)>> = HashMap::new();
 
-    for (entity, _, mut player) in query.iter_mut() {
+    for (entity, _, _, mut player) in query.iter_mut() {
         if player.chunks_radius == 0 {
             continue;
         }
@@ -57,7 +99,7 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &mut Player)>
 
     let payloads = serialize_chunks(overworld, &positions);
 
-    for (entity, mut session, player) in query.iter_mut() {
+    for (entity, mut session, player_entity, player) in query.iter_mut() {
         let Some(batch) = batches.get(&entity) else { continue };
 
         for &(x, z) in batch {
@@ -80,16 +122,24 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &mut Player)>
         }
 
         if player.chunks_pending.is_empty() {
-            session.send(BedrockProtocol::NetworkChunkPublisherUpdatePacket(
-                NetworkChunkPublisherUpdatePacket {
-                    new_view_position: BlockPos { x: 0, y: 0, z: 0 },
-                    new_view_radius: (player.chunks_radius as u32) << 4,
-                    server_built_chunks: player.chunks_sent.iter().map(|&(x, z)| ChunkPos { x, z }).collect(),
-                }
-                .into(),
-            ));
+            send_publisher_update(&mut session, player_entity, &player);
         }
     }
+}
+
+fn send_publisher_update(session: &mut Session, entity: &PlayerEntity, player: &Player) {
+    session.send(BedrockProtocol::NetworkChunkPublisherUpdatePacket(
+        NetworkChunkPublisherUpdatePacket {
+            new_view_position: BlockPos {
+                x: entity.position.x.floor() as i32,
+                y: entity.position.y.floor() as i32,
+                z: entity.position.z.floor() as i32,
+            },
+            new_view_radius: (player.chunks_radius as u32) << 4,
+            server_built_chunks: player.chunks_sent.iter().map(|&(x, z)| ChunkPos { x, z }).collect(),
+        }
+        .into(),
+    ));
 }
 
 fn serialize_chunks(dimension: &Dimension, positions: &[(i32, i32)]) -> HashMap<(i32, i32), ChunkPayload> {

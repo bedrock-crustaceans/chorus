@@ -1,11 +1,13 @@
 use crate::network::BedrockProtocol;
 use crate::network::session::Session;
+use crate::player::block_break::BlockBreakHandler;
 use crate::player::gamemode::Gamemode;
 use bedrock::form::forms::Form;
 use bedrock::protocol::v662::packets::{ModalFormRequestPacket, SetPlayerGameTypePacket};
 use bevy_ecs::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 
+pub mod block_break;
 pub mod gamemode;
 pub mod identity;
 
@@ -16,9 +18,12 @@ pub struct Player {
     gamemode: Gamemode,
 
     pub chunks_radius: i32,
-    pub chunks_center: (i32, i32),
+    /// None until the first chunk order run.
+    pub chunks_center: Option<(i32, i32)>,
     pub chunks_pending: VecDeque<(i32, i32)>,
     pub chunks_sent: HashSet<(i32, i32)>,
+
+    pub block_break: Option<BlockBreakHandler>,
 
     pub forms_id: u32,
     pub forms_pending: HashMap<u32, (Form, Box<dyn FnOnce() + Send + Sync>)>,
@@ -32,9 +37,11 @@ impl Player {
             gamemode: Gamemode::default(),
 
             chunks_radius: 0,
-            chunks_center: (0, 0),
+            chunks_center: None,
             chunks_pending: VecDeque::new(),
             chunks_sent: HashSet::new(),
+
+            block_break: None,
 
             forms_id: 0,
             forms_pending: HashMap::new(),

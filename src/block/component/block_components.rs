@@ -1,4 +1,4 @@
-use crate::block::component::block_component::{AsAny, BlockComponent};
+use crate::block::component::block_component::BlockComponent;
 use atomicow::CowArc;
 use std::any::TypeId;
 use std::collections::HashMap;
@@ -20,11 +20,17 @@ impl BlockComponents {
     }
 
     pub fn insert(&mut self, component: CowArc<'static, dyn BlockComponent>) {
-        self.map.insert(component.as_any().type_id(), component);
+        let component_ref: &dyn BlockComponent = &*component;
+        let type_id = component_ref.as_any().type_id();
+
+        self.map.insert(type_id, component);
     }
 
     pub fn get<T: BlockComponent>(&self) -> Option<&T> {
-        self.map.get(&TypeId::of::<T>()).and_then(|c| c.as_any().downcast_ref::<T>())
+        self.map.get(&TypeId::of::<T>()).and_then(|component| {
+            let component: &dyn BlockComponent = &**component;
+            component.as_any().downcast_ref::<T>()
+        })
     }
 
     pub fn contains<T: BlockComponent>(&self) -> bool {

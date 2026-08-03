@@ -89,7 +89,6 @@ impl Plugin for Server {
         })
         .add_systems(Startup, Server::start)
         .add_systems(First, Server::start_tick)
-        // .add_systems(Update, Server::tick)
         .add_systems(Last, Server::end_tick)
         .add_plugins(Registry)
         .add_plugins(Network);
@@ -104,19 +103,6 @@ impl Server {
     pub fn start_tick(mut server_state: ResMut<ServerState>) {
         server_state.tick += 1;
         server_state.tick_instant = Instant::now();
-    }
-
-    pub fn tick(server_state: Res<ServerState>, server_metrics: Res<ServerMetrics>) {
-        if server_state.tick % 20 == 0 {
-            info!(
-                "T: {}, TPS Min: {:.2}, MSPT Max: {:.2}, TPS Avg: {:.2}, MSPT Avg: {:.2}",
-                server_state.tick,
-                server_metrics.tps_min,
-                server_metrics.mspt_max,
-                server_metrics.tps_avg.get_avg(),
-                server_metrics.mspt_avg.get_avg()
-            );
-        }
     }
 
     pub fn end_tick(server_state: Res<ServerState>, mut server_metrics: ResMut<ServerMetrics>) {

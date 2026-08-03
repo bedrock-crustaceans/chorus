@@ -1,7 +1,8 @@
 use crate::command::dispatch::dispatch_commands;
 use crate::network::BedrockProtocol;
+use crate::network::handler::block::{broadcast_level_events, broadcast_level_sounds, handle_block_actions, update_block_breaking};
 use crate::network::handler::chat::{broadcast_chat, broadcast_message};
-use crate::network::handler::chunks::{handle_sub_chunk_request, send_pending_chunks};
+use crate::network::handler::chunks::{handle_sub_chunk_request, send_pending_chunks, update_chunk_order};
 use crate::network::handler::handshake::handle_handshake;
 use crate::network::handler::login::handle_login;
 use crate::network::handler::play::{broadcast_block_updates, handle_play, on_enter_play, on_quit};
@@ -12,6 +13,7 @@ use bevy_app::{App, Plugin, Update};
 use bevy_ecs::prelude::{Entity, Message};
 use bevy_ecs::schedule::IntoScheduleConfigs;
 
+pub mod block;
 pub mod chat;
 pub mod chunks;
 pub mod form;
@@ -45,13 +47,18 @@ impl Plugin for PacketHandlers {
                 handle_setup,
                 on_enter_play,
                 handle_play,
+                handle_block_actions,
+                update_block_breaking,
                 dispatch_commands,
                 broadcast_chat,
                 on_quit,
                 broadcast_message,
+                update_chunk_order,
                 send_pending_chunks,
                 handle_sub_chunk_request,
                 broadcast_block_updates,
+                broadcast_level_events,
+                broadcast_level_sounds,
             )
                 .chain(),
         );

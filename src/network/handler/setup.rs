@@ -128,7 +128,7 @@ fn send_start_game(player: &Player, session: &mut Session) {
             is_trial: false,
             movement_settings: SyncedPlayerMovementSettings {
                 rewind_history_size: 0,
-                server_authoritative_block_breaking: false,
+                server_authoritative_block_breaking: true,
             },
             current_level_time: 0,
             enchantment_seed: 0,
@@ -176,8 +176,8 @@ fn handle_request_chunk_radius(packet: &<BedrockProtocol as ProtoVersionPackets>
     let radius = packet.chunk_radius.min(8);
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
 
+    // the queue itself is filled by update_chunk_order, which also keeps it following the player
     player.chunks_radius = radius;
-    player.chunks_pending.extend((-radius..radius).flat_map(|x| (-radius..radius).map(move |z| (x, z))));
 
     session.send(BedrockProtocol::ChunkRadiusUpdatedPacket(ChunkRadiusUpdatedPacket { chunk_radius: radius }.into()));
 

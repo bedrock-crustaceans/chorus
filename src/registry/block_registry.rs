@@ -88,6 +88,10 @@ impl BlockRegistry {
         self.default_hash.get(identifier).copied()
     }
 
+    pub fn get_components(&self, hash: i32) -> Option<&BlockComponents> {
+        self.components.get(&hash)
+    }
+
     pub fn get_permutation(&self, hash: i32) -> Option<&BlockPermutation> {
         self.permutations.get(&hash)
     }

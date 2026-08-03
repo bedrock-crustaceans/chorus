@@ -9,6 +9,7 @@ mod palette;
 pub mod sub_chunk;
 
 use bevy_ecs::prelude::{Component, Message};
+use glam::Vec3;
 
 #[derive(Component, Clone, Copy, Debug)]
 pub struct DimensionId(pub i32);
@@ -21,4 +22,18 @@ pub struct BlockUpdatedMessage {
     pub z: i32,
     pub layer: usize,
     pub block_id: i32,
+}
+
+#[derive(Message, Clone)]
+pub struct LevelEventMessage {
+    pub event_id: i32,
+    pub position: Vec3,
+    pub data: i32,
+}
+
+#[derive(Message, Clone)]
+pub struct LevelSoundMessage {
+    pub name: &'static str,
+    pub position: Vec3,
+    pub data: i32,
 }
