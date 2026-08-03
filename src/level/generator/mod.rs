@@ -1,7 +1,7 @@
 pub mod flat;
+pub mod legacy;
 pub mod random;
 pub mod void;
-pub mod legacy;
 
 use crate::level::chunk::Chunk;
 use crate::registry::block_registry::BlockRegistry;

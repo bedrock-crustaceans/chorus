@@ -2,10 +2,9 @@ use crate::config::Config;
 use crate::network::network::Network;
 use crate::registry::Registry;
 use crate::utils::rolling_avg::RollingAvg;
-use bevy_app::{App, FixedFirst, FixedLast, FixedUpdate, Plugin, Startup};
+use bevy_app::{App, First, Last, Plugin, Startup};
 use bevy_ecs::prelude::{Res, Resource};
 use bevy_ecs::system::ResMut;
-use bevy_time::{Fixed, Time};
 use std::time::{Duration, Instant};
 use tracing::info;
 
@@ -59,15 +58,15 @@ impl ServerMetrics {
 
     /// Share of the tick budget the last tick used, as a percentage.
     pub fn tick_usage(&self) -> f64 {
-        Self::usage(self.mspt)
+        self.usage(self.mspt)
     }
 
     pub fn tick_usage_average(&self) -> f64 {
-        Self::usage(self.mspt_avg.get_avg())
+        self.usage(self.mspt_avg.get_avg())
     }
 
-    fn usage(mspt: f64) -> f64 {
-        mspt / (1_000. / TICK_RATE) * 100.
+    fn usage(&self, mspt: f64) -> f64 {
+        mspt / (1_000. / self.tps) * 100.
     }
 }
 
@@ -88,11 +87,10 @@ impl Plugin for Server {
             mspt_max: 0.0,
             mspt_avg: RollingAvg::new(20),
         })
-        .insert_resource(Time::<Fixed>::from_hz(TICK_RATE))
         .add_systems(Startup, Server::start)
-        .add_systems(FixedFirst, Server::start_tick)
-        .add_systems(FixedUpdate, Server::tick)
-        .add_systems(FixedLast, Server::end_tick)
+        .add_systems(First, Server::start_tick)
+        // .add_systems(Update, Server::tick)
+        .add_systems(Last, Server::end_tick)
         .add_plugins(Registry)
         .add_plugins(Network);
     }
@@ -121,9 +119,9 @@ impl Server {
         }
     }
 
-    pub fn end_tick(time: Res<Time>, server_state: Res<ServerState>, mut server_metrics: ResMut<ServerMetrics>) {
+    pub fn end_tick(server_state: Res<ServerState>, mut server_metrics: ResMut<ServerMetrics>) {
         let mspt = server_state.tick_instant.elapsed().as_secs_f64() * 1_000.;
-        let tps = 1. / time.delta_secs_f64();
+        let tps = (1_000. / mspt).min(TICK_RATE);
 
         server_metrics.tps = tps;
         server_metrics.mspt = mspt;

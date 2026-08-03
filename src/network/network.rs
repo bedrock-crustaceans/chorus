@@ -11,7 +11,7 @@ use crate::network::session::state::SessionStateChangedMessage;
 use bedrock::network::connection::Connection;
 use bedrock::network::listener::Listener;
 use bedrock::protocol::{ProtoVersion, Unknown};
-use bevy_app::{App, FixedLast, FixedPostUpdate, FixedPreUpdate, Plugin, Startup};
+use bevy_app::{App, Last, Plugin, PostUpdate, PreUpdate, Startup};
 use bevy_ecs::prelude::*;
 use crossbeam_channel::Receiver;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -33,9 +33,9 @@ impl Plugin for Network {
         app.add_plugins(PacketHandlers)
             .add_plugins(LoginAuthOIDC)
             .add_systems(Startup, Network::init)
-            .add_systems(FixedPreUpdate, Network::receive)
-            .add_systems(FixedPostUpdate, Network::flush)
-            .add_systems(FixedLast, BandwidthTracker::sample)
+            .add_systems(PreUpdate, Network::receive)
+            .add_systems(PostUpdate, Network::flush)
+            .add_systems(Last, BandwidthTracker::sample)
             .init_resource::<BandwidthTracker>()
             .add_message::<PacketReceivedMessage>()
             .add_message::<SessionStateChangedMessage>()

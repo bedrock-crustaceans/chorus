@@ -17,11 +17,11 @@ impl JavaRand {
 
     pub fn next(&mut self, bits: u32) -> i64 {
         assert!(bits <= 48, "cannot return more than 48 bits");
-        
+
         self.seed = (self.seed * MULTIPLIER + ADDEND) & MASK;
         self.seed.0 >> (48 - bits)
     }
-    
+
     pub fn next_i32(&mut self) -> i32 {
         self.next(32) as i32
     }
@@ -47,7 +47,7 @@ impl JavaRand {
         let lo = self.next(32);
         (hi << 32) | lo
     }
-    
+
     pub fn next_bool(&mut self) -> bool {
         self.next(1) != 0
     }
@@ -61,11 +61,11 @@ impl JavaRand {
         let lo = self.next(27);
         (((hi << 27) | lo) as f64) / ((1i64 << 53) as f64)
     }
-    
+
     pub fn get_seed(&self) -> i64 {
-        self.seed.0    
+        self.seed.0
     }
-    
+
     pub fn set_seed(&mut self, seed: i64) {
         *self = JavaRand::new(seed);
     }

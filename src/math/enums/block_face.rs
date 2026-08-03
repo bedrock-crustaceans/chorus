@@ -3,9 +3,9 @@ use crate::math::enums::axis::Axis;
 use crate::math::enums::axis_direction::AxisDirection;
 use crate::math::enums::compass_rose_direction::CompassRoseDirection;
 use crate::math::enums::plane::Plane;
+use glam::Vec3;
 use std::collections::HashSet;
 use strum_macros::{Display, EnumString, VariantNames};
-use glam::Vec3;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, EnumString, VariantNames, Display)]
 #[strum(serialize_all = "snake_case")]

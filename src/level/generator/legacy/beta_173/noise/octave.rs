@@ -16,15 +16,7 @@ impl OctaveNoise {
         OctaveNoise { octaves, octaves_count }
     }
 
-    pub fn noise_3d(
-        &self,
-        x: f64,
-        y: f64,
-        z: f64,
-        scale_x: f64,
-        scale_y: f64,
-        scale_z: f64,
-    ) -> f64 {
+    pub fn noise_3d(&self, x: f64, y: f64, z: f64, scale_x: f64, scale_y: f64, scale_z: f64) -> f64 {
         let mut result = 0.0;
         let mut frequency = 1.0;
         let mut amplitude = 1.0;

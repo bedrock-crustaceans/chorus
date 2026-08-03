@@ -8,7 +8,7 @@ use crate::network::handler::play::{broadcast_block_updates, handle_play, on_ent
 use crate::network::handler::request::handle_request;
 use crate::network::handler::resource::handle_resource;
 use crate::network::handler::setup::{handle_setup, on_enter_setup};
-use bevy_app::{App, FixedUpdate, Plugin};
+use bevy_app::{App, Plugin, Update};
 use bevy_ecs::prelude::{Entity, Message};
 use bevy_ecs::schedule::IntoScheduleConfigs;
 
@@ -33,7 +33,7 @@ pub struct PacketHandlers;
 impl Plugin for PacketHandlers {
     fn build(&self, app: &mut App) {
         app.add_systems(
-            FixedUpdate,
+            Update,
             // chained so that a state change reaches its entry logic within the same tick instead
             // of waiting for the next one - these all touch Session, so they never ran in parallel
             (
