@@ -3,13 +3,13 @@ use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use bedrock::network::compression::Compression;
 use bedrock::network::connection::Connection;
 use bedrock::network::encryption::Encryption;
+use bedrock::network::error::ConnectionError;
 use bedrock::protocol::Unknown;
 use bedrock::protocol::v662::enums::PlayStatus;
 use bedrock::protocol::v662::packets::PlayStatusPacket;
 use bedrock::protocol::v712::packets::{DisconnectMessage, DisconnectPacket};
 use bedrock::protocol::v1001::enums::ConnectionFailReason;
 use bevy_ecs::prelude::{Component, Entity, MessageWriter};
-use bevy_tasks::futures::now_or_never;
 use std::collections::HashMap;
 use std::mem::take;
 use tokio::sync::mpsc::error::TryRecvError;
@@ -20,11 +20,15 @@ use tracing::{debug, error};
 pub mod state;
 
 pub enum ConnectionEvent {
-    Recv,
     Send(Vec<BedrockProtocol>),
     SetCompression(Option<Compression>),
     // box here otherwise it blows up the enum size (2080+ bytes)
     SetEncryption(Option<Box<Encryption>>),
+}
+
+enum ConnectionStep {
+    Event(Option<ConnectionEvent>),
+    Recv(Result<Vec<BedrockProtocol>, ConnectionError>),
 }
 
 #[derive(Component)]
@@ -52,46 +56,48 @@ impl Session {
 
         let conn_task = runtime.spawn(async move {
             'l: loop {
-                if conn.is_closed().await {
-                    break 'l;
-                }
+                // biased so that pending events are always applied before the next batch gets
+                // decoded, otherwise a compression/encryption change could race an incoming batch
+                let step = tokio::select! {
+                    biased;
+                    event = conn_rx.recv() => ConnectionStep::Event(event),
+                    recv = conn.recv() => ConnectionStep::Recv(recv),
+                };
 
-                while let Ok(event) = conn_rx.try_recv() {
-                    match event {
-                        ConnectionEvent::Recv => {
-                            if let Some(recv) = now_or_never(conn.recv()) {
-                                match recv {
-                                    Ok(packets) => {
-                                        for packet in packets {
-                                            if inc_tx.send(packet).is_err() {
-                                                break 'l;
-                                            }
-                                        }
-                                    }
-                                    Err(err) => {
-                                        error!("error receiving packets from connection, dropping batch {:?}", err);
-                                    }
-                                }
-                            }
+                match step {
+                    ConnectionStep::Event(None) => break 'l,
+                    ConnectionStep::Event(Some(ConnectionEvent::Send(packets))) => {
+                        if !packets.is_empty()
+                            && let Err(err) = conn.send(&packets).await
+                        {
+                            error!("error sending packets to connection {:?}", err);
+                            break 'l;
                         }
-                        ConnectionEvent::Send(packets) => {
-                            if !packets.is_empty()
-                                && let Err(err) = conn.send(&packets).await
-                            {
-                                error!("error sending packets to connection {:?}", err);
+                    }
+                    ConnectionStep::Event(Some(ConnectionEvent::SetCompression(compression))) => {
+                        debug!("Setting compression to {:?}", compression);
+
+                        conn.compression = compression;
+                    }
+                    ConnectionStep::Event(Some(ConnectionEvent::SetEncryption(encryption))) => {
+                        debug!("Setting encryption");
+
+                        conn.encryption = encryption.map(|b| *b);
+                    }
+                    ConnectionStep::Recv(Ok(packets)) => {
+                        for packet in packets {
+                            if inc_tx.send(packet).is_err() {
                                 break 'l;
                             }
                         }
-                        ConnectionEvent::SetCompression(compression) => {
-                            debug!("Setting compression to {:?}", compression);
-
-                            conn.compression = compression;
-                        }
-                        ConnectionEvent::SetEncryption(encryption) => {
-                            debug!("Setting encryption");
-
-                            conn.encryption = encryption.map(|b| *b);
-                        }
+                    }
+                    // a malformed batch is recoverable, anything else means the connection is gone
+                    ConnectionStep::Recv(Err(ConnectionError::NetworkCodecError(err))) => {
+                        error!("error decoding packets from connection, dropping batch {:?}", err);
+                    }
+                    ConnectionStep::Recv(Err(err)) => {
+                        debug!("connection closed while receiving {:?}", err);
+                        break 'l;
                     }
                 }
             }
@@ -115,7 +121,10 @@ impl Session {
         }
     }
 
-    pub fn send_immediate(&self, packet: BedrockProtocol) {
+    /// Sends the packet without waiting for the end of the tick. Flushes the queue first so that
+    /// packets stay in the order they were produced in.
+    pub fn send_immediate(&mut self, packet: BedrockProtocol) {
+        self.flush();
         _ = self.conn_tx.send(ConnectionEvent::Send(vec![packet]));
     }
 
@@ -123,12 +132,11 @@ impl Session {
         self.out_q.push(packet);
     }
 
-    pub fn tick(&mut self) {
+    pub fn flush(&mut self) {
         let out = take(&mut self.out_q);
         if !out.is_empty() {
             _ = self.conn_tx.send(ConnectionEvent::Send(out));
         }
-        _ = self.conn_tx.send(ConnectionEvent::Recv);
     }
 
     pub fn recv(&mut self) -> Option<BedrockProtocol> {

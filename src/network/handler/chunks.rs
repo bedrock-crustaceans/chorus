@@ -1,3 +1,4 @@
+use crate::level::dimension::Dimension;
 use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
@@ -9,49 +10,76 @@ use bedrock::protocol::v662::types::{BlockPos, ChunkPos, SubChunkPos};
 use bedrock::protocol::v818::packets::{HeightMapDataType, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult};
 use bevy_ecs::change_detection::ResMut;
 use bevy_ecs::message::MessageReader;
-use bevy_ecs::prelude::Query;
+use bevy_ecs::prelude::{Entity, Query};
 use bevy_ecs::system::Res;
+use bevy_tasks::ComputeTaskPool;
+use std::collections::HashMap;
 use tracing::debug;
 
 const MAX_CHUNKS_PER_TICK: usize = 16;
 
-pub fn send_pending_chunks(mut query: Query<(&mut Session, &mut Player)>, mut level: ResMut<Level>, registry: Res<BlockRegistry>) {
-    let overworld = level.overworld_mut();
-    let min_y = overworld.min_sub_chunk_y;
-    for (mut session, mut player) in query.iter_mut() {
+struct ChunkPayload {
+    sub_chunk_count: u32,
+    sub_chunk_limit: u16,
+    data: Vec<u8>,
+}
+
+pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &mut Player)>, mut level: ResMut<Level>, registry: Res<BlockRegistry>) {
+    let mut batches: HashMap<Entity, Vec<(i32, i32)>> = HashMap::new();
+
+    for (entity, _, mut player) in query.iter_mut() {
         if player.chunks_radius == 0 {
             continue;
-        };
+        }
 
-        let mut sent_this_tick = false;
-        for _ in 0..MAX_CHUNKS_PER_TICK {
-            let Some((x, z)) = player.chunks_pending.pop_front() else { break };
-            sent_this_tick = true;
+        let count = player.chunks_pending.len().min(MAX_CHUNKS_PER_TICK);
+        if count == 0 {
+            continue;
+        }
 
-            let chunk = overworld.get_or_generate_chunk(&registry, x, z);
-            let limit = (chunk.highest_non_air_sub_chunk_y() - min_y) as u16;
-            let sub_chunk_count = chunk.sub_chunk_count() as u32;
-            let serialized_chunk_data = chunk.serialize();
+        let batch: Vec<(i32, i32)> = player.chunks_pending.drain(..count).collect();
+        player.chunks_sent.extend(batch.iter().copied());
+
+        batches.insert(entity, batch);
+    }
+
+    if batches.is_empty() {
+        return;
+    }
+
+    // the same chunk is often requested by several players, so generate and serialize it once
+    let mut positions: Vec<(i32, i32)> = batches.values().flatten().copied().collect();
+    positions.sort_unstable();
+    positions.dedup();
+
+    let overworld = level.overworld_mut();
+    overworld.generate_chunks(&registry, &positions);
+
+    let payloads = serialize_chunks(overworld, &positions);
+
+    for (entity, mut session, player) in query.iter_mut() {
+        let Some(batch) = batches.get(&entity) else { continue };
+
+        for &(x, z) in batch {
+            let Some(payload) = payloads.get(&(x, z)) else { continue };
 
             session.send(BedrockProtocol::LevelChunkPacket(
                 LevelChunkPacket {
                     chunk_position: ChunkPos { x, z },
                     dimension_id: 0,
-                    sub_chunk_count,
-                    sub_chunk_limit: limit,
+                    sub_chunk_count: payload.sub_chunk_count,
+                    sub_chunk_limit: payload.sub_chunk_limit,
                     cache_enabled: false,
                     cache_blobs: vec![],
-                    serialized_chunk_data,
+                    serialized_chunk_data: payload.data.clone(),
                 }
                 .into(),
             ));
 
             debug!("sent chunk {}, {}", x, z);
-
-            player.chunks_sent.insert((x, z));
         }
 
-        if sent_this_tick && player.chunks_pending.is_empty() {
+        if player.chunks_pending.is_empty() {
             session.send(BedrockProtocol::NetworkChunkPublisherUpdatePacket(
                 NetworkChunkPublisherUpdatePacket {
                     new_view_position: BlockPos { x: 0, y: 0, z: 0 },
@@ -62,6 +90,29 @@ pub fn send_pending_chunks(mut query: Query<(&mut Session, &mut Player)>, mut le
             ));
         }
     }
+}
+
+fn serialize_chunks(dimension: &Dimension, positions: &[(i32, i32)]) -> HashMap<(i32, i32), ChunkPayload> {
+    let min_y = dimension.min_sub_chunk_y;
+
+    let serialized = ComputeTaskPool::get().scope(|scope| {
+        for &(x, z) in positions {
+            let Some(chunk) = dimension.get_chunk(x, z) else { continue };
+
+            scope.spawn(async move {
+                (
+                    (x, z),
+                    ChunkPayload {
+                        sub_chunk_count: chunk.sub_chunk_count() as u32,
+                        sub_chunk_limit: (chunk.highest_non_air_sub_chunk_y() - min_y) as u16,
+                        data: chunk.serialize(),
+                    },
+                )
+            });
+        }
+    });
+
+    serialized.into_iter().collect()
 }
 
 pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>, mut query: Query<&mut Session>, level: Res<Level>) {

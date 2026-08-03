@@ -1,8 +1,9 @@
 use crate::config::Config;
 use crate::logger::setup_logger;
-use crate::server::Server;
+use crate::server::{Server, TICK_RATE};
 use bevy_app::{App, PreStartup, ScheduleRunnerPlugin, TaskPoolOptions, TaskPoolPlugin};
 use bevy_time::TimePlugin;
+use std::time::Duration;
 
 pub mod block;
 pub mod command;
@@ -29,7 +30,9 @@ impl Chorus {
 
         let mut app = App::new();
         app.add_plugins(TimePlugin)
-            .add_plugins(ScheduleRunnerPlugin::default())
+            // the default runner never sleeps, which burns every core even with nobody connected.
+            // run it a few times per tick so Time<Fixed> stays accurate without spinning
+            .add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / (TICK_RATE * 5.))))
             .add_plugins(TaskPoolPlugin {
                 task_pool_options: TaskPoolOptions {
                     max_total_threads: config.threads,

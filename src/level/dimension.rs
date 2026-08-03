@@ -1,6 +1,7 @@
 use crate::level::chunk::Chunk;
 use crate::level::generator::WorldGenerator;
 use crate::registry::block_registry::BlockRegistry;
+use bevy_tasks::ComputeTaskPool;
 use std::collections::HashMap;
 
 pub struct Dimension {
@@ -13,8 +14,8 @@ pub struct Dimension {
 
 impl Dimension {
     pub fn new<G>(id: i32, min_sub_chunk_y: i8, max_sub_chunk_y: i8, generator: G) -> Self
-    where 
-        G: WorldGenerator + Send + Sync + 'static 
+    where
+        G: WorldGenerator + Send + Sync + 'static,
     {
         Self {
             id,
@@ -31,13 +32,37 @@ impl Dimension {
 
     pub fn get_or_generate_chunk(&mut self, registry: &BlockRegistry, x: i32, z: i32) -> &Chunk {
         if !self.chunks.contains_key(&(x, z)) {
-            let mut chunk = Self::empty_chunk(registry, x, z, self.min_sub_chunk_y, self.max_sub_chunk_y, 0);
-            
-            self.generator.generate(registry, x, z, &mut chunk);
-            
+            let chunk = self.generate_chunk(registry, x, z);
+
             self.chunks.insert((x, z), chunk);
         }
         self.chunks.get(&(x, z)).unwrap()
+    }
+
+    /// Generates every position that is not loaded yet, spreading the work over the compute task
+    /// pool instead of doing it one by one on the caller's thread.
+    pub fn generate_chunks(&mut self, registry: &BlockRegistry, positions: &[(i32, i32)]) {
+        let missing: Vec<(i32, i32)> = positions.iter().copied().filter(|position| !self.chunks.contains_key(position)).collect();
+        if missing.is_empty() {
+            return;
+        }
+
+        let dimension = &*self;
+        let generated = ComputeTaskPool::get().scope(|scope| {
+            for (x, z) in missing {
+                scope.spawn(async move { ((x, z), dimension.generate_chunk(registry, x, z)) });
+            }
+        });
+
+        self.chunks.extend(generated);
+    }
+
+    fn generate_chunk(&self, registry: &BlockRegistry, x: i32, z: i32) -> Chunk {
+        let mut chunk = Self::empty_chunk(registry, x, z, self.min_sub_chunk_y, self.max_sub_chunk_y, 0);
+
+        self.generator.generate(registry, x, z, &mut chunk);
+
+        chunk
     }
 
     pub fn get_chunk(&self, x: i32, z: i32) -> Option<&Chunk> {
@@ -58,11 +83,11 @@ impl Dimension {
             None => false,
         }
     }
-    
-    fn empty_chunk(registry: &BlockRegistry,  x: i32, z: i32, min_sub_chunk_y: i8, max_sub_chunk_y: i8, biome: i32) -> Chunk {
+
+    fn empty_chunk(registry: &BlockRegistry, x: i32, z: i32, min_sub_chunk_y: i8, max_sub_chunk_y: i8, biome: i32) -> Chunk {
         let air_id = registry.get_block_id("minecraft:air").unwrap_or(0);
         let count = (max_sub_chunk_y as i32 - min_sub_chunk_y as i32 + 1) as usize;
-        
+
         Chunk::new(x, z, min_sub_chunk_y, count, air_id, biome)
     }
 }

@@ -30,7 +30,7 @@ pub fn on_enter_setup(mut sessions: Query<&mut Session>, mut server_state: ResMu
             continue;
         }
 
-        let Ok(session) = sessions.get_mut(ev.entity) else {
+        let Ok(mut session) = sessions.get_mut(ev.entity) else {
             continue;
         };
 
@@ -45,14 +45,14 @@ pub fn on_enter_setup(mut sessions: Query<&mut Session>, mut server_state: ResMu
             .into(),
         ));
 
-        send_start_game(&player, &session);
+        send_start_game(&player, &mut session);
 
         let entity = PlayerEntity::default("minecraft:player".to_string(), player.unique_id());
         commands.entity(ev.entity).insert((player, entity, DimensionId(0)));
     }
 }
 
-fn send_start_game(player: &Player, session: &Session) {
+fn send_start_game(player: &Player, session: &mut Session) {
     session.send_immediate(BedrockProtocol::StartGamePacket(
         StartGamePacket {
             target_actor_id: ActorUniqueID(player.unique_id()),

@@ -33,17 +33,23 @@ impl Plugin for PacketHandlers {
     fn build(&self, app: &mut App) {
         app.add_systems(
             FixedUpdate,
+            // chained so that a state change reaches its entry logic within the same tick instead
+            // of waiting for the next one - these all touch Session, so they never ran in parallel
             (
                 handle_request,
                 handle_login,
                 handle_handshake,
                 handle_resource,
-                (on_enter_setup, handle_setup).chain(),
-                (on_enter_play, handle_play, broadcast_chat).chain(),
+                on_enter_setup,
+                handle_setup,
+                on_enter_play,
+                handle_play,
+                broadcast_chat,
                 send_pending_chunks,
                 handle_sub_chunk_request,
                 broadcast_block_updates,
-            ),
+            )
+                .chain(),
         );
     }
 }

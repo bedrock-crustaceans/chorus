@@ -9,7 +9,7 @@ use crate::network::session::state::SessionStateChangedMessage;
 use bedrock::network::connection::Connection;
 use bedrock::network::listener::Listener;
 use bedrock::protocol::{ProtoVersion, Unknown};
-use bevy_app::{App, FixedUpdate, Plugin, Startup};
+use bevy_app::{App, FixedPostUpdate, FixedPreUpdate, Plugin, Startup};
 use bevy_ecs::prelude::*;
 use crossbeam_channel::Receiver;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -31,7 +31,8 @@ impl Plugin for Network {
         app.add_plugins(PacketHandlers)
             .add_plugins(LoginAuthOIDC)
             .add_systems(Startup, Network::init)
-            .add_systems(FixedUpdate, Network::tick)
+            .add_systems(FixedPreUpdate, Network::receive)
+            .add_systems(FixedPostUpdate, Network::flush)
             .add_message::<PacketReceivedMessage>()
             .add_message::<SessionStateChangedMessage>()
             .add_message::<BlockUpdatedMessage>()
@@ -88,18 +89,25 @@ impl Network {
         })
     }
 
-    pub fn tick(network: Res<NetworkState>, mut query: Query<(Entity, &mut Session)>, mut events: MessageWriter<PacketReceivedMessage>, mut commands: Commands) {
+    /// Accepts new connections and drains everything the connection tasks received since the last
+    /// tick. Runs before the packet handlers so that a packet never waits a whole tick to be seen.
+    pub fn receive(network: Res<NetworkState>, mut query: Query<(Entity, &mut Session)>, mut events: MessageWriter<PacketReceivedMessage>, mut commands: Commands) {
         for conn in network.incoming.try_iter() {
             let mut entity = commands.spawn_empty();
             entity.insert(Session::new(entity.id(), conn, &network.runtime));
         }
 
         for (entity, mut session) in query.iter_mut() {
-            session.tick();
-
             while let Some(packet) = session.recv() {
                 events.write(PacketReceivedMessage { entity, packet });
             }
+        }
+    }
+
+    /// Pushes everything the handlers queued this tick out, and reaps closed sessions.
+    pub fn flush(mut query: Query<(Entity, &mut Session)>, mut commands: Commands) {
+        for (entity, mut session) in query.iter_mut() {
+            session.flush();
 
             if session.is_closed() {
                 commands.entity(entity).despawn();
