@@ -1,6 +1,6 @@
-use glam::IVec3;
 use crate::block::block_permutation::BlockPermutation;
 use crate::level::level::Level;
+use glam::IVec3;
 
 pub struct Block {
     permutation: BlockPermutation,

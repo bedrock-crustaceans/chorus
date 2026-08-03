@@ -1,2 +1,2 @@
-pub mod perlin;
 pub mod octave;
+pub mod perlin;

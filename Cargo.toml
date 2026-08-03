@@ -11,7 +11,6 @@ path = "src/lib.rs"
 [dependencies]
 bevy_app = "0.19.0"
 bevy_ecs = { version = "0.19.0", features = ["debug"] }
-bevy_time = "0.19.0"
 bevy_tasks = "0.19.0"
 
 crossbeam-channel = "0.5.15"
@@ -27,7 +26,6 @@ glam = "0.33.2"
 indexmap = "2.14.0"
 
 jsonwebtoken = { version = "11.0.0", features = ["rust_crypto"] }
-jsonwebtoken_v10 = { package = "jsonwebtoken", version = "10.4.0", features = ["rust_crypto"] }
 p384 = { version = "0.14.0", features = ["ecdh", "ecdsa"] }
 base64 = "0.23.0"
 
@@ -39,4 +37,5 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing-appender = "0.2.4"
 tracing = "0.1.44"
 atomicow = "1.1.0"
-sysinfo = { version = "0.38.4", default-features = false, features = ["system"] }
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+spin_sleep = "1"

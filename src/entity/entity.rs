@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::Component;
-use std::collections::HashMap;
 use glam::{Vec2, Vec3};
+use std::collections::HashMap;
 
 #[derive(Component)]
 pub struct Entity {

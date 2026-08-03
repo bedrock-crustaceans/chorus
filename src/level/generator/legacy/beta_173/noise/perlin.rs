@@ -64,10 +64,10 @@ impl PerlinNoise {
         let v = Self::fade(yf);
         let w = Self::fade(zf);
 
-        let a  = self.perm[xi as usize] as i32 + yi;
+        let a = self.perm[xi as usize] as i32 + yi;
         let aa = self.perm[a as usize] as i32 + zi;
         let ab = self.perm[(a + 1) as usize] as i32 + zi;
-        let b  = self.perm[(xi + 1) as usize] as i32 + yi;
+        let b = self.perm[(xi + 1) as usize] as i32 + yi;
         let ba = self.perm[b as usize] as i32 + zi;
         let bb = self.perm[(b + 1) as usize] as i32 + zi;
 
@@ -76,16 +76,8 @@ impl PerlinNoise {
         let ba0 = self.perm[ba as usize];
         let bb0 = self.perm[bb as usize];
 
-        let x1 = Self::lerp(
-            u,
-            Self::grad(aa0, xf,     yf,     zf),
-            Self::grad(ba0, xf - 1.0, yf,     zf),
-        );
-        let x2 = Self::lerp(
-            u,
-            Self::grad(ab0, xf,     yf - 1.0, zf),
-            Self::grad(bb0, xf - 1.0, yf - 1.0, zf),
-        );
+        let x1 = Self::lerp(u, Self::grad(aa0, xf, yf, zf), Self::grad(ba0, xf - 1.0, yf, zf));
+        let x2 = Self::lerp(u, Self::grad(ab0, xf, yf - 1.0, zf), Self::grad(bb0, xf - 1.0, yf - 1.0, zf));
         let y1 = Self::lerp(v, x1, x2);
 
         let aa1 = self.perm[(aa + 1) as usize];
@@ -93,16 +85,8 @@ impl PerlinNoise {
         let ba1 = self.perm[(ba + 1) as usize];
         let bb1 = self.perm[(bb + 1) as usize];
 
-        let x3 = Self::lerp(
-            u,
-            Self::grad(aa1, xf,     yf,     zf - 1.0),
-            Self::grad(ba1, xf - 1.0, yf,     zf - 1.0),
-        );
-        let x4 = Self::lerp(
-            u,
-            Self::grad(ab1, xf,     yf - 1.0, zf - 1.0),
-            Self::grad(bb1, xf - 1.0, yf - 1.0, zf - 1.0),
-        );
+        let x3 = Self::lerp(u, Self::grad(aa1, xf, yf, zf - 1.0), Self::grad(ba1, xf - 1.0, yf, zf - 1.0));
+        let x4 = Self::lerp(u, Self::grad(ab1, xf, yf - 1.0, zf - 1.0), Self::grad(bb1, xf - 1.0, yf - 1.0, zf - 1.0));
         let y2 = Self::lerp(v, x3, x4);
 
         Self::lerp(w, y1, y2)
