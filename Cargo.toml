@@ -27,6 +27,7 @@ glam = "0.33.2"
 indexmap = "2.14.0"
 
 jsonwebtoken = { version = "11.0.0", features = ["rust_crypto"] }
+jsonwebtoken_v10 = { package = "jsonwebtoken", version = "10.4.0", features = ["rust_crypto"] }
 p384 = { version = "0.14.0", features = ["ecdh", "ecdsa"] }
 base64 = "0.23.0"
 
