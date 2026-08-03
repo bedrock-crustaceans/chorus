@@ -3,5 +3,6 @@ pub mod camera;
 pub mod camerashake;
 pub mod daylock;
 pub mod debug;
+pub mod gamemode;
 pub mod help;
 pub mod ping;

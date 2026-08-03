@@ -3,6 +3,7 @@ use crate::command::r#impl::aimassist::AIMASSIST_COMMAND;
 use crate::command::r#impl::camera::CAMERA_COMMAND;
 use crate::command::r#impl::camerashake::CAMERASHAKE_COMMAND;
 use crate::command::r#impl::debug::DEBUG_COMMAND;
+use crate::command::r#impl::gamemode::GAMEMODE_COMMAND;
 use crate::command::r#impl::help::HELP_COMMAND;
 use crate::command::r#impl::ping::PING_COMMAND;
 use crate::command::sender::CommandSender;
@@ -29,6 +30,8 @@ impl CommandRegistry {
         registry.register(&HELP_COMMAND);
         registry.register(&PING_COMMAND);
         registry.register(&DEBUG_COMMAND);
+
+        registry.register(&GAMEMODE_COMMAND);
 
         registry.register(&AIMASSIST_COMMAND);
         registry.register(&CAMERA_COMMAND);

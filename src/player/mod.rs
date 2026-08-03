@@ -1,16 +1,19 @@
 use crate::network::BedrockProtocol;
 use crate::network::session::Session;
+use crate::player::gamemode::Gamemode;
 use bedrock::form::forms::Form;
-use bedrock::protocol::v662::packets::ModalFormRequestPacket;
+use bedrock::protocol::v662::packets::{ModalFormRequestPacket, SetPlayerGameTypePacket};
 use bevy_ecs::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 
+pub mod gamemode;
 pub mod identity;
 
 #[derive(Component)]
 pub struct Player {
     unique_id: i64,
     runtime_id: u64,
+    gamemode: Gamemode,
 
     pub chunks_radius: i32,
     pub chunks_center: (i32, i32),
@@ -26,6 +29,7 @@ impl Player {
         Self {
             unique_id: rand::random(),
             runtime_id,
+            gamemode: Gamemode::default(),
 
             chunks_radius: 0,
             chunks_center: (0, 0),
@@ -43,6 +47,21 @@ impl Player {
 
     pub fn runtime_id(&self) -> u64 {
         self.runtime_id
+    }
+
+    pub fn gamemode(&self) -> Gamemode {
+        self.gamemode
+    }
+
+    pub fn set_gamemode(&mut self, session: &mut Session, gamemode: Gamemode) {
+        self.gamemode = gamemode;
+
+        session.send(BedrockProtocol::SetPlayerGameTypePacket(
+            SetPlayerGameTypePacket {
+                player_game_type: gamemode.game_type(),
+            }
+            .into(),
+        ));
     }
 
     pub fn send_form<F>(&mut self, session: &mut Session, form: Form, on_response: F)

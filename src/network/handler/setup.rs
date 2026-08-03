@@ -57,7 +57,7 @@ fn send_start_game(player: &Player, session: &Session) {
         StartGamePacket {
             target_actor_id: ActorUniqueID(player.unique_id()),
             target_runtime_id: ActorRuntimeID(player.runtime_id()),
-            actor_game_type: GameType::Survival,
+            actor_game_type: player.gamemode().game_type(),
             position: (0.5, 6.0, 0.5), // TODO: those shouldn't be hardcoded, maybe player db?
             rotation: Default::default(),
             settings: LevelSettings {
