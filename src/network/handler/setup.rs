@@ -128,7 +128,7 @@ fn send_start_game(player: &Player, session: &mut Session) {
             is_trial: false,
             movement_settings: SyncedPlayerMovementSettings {
                 rewind_history_size: 0,
-                server_authoritative_block_breaking: false,
+                server_authoritative_block_breaking: true,
             },
             current_level_time: 0,
             enchantment_seed: 0,
