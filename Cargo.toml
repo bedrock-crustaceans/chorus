@@ -39,3 +39,4 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing-appender = "0.2.4"
 tracing = "0.1.44"
 atomicow = "1.1.0"
+sysinfo = { version = "0.38.4", default-features = false, features = ["system"] }

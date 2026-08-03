@@ -33,9 +33,12 @@ pub const STATUS_COMMAND: CommandDefinition = const_command! {
         sender.reply(format!("§6Network upload: §c{} kB/s", format_float(bandwidth.average_sent() / 1024.)));
         sender.reply(format!("§6Network download: §c{} kB/s", format_float(bandwidth.average_received() / 1024.)));
 
-        // no /proc means no memory or thread numbers to report at all
         if let Some(stats) = process_stats() {
-            sender.reply(format!("§6Thread count: §c{}", stats.threads));
+            // the thread count has no portable source, so the line is skipped where it is unknown
+            if let Some(threads) = stats.threads {
+                sender.reply(format!("§6Thread count: §c{threads}"));
+            }
+
             sender.reply(format!("§6Total memory: §c{} MB.", format_megabytes(stats.resident_bytes)));
             sender.reply(format!("§6Total virtual memory: §c{} MB.", format_megabytes(stats.virtual_bytes)));
         }

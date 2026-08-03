@@ -19,6 +19,7 @@ pub fn process_stats() -> Option<ProcessStats> {
     Some(ProcessStats {
         resident_bytes: process.memory(),
         virtual_bytes: process.virtual_memory(),
-        threads: process.tasks().map(|tasks| tasks.len()),
+        // tasks() lists the spawned threads only, the main one is not among them
+        threads: process.tasks().map(|tasks| tasks.len() + 1),
     })
 }
