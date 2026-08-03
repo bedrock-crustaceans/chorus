@@ -176,8 +176,8 @@ fn handle_request_chunk_radius(packet: &<BedrockProtocol as ProtoVersionPackets>
     let radius = packet.chunk_radius.min(8);
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
 
+    // the queue itself is filled by update_chunk_order, which also keeps it following the player
     player.chunks_radius = radius;
-    player.chunks_pending.extend((-radius..radius).flat_map(|x| (-radius..radius).map(move |z| (x, z))));
 
     session.send(BedrockProtocol::ChunkRadiusUpdatedPacket(ChunkRadiusUpdatedPacket { chunk_radius: radius }.into()));
 

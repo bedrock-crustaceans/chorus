@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::network::network::Network;
 use crate::registry::Registry;
 use crate::utils::rolling_avg::RollingAvg;
-use bevy_app::{App, FixedFirst, FixedLast, FixedUpdate, Plugin, Startup};
+use bevy_app::{App, FixedFirst, FixedLast, Plugin, Startup};
 use bevy_ecs::prelude::{Res, Resource};
 use bevy_ecs::system::ResMut;
 use bevy_time::{Fixed, Time};
@@ -91,7 +91,6 @@ impl Plugin for Server {
         .insert_resource(Time::<Fixed>::from_hz(TICK_RATE))
         .add_systems(Startup, Server::start)
         .add_systems(FixedFirst, Server::start_tick)
-        .add_systems(FixedUpdate, Server::tick)
         .add_systems(FixedLast, Server::end_tick)
         .add_plugins(Registry)
         .add_plugins(Network);
@@ -106,19 +105,6 @@ impl Server {
     pub fn start_tick(mut server_state: ResMut<ServerState>) {
         server_state.tick += 1;
         server_state.tick_instant = Instant::now();
-    }
-
-    pub fn tick(server_state: Res<ServerState>, server_metrics: Res<ServerMetrics>) {
-        if server_state.tick % 20 == 0 {
-            info!(
-                "T: {}, TPS Min: {:.2}, MSPT Max: {:.2}, TPS Avg: {:.2}, MSPT Avg: {:.2}",
-                server_state.tick,
-                server_metrics.tps_min,
-                server_metrics.mspt_max,
-                server_metrics.tps_avg.get_avg(),
-                server_metrics.mspt_avg.get_avg()
-            );
-        }
     }
 
     pub fn end_tick(time: Res<Time>, server_state: Res<ServerState>, mut server_metrics: ResMut<ServerMetrics>) {

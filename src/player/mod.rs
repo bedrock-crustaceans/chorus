@@ -16,7 +16,8 @@ pub struct Player {
     gamemode: Gamemode,
 
     pub chunks_radius: i32,
-    pub chunks_center: (i32, i32),
+    /// None until the first chunk order run.
+    pub chunks_center: Option<(i32, i32)>,
     pub chunks_pending: VecDeque<(i32, i32)>,
     pub chunks_sent: HashSet<(i32, i32)>,
 
@@ -32,7 +33,7 @@ impl Player {
             gamemode: Gamemode::default(),
 
             chunks_radius: 0,
-            chunks_center: (0, 0),
+            chunks_center: None,
             chunks_pending: VecDeque::new(),
             chunks_sent: HashSet::new(),
 
