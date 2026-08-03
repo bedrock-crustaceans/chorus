@@ -2,6 +2,7 @@ use crate::network::BedrockProtocol;
 use crate::network::session::Session;
 use crate::player::block_break::BlockBreakHandler;
 use crate::player::gamemode::Gamemode;
+use crate::player::inventory::PlayerInventory;
 use bedrock::form::forms::Form;
 use bedrock::protocol::v662::packets::{ModalFormRequestPacket, SetPlayerGameTypePacket};
 use bevy_ecs::prelude::*;
@@ -10,6 +11,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 pub mod block_break;
 pub mod gamemode;
 pub mod identity;
+pub mod inventory;
 
 #[derive(Component)]
 pub struct Player {
@@ -24,6 +26,7 @@ pub struct Player {
     pub chunks_sent: HashSet<(i32, i32)>,
 
     pub block_break: Option<BlockBreakHandler>,
+    pub inventory: PlayerInventory,
 
     pub forms_id: u32,
     pub forms_pending: HashMap<u32, (Form, Box<dyn FnOnce() + Send + Sync>)>,
@@ -42,6 +45,7 @@ impl Player {
             chunks_sent: HashSet::new(),
 
             block_break: None,
+            inventory: PlayerInventory::new(),
 
             forms_id: 0,
             forms_pending: HashMap::new(),

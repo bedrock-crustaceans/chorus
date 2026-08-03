@@ -2,6 +2,7 @@ use crate::block::component::mineable_component::MineableComponent;
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::level::Level;
 use crate::level::{BlockUpdatedMessage, LevelEventMessage, LevelSoundMessage};
+use crate::math::enums::block_face::BlockFace;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
@@ -69,6 +70,12 @@ pub fn handle_block_actions(
                 PlayerActionType::AbortDestroyBlock | PlayerActionType::StopDestroyBlock => {
                     stop_break(&mut player, &mut event_writer);
                 }
+                // vanilla treats this as telemetry, but it is the only placement signal chorus can
+                // read: the item use transaction it belongs to arrives in a packet bedrock-rs
+                // cannot decode yet
+                PlayerActionType::StartItemUseOn => {
+                    place_block(&action, entity, &player, &mut level, &registry, &mut block_writer);
+                }
                 PlayerActionType::PredictDestroyBlock | PlayerActionType::CreativeDestroyBlock => {
                     break_block(&action, entity, &mut player, &mut level, &registry, &mut event_writer, &mut block_writer);
                 }
@@ -98,6 +105,35 @@ fn collect_actions(packet: &BedrockProtocol) -> Vec<BlockAction> {
             .collect(),
         _ => vec![],
     }
+}
+
+/// Puts the held block against the face the player clicked.
+fn place_block(action: &BlockAction, entity: &PlayerEntity, player: &Player, level: &mut Level, registry: &BlockRegistry, block_writer: &mut MessageWriter<BlockUpdatedMessage>) {
+    // the block comes from the server's own inventory, never from what the client claims
+    let block_id = player.inventory.held_item().block_runtime_id;
+    if block_id == 0 {
+        debug!("nothing placeable in the held slot");
+        return;
+    }
+
+    let Ok(face) = BlockFace::from_index(action.face as usize) else {
+        return;
+    };
+
+    let position = action.position + face.get_unit_vec().as_ivec3();
+    if !in_reach(entity, position) {
+        return;
+    }
+
+    let air_id = registry.get_block_id("minecraft:air").unwrap_or(0);
+    if level.get_block(0, position.x, position.y, position.z, 0) != Some(air_id) {
+        debug!("{} is not free", position);
+        return;
+    }
+
+    debug!("placing block {} at {}", block_id, position);
+
+    level.set_block(0, position.x, position.y, position.z, 0, block_id, block_writer);
 }
 
 fn attack_block(action: &BlockAction, entity: &PlayerEntity, player: &mut Player, level: &Level, registry: &BlockRegistry, event_writer: &mut MessageWriter<LevelEventMessage>) {
