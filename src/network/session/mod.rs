@@ -1,5 +1,7 @@
 use crate::network::BedrockProtocol;
+use crate::network::bandwidth::BandwidthCounters;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
+use bedrock::network::codec::{decode_packets, encode_packets};
 use bedrock::network::compression::Compression;
 use bedrock::network::connection::Connection;
 use bedrock::network::encryption::Encryption;
@@ -12,6 +14,7 @@ use bedrock::protocol::v1001::enums::ConnectionFailReason;
 use bevy_ecs::prelude::{Component, Entity, MessageWriter};
 use std::collections::HashMap;
 use std::mem::take;
+use std::sync::Arc;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
@@ -28,7 +31,7 @@ pub enum ConnectionEvent {
 
 enum ConnectionStep {
     Event(Option<ConnectionEvent>),
-    Recv(Result<Vec<BedrockProtocol>, ConnectionError>),
+    Recv(Result<Vec<u8>, ConnectionError>),
 }
 
 #[derive(Component)]
@@ -48,7 +51,7 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(entity: Entity, conn: Connection<Unknown>, runtime: &tokio::runtime::Runtime) -> Self {
+    pub fn new(entity: Entity, conn: Connection<Unknown>, runtime: &tokio::runtime::Runtime, bandwidth: Arc<BandwidthCounters>) -> Self {
         let (inc_tx, inc_rx) = tokio::sync::mpsc::unbounded_channel::<BedrockProtocol>();
         let (conn_tx, mut conn_rx) = tokio::sync::mpsc::unbounded_channel::<ConnectionEvent>();
 
@@ -61,15 +64,29 @@ impl Session {
                 let step = tokio::select! {
                     biased;
                     event = conn_rx.recv() => ConnectionStep::Event(event),
-                    recv = conn.recv() => ConnectionStep::Recv(recv),
+                    recv = conn.recv_raw() => ConnectionStep::Recv(recv),
                 };
 
                 match step {
                     ConnectionStep::Event(None) => break 'l,
                     ConnectionStep::Event(Some(ConnectionEvent::Send(packets))) => {
-                        if !packets.is_empty()
-                            && let Err(err) = conn.send(&packets).await
-                        {
+                        if packets.is_empty() {
+                            continue;
+                        }
+
+                        // encoded here rather than in Connection::send so the bandwidth tracker
+                        // gets to see how much actually goes over the wire
+                        let stream = match encode_packets(&packets, conn.compression.as_ref(), conn.encryption.as_mut()) {
+                            Ok(stream) => stream,
+                            Err(err) => {
+                                error!("error encoding packets, dropping batch {:?}", err);
+                                continue;
+                            }
+                        };
+
+                        bandwidth.add_sent(stream.len() as u64);
+
+                        if let Err(err) = conn.send_raw(&stream).await {
                             error!("error sending packets to connection {:?}", err);
                             break 'l;
                         }
@@ -84,16 +101,23 @@ impl Session {
 
                         conn.encryption = encryption.map(|b| *b);
                     }
-                    ConnectionStep::Recv(Ok(packets)) => {
+                    ConnectionStep::Recv(Ok(stream)) => {
+                        bandwidth.add_received(stream.len() as u64);
+
+                        // a malformed batch is recoverable, so it only drops the batch
+                        let packets = match decode_packets(stream, conn.compression.as_ref(), conn.encryption.as_mut()) {
+                            Ok(packets) => packets,
+                            Err(err) => {
+                                error!("error decoding packets from connection, dropping batch {:?}", err);
+                                continue;
+                            }
+                        };
+
                         for packet in packets {
                             if inc_tx.send(packet).is_err() {
                                 break 'l;
                             }
                         }
-                    }
-                    // a malformed batch is recoverable, anything else means the connection is gone
-                    ConnectionStep::Recv(Err(ConnectionError::NetworkCodecError(err))) => {
-                        error!("error decoding packets from connection, dropping batch {:?}", err);
                     }
                     ConnectionStep::Recv(Err(err)) => {
                         debug!("connection closed while receiving {:?}", err);

@@ -1,4 +1,4 @@
-use crate::command::sender::CommandSender;
+use crate::command::dispatch::CommandRequestedMessage;
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
@@ -113,7 +113,7 @@ pub fn on_enter_play(mut sessions: Query<(&mut Session, &Player)>, commands: Res
 pub fn handle_play(
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     mut chat_writer: MessageWriter<PlayerChatMessage>,
-    commands: Res<CommandRegistry>,
+    mut command_writer: MessageWriter<CommandRequestedMessage>,
     mut query: Query<(&mut PlayerEntity, &mut Player, &mut Session, &PlayerIdentity)>,
 ) {
     for ev in packet_reader.read() {
@@ -134,8 +134,10 @@ pub fn handle_play(
             }
             BedrockProtocol::TextPacket(packet) => handle_text(packet, identity, &mut chat_writer),
             BedrockProtocol::CommandRequestPacket(packet) => {
-                let mut sender = CommandSender::new(&mut session, identity.name().to_string(), Some(&mut player));
-                commands.dispatch(&packet.command, &mut sender);
+                command_writer.write(CommandRequestedMessage {
+                    entity: ev.entity,
+                    line: packet.command.clone(),
+                });
             }
             BedrockProtocol::ModalFormResponsePacket(packet) => handle_modal_form_response(packet, &mut player),
             packet => {

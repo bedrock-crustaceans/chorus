@@ -6,3 +6,4 @@ pub mod debug;
 pub mod gamemode;
 pub mod help;
 pub mod ping;
+pub mod status;

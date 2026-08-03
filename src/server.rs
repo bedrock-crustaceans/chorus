@@ -6,7 +6,7 @@ use bevy_app::{App, FixedFirst, FixedLast, FixedUpdate, Plugin, Startup};
 use bevy_ecs::prelude::{Res, Resource};
 use bevy_ecs::system::ResMut;
 use bevy_time::{Fixed, Time};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tracing::info;
 
 pub const TICK_RATE: f64 = 20.0;
@@ -17,11 +17,20 @@ pub struct Server;
 pub struct ServerState {
     tick: i64,
     tick_instant: Instant,
+    started: Instant,
 
     runtime_id: u64,
 }
 
 impl ServerState {
+    pub fn tick(&self) -> i64 {
+        self.tick
+    }
+
+    pub fn uptime(&self) -> Duration {
+        self.started.elapsed()
+    }
+
     pub fn get_runtime_id(&mut self) -> u64 {
         let id = self.runtime_id;
         self.runtime_id = self.runtime_id.wrapping_add(1);
@@ -31,10 +40,35 @@ impl ServerState {
 
 #[derive(Resource)]
 pub struct ServerMetrics {
+    tps: f64,
     tps_min: f64,
     tps_avg: RollingAvg<f64>,
+    mspt: f64,
     mspt_max: f64,
     mspt_avg: RollingAvg<f64>,
+}
+
+impl ServerMetrics {
+    pub fn tps(&self) -> f64 {
+        self.tps
+    }
+
+    pub fn tps_average(&self) -> f64 {
+        self.tps_avg.get_avg()
+    }
+
+    /// Share of the tick budget the last tick used, as a percentage.
+    pub fn tick_usage(&self) -> f64 {
+        Self::usage(self.mspt)
+    }
+
+    pub fn tick_usage_average(&self) -> f64 {
+        Self::usage(self.mspt_avg.get_avg())
+    }
+
+    fn usage(mspt: f64) -> f64 {
+        mspt / (1_000. / TICK_RATE) * 100.
+    }
 }
 
 impl Plugin for Server {
@@ -42,12 +76,15 @@ impl Plugin for Server {
         app.insert_resource(ServerState {
             tick: 0,
             tick_instant: Instant::now(),
+            started: Instant::now(),
 
             runtime_id: 1,
         })
         .insert_resource(ServerMetrics {
-            tps_min: 20.0,
+            tps: TICK_RATE,
+            tps_min: TICK_RATE,
             tps_avg: RollingAvg::new(20),
+            mspt: 0.0,
             mspt_max: 0.0,
             mspt_avg: RollingAvg::new(20),
         })
@@ -87,6 +124,9 @@ impl Server {
     pub fn end_tick(time: Res<Time>, server_state: Res<ServerState>, mut server_metrics: ResMut<ServerMetrics>) {
         let mspt = server_state.tick_instant.elapsed().as_secs_f64() * 1_000.;
         let tps = 1. / time.delta_secs_f64();
+
+        server_metrics.tps = tps;
+        server_metrics.mspt = mspt;
 
         server_metrics.tps_min = server_metrics.tps_min.min(tps);
         server_metrics.tps_avg.add(tps);

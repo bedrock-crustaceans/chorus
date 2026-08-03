@@ -33,7 +33,9 @@ pub const HELP_COMMAND: CommandDefinition = const_command! {
             ])
         },
     ],
-    execute: |registry, sender, args| {
+    execute: |context, sender, args| {
+        let registry = context.registry();
+
         let mut name_parts = args.to_vec();
         let mut page = 1;
 

@@ -1,3 +1,4 @@
+use crate::command::dispatch::dispatch_commands;
 use crate::network::BedrockProtocol;
 use crate::network::handler::chat::broadcast_chat;
 use crate::network::handler::chunks::{handle_sub_chunk_request, send_pending_chunks};
@@ -44,6 +45,7 @@ impl Plugin for PacketHandlers {
                 handle_setup,
                 on_enter_play,
                 handle_play,
+                dispatch_commands,
                 broadcast_chat,
                 send_pending_chunks,
                 handle_sub_chunk_request,

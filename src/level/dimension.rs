@@ -26,6 +26,18 @@ impl Dimension {
         }
     }
 
+    pub fn name(&self) -> &'static str {
+        match self.id {
+            1 => "nether",
+            2 => "the_end",
+            _ => "overworld",
+        }
+    }
+
+    pub fn chunk_count(&self) -> usize {
+        self.chunks.len()
+    }
+
     pub fn sub_chunk_count(&self) -> usize {
         (self.max_sub_chunk_y as i32 - self.min_sub_chunk_y as i32 + 1) as usize
     }

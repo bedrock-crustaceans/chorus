@@ -1,7 +1,7 @@
 use crate::command::command_result::CommandResult;
+use crate::command::context::CommandContext;
 use crate::command::parameter::CommandOverload;
 use crate::command::sender::CommandSender;
-use crate::registry::command_registry::CommandRegistry;
 use atomicow::CowArc;
 use bedrock::protocol::v898::packets::CommandPermissionLevelString;
 
@@ -13,7 +13,7 @@ pub struct CommandDefinition {
     pub permission: CommandPermissionLevelString,
     pub overloads: CowArc<'static, [CommandOverload]>,
 
-    pub execute: fn(&CommandRegistry, &mut CommandSender, &[&str]) -> CommandResult,
+    pub execute: fn(&CommandContext, &mut CommandSender, &[&str]) -> CommandResult,
 }
 
 impl CommandDefinition {

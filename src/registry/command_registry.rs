@@ -1,4 +1,5 @@
 use crate::command::command_definition::CommandDefinition;
+use crate::command::context::CommandContext;
 use crate::command::r#impl::aimassist::AIMASSIST_COMMAND;
 use crate::command::r#impl::camera::CAMERA_COMMAND;
 use crate::command::r#impl::camerashake::CAMERASHAKE_COMMAND;
@@ -6,6 +7,7 @@ use crate::command::r#impl::debug::DEBUG_COMMAND;
 use crate::command::r#impl::gamemode::GAMEMODE_COMMAND;
 use crate::command::r#impl::help::HELP_COMMAND;
 use crate::command::r#impl::ping::PING_COMMAND;
+use crate::command::r#impl::status::STATUS_COMMAND;
 use crate::command::sender::CommandSender;
 use atomicow::CowArc;
 use bedrock::protocol::v898::packets::{AvailableCommandsPacket, CommandsEntry};
@@ -30,6 +32,7 @@ impl CommandRegistry {
         registry.register(&HELP_COMMAND);
         registry.register(&PING_COMMAND);
         registry.register(&DEBUG_COMMAND);
+        registry.register(&STATUS_COMMAND);
 
         registry.register(&GAMEMODE_COMMAND);
 
@@ -66,7 +69,7 @@ impl CommandRegistry {
         self.commands.iter().map(|c| c.as_ref())
     }
 
-    pub fn dispatch(&self, line: &str, sender: &mut CommandSender) {
+    pub fn dispatch(&self, context: &CommandContext, line: &str, sender: &mut CommandSender) {
         let line = line.trim().trim_start_matches('/');
 
         let mut parts = line.split_whitespace();
@@ -80,7 +83,7 @@ impl CommandRegistry {
             return;
         };
 
-        if let Err(err) = (command.execute)(self, sender, &args) {
+        if let Err(err) = (command.execute)(context, sender, &args) {
             sender.reply(format!("§c{err}"));
         }
     }

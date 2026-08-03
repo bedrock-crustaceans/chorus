@@ -1,6 +1,8 @@
+use crate::command::dispatch::CommandRequestedMessage;
 use crate::config::Config;
 use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
+use crate::network::bandwidth::BandwidthTracker;
 use crate::network::handler::chat::PlayerChatMessage;
 use crate::network::handler::{PacketHandlers, PacketReceivedMessage};
 use crate::network::login::auth::LoginAuthOIDC;
@@ -9,7 +11,7 @@ use crate::network::session::state::SessionStateChangedMessage;
 use bedrock::network::connection::Connection;
 use bedrock::network::listener::Listener;
 use bedrock::protocol::{ProtoVersion, Unknown};
-use bevy_app::{App, FixedPostUpdate, FixedPreUpdate, Plugin, Startup};
+use bevy_app::{App, FixedLast, FixedPostUpdate, FixedPreUpdate, Plugin, Startup};
 use bevy_ecs::prelude::*;
 use crossbeam_channel::Receiver;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -33,10 +35,13 @@ impl Plugin for Network {
             .add_systems(Startup, Network::init)
             .add_systems(FixedPreUpdate, Network::receive)
             .add_systems(FixedPostUpdate, Network::flush)
+            .add_systems(FixedLast, BandwidthTracker::sample)
+            .init_resource::<BandwidthTracker>()
             .add_message::<PacketReceivedMessage>()
             .add_message::<SessionStateChangedMessage>()
             .add_message::<BlockUpdatedMessage>()
-            .add_message::<PlayerChatMessage>();
+            .add_message::<PlayerChatMessage>()
+            .add_message::<CommandRequestedMessage>();
     }
 }
 
@@ -91,10 +96,10 @@ impl Network {
 
     /// Accepts new connections and drains everything the connection tasks received since the last
     /// tick. Runs before the packet handlers so that a packet never waits a whole tick to be seen.
-    pub fn receive(network: Res<NetworkState>, mut query: Query<(Entity, &mut Session)>, mut events: MessageWriter<PacketReceivedMessage>, mut commands: Commands) {
+    pub fn receive(network: Res<NetworkState>, bandwidth: Res<BandwidthTracker>, mut query: Query<(Entity, &mut Session)>, mut events: MessageWriter<PacketReceivedMessage>, mut commands: Commands) {
         for conn in network.incoming.try_iter() {
             let mut entity = commands.spawn_empty();
-            entity.insert(Session::new(entity.id(), conn, &network.runtime));
+            entity.insert(Session::new(entity.id(), conn, &network.runtime, bandwidth.counters()));
         }
 
         for (entity, mut session) in query.iter_mut() {
