@@ -1,11 +1,14 @@
 use crate::item::item_stack::ItemStack;
+use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::Player;
+use crate::player::gamemode::Gamemode;
 use crate::player::inventory::Inventory;
 use crate::registry::block_registry::BlockRegistry;
+use crate::registry::item_registry::ItemRegistry;
 use bedrock::protocol::v662::enums::{ContainerID, ContainerType};
 use bedrock::protocol::v662::packets::ContainerOpenPacket;
 use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID};
@@ -40,7 +43,13 @@ pub fn send_initial_inventory(mut sessions: Query<(&mut Session, &mut Player)>, 
     }
 }
 
-pub fn handle_inventory_packets(mut packet_reader: MessageReader<PacketReceivedMessage>, blocks: Res<BlockRegistry>, mut query: Query<(&mut Session, &mut Player)>) {
+pub fn handle_inventory_packets(
+    mut packet_reader: MessageReader<PacketReceivedMessage>,
+    blocks: Res<BlockRegistry>,
+    items: Res<ItemRegistry>,
+    level: Res<Level>,
+    mut query: Query<(&mut Session, &mut Player)>,
+) {
     for ev in packet_reader.read() {
         let Ok((mut session, mut player)) = query.get_mut(ev.entity) else {
             continue;
@@ -109,9 +118,47 @@ pub fn handle_inventory_packets(mut packet_reader: MessageReader<PacketReceivedM
 
                 player.inventory.main_mut().set(slot as usize, item);
             }
+            // middle click - the client asks the server to hand it the block it is looking at
+            BedrockProtocol::BlockPickRequestPacket(packet) => {
+                let position = &packet.position;
+                let Some(block_id) = level.get_block(0, position.x, position.y, position.z, 0) else {
+                    continue;
+                };
+
+                if Some(block_id) == blocks.get_block_id("minecraft:air") {
+                    continue;
+                }
+
+                let Some(item) = picked_item(&blocks, &items, block_id) else {
+                    debug!("no item for block {}", block_id);
+                    continue;
+                };
+
+                // only creative players get a stack they do not own yet
+                let allow_new = player.gamemode() == Gamemode::Creative;
+                if !player.inventory.pick_item(item, allow_new) {
+                    continue;
+                }
+
+                send_content(&mut session, &mut player, ContainerID::Inventory);
+                send_held_item(&mut session, &player);
+            }
             _ => {}
         }
     }
+}
+
+/// Resolves the item a block hands out when it is picked. Block and item share the identifier.
+fn picked_item(blocks: &BlockRegistry, items: &ItemRegistry, block_id: i32) -> Option<ItemStack> {
+    let permutation = blocks.get_permutation(block_id)?;
+    let id = items.get(permutation.get_identifier())?;
+
+    Some(ItemStack {
+        id,
+        count: 1,
+        meta: 0,
+        block_runtime_id: block_id,
+    })
 }
 
 fn send_content(session: &mut Session, player: &mut Player, container: ContainerID) {

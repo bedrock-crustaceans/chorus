@@ -35,6 +35,24 @@ impl Inventory {
             None => false,
         }
     }
+
+    /// Finds the first slot holding the same item, ignoring how many are stacked in it.
+    pub fn first(&self, item: &ItemStack) -> Option<usize> {
+        self.slots.iter().position(|slot| slot.is_same(item))
+    }
+
+    pub fn first_empty(&self) -> Option<usize> {
+        self.slots.iter().position(ItemStack::is_empty)
+    }
+
+    pub fn swap(&mut self, from: usize, to: usize) -> bool {
+        if from >= self.slots.len() || to >= self.slots.len() {
+            return false;
+        }
+
+        self.slots.swap(from, to);
+        true
+    }
 }
 
 pub struct PlayerInventory {
@@ -95,6 +113,30 @@ impl PlayerInventory {
 
     pub fn held_item(&self) -> &ItemStack {
         self.main.get(self.held_slot as usize).unwrap_or(const { &ItemStack::air() })
+    }
+
+    /// Equips the item the player picked: an existing stack is moved into the hand, otherwise the
+    /// item is put in the first free slot. `allow_new` is false for players with finite resources,
+    /// they may only pick what they already carry. Returns whether anything changed.
+    pub fn pick_item(&mut self, item: ItemStack, allow_new: bool) -> bool {
+        if let Some(slot) = self.main.first(&item) {
+            return if slot < HOTBAR_SIZE {
+                self.set_held_slot(slot as u8)
+            } else {
+                self.main.swap(self.held_slot as usize, slot)
+            };
+        }
+
+        if !allow_new {
+            return false;
+        }
+
+        match self.main.first_empty() {
+            None => self.main.set(self.held_slot as usize, item),
+            Some(slot) if slot < HOTBAR_SIZE => self.main.set(slot, item) && self.set_held_slot(slot as u8),
+            // the hand is emptied into the free slot so nothing is lost
+            Some(slot) => self.main.swap(self.held_slot as usize, slot) && self.main.set(self.held_slot as usize, item),
+        }
     }
 
     /// Stack ids start at 1 - zero is reserved for empty slots.

@@ -23,6 +23,11 @@ impl ItemStack {
         self.id == 0 || self.count == 0
     }
 
+    /// Compares the item type only, so stacks of different sizes still match.
+    pub fn is_same(&self, other: &Self) -> bool {
+        self.id == other.id && self.meta == other.meta && self.block_runtime_id == other.block_runtime_id
+    }
+
     /// `net_id` identifies the stack across item stack requests. Empty slots must never carry one.
     pub fn to_descriptor(&self, net_id: Option<i32>) -> NetworkItemStackDescriptorV2 {
         if self.is_empty() {
