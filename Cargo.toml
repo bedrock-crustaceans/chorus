@@ -27,7 +27,7 @@ vek = "0.17.1"
 indexmap = "2.14.0"
 
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto", "p384"] }
-base64 = "0.22.1"
+base64 = "0.23.1"
 p384 = { version = "0.14.0-rc.8", features = ["ecdh", "ecdsa"] }
 
 bedrock = { git = "https://github.com/bedrock-crustaceans/bedrock-rs", branch = "main", features = ["full", "form", "protocol-packet-meta", "protocol-packet-dyn", "protocol-unknown", "protocol-v1001"] }
