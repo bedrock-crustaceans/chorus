@@ -1,20 +1,12 @@
 use crate::command::command_definition::CommandDefinition;
 use crate::command::context::CommandContext;
-use crate::command::r#impl::aimassist::AIMASSIST_COMMAND;
-use crate::command::r#impl::camera::CAMERA_COMMAND;
-use crate::command::r#impl::camerashake::CAMERASHAKE_COMMAND;
-use crate::command::r#impl::debug::DEBUG_COMMAND;
-use crate::command::r#impl::gamemode::GAMEMODE_COMMAND;
-use crate::command::r#impl::help::HELP_COMMAND;
-use crate::command::r#impl::list::LIST_COMMAND;
-use crate::command::r#impl::ping::PING_COMMAND;
-use crate::command::r#impl::status::STATUS_COMMAND;
+use crate::command::r#impl::DEFINITIONS;
 use crate::command::sender::CommandSender;
 use atomicow::CowArc;
 use bedrock::protocol::v898::packets::{AvailableCommandsPacket, CommandsEntry};
 use bevy_ecs::prelude::{Commands, Resource};
 use std::collections::HashMap;
-use tracing::debug;
+use tracing::{debug, info};
 
 #[derive(Resource, Default)]
 pub struct CommandRegistry {
@@ -30,17 +22,7 @@ impl CommandRegistry {
     pub fn init(mut commands: Commands) {
         let mut registry = Self::new();
 
-        registry.register(&HELP_COMMAND);
-        registry.register(&PING_COMMAND);
-        registry.register(&DEBUG_COMMAND);
-        registry.register(&STATUS_COMMAND);
-        registry.register(&LIST_COMMAND);
-
-        registry.register(&GAMEMODE_COMMAND);
-
-        registry.register(&AIMASSIST_COMMAND);
-        registry.register(&CAMERA_COMMAND);
-        registry.register(&CAMERASHAKE_COMMAND);
+        registry.register_all(DEFINITIONS.iter().copied());
 
         commands.insert_resource(registry);
     }
@@ -61,6 +43,20 @@ impl CommandRegistry {
         debug!("registered command {:?}", command.name);
 
         self.commands.push(command);
+    }
+
+    pub fn register_all<I, C>(&mut self, commands: I)
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<CowArc<'static, CommandDefinition>>,
+    {
+        let before = self.commands.len();
+
+        for command in commands {
+            self.register(command);
+        }
+
+        info!("registered {} commands", self.commands.len() - before);
     }
 
     pub fn get(&self, name: &str) -> Option<&CommandDefinition> {
