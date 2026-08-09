@@ -48,7 +48,8 @@ impl Plugin for PacketHandlers {
                 (broadcast_chat, on_quit, broadcast_message).chain(),
                 (update_chunk_order, send_pending_chunks, handle_sub_chunk_request).chain(),
                 (broadcast_block_updates, broadcast_level_events, broadcast_level_sounds).chain(),
-            ).chain(),
+            )
+                .chain(),
         );
     }
 }
