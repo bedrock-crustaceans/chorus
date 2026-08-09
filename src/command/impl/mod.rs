@@ -5,5 +5,6 @@ pub mod daylock;
 pub mod debug;
 pub mod gamemode;
 pub mod help;
+pub mod list;
 pub mod ping;
 pub mod status;

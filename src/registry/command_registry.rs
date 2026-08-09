@@ -6,6 +6,7 @@ use crate::command::r#impl::camerashake::CAMERASHAKE_COMMAND;
 use crate::command::r#impl::debug::DEBUG_COMMAND;
 use crate::command::r#impl::gamemode::GAMEMODE_COMMAND;
 use crate::command::r#impl::help::HELP_COMMAND;
+use crate::command::r#impl::list::LIST_COMMAND;
 use crate::command::r#impl::ping::PING_COMMAND;
 use crate::command::r#impl::status::STATUS_COMMAND;
 use crate::command::sender::CommandSender;
@@ -33,6 +34,7 @@ impl CommandRegistry {
         registry.register(&PING_COMMAND);
         registry.register(&DEBUG_COMMAND);
         registry.register(&STATUS_COMMAND);
+        registry.register(&LIST_COMMAND);
 
         registry.register(&GAMEMODE_COMMAND);
 
