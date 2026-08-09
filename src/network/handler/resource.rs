@@ -5,11 +5,10 @@ use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::resource::ResourcePacks;
 use bedrock::protocol::ProtoVersionPackets;
-use bedrock::protocol::v662::enums::ResourcePackResponse;
 use bedrock::protocol::v662::packets::ResourcePackChunkDataPacket;
 use bedrock::protocol::v662::types::{BaseGameVersion, Experiments};
-use bedrock::protocol::v818::packets::{ResourcePackEntry, ResourcePacksInfoPacket};
 use bedrock::protocol::v898::packets::{PackEntry, ResourcePackStackPacket};
+use bedrock::protocol::v2168::packets::{ResourcePackClientResponsePacket, ResourcePackEntry, ResourcePacksInfoPacket};
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::{MessageWriter, ParamSet, Query, Res};
 use tracing::warn;
@@ -110,14 +109,14 @@ fn handle_client_response(
     packet: &<BedrockProtocol as ProtoVersionPackets>::ResourcePackClientResponsePacket,
     state_writer: &mut MessageWriter<SessionStateChangedMessage>,
 ) {
-    match packet.response {
-        ResourcePackResponse::Cancel => {
+    match packet {
+        ResourcePackClientResponsePacket::Cancel => {
             session.close(Some("disconnectionScreen.noReason"));
         }
-        ResourcePackResponse::Downloading => {
+        ResourcePackClientResponsePacket::Downloading(_) => {
             // Client has begun downloading; chunk requests will follow.
         }
-        ResourcePackResponse::DownloadingFinished => {
+        ResourcePackClientResponsePacket::DownloadingFinished => {
             let addon_list: Vec<PackEntry> = resource_packs
                 .packs()
                 .iter()
@@ -142,7 +141,7 @@ fn handle_client_response(
                 .into(),
             ));
         }
-        ResourcePackResponse::ResourcePackStackFinished => {
+        ResourcePackClientResponsePacket::ResourcePackStackFinished => {
             session.set_state(SessionState::Setup, state_writer);
         }
     }

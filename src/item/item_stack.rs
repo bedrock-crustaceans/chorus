@@ -1,4 +1,6 @@
-use bedrock::protocol::v975::types::{ItemStackNetIdVariant, NetworkItemStackDescriptorV2};
+use crate::network::BedrockProtocol;
+use bedrock::protocol::ProtoVersionTypes;
+use bedrock::protocol::v2168::types::NetworkItemStackDescriptorV2;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ItemStack {
@@ -29,7 +31,7 @@ impl ItemStack {
     }
 
     /// `net_id` identifies the stack across item stack requests. Empty slots must never carry one.
-    pub fn to_descriptor(&self, net_id: Option<i32>) -> NetworkItemStackDescriptorV2 {
+    pub fn to_descriptor(&self, net_id: Option<i32>) -> <BedrockProtocol as ProtoVersionTypes>::NetworkItemStackDescriptorV2 {
         if self.is_empty() {
             return NetworkItemStackDescriptorV2 {
                 id: 0,
@@ -45,7 +47,7 @@ impl ItemStack {
             id: self.id,
             stack_size: self.count,
             aux_value: self.meta,
-            net_id: net_id.map(ItemStackNetIdVariant::ItemStackNetId),
+            net_id,
             block_runtime_id: self.block_runtime_id as u32,
             user_data_buffer: vec![],
         }

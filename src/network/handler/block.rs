@@ -99,8 +99,12 @@ fn collect_actions(packet: &BedrockProtocol) -> Vec<BlockAction> {
             .flatten()
             .map(|action| BlockAction {
                 action: action.action_type.clone(),
-                position: action.position.as_ref().map_or(IVec3::ZERO, |position| IVec3::new(position.x, position.y, position.z)),
-                face: action.facing.unwrap_or_default(),
+                position: {
+                    let position = &action.position;
+
+                    IVec3::new(position.x, position.y, position.z)
+                },
+                face: action.facing,
             })
             .collect(),
         _ => vec![],

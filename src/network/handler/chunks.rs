@@ -6,9 +6,10 @@ use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
 use crate::player::Player;
 use crate::registry::block_registry::BlockRegistry;
-use bedrock::protocol::v662::packets::{LevelChunkPacket, NetworkChunkPublisherUpdatePacket};
-use bedrock::protocol::v662::types::{BlockPos, ChunkPos, SubChunkPos};
-use bedrock::protocol::v818::packets::{HeightMapDataType, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult};
+use bedrock::protocol::v662::packets::NetworkChunkPublisherUpdatePacket;
+use bedrock::protocol::v662::types::{BlockPos, ChunkPos};
+use bedrock::protocol::v2168::packets::{HeightMapDataType, LevelChunkPacket, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult};
+use bedrock::protocol::v2168::types::SubChunkPos;
 use bevy_ecs::change_detection::ResMut;
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::{Entity, Query};
@@ -110,7 +111,7 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity
                     chunk_position: ChunkPos { x, z },
                     dimension_id: 0,
                     sub_chunk_count: payload.sub_chunk_count,
-                    sub_chunk_limit: payload.sub_chunk_limit,
+                    client_request_sub_chunk_limit: None,
                     cache_enabled: false,
                     cache_blobs: vec![],
                     serialized_chunk_data: payload.data.clone(),

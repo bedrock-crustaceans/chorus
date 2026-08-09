@@ -7,17 +7,16 @@ use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::Player;
 use crate::registry::item_registry::ItemRegistry;
 use crate::server::ServerState;
-use bedrock::protocol::v662::enums::{
-    ChatRestrictionLevel, Difficulty, EditorWorldType, EducationEditionOffer, GamePublishSetting, GameType, GeneratorType, PlayStatus, PlayerPermissionLevel, SpawnBiomeType,
-};
+use bedrock::protocol::v662::enums::{ChatRestrictionLevel, Difficulty, EditorWorldType, GamePublishSetting, GameType, GeneratorType, PlayStatus, PlayerPermissionLevel, SpawnBiomeType};
 use bedrock::protocol::v662::packets::ChunkRadiusUpdatedPacket;
 use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID, BaseGameVersion, EduSharedUriResource, Experiments, NetworkPermissions, SpawnSettings};
 use bedrock::protocol::v800::packets::BiomeDefinitionListPacket;
 use bedrock::protocol::v818::types::SyncedPlayerMovementSettings;
 use bedrock::protocol::v944::packets::VoxelShapesPacket;
 use bedrock::protocol::v944::types::NetworkBlockPosition;
-use bedrock::protocol::v1001::packets::StartGamePacket;
-use bedrock::protocol::v1001::types::{GameRuleLegacyData, LevelSettings};
+use bedrock::protocol::v2168::enums::EducationEditionOffer;
+use bedrock::protocol::v2168::packets::StartGamePacket;
+use bedrock::protocol::v2168::types::{GameRuleLegacyData, LevelSettings};
 use bedrock::protocol::{ProtoVersion, ProtoVersionPackets};
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Commands, Query};
@@ -104,7 +103,7 @@ fn send_start_game(player: &Player, session: &mut Session) {
                 },
                 bonus_chest_enabled: false,
                 starting_map_enabled: false,
-                player_permissions: PlayerPermissionLevel::Member,
+                player_permissions: PlayerPermissionLevel::Member as u8,
                 server_chunk_tick_range: 0,
                 locked_behaviour_pack: false,
                 locked_resource_pack: false,
@@ -150,7 +149,6 @@ fn send_start_game(player: &Player, session: &mut Session) {
             server_enabled_client_side_generation: false,
             block_network_ids_are_hashes: true,
             network_permissions: NetworkPermissions { server_auth_sound_enabled: false },
-            is_logging_chat: false,
             server_join_information: None,
             server_id: "".to_string(),
             world_id: "".to_string(),

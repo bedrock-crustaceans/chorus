@@ -1,9 +1,11 @@
 use crate::network::BedrockProtocol;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
-use bedrock::protocol::v662::types::NetworkItemInstanceDescriptor;
+use bedrock::protocol::ProtoVersionPackets;
 use bedrock::protocol::v776::enums::ItemVersion;
-use bedrock::protocol::v776::packets::{CreativeContentPacket, CreativeItemCategory, CreativeItemData, CreativeItemGroup, ItemComponentPacket, ItemsEntry};
+use bedrock::protocol::v776::packets::{ItemComponentPacket, ItemsEntry};
+use bedrock::protocol::v2168::packets::{CreativeContentPacket, CreativeItemCategory, CreativeItemData, CreativeItemGroup};
+use bedrock::protocol::v2168::types::NetworkItemInstanceDescriptor;
 use bevy_ecs::prelude::{Commands, Resource};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -147,11 +149,11 @@ impl ItemRegistry {
 
         Some(NetworkItemInstanceDescriptor {
             id: runtime_id as i32,
-            stack_size: Some(1),
-            aux_value: Some(entry.damage),
+            stack_size: 1,
+            aux_value: entry.damage,
             // zero means the item does not place a block
-            block_runtime_id: Some(entry.block_state_b64.as_deref().and_then(block_runtime_id).unwrap_or(0)),
-            user_data_buffer: Some(vec![]),
+            block_runtime_id: entry.block_state_b64.as_deref().and_then(block_runtime_id).unwrap_or(0),
+            user_data_buffer: vec![],
         })
     }
 
@@ -180,7 +182,7 @@ impl ItemRegistry {
         }
     }
 
-    pub fn to_creative_packet(&self) -> CreativeContentPacket<BedrockProtocol> {
+    pub fn to_creative_packet(&self) -> <BedrockProtocol as ProtoVersionPackets>::CreativeContentPacket {
         CreativeContentPacket {
             groups: self.creative.groups.clone(),
             contents: self.creative.contents.clone(),
@@ -220,9 +222,9 @@ fn creative_category(category: i32) -> CreativeItemCategory {
 fn air_instance() -> NetworkItemInstanceDescriptor {
     NetworkItemInstanceDescriptor {
         id: 0,
-        stack_size: None,
-        aux_value: None,
-        block_runtime_id: None,
-        user_data_buffer: None,
+        stack_size: 0,
+        aux_value: 0,
+        block_runtime_id: 0,
+        user_data_buffer: vec![],
     }
 }
