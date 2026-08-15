@@ -8,6 +8,7 @@ use crate::network::handler::chat::{BroadcastMessage, PlayerChatMessage};
 use crate::network::handler::inventory::{InventoryCloseMessage, InventoryOpenMessage, PlayerItemHeldMessage};
 use crate::network::handler::login::PlayerLoginMessage;
 use crate::network::handler::play::{PlayerJoinedMessage, PlayerMoveMessage, PlayerQuitMessage};
+use crate::network::handler::request::PlayerPreLoginMessage;
 use crate::network::handler::resource::ResourcePackResponseMessage;
 use crate::network::handler::{PacketHandlers, PacketReceivedMessage};
 use crate::network::login::auth::LoginAuthOIDC;
@@ -47,6 +48,7 @@ impl Plugin for Network {
             .add_message::<PlayerJoinedMessage>()
             .add_message::<PlayerQuitMessage>()
             .add_message::<PlayerLoginMessage>()
+            .add_message::<PlayerPreLoginMessage>()
             .add_message::<PlayerMoveMessage>()
             .add_message::<ResourcePackResponseMessage>()
             .add_message::<BlockUpdatedMessage>()

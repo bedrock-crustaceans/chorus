@@ -6,12 +6,22 @@ use bedrock::network::compression::Compression;
 use bedrock::protocol::ProtoVersion;
 use bedrock::protocol::v662::enums::{PacketCompressionAlgorithm, PlayStatus};
 use bedrock::protocol::v662::packets::NetworkSettingsPacket;
-use bevy_ecs::message::MessageReader;
-use bevy_ecs::prelude::MessageWriter;
+use bevy_ecs::message::{Message, MessageReader};
+use bevy_ecs::prelude::{Entity, MessageWriter};
 use bevy_ecs::system::Query;
 use tracing::error;
 
-pub fn handle_request(mut reader: MessageReader<PacketReceivedMessage>, mut writer: MessageWriter<SessionStateChangedMessage>, mut sessions: Query<&mut Session>) {
+#[derive(Message, Clone, Debug)]
+pub struct PlayerPreLoginMessage {
+    pub entity: Entity,
+}
+
+pub fn handle_request(
+    mut reader: MessageReader<PacketReceivedMessage>,
+    mut writer: MessageWriter<SessionStateChangedMessage>,
+    mut pre_login_writer: MessageWriter<PlayerPreLoginMessage>,
+    mut sessions: Query<&mut Session>,
+) {
     for ev in reader.read() {
         if let Ok(mut session) = sessions.get_mut(ev.entity) {
             if session.get_state() != SessionState::Request {
@@ -39,7 +49,11 @@ pub fn handle_request(mut reader: MessageReader<PacketReceivedMessage>, mut writ
                 } else {
                     Some("disconnectionScreen.outdatedServer")
                 });
+
+                continue;
             }
+
+            pre_login_writer.write(PlayerPreLoginMessage { entity: ev.entity });
 
             let compression_threshold: u16 = 1;
 
