@@ -19,11 +19,29 @@ use bedrock::protocol::v944::enums::ContainerEnumName;
 use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bedrock::protocol::v975::packets::MobEquipmentPacket;
 use bedrock::protocol::v1001::packets::InventoryContentPacket;
-use bevy_ecs::message::MessageReader;
-use bevy_ecs::prelude::{Query, Res};
+use bevy_ecs::message::{Message, MessageReader, MessageWriter};
+use bevy_ecs::prelude::{Entity, Query, Res};
 use tracing::debug;
 
 const PLAYER_WINDOW: ContainerID = ContainerID::First;
+
+#[derive(Message, Clone, Debug)]
+pub struct InventoryOpenMessage {
+    pub entity: Entity,
+    pub container_id: u32,
+}
+
+#[derive(Message, Clone, Debug)]
+pub struct InventoryCloseMessage {
+    pub entity: Entity,
+    pub container_id: u32,
+}
+
+#[derive(Message, Clone, Debug)]
+pub struct PlayerItemHeldMessage {
+    pub entity: Entity,
+    pub slot: u8,
+}
 
 pub fn send_initial_inventory(mut sessions: Query<(&mut Session, &mut Player)>, mut state_reader: MessageReader<SessionStateChangedMessage>) {
     for ev in state_reader.read() {
@@ -49,6 +67,9 @@ pub fn handle_inventory_packets(
     items: Res<ItemRegistry>,
     level: Res<Level>,
     mut query: Query<(&mut Session, &mut Player)>,
+    mut open_writer: MessageWriter<InventoryOpenMessage>,
+    mut close_writer: MessageWriter<InventoryCloseMessage>,
+    mut held_writer: MessageWriter<PlayerItemHeldMessage>,
 ) {
     for ev in packet_reader.read() {
         let Ok((mut session, mut player)) = query.get_mut(ev.entity) else {
@@ -75,6 +96,11 @@ pub fn handle_inventory_packets(
                     }
                     .into(),
                 ));
+
+                open_writer.write(InventoryOpenMessage {
+                    entity: ev.entity,
+                    container_id: PLAYER_WINDOW as u32,
+                });
             }
             // the client expects an ACK for every close, otherwise it refuses to open
             // another window afterwards. interesting
@@ -87,6 +113,11 @@ pub fn handle_inventory_packets(
                     }
                     .into(),
                 ));
+
+                close_writer.write(InventoryCloseMessage {
+                    entity: ev.entity,
+                    container_id: packet.container_id.clone() as u32,
+                });
             }
             BedrockProtocol::MobEquipmentPacket(packet) => {
                 // the offhand uses the same packet, only the main inventory changes the held slot
@@ -99,6 +130,8 @@ pub fn handle_inventory_packets(
                     send_held_item(&mut session, &player);
                     continue;
                 }
+
+                held_writer.write(PlayerItemHeldMessage { entity: ev.entity, slot });
 
                 // creative picks are the only way items enter an inventory right now, and they
                 // arrive as item stack requests chorus cannot read yet
