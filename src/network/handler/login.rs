@@ -13,8 +13,8 @@ use bedrock::network::encryption::Encryption;
 use bedrock::protocol::ProtoCodecLE;
 use bedrock::protocol::v662::enums::PlayStatus;
 use bedrock::protocol::v662::packets::ServerToClientHandshakePacket;
-use bevy_ecs::message::MessageReader;
-use bevy_ecs::prelude::{Commands, MessageWriter, Query, Res};
+use bevy_ecs::message::{Message, MessageReader};
+use bevy_ecs::prelude::{Commands, Entity, MessageWriter, Query, Res};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use p384::elliptic_curve::Generate;
 use p384::pkcs8::DecodePublicKey;
@@ -23,11 +23,19 @@ use rand::RngExt;
 use std::io::Read;
 use tracing::*;
 
+#[derive(Message, Clone, Debug)]
+pub struct PlayerLoginMessage {
+    pub entity: Entity,
+    pub name: String,
+    pub xuid: String,
+}
+
 pub fn handle_login(
     config: Res<Config>,
     oidc: Option<Res<Auth>>,
     mut reader: MessageReader<PacketReceivedMessage>,
     mut writer: MessageWriter<SessionStateChangedMessage>,
+    mut login_writer: MessageWriter<PlayerLoginMessage>,
     mut sessions: Query<&mut Session>,
     mut commands: Commands,
 ) {
@@ -54,6 +62,12 @@ pub fn handle_login(
         }
 
         commands.entity(ev.entity).insert(PlayerIdentity::new(request.auth_data.xname.clone(), request.auth_data.xid.clone()));
+
+        login_writer.write(PlayerLoginMessage {
+            entity: ev.entity,
+            name: request.auth_data.xname.clone(),
+            xuid: request.auth_data.xid.clone(),
+        });
 
         if config.encryption {
             let mut token = [0u8; 16];
