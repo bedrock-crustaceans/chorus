@@ -1,4 +1,4 @@
-use crate::command::dispatch::CommandRequestedMessage;
+use crate::command::dispatch::{CommandPreprocessMessage, CommandRequestedMessage};
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
@@ -163,6 +163,7 @@ pub fn announce_join_quit(mut join_reader: MessageReader<PlayerJoinedMessage>, m
 pub fn handle_play(
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     mut chat_writer: MessageWriter<PlayerChatMessage>,
+    mut command_preprocess_writer: MessageWriter<CommandPreprocessMessage>,
     mut command_writer: MessageWriter<CommandRequestedMessage>,
     mut query: Query<(&mut PlayerEntity, &mut Player, &mut Session, &PlayerIdentity)>,
 ) {
@@ -182,8 +183,13 @@ pub fn handle_play(
                 let (pitch, yaw) = packet.player_rotation;
                 entity.rotation = Vec2::new(pitch, yaw);
             }
-            BedrockProtocol::TextPacket(packet) => handle_text(packet, identity, &mut chat_writer),
+            BedrockProtocol::TextPacket(packet) => handle_text(ev.entity, packet, identity, &mut chat_writer),
             BedrockProtocol::CommandRequestPacket(packet) => {
+                command_preprocess_writer.write(CommandPreprocessMessage {
+                    entity: ev.entity,
+                    line: packet.command.clone(),
+                });
+
                 command_writer.write(CommandRequestedMessage {
                     entity: ev.entity,
                     line: packet.command.clone(),

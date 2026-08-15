@@ -1,4 +1,4 @@
-use crate::command::dispatch::CommandRequestedMessage;
+use crate::command::dispatch::{CommandPreprocessMessage, CommandRequestedMessage};
 use crate::config::Config;
 use crate::level::{BlockUpdatedMessage, LevelEventMessage, LevelSoundMessage};
 use crate::network::BedrockProtocol;
@@ -51,6 +51,7 @@ impl Plugin for Network {
             .add_message::<InventoryCloseMessage>()
             .add_message::<PlayerItemHeldMessage>()
             .add_message::<PlayerChatMessage>()
+            .add_message::<CommandPreprocessMessage>()
             .add_message::<CommandRequestedMessage>()
             .add_message::<BroadcastMessage>()
             .add_message::<LevelEventMessage>()
