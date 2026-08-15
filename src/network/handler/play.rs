@@ -4,7 +4,7 @@ use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::handler::chat::{BroadcastMessage, PlayerChatMessage, handle_text};
-use crate::network::handler::form::handle_modal_form_response;
+use crate::network::handler::form::{FormResponseMessage, handle_modal_form_response};
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::Player;
@@ -175,6 +175,7 @@ pub fn handle_play(
     mut command_preprocess_writer: MessageWriter<CommandPreprocessMessage>,
     mut command_writer: MessageWriter<CommandRequestedMessage>,
     mut move_writer: MessageWriter<PlayerMoveMessage>,
+    mut form_writer: MessageWriter<FormResponseMessage>,
     mut query: Query<(&mut PlayerEntity, &mut Player, &mut Session, &PlayerIdentity)>,
 ) {
     for ev in packet_reader.read() {
@@ -218,7 +219,7 @@ pub fn handle_play(
                     line: packet.command.clone(),
                 });
             }
-            BedrockProtocol::ModalFormResponsePacket(packet) => handle_modal_form_response(packet, &mut player),
+            BedrockProtocol::ModalFormResponsePacket(packet) => handle_modal_form_response(ev.entity, packet, &mut player, &mut form_writer),
             packet => {
                 let count = session.unhandled_packets.entry(packet.as_ref().meta().name).or_insert(0);
                 *count = count.saturating_add(1);

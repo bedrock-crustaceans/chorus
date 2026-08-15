@@ -5,6 +5,7 @@ use crate::network::BedrockProtocol;
 use crate::network::bandwidth::BandwidthTracker;
 use crate::network::handler::block::{BlockBreakMessage, BlockPlaceMessage};
 use crate::network::handler::chat::{BroadcastMessage, PlayerChatMessage};
+use crate::network::handler::form::FormResponseMessage;
 use crate::network::handler::inventory::{InventoryCloseMessage, InventoryOpenMessage, PlayerItemHeldMessage};
 use crate::network::handler::login::PlayerLoginMessage;
 use crate::network::handler::play::{PlayerJoinedMessage, PlayerMoveMessage, PlayerQuitMessage};
@@ -57,6 +58,7 @@ impl Plugin for Network {
             .add_message::<InventoryOpenMessage>()
             .add_message::<InventoryCloseMessage>()
             .add_message::<PlayerItemHeldMessage>()
+            .add_message::<FormResponseMessage>()
             .add_message::<PlayerChatMessage>()
             .add_message::<CommandPreprocessMessage>()
             .add_message::<CommandRequestedMessage>()
