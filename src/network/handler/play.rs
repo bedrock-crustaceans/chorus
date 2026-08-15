@@ -18,16 +18,28 @@ use bedrock::protocol::v776::enums::AbilitiesIndex;
 use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitiesLayer, SerializedLayer};
 use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bedrock::protocol::v2168::enums::DataItemType;
-use bevy_ecs::message::{MessageReader, MessageWriter};
-use bevy_ecs::prelude::{Query, Res};
+use bevy_ecs::message::{Message, MessageReader, MessageWriter};
+use bevy_ecs::prelude::{Entity, Query, Res};
 use glam::{Vec2, Vec3};
 use tracing::{debug, info};
+
+#[derive(Message, Clone, Debug)]
+pub struct PlayerJoinedMessage {
+    pub entity: Entity,
+    pub name: String,
+}
+
+#[derive(Message, Clone, Debug)]
+pub struct PlayerQuitMessage {
+    pub entity: Entity,
+    pub name: String,
+}
 
 pub fn on_enter_play(
     mut sessions: Query<(&mut Session, &Player, &PlayerIdentity)>,
     commands: Res<CommandRegistry>,
     mut state_reader: MessageReader<SessionStateChangedMessage>,
-    mut broadcast_writer: MessageWriter<BroadcastMessage>,
+    mut join_writer: MessageWriter<PlayerJoinedMessage>,
 ) {
     for ev in state_reader.read() {
         if ev.to != SessionState::Play {
@@ -41,7 +53,10 @@ pub fn on_enter_play(
 
         info!("{} joined the game", identity.name());
 
-        broadcast_writer.write(BroadcastMessage::translate("§e%multiplayer.player.joined", vec![identity.name().to_string()]));
+        join_writer.write(PlayerJoinedMessage {
+            entity: ev.entity,
+            name: identity.name().to_string(),
+        });
 
         session.send(BedrockProtocol::AvailableCommandsPacket(commands.to_packet().into()));
 
@@ -120,15 +135,28 @@ pub fn on_enter_play(
     }
 }
 
-pub fn on_quit(sessions: Query<(&Session, &PlayerIdentity)>, mut broadcast_writer: MessageWriter<BroadcastMessage>) {
-    for (session, identity) in &sessions {
+pub fn on_quit(sessions: Query<(Entity, &Session, &PlayerIdentity)>, mut quit_writer: MessageWriter<PlayerQuitMessage>) {
+    for (entity, session, identity) in &sessions {
         if !session.is_closed() || session.get_state() != SessionState::Play {
             continue;
         }
 
         info!("{} left the game", identity.name());
 
-        broadcast_writer.write(BroadcastMessage::translate("§e%multiplayer.player.left", vec![identity.name().to_string()]));
+        quit_writer.write(PlayerQuitMessage {
+            entity,
+            name: identity.name().to_string(),
+        });
+    }
+}
+
+pub fn announce_join_quit(mut join_reader: MessageReader<PlayerJoinedMessage>, mut quit_reader: MessageReader<PlayerQuitMessage>, mut broadcast_writer: MessageWriter<BroadcastMessage>) {
+    for ev in join_reader.read() {
+        broadcast_writer.write(BroadcastMessage::translate("§e%multiplayer.player.joined", vec![ev.name.clone()]));
+    }
+
+    for ev in quit_reader.read() {
+        broadcast_writer.write(BroadcastMessage::translate("§e%multiplayer.player.left", vec![ev.name.clone()]));
     }
 }
 

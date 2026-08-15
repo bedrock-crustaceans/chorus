@@ -67,9 +67,9 @@ Chorus is licensed under the [Apache License 2.0](LICENSE).
 
 <!-- BADGES -->
 
-[minecraft_badge_url]: https://img.shields.io/badge/minecraft-26.30-black?style=flat-square
-[minecraft_url]: https://www.minecraft.net/en-us/article/minecraft-26-30-bedrock-changelog
-[protocol_badge_url]: https://img.shields.io/badge/protocol-v1001-white?style=flat-square
+[minecraft_badge_url]: https://img.shields.io/badge/minecraft-26.40-black?style=flat-square
+[minecraft_url]: https://www.minecraft.net/en-us/article/minecraft-26-40-bedrock-changelog
+[protocol_badge_url]: https://img.shields.io/badge/protocol-v2168-white?style=flat-square
 [protocol_url]: https://github.com/Mojang/bedrock-protocol-docs
 [rust_badge_url]: https://img.shields.io/badge/rust-2024-%23D34516?style=flat-square&logo=rust&logoColor=%23D34516&labelColor=white
 [rust_url]: https://rust-lang.org/
