@@ -4,6 +4,7 @@ use crate::level::{BlockUpdatedMessage, LevelEventMessage, LevelSoundMessage};
 use crate::network::BedrockProtocol;
 use crate::network::bandwidth::BandwidthTracker;
 use crate::network::handler::chat::{BroadcastMessage, PlayerChatMessage};
+use crate::network::handler::play::{PlayerJoinedMessage, PlayerQuitMessage};
 use crate::network::handler::{PacketHandlers, PacketReceivedMessage};
 use crate::network::login::auth::LoginAuthOIDC;
 use crate::network::session::Session;
@@ -39,6 +40,8 @@ impl Plugin for Network {
             .init_resource::<BandwidthTracker>()
             .add_message::<PacketReceivedMessage>()
             .add_message::<SessionStateChangedMessage>()
+            .add_message::<PlayerJoinedMessage>()
+            .add_message::<PlayerQuitMessage>()
             .add_message::<BlockUpdatedMessage>()
             .add_message::<PlayerChatMessage>()
             .add_message::<CommandRequestedMessage>()

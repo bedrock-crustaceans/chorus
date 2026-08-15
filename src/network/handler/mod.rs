@@ -6,7 +6,7 @@ use crate::network::handler::chunks::{handle_sub_chunk_request, send_pending_chu
 use crate::network::handler::handshake::handle_handshake;
 use crate::network::handler::inventory::{handle_inventory_packets, send_initial_inventory};
 use crate::network::handler::login::handle_login;
-use crate::network::handler::play::{broadcast_block_updates, handle_play, on_enter_play, on_quit};
+use crate::network::handler::play::{announce_join_quit, broadcast_block_updates, handle_play, on_enter_play, on_quit};
 use crate::network::handler::request::handle_request;
 use crate::network::handler::resource::handle_resource;
 use crate::network::handler::setup::{handle_setup, on_enter_setup};
@@ -45,7 +45,7 @@ impl Plugin for PacketHandlers {
                 (on_enter_setup, handle_setup).chain(),
                 (on_enter_play, send_initial_inventory, handle_play).chain(),
                 (handle_block_actions, update_block_breaking, handle_inventory_packets, dispatch_commands).chain(),
-                (broadcast_chat, on_quit, broadcast_message).chain(),
+                (broadcast_chat, on_quit, announce_join_quit, broadcast_message).chain(),
                 (update_chunk_order, send_pending_chunks, handle_sub_chunk_request).chain(),
                 (broadcast_block_updates, broadcast_level_events, broadcast_level_sounds).chain(),
             )
