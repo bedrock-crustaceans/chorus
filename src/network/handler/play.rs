@@ -160,11 +160,21 @@ pub fn announce_join_quit(mut join_reader: MessageReader<PlayerJoinedMessage>, m
     }
 }
 
+#[derive(Message, Clone, Debug)]
+pub struct PlayerMoveMessage {
+    pub entity: Entity,
+    pub from_position: Vec3,
+    pub to_position: Vec3,
+    pub from_rotation: Vec2,
+    pub to_rotation: Vec2,
+}
+
 pub fn handle_play(
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     mut chat_writer: MessageWriter<PlayerChatMessage>,
     mut command_preprocess_writer: MessageWriter<CommandPreprocessMessage>,
     mut command_writer: MessageWriter<CommandRequestedMessage>,
+    mut move_writer: MessageWriter<PlayerMoveMessage>,
     mut query: Query<(&mut PlayerEntity, &mut Player, &mut Session, &PlayerIdentity)>,
 ) {
     for ev in packet_reader.read() {
@@ -179,9 +189,22 @@ pub fn handle_play(
         match &ev.packet {
             BedrockProtocol::PlayerAuthInputPacket(packet) => {
                 let (x, y, z) = packet.player_position;
-                entity.position = Vec3::new(x, y, z);
+                let new_position = Vec3::new(x, y, z);
                 let (pitch, yaw) = packet.player_rotation;
-                entity.rotation = Vec2::new(pitch, yaw);
+                let new_rotation = Vec2::new(pitch, yaw);
+
+                if new_position != entity.position || new_rotation != entity.rotation {
+                    move_writer.write(PlayerMoveMessage {
+                        entity: ev.entity,
+                        from_position: entity.position,
+                        to_position: new_position,
+                        from_rotation: entity.rotation,
+                        to_rotation: new_rotation,
+                    });
+                }
+
+                entity.position = new_position;
+                entity.rotation = new_rotation;
             }
             BedrockProtocol::TextPacket(packet) => handle_text(ev.entity, packet, identity, &mut chat_writer),
             BedrockProtocol::CommandRequestPacket(packet) => {
