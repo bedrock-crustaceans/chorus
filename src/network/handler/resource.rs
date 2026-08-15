@@ -9,15 +9,30 @@ use bedrock::protocol::v662::packets::ResourcePackChunkDataPacket;
 use bedrock::protocol::v662::types::{BaseGameVersion, Experiments};
 use bedrock::protocol::v898::packets::{PackEntry, ResourcePackStackPacket};
 use bedrock::protocol::v2168::packets::{ResourcePackClientResponsePacket, ResourcePackEntry, ResourcePacksInfoPacket};
-use bevy_ecs::message::MessageReader;
-use bevy_ecs::prelude::{MessageWriter, ParamSet, Query, Res};
+use bevy_ecs::message::{Message, MessageReader};
+use bevy_ecs::prelude::{Entity, MessageWriter, ParamSet, Query, Res};
 use tracing::warn;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ResourcePackResponseKind {
+    Cancelled,
+    Downloading,
+    DownloadingFinished,
+    StackFinished,
+}
+
+#[derive(Message, Clone, Debug)]
+pub struct ResourcePackResponseMessage {
+    pub entity: Entity,
+    pub response: ResourcePackResponseKind,
+}
 
 pub fn handle_resource(
     config: Res<Config>,
     resource_packs: Res<ResourcePacks>,
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     mut state_message_set: ParamSet<(MessageReader<SessionStateChangedMessage>, MessageWriter<SessionStateChangedMessage>)>,
+    mut response_writer: MessageWriter<ResourcePackResponseMessage>,
     mut sessions: Query<&mut Session>,
 ) {
     for ev in state_message_set.p0().read() {
@@ -70,7 +85,7 @@ pub fn handle_resource(
                 handle_chunk_request(&mut session, &resource_packs, &packet.resource_name, packet.chunk);
             }
             BedrockProtocol::ResourcePackClientResponsePacket(packet) => {
-                handle_client_response(&config, &mut session, &resource_packs, packet, &mut state_message_set.p1());
+                handle_client_response(ev.entity, &config, &mut session, &resource_packs, packet, &mut state_message_set.p1(), &mut response_writer);
             }
             _ => continue,
         }
@@ -102,21 +117,38 @@ fn handle_chunk_request(session: &mut Session, resource_packs: &ResourcePacks, r
     ));
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_client_response(
+    entity: Entity,
     config: &Config,
     session: &mut Session,
     resource_packs: &ResourcePacks,
     packet: &<BedrockProtocol as ProtoVersionPackets>::ResourcePackClientResponsePacket,
     state_writer: &mut MessageWriter<SessionStateChangedMessage>,
+    response_writer: &mut MessageWriter<ResourcePackResponseMessage>,
 ) {
     match packet {
         ResourcePackClientResponsePacket::Cancel => {
+            response_writer.write(ResourcePackResponseMessage {
+                entity,
+                response: ResourcePackResponseKind::Cancelled,
+            });
+
             session.close(Some("disconnectionScreen.noReason"));
         }
         ResourcePackClientResponsePacket::Downloading(_) => {
             // Client has begun downloading; chunk requests will follow.
+            response_writer.write(ResourcePackResponseMessage {
+                entity,
+                response: ResourcePackResponseKind::Downloading,
+            });
         }
         ResourcePackClientResponsePacket::DownloadingFinished => {
+            response_writer.write(ResourcePackResponseMessage {
+                entity,
+                response: ResourcePackResponseKind::DownloadingFinished,
+            });
+
             let addon_list: Vec<PackEntry> = resource_packs
                 .packs()
                 .iter()
@@ -142,6 +174,11 @@ fn handle_client_response(
             ));
         }
         ResourcePackClientResponsePacket::ResourcePackStackFinished => {
+            response_writer.write(ResourcePackResponseMessage {
+                entity,
+                response: ResourcePackResponseKind::StackFinished,
+            });
+
             session.set_state(SessionState::Setup, state_writer);
         }
     }
