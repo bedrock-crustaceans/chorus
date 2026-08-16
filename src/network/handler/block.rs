@@ -15,8 +15,8 @@ use bedrock::protocol::v662::packets::LevelEventPacket;
 use bedrock::protocol::v766::enums::LevelEvent;
 use bedrock::protocol::v1001::packets::LevelSoundEventPacket;
 use bevy_ecs::change_detection::ResMut;
-use bevy_ecs::message::{MessageReader, MessageWriter};
-use bevy_ecs::prelude::Query;
+use bevy_ecs::message::{Message, MessageReader, MessageWriter};
+use bevy_ecs::prelude::{Entity, Query};
 use bevy_ecs::system::Res;
 use glam::{IVec3, Vec3};
 use tracing::debug;
@@ -35,6 +35,21 @@ struct BlockAction {
     face: i32,
 }
 
+#[derive(Message, Clone, Debug)]
+pub struct BlockBreakMessage {
+    pub entity: Entity,
+    pub position: IVec3,
+    pub block_id: i32,
+}
+
+#[derive(Message, Clone, Debug)]
+pub struct BlockPlaceMessage {
+    pub entity: Entity,
+    pub position: IVec3,
+    pub block_id: i32,
+    pub face: i32,
+}
+
 pub fn handle_block_actions(
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     mut query: Query<(&Session, &PlayerEntity, &mut Player)>,
@@ -42,6 +57,8 @@ pub fn handle_block_actions(
     registry: Res<BlockRegistry>,
     mut event_writer: MessageWriter<LevelEventMessage>,
     mut block_writer: MessageWriter<BlockUpdatedMessage>,
+    mut break_writer: MessageWriter<BlockBreakMessage>,
+    mut place_writer: MessageWriter<BlockPlaceMessage>,
 ) {
     for ev in packet_reader.read() {
         let Ok((session, entity, mut player)) = query.get_mut(ev.entity) else {
@@ -74,10 +91,10 @@ pub fn handle_block_actions(
                 // read: the item use transaction it belongs to arrives in a packet bedrock-rs
                 // cannot decode yet
                 PlayerActionType::StartItemUseOn => {
-                    place_block(&action, entity, &player, &mut level, &registry, &mut block_writer);
+                    place_block(ev.entity, &action, entity, &player, &mut level, &registry, &mut block_writer, &mut place_writer);
                 }
                 PlayerActionType::PredictDestroyBlock | PlayerActionType::CreativeDestroyBlock => {
-                    break_block(&action, entity, &mut player, &mut level, &registry, &mut event_writer, &mut block_writer);
+                    break_block(ev.entity, &action, entity, &mut player, &mut level, &registry, &mut event_writer, &mut block_writer, &mut break_writer);
                 }
                 _ => {}
             }
@@ -112,7 +129,17 @@ fn collect_actions(packet: &BedrockProtocol) -> Vec<BlockAction> {
 }
 
 /// Puts the held block against the face the player clicked.
-fn place_block(action: &BlockAction, entity: &PlayerEntity, player: &Player, level: &mut Level, registry: &BlockRegistry, block_writer: &mut MessageWriter<BlockUpdatedMessage>) {
+#[allow(clippy::too_many_arguments)]
+fn place_block(
+    player_entity: Entity,
+    action: &BlockAction,
+    entity: &PlayerEntity,
+    player: &Player,
+    level: &mut Level,
+    registry: &BlockRegistry,
+    block_writer: &mut MessageWriter<BlockUpdatedMessage>,
+    place_writer: &mut MessageWriter<BlockPlaceMessage>,
+) {
     // the block comes from the server's own inventory, never from what the client claims
     let block_id = player.inventory.held_item().block_runtime_id;
     if block_id == 0 {
@@ -138,6 +165,13 @@ fn place_block(action: &BlockAction, entity: &PlayerEntity, player: &Player, lev
     debug!("placing block {} at {}", block_id, position);
 
     level.set_block(0, position.x, position.y, position.z, 0, block_id, block_writer);
+
+    place_writer.write(BlockPlaceMessage {
+        entity: player_entity,
+        position,
+        block_id,
+        face: action.face,
+    });
 }
 
 fn attack_block(action: &BlockAction, entity: &PlayerEntity, player: &mut Player, level: &Level, registry: &BlockRegistry, event_writer: &mut MessageWriter<LevelEventMessage>) {
@@ -188,6 +222,7 @@ fn stop_break(player: &mut Player, event_writer: &mut MessageWriter<LevelEventMe
 
 #[allow(clippy::too_many_arguments)]
 fn break_block(
+    player_entity: Entity,
     action: &BlockAction,
     entity: &PlayerEntity,
     player: &mut Player,
@@ -195,6 +230,7 @@ fn break_block(
     registry: &BlockRegistry,
     event_writer: &mut MessageWriter<LevelEventMessage>,
     block_writer: &mut MessageWriter<BlockUpdatedMessage>,
+    break_writer: &mut MessageWriter<BlockBreakMessage>,
 ) {
     stop_break(player, event_writer);
 
@@ -230,6 +266,12 @@ fn break_block(
     });
 
     level.set_block(0, position.x, position.y, position.z, 0, air_id, block_writer);
+
+    break_writer.write(BlockBreakMessage {
+        entity: player_entity,
+        position,
+        block_id,
+    });
 }
 
 pub fn update_block_breaking(mut query: Query<(&PlayerEntity, &mut Player)>, mut event_writer: MessageWriter<LevelEventMessage>, mut sound_writer: MessageWriter<LevelSoundMessage>) {

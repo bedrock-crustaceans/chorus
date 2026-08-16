@@ -1,10 +1,10 @@
-use crate::command::dispatch::CommandRequestedMessage;
+use crate::command::dispatch::{CommandPreprocessMessage, CommandRequestedMessage};
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::handler::chat::{BroadcastMessage, PlayerChatMessage, handle_text};
-use crate::network::handler::form::handle_modal_form_response;
+use crate::network::handler::form::{FormResponseMessage, handle_modal_form_response};
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::Player;
@@ -160,10 +160,22 @@ pub fn announce_join_quit(mut join_reader: MessageReader<PlayerJoinedMessage>, m
     }
 }
 
+#[derive(Message, Clone, Debug)]
+pub struct PlayerMoveMessage {
+    pub entity: Entity,
+    pub from_position: Vec3,
+    pub to_position: Vec3,
+    pub from_rotation: Vec2,
+    pub to_rotation: Vec2,
+}
+
 pub fn handle_play(
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     mut chat_writer: MessageWriter<PlayerChatMessage>,
+    mut command_preprocess_writer: MessageWriter<CommandPreprocessMessage>,
     mut command_writer: MessageWriter<CommandRequestedMessage>,
+    mut move_writer: MessageWriter<PlayerMoveMessage>,
+    mut form_writer: MessageWriter<FormResponseMessage>,
     mut query: Query<(&mut PlayerEntity, &mut Player, &mut Session, &PlayerIdentity)>,
 ) {
     for ev in packet_reader.read() {
@@ -178,18 +190,36 @@ pub fn handle_play(
         match &ev.packet {
             BedrockProtocol::PlayerAuthInputPacket(packet) => {
                 let (x, y, z) = packet.player_position;
-                entity.position = Vec3::new(x, y, z);
+                let new_position = Vec3::new(x, y, z);
                 let (pitch, yaw) = packet.player_rotation;
-                entity.rotation = Vec2::new(pitch, yaw);
+                let new_rotation = Vec2::new(pitch, yaw);
+
+                if new_position != entity.position || new_rotation != entity.rotation {
+                    move_writer.write(PlayerMoveMessage {
+                        entity: ev.entity,
+                        from_position: entity.position,
+                        to_position: new_position,
+                        from_rotation: entity.rotation,
+                        to_rotation: new_rotation,
+                    });
+                }
+
+                entity.position = new_position;
+                entity.rotation = new_rotation;
             }
-            BedrockProtocol::TextPacket(packet) => handle_text(packet, identity, &mut chat_writer),
+            BedrockProtocol::TextPacket(packet) => handle_text(ev.entity, packet, identity, &mut chat_writer),
             BedrockProtocol::CommandRequestPacket(packet) => {
+                command_preprocess_writer.write(CommandPreprocessMessage {
+                    entity: ev.entity,
+                    line: packet.command.clone(),
+                });
+
                 command_writer.write(CommandRequestedMessage {
                     entity: ev.entity,
                     line: packet.command.clone(),
                 });
             }
-            BedrockProtocol::ModalFormResponsePacket(packet) => handle_modal_form_response(packet, &mut player),
+            BedrockProtocol::ModalFormResponsePacket(packet) => handle_modal_form_response(ev.entity, packet, &mut player, &mut form_writer),
             packet => {
                 let count = session.unhandled_packets.entry(packet.as_ref().meta().name).or_insert(0);
                 *count = count.saturating_add(1);

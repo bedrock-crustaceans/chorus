@@ -13,6 +13,12 @@ pub struct CommandRequestedMessage {
     pub line: String,
 }
 
+#[derive(Message, Clone, Debug)]
+pub struct CommandPreprocessMessage {
+    pub entity: Entity,
+    pub line: String,
+}
+
 /// Exclusive so that a command can read the whole world. The sender needs the session and the
 /// player mutably, so both are taken out of the entity for the duration of the call and put back
 /// right after.

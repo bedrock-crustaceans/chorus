@@ -5,7 +5,7 @@ use crate::player::identity::PlayerIdentity;
 use bedrock::protocol::ProtoVersionPackets;
 use bedrock::protocol::v924::enums::TextPacketType;
 use bevy_ecs::message::{Message, MessageReader, MessageWriter};
-use bevy_ecs::prelude::Query;
+use bevy_ecs::prelude::{Entity, Query};
 use tracing::info;
 
 type TextPacket = <BedrockProtocol as ProtoVersionPackets>::TextPacket;
@@ -27,12 +27,13 @@ impl BroadcastMessage {
 
 #[derive(Message)]
 pub struct PlayerChatMessage {
+    pub entity: Entity,
     pub sender_name: String,
     pub sender_xuid: String,
     pub message: String,
 }
 
-pub fn handle_text(packet: &TextPacket, identity: &PlayerIdentity, chat_writer: &mut MessageWriter<PlayerChatMessage>) {
+pub fn handle_text(entity: Entity, packet: &TextPacket, identity: &PlayerIdentity, chat_writer: &mut MessageWriter<PlayerChatMessage>) {
     let TextPacketType::Chat { message, .. } = &packet.message_type else {
         return;
     };
@@ -45,6 +46,7 @@ pub fn handle_text(packet: &TextPacket, identity: &PlayerIdentity, chat_writer: 
     info!("<{}> {}", identity.name(), message);
 
     chat_writer.write(PlayerChatMessage {
+        entity,
         sender_name: identity.name().to_string(),
         sender_xuid: identity.xuid().to_string(),
         message: message.to_string(),
