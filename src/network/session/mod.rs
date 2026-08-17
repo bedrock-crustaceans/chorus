@@ -11,7 +11,7 @@ use bedrock::protocol::v662::enums::PlayStatus;
 use bedrock::protocol::v662::packets::PlayStatusPacket;
 use bedrock::protocol::v712::packets::{DisconnectMessage, DisconnectPacket};
 use bedrock::protocol::v1001::enums::ConnectionFailReason;
-use bevy_ecs::prelude::{Component, Entity, MessageWriter};
+use bevy_ecs::prelude::{Component, Entity, Message, MessageWriter, Query};
 use std::collections::HashMap;
 use std::mem::take;
 use std::sync::Arc;
@@ -34,11 +34,24 @@ enum ConnectionStep {
     Recv(Result<Vec<u8>, ConnectionError>),
 }
 
+#[derive(Message, Clone, Debug)]
+pub struct PlayerKickedMessage {
+    pub entity: Entity,
+    pub reason: String,
+}
+
+#[derive(Message, Clone, Debug)]
+pub struct PlayerDisconnectMessage {
+    pub entity: Entity,
+}
+
 #[derive(Component)]
 pub struct Session {
     entity: Entity,
 
     closed: bool,
+    close_reason: Option<String>,
+    close_notified: bool,
     state: SessionState,
 
     out_q: Vec<BedrockProtocol>,
@@ -132,6 +145,8 @@ impl Session {
             entity,
 
             closed: false,
+            close_reason: None,
+            close_notified: false,
 
             state: SessionState::Request,
 
@@ -218,6 +233,8 @@ impl Session {
                 }
                 .into(),
             ));
+
+            self.close_reason = Some(reason.to_string());
         }
 
         self.closed = true;
@@ -225,6 +242,15 @@ impl Session {
 
     pub fn is_closed(&self) -> bool {
         self.closed
+    }
+
+    fn take_close_event(&mut self) -> Option<Option<String>> {
+        if !self.closed || self.close_notified {
+            return None;
+        }
+
+        self.close_notified = true;
+        Some(self.close_reason.take())
     }
 
     pub fn on_login_success(&mut self) {
@@ -246,5 +272,19 @@ impl Session {
 impl Drop for Session {
     fn drop(&mut self) {
         self.conn_task.abort();
+    }
+}
+
+pub fn detect_session_close(mut sessions: Query<(Entity, &mut Session)>, mut kick_writer: MessageWriter<PlayerKickedMessage>, mut disconnect_writer: MessageWriter<PlayerDisconnectMessage>) {
+    for (entity, mut session) in sessions.iter_mut() {
+        match session.take_close_event() {
+            Some(Some(reason)) => {
+                kick_writer.write(PlayerKickedMessage { entity, reason });
+            }
+            Some(None) => {
+                disconnect_writer.write(PlayerDisconnectMessage { entity });
+            }
+            None => {}
+        }
     }
 }
