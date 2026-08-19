@@ -1,7 +1,5 @@
 use crate::command::command_definition::CommandDefinition;
 
-pub mod daylock;
-
 macro_rules! commands {
     ($($module:ident::$command:ident),* $(,)?) => {
         $(pub mod $module;)*
