@@ -7,6 +7,13 @@ use tracing::debug;
 
 const CONFIG_PATH: &str = "chorus.toml";
 
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum NetworkTransport {
+    #[default]
+    RakNet,
+    NetherNet,
+}
+
 #[derive(Resource, Serialize, Deserialize, Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
@@ -16,6 +23,9 @@ pub struct Config {
     pub sub_name: String,
     pub max_players: i32,
     pub threads: usize,
+    pub transport: NetworkTransport,
+    /// TCP port the NetherNet HTTP signaling endpoint binds to, unused for RakNet.
+    pub nethernet_http_port: u16,
     pub log_to_file: bool,
     pub logs_directory: PathBuf,
     pub resource_packs_directory: PathBuf,
@@ -38,6 +48,8 @@ impl Default for Config {
             sub_name: String::from("bedrock-crustaceans.org"),
             max_players: 20,
             threads: 4,
+            transport: NetworkTransport::RakNet,
+            nethernet_http_port: 19133,
             log_to_file: true,
             logs_directory: PathBuf::from("logs"),
             resource_packs_directory: PathBuf::from("resource_packs"),

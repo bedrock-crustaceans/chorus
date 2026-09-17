@@ -1,185 +1,113 @@
 use crate::network::BedrockProtocol;
-use crate::network::bandwidth::BandwidthCounters;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
+use crate::network::transport::SessionId;
 use bedrock::network::codec::{decode_packets, encode_packets};
 use bedrock::network::compression::Compression;
-use bedrock::network::connection::Connection;
 use bedrock::network::encryption::Encryption;
-use bedrock::network::error::ConnectionError;
-use bedrock::protocol::Unknown;
 use bedrock::protocol::v662::enums::PlayStatus;
 use bedrock::protocol::v662::packets::PlayStatusPacket;
 use bedrock::protocol::v712::packets::{DisconnectMessage, DisconnectPacket};
+use bedrock::protocol::v2193::enums::ConnectionFailReason;
 use bevy_ecs::prelude::{Component, Entity, MessageWriter};
 use std::collections::HashMap;
 use std::mem::take;
-use std::sync::Arc;
-use bedrock::protocol::v2193::enums::ConnectionFailReason;
-use tokio::sync::mpsc::error::TryRecvError;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use tokio::task::JoinHandle;
 use tracing::{debug, error};
 
 pub mod state;
 
-pub enum ConnectionEvent {
-    Send(Vec<BedrockProtocol>),
-    SetCompression(Option<Compression>),
-    // box here otherwise it blows up the enum size (2080+ bytes)
-    SetEncryption(Option<Box<Encryption>>),
-}
-
-enum ConnectionStep {
-    Event(Option<ConnectionEvent>),
-    Recv(Result<Vec<u8>, ConnectionError>),
-}
-
 #[derive(Component)]
 pub struct Session {
     entity: Entity,
+    pub id: SessionId,
 
     closed: bool,
     state: SessionState,
 
-    out_q: Vec<BedrockProtocol>,
-    inc_rx: UnboundedReceiver<BedrockProtocol>,
+    compression: Option<Compression>,
+    encryption: Option<Encryption>,
 
-    conn_tx: UnboundedSender<ConnectionEvent>,
-    conn_task: JoinHandle<()>,
+    out_q: Vec<BedrockProtocol>,
+    // already-encoded batches waiting to go out ahead of `out_q`, e.g. immediate sends
+    // made under compression/encryption settings that have since changed
+    pending_wire: Vec<Vec<u8>>,
 
     pub unhandled_packets: HashMap<&'static str, usize>,
 }
 
 impl Session {
-    pub fn new(entity: Entity, conn: Connection<Unknown>, runtime: &tokio::runtime::Runtime, bandwidth: Arc<BandwidthCounters>) -> Self {
-        let (inc_tx, inc_rx) = tokio::sync::mpsc::unbounded_channel::<BedrockProtocol>();
-        let (conn_tx, mut conn_rx) = tokio::sync::mpsc::unbounded_channel::<ConnectionEvent>();
-
-        let mut conn: Connection<BedrockProtocol> = conn.into_ver();
-
-        let conn_task = runtime.spawn(async move {
-            'l: loop {
-                // biased so that pending events are always applied before the next batch gets
-                // decoded, otherwise a compression/encryption change could race an incoming batch
-                let step = tokio::select! {
-                    biased;
-                    event = conn_rx.recv() => ConnectionStep::Event(event),
-                    recv = conn.recv_raw() => ConnectionStep::Recv(recv),
-                };
-
-                match step {
-                    ConnectionStep::Event(None) => break 'l,
-                    ConnectionStep::Event(Some(ConnectionEvent::Send(packets))) => {
-                        if packets.is_empty() {
-                            continue;
-                        }
-
-                        // encoded here rather than in Connection::send so the bandwidth tracker
-                        // gets to see how much actually goes over the wire
-                        let stream = match encode_packets(&packets, conn.compression.as_ref(), conn.encryption.as_mut()) {
-                            Ok(stream) => stream,
-                            Err(err) => {
-                                error!("error encoding packets, dropping batch {:?}", err);
-                                continue;
-                            }
-                        };
-
-                        bandwidth.add_sent(stream.len() as u64);
-
-                        if let Err(err) = conn.send_raw(&stream).await {
-                            error!("error sending packets to connection {:?}", err);
-                            break 'l;
-                        }
-                    }
-                    ConnectionStep::Event(Some(ConnectionEvent::SetCompression(compression))) => {
-                        debug!("Setting compression to {:?}", compression);
-
-                        conn.compression = compression;
-                    }
-                    ConnectionStep::Event(Some(ConnectionEvent::SetEncryption(encryption))) => {
-                        debug!("Setting encryption");
-
-                        conn.encryption = encryption.map(|b| *b);
-                    }
-                    ConnectionStep::Recv(Ok(stream)) => {
-                        bandwidth.add_received(stream.len() as u64);
-
-                        // a malformed batch is recoverable, so it only drops the batch
-                        let packets = match decode_packets(stream, conn.compression.as_ref(), conn.encryption.as_mut()) {
-                            Ok(packets) => packets,
-                            Err(err) => {
-                                error!("error decoding packets from connection, dropping batch {:?}", err);
-                                continue;
-                            }
-                        };
-
-                        for packet in packets {
-                            if inc_tx.send(packet).is_err() {
-                                break 'l;
-                            }
-                        }
-                    }
-                    ConnectionStep::Recv(Err(err)) => {
-                        debug!("connection closed while receiving {:?}", err);
-                        break 'l;
-                    }
-                }
-            }
-            conn.close().await;
-        });
-
+    pub fn new(entity: Entity, id: SessionId) -> Self {
         Self {
             entity,
+            id,
 
             closed: false,
-
             state: SessionState::Request,
 
-            out_q: vec![],
-            inc_rx,
+            compression: None,
+            encryption: None,
 
-            conn_tx,
-            conn_task,
+            out_q: vec![],
+            pending_wire: vec![],
 
             unhandled_packets: HashMap::new(),
         }
     }
 
-    /// Sends the packet without waiting for the end of the tick. Flushes the queue first so that
-    /// packets stay in the order they were produced in.
+    /// Decodes a raw batch the transport handed us, dropping it if it fails to decrypt/decompress.
+    pub fn decode(&mut self, stream: Vec<u8>) -> Vec<BedrockProtocol> {
+        decode_packets(stream, self.compression.as_ref(), self.encryption.as_mut()).unwrap_or_else(|err| {
+            error!("error decoding packets, dropping batch {:?}", err);
+            vec![]
+        })
+    }
+
+    /// Encodes the packet and sends it ahead of anything still queued in `out_q`, using the
+    /// session's current compression/encryption so a state change right after this call doesn't
+    /// retroactively apply to it.
     pub fn send_immediate(&mut self, packet: BedrockProtocol) {
-        self.flush();
-        _ = self.conn_tx.send(ConnectionEvent::Send(vec![packet]));
+        self.flush_queue();
+        self.encode_now(vec![packet]);
     }
 
     pub fn send(&mut self, packet: BedrockProtocol) {
         self.out_q.push(packet);
     }
 
-    pub fn flush(&mut self) {
+    fn flush_queue(&mut self) {
         let out = take(&mut self.out_q);
         if !out.is_empty() {
-            _ = self.conn_tx.send(ConnectionEvent::Send(out));
+            self.encode_now(out);
         }
     }
 
-    pub fn recv(&mut self) -> Option<BedrockProtocol> {
-        match self.inc_rx.try_recv() {
-            Ok(packet) => Some(packet),
-            Err(TryRecvError::Empty) => None,
-            Err(TryRecvError::Disconnected) => {
-                self.close(None);
-                None
-            }
+    fn encode_now(&mut self, packets: Vec<BedrockProtocol>) {
+        match encode_packets(&packets, self.compression.as_ref(), self.encryption.as_mut()) {
+            Ok(stream) => self.pending_wire.push(stream),
+            Err(err) => error!("error encoding packets, dropping batch {:?}", err),
         }
     }
 
-    pub fn set_compression(&self, compression: Option<Compression>) {
-        _ = self.conn_tx.send(ConnectionEvent::SetCompression(compression));
+    /// Drains everything encoded this tick for [`Network::flush`](crate::network::network::Network::flush)
+    /// to hand to the transport, in the order it was produced.
+    pub fn take_outgoing(&mut self) -> Vec<Vec<u8>> {
+        self.flush_queue();
+        take(&mut self.pending_wire)
     }
 
-    pub fn set_encryption(&self, encryption: Option<Encryption>) {
-        _ = self.conn_tx.send(ConnectionEvent::SetEncryption(encryption.map(Box::new)));
+    pub fn set_compression(&mut self, compression: Option<Compression>) {
+        debug!("Setting compression to {:?}", compression);
+        self.compression = compression;
+    }
+
+    /// No-op for a NetherNet session: WebRTC's own DTLS already secures the connection, so this
+    /// layer isn't needed and vanilla clients don't complete the handshake for it over NetherNet.
+    pub fn set_encryption(&mut self, encryption: Option<Encryption>) {
+        if !self.id.supports_encryption() {
+            return;
+        }
+
+        debug!("Setting encryption");
+        self.encryption = encryption;
     }
 
     pub fn set_state(&mut self, state: SessionState, writer: &mut MessageWriter<SessionStateChangedMessage>) {
@@ -240,11 +168,5 @@ impl Session {
         } else {
             self.send(packet);
         }
-    }
-}
-
-impl Drop for Session {
-    fn drop(&mut self) {
-        self.conn_task.abort();
     }
 }
