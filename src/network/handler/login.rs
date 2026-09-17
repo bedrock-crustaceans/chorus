@@ -69,7 +69,7 @@ pub fn handle_login(
             xuid: request.auth_data.xid.clone(),
         });
 
-        if config.encryption {
+        if config.encryption && session.id.supports_encryption() {
             let mut token = [0u8; 16];
             rand::rng().fill(&mut token);
 
