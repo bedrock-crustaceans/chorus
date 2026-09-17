@@ -8,15 +8,15 @@ use crate::player::Player;
 use crate::registry::block_registry::BlockRegistry;
 use bedrock::protocol::v662::packets::NetworkChunkPublisherUpdatePacket;
 use bedrock::protocol::v662::types::{BlockPos, ChunkPos};
+use bedrock::protocol::v2168::packets::LevelChunkPacket;
 use bedrock::protocol::v2168::types::SubChunkPos;
+use bedrock::protocol::v2193::packets::{HeightMapDataType, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult};
 use bevy_ecs::change_detection::ResMut;
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::{Entity, Query};
 use bevy_ecs::system::Res;
 use bevy_tasks::ComputeTaskPool;
 use std::collections::{HashMap, HashSet, VecDeque};
-use bedrock::protocol::v2168::packets::LevelChunkPacket;
-use bedrock::protocol::v2193::packets::{HeightMapDataType, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult};
 use tracing::debug;
 
 const MAX_CHUNKS_PER_TICK: usize = 16;
