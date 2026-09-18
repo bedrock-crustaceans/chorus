@@ -18,8 +18,8 @@ use bedrock::protocol::v2168::enums::EducationEditionOffer;
 use bedrock::protocol::v2168::packets::StartGamePacket;
 use bedrock::protocol::v2168::types::{GameRuleLegacyData, LevelSettings};
 use bedrock::protocol::{ProtoVersion, ProtoVersionPackets};
-use bevy_ecs::message::{MessageReader, MessageWriter};
-use bevy_ecs::prelude::{Commands, Query};
+use bevy_ecs::message::{Message, MessageReader, MessageWriter};
+use bevy_ecs::prelude::{Commands, Entity, Query};
 use bevy_ecs::system::{Res, ResMut};
 use tracing::{debug, warn};
 
@@ -159,10 +159,17 @@ fn send_start_game(player: &Player, session: &mut Session) {
     ))
 }
 
+#[derive(Message, Clone, Debug)]
+pub struct PlayerChunkRadiusMessage {
+    pub entity: Entity,
+    pub radius: i32,
+}
+
 pub fn handle_setup(
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     items: Res<ItemRegistry>,
     mut state_writer: MessageWriter<SessionStateChangedMessage>,
+    mut chunk_radius_writer: MessageWriter<PlayerChunkRadiusMessage>,
     mut query: Query<(&mut Player, &mut Session)>,
 ) {
     for ev in packet_reader.read() {
@@ -173,7 +180,7 @@ pub fn handle_setup(
             continue;
         }
         match &ev.packet {
-            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(packet, &mut player, &mut session, &items),
+            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(ev.entity, packet, &mut player, &mut session, &items, &mut chunk_radius_writer),
             BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => handle_set_local_player_as_initialized(packet, &player, &mut session, &mut state_writer),
             packet => {
                 let count = session.unhandled_packets.entry(packet.as_ref().meta().name).or_insert(0);
@@ -183,12 +190,21 @@ pub fn handle_setup(
     }
 }
 
-fn handle_request_chunk_radius(packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, player: &mut Player, session: &mut Session, items: &ItemRegistry) {
+fn handle_request_chunk_radius(
+    entity: Entity,
+    packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket,
+    player: &mut Player,
+    session: &mut Session,
+    items: &ItemRegistry,
+    chunk_radius_writer: &mut MessageWriter<PlayerChunkRadiusMessage>,
+) {
     let radius = packet.chunk_radius.min(8);
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
 
     // the queue itself is filled by update_chunk_order, which also keeps it following the player
     player.chunks_radius = radius;
+
+    chunk_radius_writer.write(PlayerChunkRadiusMessage { entity, radius });
 
     session.send(BedrockProtocol::ChunkRadiusUpdatedPacket(ChunkRadiusUpdatedPacket { chunk_radius: radius }.into()));
 

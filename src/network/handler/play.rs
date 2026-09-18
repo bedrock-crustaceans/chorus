@@ -1,5 +1,6 @@
 use crate::command::dispatch::{CommandPreprocessMessage, CommandRequestedMessage};
 use crate::entity::entity::Entity as PlayerEntity;
+use crate::item::item_stack::ItemStack;
 use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
@@ -17,7 +18,7 @@ use bedrock::protocol::v729::packets::{AttributeData, UpdateAttributesPacket};
 use bedrock::protocol::v776::enums::AbilitiesIndex;
 use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitiesLayer, SerializedLayer};
 use bedrock::protocol::v944::types::NetworkBlockPosition;
-use bedrock::protocol::v2168::enums::DataItemType;
+use bedrock::protocol::v2168::enums::{DataItemType, PlayerAuthInputData};
 use bevy_ecs::message::{Message, MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Entity, Query, Res};
 use glam::{Vec2, Vec3};
@@ -169,12 +170,46 @@ pub struct PlayerMoveMessage {
     pub to_rotation: Vec2,
 }
 
+#[derive(Message, Clone, Debug)]
+pub struct PlayerToggleSneakMessage {
+    pub entity: Entity,
+    pub sneaking: bool,
+}
+
+#[derive(Message, Clone, Debug)]
+pub struct PlayerToggleSprintMessage {
+    pub entity: Entity,
+    pub sprinting: bool,
+}
+
+#[derive(Message, Clone, Debug)]
+pub struct PlayerToggleFlightMessage {
+    pub entity: Entity,
+    pub flying: bool,
+}
+
+#[derive(Message, Clone, Debug)]
+pub struct PlayerJumpMessage {
+    pub entity: Entity,
+}
+
+#[derive(Message, Clone, Debug)]
+pub struct PlayerItemUseMessage {
+    pub entity: Entity,
+    pub item: ItemStack,
+}
+
 pub fn handle_play(
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     mut chat_writer: MessageWriter<PlayerChatMessage>,
     mut command_preprocess_writer: MessageWriter<CommandPreprocessMessage>,
     mut command_writer: MessageWriter<CommandRequestedMessage>,
     mut move_writer: MessageWriter<PlayerMoveMessage>,
+    mut sneak_writer: MessageWriter<PlayerToggleSneakMessage>,
+    mut sprint_writer: MessageWriter<PlayerToggleSprintMessage>,
+    mut flight_writer: MessageWriter<PlayerToggleFlightMessage>,
+    mut jump_writer: MessageWriter<PlayerJumpMessage>,
+    mut item_use_writer: MessageWriter<PlayerItemUseMessage>,
     mut form_writer: MessageWriter<FormResponseMessage>,
     mut query: Query<(&mut PlayerEntity, &mut Player, &mut Session, &PlayerIdentity)>,
 ) {
@@ -206,6 +241,35 @@ pub fn handle_play(
 
                 entity.position = new_position;
                 entity.rotation = new_rotation;
+
+                if packet.input_data.contains(&PlayerAuthInputData::StartSneaking) {
+                    sneak_writer.write(PlayerToggleSneakMessage { entity: ev.entity, sneaking: true });
+                } else if packet.input_data.contains(&PlayerAuthInputData::StopSneaking) {
+                    sneak_writer.write(PlayerToggleSneakMessage { entity: ev.entity, sneaking: false });
+                }
+
+                if packet.input_data.contains(&PlayerAuthInputData::StartSprinting) {
+                    sprint_writer.write(PlayerToggleSprintMessage { entity: ev.entity, sprinting: true });
+                } else if packet.input_data.contains(&PlayerAuthInputData::StopSprinting) {
+                    sprint_writer.write(PlayerToggleSprintMessage { entity: ev.entity, sprinting: false });
+                }
+
+                if packet.input_data.contains(&PlayerAuthInputData::StartFlying) {
+                    flight_writer.write(PlayerToggleFlightMessage { entity: ev.entity, flying: true });
+                } else if packet.input_data.contains(&PlayerAuthInputData::StopFlying) {
+                    flight_writer.write(PlayerToggleFlightMessage { entity: ev.entity, flying: false });
+                }
+
+                if packet.input_data.contains(&PlayerAuthInputData::StartJumping) {
+                    jump_writer.write(PlayerJumpMessage { entity: ev.entity });
+                }
+
+                if packet.input_data.contains(&PlayerAuthInputData::StartUsingItem) {
+                    item_use_writer.write(PlayerItemUseMessage {
+                        entity: ev.entity,
+                        item: *player.inventory.held_item(),
+                    });
+                }
             }
             BedrockProtocol::TextPacket(packet) => handle_text(ev.entity, packet, identity, &mut chat_writer),
             BedrockProtocol::CommandRequestPacket(packet) => {

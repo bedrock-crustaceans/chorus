@@ -11,7 +11,7 @@ use bedrock::protocol::v662::types::{BlockPos, ChunkPos};
 use bedrock::protocol::v2168::packets::{HeightMapDataType, LevelChunkPacket, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult};
 use bedrock::protocol::v2168::types::SubChunkPos;
 use bevy_ecs::change_detection::ResMut;
-use bevy_ecs::message::MessageReader;
+use bevy_ecs::message::{Message, MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Entity, Query};
 use bevy_ecs::system::Res;
 use bevy_tasks::ComputeTaskPool;
@@ -24,6 +24,13 @@ struct ChunkPayload {
     sub_chunk_count: u32,
     sub_chunk_limit: u16,
     data: Vec<u8>,
+}
+
+#[derive(Message, Clone, Debug)]
+pub struct ChunkSentMessage {
+    pub entity: Entity,
+    pub x: i32,
+    pub z: i32,
 }
 
 pub fn update_chunk_order(mut query: Query<(&mut Session, &PlayerEntity, &mut Player)>) {
@@ -67,7 +74,12 @@ pub fn update_chunk_order(mut query: Query<(&mut Session, &PlayerEntity, &mut Pl
     }
 }
 
-pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity, &mut Player)>, mut level: ResMut<Level>, registry: Res<BlockRegistry>) {
+pub fn send_pending_chunks(
+    mut query: Query<(Entity, &mut Session, &PlayerEntity, &mut Player)>,
+    mut level: ResMut<Level>,
+    registry: Res<BlockRegistry>,
+    mut chunk_sent_writer: MessageWriter<ChunkSentMessage>,
+) {
     let mut batches: HashMap<Entity, Vec<(i32, i32)>> = HashMap::new();
 
     for (entity, _, _, mut player) in query.iter_mut() {
@@ -118,6 +130,8 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity
                 }
                 .into(),
             ));
+
+            chunk_sent_writer.write(ChunkSentMessage { entity, x, z });
 
             debug!("sent chunk {}, {}", x, z);
         }
