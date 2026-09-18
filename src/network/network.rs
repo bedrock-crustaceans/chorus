@@ -40,15 +40,15 @@ impl Plugin for Network {
         app.add_plugins(PacketHandlers)
             .add_plugins(LoginAuthOIDC)
             .add_plugins(RakServerPlugin)
-            .add_plugins(NethernetServerPlugin)
-            .add_plugins(NethernetHttpServerPlugin)
+            .add_plugins(NetherServerPlugin)
+            .add_plugins(NetherHttpServerPlugin)
             .add_systems(Startup, Network::init)
             .add_systems(
                 PreUpdate,
                 // chained (rather than run as one system) so a newly-spawned Session's Commands are
                 // applied before `receive` looks it up - otherwise a packet from a session that
                 // connected this same tick would find no entity and get silently dropped
-                (Network::accept, Network::receive).chain().after(RakServerSet).after(NethernetServerSet).after(NethernetHttpServerSet),
+                (Network::accept, Network::receive).chain().after(RakServerSet).after(NetherServerSet).after(NetherHttpServerSet),
             )
             .add_systems(PostUpdate, Network::flush)
             .add_systems(Last, BandwidthTracker::sample)
@@ -124,11 +124,11 @@ impl Network {
                 data.protocol_version = BedrockProtocol::PROTOCOL_VERSION;
                 data.game_version = BedrockProtocol::GAME_VERSION.to_string();
 
-                let mut lan = NethernetServer::new(network_id, bind_addr, |_| {}).expect("failed to bind nethernet lan signaler");
+                let mut lan = NetherServer::new(network_id, bind_addr, |_| {}).expect("failed to bind nethernet lan signaler");
                 lan.set_server_data(data.clone());
 
                 let http_addr = SocketAddr::new(ip, config.nethernet_http_port);
-                let mut http = NethernetHttpServer::bind(http_addr, |_| {}).expect("failed to bind nethernet http signaler");
+                let mut http = NetherHttpServer::bind(http_addr, |_| {}).expect("failed to bind nethernet http signaler");
                 http.set_server_data(data);
 
                 info!("Listening for NetherNet connections on {bind_addr} (LAN) and {http_addr} (HTTP signaling)");
@@ -146,8 +146,8 @@ impl Network {
     /// by this point their own event queues are already empty.
     pub fn accept(
         mut rak_events: MessageReader<RakServerEvent>,
-        mut nether_lan_events: MessageReader<NethernetServerEvent>,
-        mut nether_http_events: MessageReader<NethernetHttpServerEvent>,
+        mut nether_lan_events: MessageReader<NetherServerEvent>,
+        mut nether_http_events: MessageReader<NetherHttpServerEvent>,
         mut state: ResMut<NetworkState>,
         mut commands: Commands,
     ) {
@@ -160,15 +160,15 @@ impl Network {
 
         for event in nether_lan_events.read() {
             match event {
-                NethernetServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetLan(id.clone())),
-                NethernetServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &SessionId::NetherNetLan(id.clone())),
+                NetherServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetLan(id.clone())),
+                NetherServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &SessionId::NetherNetLan(id.clone())),
             }
         }
 
         for event in nether_http_events.read() {
             match event {
-                NethernetHttpServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetHttp(id.clone())),
-                NethernetHttpServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &SessionId::NetherNetHttp(id.clone())),
+                NetherHttpServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetHttp(id.clone())),
+                NetherHttpServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &SessionId::NetherNetHttp(id.clone())),
             }
         }
     }
@@ -177,8 +177,8 @@ impl Network {
     /// Commands applied in between) so a session that connected this same tick already has one.
     pub fn receive(
         mut rak_server: Option<ResMut<RakServer>>,
-        mut nether_lan: Option<ResMut<NethernetServer>>,
-        mut nether_http: Option<ResMut<NethernetHttpServer>>,
+        mut nether_lan: Option<ResMut<NetherServer>>,
+        mut nether_http: Option<ResMut<NetherHttpServer>>,
         state: Res<NetworkState>,
         bandwidth: Res<BandwidthTracker>,
         mut query: Query<&mut Session>,
@@ -222,8 +222,8 @@ impl Network {
     /// Pushes everything the handlers queued this tick out, and reaps closed sessions.
     pub fn flush(
         mut rak_server: Option<ResMut<RakServer>>,
-        mut nether_lan: Option<ResMut<NethernetServer>>,
-        mut nether_http: Option<ResMut<NethernetHttpServer>>,
+        mut nether_lan: Option<ResMut<NetherServer>>,
+        mut nether_http: Option<ResMut<NetherHttpServer>>,
         mut state: ResMut<NetworkState>,
         bandwidth: Res<BandwidthTracker>,
         mut query: Query<(Entity, &mut Session)>,

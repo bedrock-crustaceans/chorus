@@ -1,14 +1,14 @@
 use bedrock::network::info::RAKNET_GAMEPACKET_ID;
 use bevy_ecs::prelude::ResMut;
-use bevy_nethernet::prelude::{NethernetHttpServer, NethernetServer, NethernetSessionId};
+use bevy_nethernet::prelude::{NetherHttpServer, NetherServer, NetherSessionId};
 use bevy_raknet::prelude::{RakPriority, RakReliability, RakServer, RakSessionId};
 use tracing::warn;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum SessionId {
     RakNet(RakSessionId),
-    NetherNetLan(NethernetSessionId),
-    NetherNetHttp(NethernetSessionId),
+    NetherNetLan(NetherSessionId),
+    NetherNetHttp(NetherSessionId),
 }
 
 impl SessionId {
@@ -28,11 +28,11 @@ impl SessionId {
 /// the servers' own event queues are empty - read the message types directly instead.
 pub enum ActiveTransport<'a> {
     RakNet(&'a mut RakServer),
-    NetherNet { lan: &'a mut NethernetServer, http: &'a mut NethernetHttpServer },
+    NetherNet { lan: &'a mut NetherServer, http: &'a mut NetherHttpServer },
 }
 
 impl<'a> ActiveTransport<'a> {
-    pub fn from_resources(rak: &'a mut Option<ResMut<RakServer>>, nether_lan: &'a mut Option<ResMut<NethernetServer>>, nether_http: &'a mut Option<ResMut<NethernetHttpServer>>) -> Option<Self> {
+    pub fn from_resources(rak: &'a mut Option<ResMut<RakServer>>, nether_lan: &'a mut Option<ResMut<NetherServer>>, nether_http: &'a mut Option<ResMut<NetherHttpServer>>) -> Option<Self> {
         if let Some(server) = rak.as_deref_mut() {
             return Some(Self::RakNet(server));
         }
