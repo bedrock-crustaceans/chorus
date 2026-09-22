@@ -79,7 +79,7 @@ impl Player {
     where
         F: FnOnce() + Send + Sync + 'static,
     {
-        let Ok(json) = serde_json::to_string(&form) else {
+        let Ok(json) = facet_json::to_string(&form) else {
             return;
         };
 
