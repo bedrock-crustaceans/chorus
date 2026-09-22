@@ -2,47 +2,12 @@
 pub mod HashUtils {
     use crate::block::state::block_state::BlockState;
     use atomicow::CowArc;
-    use serde::ser::SerializeMap;
-    use serde::{Serialize, Serializer};
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::HashMap;
 
-    pub struct SortedCompound<'a> {
-        compound: &'a HashMap<String, nbtx::Value>,
-    }
+    pub fn hash_nbt(mut compound: nbtx::Compound) -> i32 {
+        compound.sort_keys();
 
-    impl<'a> SortedCompound<'a> {
-        pub fn new(compound: &'a HashMap<String, nbtx::Value>) -> Self {
-            Self { compound }
-        }
-    }
-
-    impl<'a> Serialize for SortedCompound<'a> {
-        fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            let map: BTreeMap<&String, &nbtx::Value> = self.compound.iter().collect();
-
-            let mut map_ser = ser.serialize_map(Some(map.len()))?;
-            for (k, v) in &map {
-                match v {
-                    nbtx::Value::Compound(map) => {
-                        let v = &SortedCompound::new(map);
-                        map_ser.serialize_entry(k, v)?
-                    }
-                    _ => {
-                        map_ser.serialize_entry(k, v)?;
-                    }
-                }
-            }
-            map_ser.end()
-        }
-    }
-
-    pub fn hash_nbt(compound: &HashMap<String, nbtx::Value>) -> i32 {
-        let sorted = SortedCompound::new(compound);
-
-        fnv1a_32::hash(nbtx::to_le_bytes(&sorted).unwrap().as_slice()) as i32
+        fnv1a_32::hash(nbtx::to_le_bytes(&nbtx::Value::Compound(compound)).unwrap().as_slice()) as i32
     }
 
     pub fn hash_block_permutation(identifier: &str, states: &HashMap<CowArc<'static, str>, BlockState>) -> i32 {
@@ -50,27 +15,27 @@ pub mod HashUtils {
             return -2;
         }
 
-        let mut states_tag: HashMap<String, nbtx::Value> = HashMap::new();
+        let mut states_tag = nbtx::Compound::new();
         for (id, val) in states {
             match val {
                 BlockState::Bool(val) => {
-                    states_tag.insert(id.to_string(), nbtx::Value::Byte(if *val { 1 } else { 0 }));
+                    states_tag.insert(id.as_ref().into(), nbtx::Value::Byte(if *val { 1 } else { 0 }));
                 }
                 BlockState::Int(val) => {
-                    states_tag.insert(id.to_string(), nbtx::Value::Int(*val));
+                    states_tag.insert(id.as_ref().into(), nbtx::Value::Int(*val));
                 }
                 BlockState::Enum(val) => {
-                    states_tag.insert(id.to_string(), nbtx::Value::String(val.to_string()));
+                    states_tag.insert(id.as_ref().into(), nbtx::Value::String(val.as_ref().into()));
                 }
             }
         }
 
-        let mut tag: HashMap<String, nbtx::Value> = HashMap::new();
+        let mut tag = nbtx::Compound::new();
 
-        tag.insert(String::from("name"), nbtx::Value::String(identifier.to_string()));
-        tag.insert(String::from("states"), nbtx::Value::Compound(states_tag));
+        tag.insert("name".into(), nbtx::Value::String(identifier.into()));
+        tag.insert("states".into(), nbtx::Value::Compound(states_tag));
 
-        hash_nbt(&tag)
+        hash_nbt(tag)
     }
 
     pub mod fnv1a_32 {

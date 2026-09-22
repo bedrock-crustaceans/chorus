@@ -22,6 +22,7 @@ use bedrock::protocol::{ProtoVersion, ProtoVersionPackets};
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Commands, Query};
 use bevy_ecs::system::{Res, ResMut};
+use indexmap::IndexMap;
 use std::collections::HashMap;
 use tracing::{debug, warn};
 
@@ -55,11 +56,11 @@ pub fn on_enter_setup(
         session.send_immediate(BedrockProtocol::JigsawStructureDataPacket(
             JigsawStructureDataPacket {
                 jigsaw_structure_data_tag: nbtx::Value::Compound({
-                    let mut compound = HashMap::new();
-                    compound.insert("processors".to_string(), nbtx::Value::List(vec![]));
-                    compound.insert("template_pools".to_string(), nbtx::Value::List(vec![]));
-                    compound.insert("jigsaws".to_string(), nbtx::Value::List(vec![]));
-                    compound.insert("structure_sets".to_string(), nbtx::Value::List(vec![]));
+                    let mut compound = IndexMap::new();
+                    compound.insert("processors".into(), nbtx::Value::List(vec![]));
+                    compound.insert("template_pools".into(), nbtx::Value::List(vec![]));
+                    compound.insert("jigsaws".into(), nbtx::Value::List(vec![]));
+                    compound.insert("structure_sets".into(), nbtx::Value::List(vec![]));
                     compound
                 }),
             }

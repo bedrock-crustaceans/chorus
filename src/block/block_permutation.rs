@@ -112,23 +112,23 @@ impl BlockPermutation {
     }
 
     pub fn build_block_state_tag(identifier: &str, property_values: &HashMap<&str, BlockState>) -> HashMap<String, nbtx::Value> {
-        let mut states: HashMap<String, nbtx::Value> = HashMap::new();
-        for (id, val) in property_values {
+        let mut states = nbtx::Compound::new();
+        for (&id, val) in property_values {
             match val {
                 BlockState::Bool(val) => {
-                    states.insert(id.to_string(), nbtx::Value::Byte(if *val { 1 } else { 0 }));
+                    states.insert(id.into(), nbtx::Value::Byte(if *val { 1 } else { 0 }));
                 }
                 BlockState::Int(val) => {
-                    states.insert(id.to_string(), nbtx::Value::Int(*val));
+                    states.insert(id.into(), nbtx::Value::Int(*val));
                 }
                 BlockState::Enum(val) => {
-                    states.insert(id.to_string(), nbtx::Value::String(val.to_string()));
+                    states.insert(id.into(), nbtx::Value::String(val.as_ref().into()));
                 }
             }
         }
 
         let mut tag: HashMap<String, nbtx::Value> = HashMap::new();
-        tag.insert(String::from("name"), nbtx::Value::String(identifier.to_owned()));
+        tag.insert(String::from("name"), nbtx::Value::String(identifier.into()));
         tag.insert(String::from("states"), nbtx::Value::Compound(states));
         tag.insert(String::from("version"), nbtx::Value::Int(BLOCK_STATE_VERSION));
         tag
