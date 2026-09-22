@@ -13,15 +13,19 @@ use tracing::{info, warn};
 
 /// The item table the client resolves every item id against, and the creative menu built on top of
 /// it. Both are vanilla data for the protocol chorus speaks.
-const ITEM_STATES: &str = include_str!("../resources/runtime_item_states.json");
+const ITEM_PALETTE: &str = include_str!("../resources/item_palette.json");
 const CREATIVE_ITEMS: &str = include_str!("../resources/creative_items.json");
+
+#[derive(Deserialize)]
+struct ItemPalette {
+    pub items: Vec<ItemState>
+}
 
 #[derive(Deserialize)]
 struct ItemState {
     name: String,
     id: i16,
     version: i32,
-    #[serde(rename = "componentBased")]
     component_based: bool,
 }
 
@@ -87,21 +91,21 @@ impl ItemRegistry {
     }
 
     fn load_items(&mut self) {
-        let states: Vec<ItemState> = match serde_json::from_str(ITEM_STATES) {
-            Ok(states) => states,
+        let palette = match serde_json::from_str::<ItemPalette>(ITEM_PALETTE) {
+            Ok(palette) => palette.items,
             Err(err) => {
                 warn!("failed to read the item table: {}", err);
                 return;
             }
         };
 
-        for state in states {
-            self.index.insert(state.name.clone(), state.id);
+        for item in palette {
+            self.index.insert(item.name.clone(), item.id);
             self.items.push(ItemDefinition {
-                identifier: state.name,
-                runtime_id: state.id,
-                version: item_version(state.version),
-                component_based: state.component_based,
+                identifier: item.name,
+                runtime_id: item.id,
+                version: item_version(item.version),
+                component_based: item.component_based,
             });
         }
     }
