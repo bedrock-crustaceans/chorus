@@ -28,20 +28,36 @@ cargo fmt
 cargo clippy
 ```
 
-There are no tests at this time. The workspace has one internal crate: `crates/raknet`.
+There are no tests at this time.
+
+## Workspace layout
+
+The repository root is a virtual manifest. Every crate lives under `crates/`:
+
+| Crate | Contents |
+|---|---|
+| `chorus` | The server binary and library: network, session, command, player, config, logger, resource packs |
+| `chorus-world` | World data: blocks (definitions, components, states, impls), level/chunks, entities, item stacks, `BlockRegistry` |
+| `chorus-util` | Shared helpers: math, identifiers, hashing, errors, build info, the `BedrockProtocol` alias |
+| `chorus-gamedata` | Vanilla data dumps under `crates/chorus-gamedata/assets` |
+| `chorus-macros` | Declarative macros (`const_block!`, `const_permutation!`, `const_bool!`, `const_int!`, `const_enum!`, `const_command!`) |
+
+Macro expansions name their types absolutely (`::chorus_world::...`, `::chorus::...`), so `chorus` and `chorus-world` each declare `extern crate self as ...` to stay usable from inside their own crate.
+
+`chorus` re-exports `block`, `entity`, `item`, `level` from `chorus-world` and `error`, `info`, `math`, `utils` from `chorus-util`, so `chorus::block::...` still resolves.
 
 ## Architecture
 
 ### Bevy ECS as the tick loop
 
-`Chorus::init()` (`src/lib.rs`) constructs a Bevy `App` configured to tick at 20 Hz via `ScheduleRunnerPlugin` + `Time<Fixed>`. All game logic lives in Bevy systems, resources, and components.
+`Chorus::init()` (`crates/chorus/src/lib.rs`) constructs a Bevy `App` configured to tick at 20 Hz via `ScheduleRunnerPlugin` + `Time<Fixed>`. All game logic lives in Bevy systems, resources, and components.
 
 ### Plugin tree
 
 ```
-Server (src/server.rs)
-├── Registry (src/registry/)   — registers block definitions into BlockRegistry
-└── Network (src/network/network.rs)
+Server (crates/chorus/src/server.rs)
+├── Registry (crates/chorus/src/registry/)   — registers block definitions into BlockRegistry
+└── Network (crates/chorus/src/network/network.rs)
     ├── PacketHandlers          — per-state packet routing systems
     └── LoginAuthOIDC           — optional OIDC auth resource
 ```
@@ -52,7 +68,7 @@ Server (src/server.rs)
 
 The `Network` plugin owns a Tokio runtime and a `bedrock-rs` RakNet `Listener`. A background task accepts incoming connections and sends them through a `crossbeam_channel` to the ECS world.
 
-Each connection becomes a `Session` Bevy component (`src/network/session/mod.rs`) spawned onto an entity. `Session` bridges the synchronous ECS world to an async Tokio task via two `mpsc` channels (`ConnectionEvent` outbound, `BedrockProtocol` inbound).
+Each connection becomes a `Session` Bevy component (`crates/chorus/src/network/session/mod.rs`) spawned onto an entity. `Session` bridges the synchronous ECS world to an async Tokio task via two `mpsc` channels (`ConnectionEvent` outbound, `BedrockProtocol` inbound).
 
 `Session` holds a `SessionState` state machine:
 
@@ -68,23 +84,23 @@ State transitions emit a `SessionStateChangedMessage` which handler systems obse
 
 | Handler file | State |
 |---|---|
-| `handler/request.rs` | `Request` |
-| `handler/login.rs` | `Login` |
-| `handler/handshake.rs` | `Handshake` |
-| `handler/resource.rs` | `Resource` |
-| `handler/setup.rs` | `Setup` / `Play` |
+| `crates/chorus/src/network/handler/request.rs` | `Request` |
+| `crates/chorus/src/network/handler/login.rs` | `Login` |
+| `crates/chorus/src/network/handler/handshake.rs` | `Handshake` |
+| `crates/chorus/src/network/handler/resource.rs` | `Resource` |
+| `crates/chorus/src/network/handler/setup.rs` | `Setup` / `Play` |
 
 ### Block system
 
-`BlockDefinition` (`src/block/block_definition.rs`) declares a block's identifier, states (combinatorial state values), base components, and conditional permutation overrides. `BlockDefinition::generate()` expands all permutations, computes FNV hashes, and returns maps from hash → `BlockPermutation` and hash → `BlockComponents`.
+`BlockDefinition` (`crates/chorus-world/src/block/block_definition.rs`) declares a block's identifier, states (combinatorial state values), base components, and conditional permutation overrides. `BlockDefinition::generate()` expands all permutations, computes FNV hashes, and returns maps from hash → `BlockPermutation` and hash → `BlockComponents`.
 
-Use the `const_block!` / `const_permutation!` macros for compile-time static definitions (see `src/block/impl/grass_block.rs` for a minimal example). Runtime-allocated definitions use `BlockDefinition::new(...)`.
+Use the `const_block!` / `const_permutation!` macros for compile-time static definitions (see `crates/chorus-world/src/block/impl/grass_block.rs` for a minimal example). Runtime-allocated definitions use `BlockDefinition::new(...)`.
 
-`BlockRegistry` (`src/registry/block_registry.rs`) is a Bevy `Resource`. Add new blocks by calling `registry.register_all([...])` inside `BlockRegistry::init`.
+`BlockRegistry` (`crates/chorus-world/src/registry/block_registry.rs`) is a Bevy `Resource`. Add new blocks by calling `registry.register_all([...])` inside `BlockRegistry::init`.
 
 ### Resource packs
 
-`ResourcePacks::load` (`src/resource/mod.rs`) is a startup system that scans the configured `resource_packs_directory` for `.mcpack` / `.zip` files and loads them into the `ResourcePacks` Bevy resource.
+`ResourcePacks::load` (`crates/chorus/src/resource/mod.rs`) is a startup system that scans the configured `resource_packs_directory` for `.mcpack` / `.zip` files and loads them into the `ResourcePacks` Bevy resource.
 
 ### Configuration
 
@@ -92,4 +108,4 @@ Use the `const_block!` / `const_permutation!` macros for compile-time static def
 
 ### Protocol version
 
-`BedrockProtocol` is a type alias for `V975` from `bedrock-rs` (`src/network/mod.rs`). To change the protocol version, update this alias and adjust any version-specific packet imports.
+`BedrockProtocol` is a type alias for `V2193` from `bedrock-rs` (`crates/chorus-util/src/protocol.rs`, re-exported from `chorus::network`). To change the protocol version, update this alias and adjust any version-specific packet imports.

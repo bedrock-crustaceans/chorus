@@ -6,6 +6,11 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/../raknet/raknet-tokio/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/../raknet/raknet/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/chorus-gamedata/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/chorus-macros/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/chorus-util/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/chorus-world/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/chorus/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/protocol/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/run" />
