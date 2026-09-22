@@ -18,7 +18,7 @@ const CREATIVE_ITEMS: &str = include_str!("../resources/creative_items.json");
 
 #[derive(Deserialize)]
 struct ItemPalette {
-    pub items: Vec<ItemState>
+    pub items: Vec<ItemState>,
 }
 
 #[derive(Deserialize)]

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::DimensionId;
 use crate::network::BedrockProtocol;
@@ -11,6 +10,7 @@ use crate::server::ServerState;
 use bedrock::protocol::v662::enums::{ChatRestrictionLevel, Difficulty, EditorWorldType, GamePublishSetting, GameType, GeneratorType, PlayStatus, PlayerPermissionLevel, SpawnBiomeType};
 use bedrock::protocol::v662::packets::ChunkRadiusUpdatedPacket;
 use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID, BaseGameVersion, EduSharedUriResource, Experiments, NetworkPermissions, SpawnSettings};
+use bedrock::protocol::v712::packets::JigsawStructureDataPacket;
 use bedrock::protocol::v800::packets::BiomeDefinitionListPacket;
 use bedrock::protocol::v818::types::SyncedPlayerMovementSettings;
 use bedrock::protocol::v944::packets::VoxelShapesPacket;
@@ -19,10 +19,10 @@ use bedrock::protocol::v2168::enums::EducationEditionOffer;
 use bedrock::protocol::v2168::packets::StartGamePacket;
 use bedrock::protocol::v2168::types::{GameRuleLegacyData, LevelSettings};
 use bedrock::protocol::{ProtoVersion, ProtoVersionPackets};
-use bedrock::protocol::v712::packets::JigsawStructureDataPacket;
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Commands, Query};
 use bevy_ecs::system::{Res, ResMut};
+use std::collections::HashMap;
 use tracing::{debug, warn};
 
 pub fn on_enter_setup(
@@ -51,17 +51,20 @@ pub fn on_enter_setup(
             }
             .into(),
         ));
-        
-        session.send_immediate(BedrockProtocol::JigsawStructureDataPacket(JigsawStructureDataPacket {
-            jigsaw_structure_data_tag: nbtx::Value::Compound({
-                let mut compound = HashMap::new();
-                compound.insert("processors".to_string(), nbtx::Value::List(vec![]));
-                compound.insert("template_pools".to_string(), nbtx::Value::List(vec![]));
-                compound.insert("jigsaws".to_string(), nbtx::Value::List(vec![]));
-                compound.insert("structure_sets".to_string(), nbtx::Value::List(vec![]));
-                compound
-            })
-        }.into()));
+
+        session.send_immediate(BedrockProtocol::JigsawStructureDataPacket(
+            JigsawStructureDataPacket {
+                jigsaw_structure_data_tag: nbtx::Value::Compound({
+                    let mut compound = HashMap::new();
+                    compound.insert("processors".to_string(), nbtx::Value::List(vec![]));
+                    compound.insert("template_pools".to_string(), nbtx::Value::List(vec![]));
+                    compound.insert("jigsaws".to_string(), nbtx::Value::List(vec![]));
+                    compound.insert("structure_sets".to_string(), nbtx::Value::List(vec![]));
+                    compound
+                }),
+            }
+            .into(),
+        ));
 
         send_start_game(&player, &mut session);
 
