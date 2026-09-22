@@ -9,6 +9,7 @@ use item_registry::ItemRegistry;
 pub mod block_registry;
 pub mod command_registry;
 pub mod item_registry;
+pub mod structure_registry;
 
 pub struct Registry;
 

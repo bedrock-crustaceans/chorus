@@ -7,6 +7,7 @@ use bedrock::protocol::v776::packets::{ItemComponentPacket, ItemsEntry};
 use bedrock::protocol::v2168::packets::{CreativeContentPacket, CreativeItemCategory, CreativeItemData, CreativeItemGroup};
 use bedrock::protocol::v2168::types::NetworkItemInstanceDescriptor;
 use bevy_ecs::prelude::{Commands, Resource};
+use indexmap::IndexMap;
 use serde::Deserialize;
 use std::collections::HashMap;
 use tracing::{info, warn};
@@ -180,7 +181,7 @@ impl ItemRegistry {
                     is_component_based: item.component_based,
                     version: item.version.clone(),
                     // chorus does not ship the component definitions yet
-                    component_data: nbtx::Value::Compound(HashMap::new()),
+                    component_data: nbtx::Value::Compound(IndexMap::new()),
                 })
                 .collect(),
         }
