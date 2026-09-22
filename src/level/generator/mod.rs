@@ -1,5 +1,4 @@
 pub mod flat;
-pub mod legacy;
 pub mod random;
 pub mod void;
 
