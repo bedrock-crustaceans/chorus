@@ -4,38 +4,34 @@ pub mod HashUtils {
     use atomicow::CowArc;
     use std::collections::HashMap;
 
-    pub fn hash_nbt(mut compound: nbtx::Compound) -> i32 {
-        compound.sort_keys();
-
-        fnv1a_32::hash(nbtx::to_le_bytes(&nbtx::Value::Compound(compound)).unwrap().as_slice()) as i32
-    }
-
     pub fn hash_block_permutation(identifier: &str, states: &HashMap<CowArc<'static, str>, BlockState>) -> i32 {
         if identifier == "minecraft:unknown" {
             return -2;
         }
 
-        let mut states_tag = nbtx::Compound::new();
-        for (id, val) in states {
-            match val {
-                BlockState::Bool(val) => {
-                    states_tag.insert(id.as_ref().into(), nbtx::Value::Byte(if *val { 1 } else { 0 }));
-                }
-                BlockState::Int(val) => {
-                    states_tag.insert(id.as_ref().into(), nbtx::Value::Int(*val));
-                }
-                BlockState::Enum(val) => {
-                    states_tag.insert(id.as_ref().into(), nbtx::Value::String(val.as_ref().into()));
-                }
-            }
-        }
-
         let mut tag = nbtx::Compound::new();
-
         tag.insert("name".into(), nbtx::Value::String(identifier.into()));
-        tag.insert("states".into(), nbtx::Value::Compound(states_tag));
+        tag.insert(
+            "states".into(),
+            nbtx::Value::Compound({
+                let mut map = nbtx::Compound::from_iter(states.iter().map(|(id, val)| {
+                    (
+                        id.as_ref().into(),
+                        match val {
+                            BlockState::Bool(val) => nbtx::Value::Byte(if *val { 1 } else { 0 }),
+                            BlockState::Int(val) => nbtx::Value::Int(*val),
+                            BlockState::Enum(val) => nbtx::Value::String(val.as_ref().into()),
+                        },
+                    )
+                }));
+                map.sort_unstable_keys();
+                map
+            }),
+        );
+        tag.sort_unstable_keys();
 
-        hash_nbt(tag)
+        // TODO: return error here instead of unwrap
+        fnv1a_32::hash(nbtx::to_le_bytes(&nbtx::Value::Compound(tag)).unwrap().as_slice()) as i32
     }
 
     pub mod fnv1a_32 {
