@@ -23,7 +23,6 @@ use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Commands, Query};
 use bevy_ecs::system::{Res, ResMut};
 use indexmap::IndexMap;
-use std::collections::HashMap;
 use tracing::{debug, warn};
 
 pub fn on_enter_setup(
