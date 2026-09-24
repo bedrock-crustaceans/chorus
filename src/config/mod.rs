@@ -37,6 +37,7 @@ pub struct Config {
     pub log_level: String,
     pub force_accept_resource_packs: bool,
     pub force_disable_vibrant_visuals: bool,
+    pub max_view_distance: i32,
 }
 
 impl Default for Config {
@@ -61,6 +62,7 @@ impl Default for Config {
             log_level: String::from("info"),
             force_accept_resource_packs: false,
             force_disable_vibrant_visuals: false,
+            max_view_distance: 8,
         }
     }
 }

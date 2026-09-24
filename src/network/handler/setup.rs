@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::DimensionId;
 use crate::network::BedrockProtocol;
@@ -177,6 +178,7 @@ fn send_start_game(player: &Player, session: &mut Session) {
 }
 
 pub fn handle_setup(
+    config: Res<Config>,
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     items: Res<ItemRegistry>,
     mut state_writer: MessageWriter<SessionStateChangedMessage>,
@@ -190,7 +192,7 @@ pub fn handle_setup(
             continue;
         }
         match &ev.packet {
-            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(packet, &mut player, &mut session, &items),
+            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(&config, packet, &mut player, &mut session, &items),
             BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => handle_set_local_player_as_initialized(packet, &player, &mut session, &mut state_writer),
             packet => {
                 let count = session.unhandled_packets.entry(packet.as_ref().meta().name).or_insert(0);
@@ -200,8 +202,8 @@ pub fn handle_setup(
     }
 }
 
-fn handle_request_chunk_radius(packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, player: &mut Player, session: &mut Session, items: &ItemRegistry) {
-    let radius = packet.chunk_radius;
+fn handle_request_chunk_radius(config: &Config, packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, player: &mut Player, session: &mut Session, items: &ItemRegistry) {
+    let radius = packet.chunk_radius.min(config.max_view_distance);
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
 
     // the queue itself is filled by update_chunk_order, which also keeps it following the player
