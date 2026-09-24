@@ -14,9 +14,13 @@ impl<const N: usize> BitArray<N> {
     const VALID_BITS: [u8; 8] = [1, 2, 3, 4, 5, 6, 8, 16];
 
     pub fn new() -> Self {
+        Self::with_bits(1)
+    }
+    
+    pub fn with_bits(bits: u8) -> Self {
         Self {
-            bits: 1,
-            blocks: vec![0u32; N.div_ceil(32)].into_boxed_slice(),
+            bits,
+            blocks: vec![0u32; N.div_ceil(32 / bits as usize)].into_boxed_slice(),
         }
     }
 
@@ -65,7 +69,7 @@ impl<const N: usize> BitArray<N> {
     }
 
     pub fn bits_for(value: u16) -> u8 {
-        Self::VALID_BITS.iter().copied().find(|&n| value < (1 << n)).unwrap_or(16)
+        Self::VALID_BITS.iter().copied().find(|&n| (value as u32) < (1u32 << n)).unwrap_or(16)
     }
 
     pub fn resize(&mut self, bits: u8) {
