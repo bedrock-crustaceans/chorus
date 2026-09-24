@@ -22,15 +22,12 @@ pub struct PhaseInputs<'a, G> {
 
 impl<'a, G> PhaseInputs<'a, G> {
     pub fn get<Q: Phase<G>>(&self, cell: ChunkPos) -> Arc<Q::Output> {
+        self.try_get::<Q>(cell).expect("dependency read outside its declared requirement")
+    }
+
+    pub fn try_get<Q: Phase<G>>(&self, cell: ChunkPos) -> Option<Arc<Q::Output>> {
         let key = (PhaseId::of::<Q>(), cell);
-        self.resolved
-            .iter()
-            .find(|(k, _)| *k == key)
-            .expect("dependency read outside its declared requirement")
-            .1
-            .clone()
-            .downcast::<Q::Output>()
-            .unwrap()
+        self.resolved.iter().find(|(k, _)| *k == key).map(|(_, output)| output.clone().downcast::<Q::Output>().unwrap())
     }
 }
 
