@@ -3,7 +3,7 @@ use crate::command::context::CommandContext;
 use crate::command::sender::CommandSender;
 use crate::const_command;
 use crate::level::DimensionId;
-use crate::level::dimension::Dimension;
+use crate::level::generator::dimension::Dimension;
 use crate::level::level::Level;
 use crate::network::bandwidth::BandwidthTracker;
 use crate::server::{ServerMetrics, ServerState};

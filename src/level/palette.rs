@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use indexmap::map::Entry;
 use std::io::{Read, Write};
 
+#[derive(Clone)]
 pub enum Palette {
     Uniform { value: i32 },
     Indexed { values: IndexMap<i32, u16>, indices: BitArray<4096> },

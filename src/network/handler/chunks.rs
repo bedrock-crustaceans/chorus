@@ -1,11 +1,10 @@
 use crate::entity::entity::Entity as PlayerEntity;
-use crate::level::dimension::Dimension;
+use crate::level::generator::dimension::Dimension;
 use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
 use crate::player::Player;
-use crate::registry::block_registry::BlockRegistry;
 use bedrock::protocol::v662::packets::NetworkChunkPublisherUpdatePacket;
 use bedrock::protocol::v662::types::{BlockPos, ChunkPos};
 use bedrock::protocol::v2168::packets::LevelChunkPacket;
@@ -18,6 +17,8 @@ use bevy_ecs::system::Res;
 use bevy_tasks::ComputeTaskPool;
 use std::collections::{HashMap, HashSet, VecDeque};
 use tracing::debug;
+
+const GENERATE_TICK_LIMIT: usize = 10_000;
 
 const MAX_CHUNKS_PER_TICK: usize = 16;
 
@@ -68,7 +69,7 @@ pub fn update_chunk_order(mut query: Query<(&mut Session, &PlayerEntity, &mut Pl
     }
 }
 
-pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity, &mut Player)>, mut level: ResMut<Level>, registry: Res<BlockRegistry>) {
+pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity, &mut Player)>, mut level: ResMut<Level>) {
     let mut batches: HashMap<Entity, Vec<(i32, i32)>> = HashMap::new();
 
     for (entity, _, _, mut player) in query.iter_mut() {
@@ -97,7 +98,13 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity
     positions.dedup();
 
     let overworld = level.overworld_mut();
-    overworld.generate_chunks(&registry, &positions);
+    overworld.request_chunks(&positions);
+    for _ in 0..GENERATE_TICK_LIMIT {
+        overworld.tick();
+        if positions.iter().all(|&(x, z)| overworld.get_chunk(x, z).is_some()) {
+            break;
+        }
+    }
 
     let payloads = serialize_chunks(overworld, &positions);
 
@@ -119,8 +126,6 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity
                 }
                 .into(),
             ));
-
-            debug!("sent chunk {}, {}", x, z);
         }
 
         if player.chunks_pending.is_empty() {

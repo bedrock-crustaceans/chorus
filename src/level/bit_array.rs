@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct BitArray<const N: usize> {
     bits: u8,
     blocks: Box<[u32]>,
