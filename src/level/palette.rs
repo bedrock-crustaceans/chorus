@@ -16,6 +16,33 @@ impl Palette {
         Self::Uniform { value }
     }
 
+    pub fn from_blocks(blocks: &[i32; 4096]) -> Self {
+        let mut values: IndexMap<i32, u16> = IndexMap::new();
+        for &value in blocks {
+            match values.entry(value) {
+                Entry::Occupied(mut occupied) => *occupied.get_mut() += 1,
+                Entry::Vacant(vacant) => {
+                    vacant.insert(1);
+                }
+            }
+        }
+
+        if values.len() == 1 {
+            let (&value, _) = values.first().expect("len is 1");
+            return Self::Uniform { value };
+        }
+
+        let bits = BitArray::<4096>::bits_for((values.len() - 1) as u16);
+        let mut indices = BitArray::<4096>::with_bits(bits);
+
+        for (i, &value) in blocks.iter().enumerate() {
+            let index = values.get_index_of(&value).expect("value was inserted above");
+            indices.set(i, index as u16);
+        }
+
+        Self::Indexed { values, indices }
+    }
+
     pub fn get(&self, index: usize) -> i32 {
         match &self {
             Self::Uniform { value } => *value,

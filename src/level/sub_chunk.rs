@@ -19,6 +19,16 @@ impl SubChunk {
         }
     }
 
+    pub fn from_blocks(blocks: &[i32; 4096], air_id: i32, biome: i32) -> Self {
+        let non_air_count = blocks.iter().filter(|&&block_id| block_id != air_id).count() as u32;
+        Self {
+            blocks: vec![Palette::from_blocks(blocks), Palette::new(air_id)],
+            biomes: Palette::new(biome),
+            air_id,
+            non_air_count,
+        }
+    }
+
     pub fn get(&self, x: u8, y: u8, z: u8, layer: usize) -> i32 {
         debug_assert!(x < 16 && y < 16 && z < 16 && layer < 2);
         self.blocks[layer].get(Self::index(x, y, z))
@@ -63,7 +73,7 @@ impl SubChunk {
         buf
     }
 
-    fn index(x: u8, y: u8, z: u8) -> usize {
+    pub fn index(x: u8, y: u8, z: u8) -> usize {
         ((x as usize) << 8) | ((z as usize) << 4) | (y as usize)
     }
 }
