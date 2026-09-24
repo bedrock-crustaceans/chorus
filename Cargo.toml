@@ -12,6 +12,8 @@ path = "src/lib.rs"
 bevy_app = "0.19.0"
 bevy_ecs = { version = "0.19.0", features = ["debug"] }
 bevy_tasks = "0.19.0"
+crossbeam-channel = "0.5.17"
+slotmap = "1.1.1"
 
 bevy-raknet = { git = "https://github.com/bedrock-crustaceans/raknet", branch = "main" }
 bevy-nethernet = { git = "https://github.com/bedrock-crustaceans/nethernet", branch = "main" }

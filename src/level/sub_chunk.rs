@@ -1,6 +1,7 @@
 use crate::level::palette::Palette;
 use bedrock::protocol::ProtoCodec;
 
+#[derive(Clone)]
 pub struct SubChunk {
     blocks: Vec<Palette>,
     biomes: Palette,

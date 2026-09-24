@@ -99,4 +99,8 @@ impl BlockRegistry {
     pub fn get_random(&self) -> i32 {
         *self.default_hash.values().choose(&mut rand::rng()).expect("no hash found")
     }
+
+    pub fn get_all_block_ids(&self) -> Vec<i32> {
+        self.default_hash.values().copied().collect()
+    }
 }

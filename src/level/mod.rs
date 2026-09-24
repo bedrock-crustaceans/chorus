@@ -2,7 +2,6 @@ pub mod biome;
 mod bit_array;
 pub mod chunk;
 pub mod chunk_state;
-pub mod dimension;
 pub mod generator;
 pub mod level;
 mod palette;

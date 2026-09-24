@@ -1,10 +1,6 @@
-pub mod flat;
-pub mod random;
-pub mod void;
-
-use crate::level::chunk::Chunk;
-use crate::registry::block_registry::BlockRegistry;
-
-pub trait WorldGenerator: Send + Sync {
-    fn generate(&self, registry: &BlockRegistry, x: i32, z: i32, chunk: &mut Chunk);
-}
+pub mod dimension;
+pub mod graph;
+pub mod r#impl;
+pub mod phase;
+pub mod phase_graph;
+pub mod pos;

@@ -201,7 +201,7 @@ pub fn handle_setup(
 }
 
 fn handle_request_chunk_radius(packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, player: &mut Player, session: &mut Session, items: &ItemRegistry) {
-    let radius = packet.chunk_radius.min(8);
+    let radius = packet.chunk_radius;
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
 
     // the queue itself is filled by update_chunk_order, which also keeps it following the player
