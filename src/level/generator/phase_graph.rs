@@ -39,6 +39,7 @@ pub struct PhaseGraph<G: 'static> {
     requests_rx: Receiver<Request<G>>,
     completions_tx: Sender<(NodeKey, ErasedOutput)>,
     completions_rx: Receiver<(NodeKey, ErasedOutput)>,
+    pending_dispatch: Vec<NodeKey>,
 }
 
 impl<G: Send + Sync + 'static> PhaseGraph<G> {
@@ -53,6 +54,7 @@ impl<G: Send + Sync + 'static> PhaseGraph<G> {
             requests_rx,
             completions_tx,
             completions_rx,
+            pending_dispatch: Vec::new(),
         }
     }
 
@@ -76,55 +78,91 @@ impl<G: Send + Sync + 'static> PhaseGraph<G> {
         while let Ok(request) = self.requests_rx.try_recv() {
             self.request(request.descriptor, request.cell, request.notify);
         }
+
+        while let Some(key) = self.pending_dispatch.pop() {
+            self.dispatch(key);
+        }
     }
 
     fn request(&mut self, descriptor: PhaseDescriptor<G>, cell: ChunkPos, notify: Option<Sender<(ChunkPos, ErasedOutput)>>) {
-        let map_key = (descriptor.phase, cell);
+        enum Step<G: 'static> {
+            Enter {
+                descriptor: PhaseDescriptor<G>,
+                cell: ChunkPos,
+                notify: Option<Sender<(ChunkPos, ErasedOutput)>>,
+            },
+            Finalize {
+                key: NodeKey,
+            },
+        }
 
-        if let Some(&key) = self.graph.index.get(&map_key) {
-            match &self.graph.nodes[key].status {
-                NodeStatus::Done(output) => {
-                    if let Some(notify) = notify {
-                        let _ = notify.send((cell, output.clone()));
+        let mut work = vec![Step::Enter { descriptor, cell, notify }];
+
+        while let Some(step) = work.pop() {
+            match step {
+                Step::Enter { descriptor, cell, notify } => {
+                    let map_key = (descriptor.phase, cell);
+
+                    if let Some(&key) = self.graph.index.get(&map_key) {
+                        match &self.graph.nodes[key].status {
+                            NodeStatus::Done(output) => {
+                                if let Some(notify) = notify {
+                                    let _ = notify.send((cell, output.clone()));
+                                }
+                            }
+                            _ => {
+                                if let Some(notify) = notify {
+                                    self.graph.nodes[key].waiters.push(notify);
+                                }
+                            }
+                        }
+                        continue;
+                    }
+
+                    let key = self.graph.nodes.insert(Node {
+                        descriptor,
+                        cell,
+                        deps: Vec::new(),
+                        dependents: Vec::new(),
+                        status: NodeStatus::Pending { remaining: 0 },
+                        waiters: notify.into_iter().collect(),
+                    });
+                    self.graph.index.insert(map_key, key);
+
+                    work.push(Step::Finalize { key });
+                    for requirement in (descriptor.requires)() {
+                        for dependency_cell in (requirement.cells)(cell) {
+                            work.push(Step::Enter {
+                                descriptor: requirement.descriptor,
+                                cell: dependency_cell,
+                                notify: None,
+                            });
+                        }
                     }
                 }
-                _ => {
-                    if let Some(notify) = notify {
-                        self.graph.nodes[key].waiters.push(notify);
+                Step::Finalize { key } => {
+                    let descriptor = self.graph.nodes[key].descriptor;
+                    let cell = self.graph.nodes[key].cell;
+
+                    let mut deps = Vec::new();
+                    for requirement in (descriptor.requires)() {
+                        for dependency_cell in (requirement.cells)(cell) {
+                            let dependency_key = self.graph.index[&(requirement.descriptor.phase, dependency_cell)];
+                            deps.push(dependency_key);
+                            self.graph.nodes[dependency_key].dependents.push(key);
+                        }
+                    }
+
+                    let remaining = deps.iter().filter(|dependency_key| !matches!(self.graph.nodes[**dependency_key].status, NodeStatus::Done(_))).count();
+                    self.graph.nodes[key].deps = deps;
+
+                    if remaining == 0 {
+                        self.pending_dispatch.push(key);
+                    } else {
+                        self.graph.nodes[key].status = NodeStatus::Pending { remaining };
                     }
                 }
             }
-            return;
-        }
-
-        let key = self.graph.nodes.insert(Node {
-            descriptor,
-            cell,
-            deps: Vec::new(),
-            dependents: Vec::new(),
-            status: NodeStatus::Pending { remaining: 0 },
-            waiters: notify.into_iter().collect(),
-        });
-        self.graph.index.insert(map_key, key);
-
-        let mut deps = Vec::new();
-        for requirement in (descriptor.requires)() {
-            for dependency_cell in (requirement.cells)(cell) {
-                self.request(requirement.descriptor, dependency_cell, None);
-
-                let dependency_key = self.graph.index[&(requirement.descriptor.phase, dependency_cell)];
-                deps.push(dependency_key);
-                self.graph.nodes[dependency_key].dependents.push(key);
-            }
-        }
-
-        let remaining = deps.iter().filter(|dependency_key| !matches!(self.graph.nodes[**dependency_key].status, NodeStatus::Done(_))).count();
-        self.graph.nodes[key].deps = deps;
-
-        if remaining == 0 {
-            self.dispatch(key);
-        } else {
-            self.graph.nodes[key].status = NodeStatus::Pending { remaining };
         }
     }
 
@@ -183,7 +221,7 @@ impl<G: Send + Sync + 'static> PhaseGraph<G> {
                 _ => false,
             };
             if ready {
-                self.dispatch(dependent_key);
+                self.pending_dispatch.push(dependent_key);
             }
         }
 
