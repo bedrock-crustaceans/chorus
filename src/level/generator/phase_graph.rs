@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use bevy_tasks::ComputeTaskPool;
 use crossbeam_channel::{Receiver, Sender};
@@ -42,6 +43,8 @@ pub struct PhaseGraph<G: 'static> {
     pending_dispatch: Vec<NodeKey>,
 }
 
+const DISPATCH_TIME_BUDGET: Duration = Duration::from_millis(20);
+
 impl<G: Send + Sync + 'static> PhaseGraph<G> {
     pub fn new(generator: G) -> Self {
         let (requests_tx, requests_rx) = crossbeam_channel::unbounded();
@@ -79,7 +82,9 @@ impl<G: Send + Sync + 'static> PhaseGraph<G> {
             self.request(request.descriptor, request.cell, request.notify);
         }
 
-        while let Some(key) = self.pending_dispatch.pop() {
+        let deadline = Instant::now() + DISPATCH_TIME_BUDGET;
+        while Instant::now() < deadline {
+            let Some(key) = self.pending_dispatch.pop() else { break };
             self.dispatch(key);
         }
     }

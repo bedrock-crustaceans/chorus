@@ -33,7 +33,7 @@ impl<'a, G> PhaseInputs<'a, G> {
 
 pub struct PhaseDescriptor<G: 'static> {
     pub(crate) phase: PhaseId,
-    pub(crate) requires: fn() -> &'static [Requirement<G>],
+    pub(crate) requires: fn() -> Vec<Requirement<G>>,
     pub(crate) run: fn(&G, ChunkPos, &PhaseInputs<G>) -> ErasedOutput,
 }
 
@@ -71,8 +71,8 @@ impl<G> Copy for Requirement<G> {}
 pub trait Phase<G>: 'static {
     type Output: Send + Sync + 'static;
 
-    fn requires() -> &'static [Requirement<G>] {
-        &[]
+    fn requires() -> Vec<Requirement<G>> {
+        Vec::new()
     }
 
     fn run(generator: &G, cell: ChunkPos, inputs: &PhaseInputs<G>) -> Self::Output;
