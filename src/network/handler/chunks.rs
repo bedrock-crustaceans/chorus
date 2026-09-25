@@ -18,9 +18,7 @@ use bevy_tasks::ComputeTaskPool;
 use std::collections::{HashMap, HashSet, VecDeque};
 use tracing::debug;
 
-const GENERATE_TICK_LIMIT: usize = 10_000;
-
-const MAX_CHUNKS_PER_TICK: usize = 16;
+const MAX_NEW_REQUESTS_PER_TICK: usize = 16;
 
 struct ChunkPayload {
     sub_chunk_count: u32,
@@ -61,6 +59,7 @@ pub fn update_chunk_order(mut query: Query<(&mut Session, &PlayerEntity, &mut Pl
         // if the player ever comes back
         let in_view: HashSet<(i32, i32)> = wanted.iter().copied().collect();
         player.chunks_sent.retain(|position| in_view.contains(position));
+        player.chunks_requested.retain(|position| in_view.contains(position));
 
         let pending: VecDeque<(i32, i32)> = wanted.into_iter().filter(|position| !player.chunks_sent.contains(position)).collect();
         player.chunks_pending = pending;
@@ -70,48 +69,59 @@ pub fn update_chunk_order(mut query: Query<(&mut Session, &PlayerEntity, &mut Pl
 }
 
 pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity, &mut Player)>, mut level: ResMut<Level>) {
-    let mut batches: HashMap<Entity, Vec<(i32, i32)>> = HashMap::new();
+    let overworld = level.overworld_mut();
 
-    for (entity, _, _, mut player) in query.iter_mut() {
+    let mut to_request: Vec<(i32, i32)> = Vec::new();
+    for (_, _, _, mut player) in query.iter_mut() {
         if player.chunks_radius == 0 {
             continue;
         }
 
-        let count = player.chunks_pending.len().min(MAX_CHUNKS_PER_TICK);
-        if count == 0 {
-            continue;
+        let candidates: Vec<(i32, i32)> = player.chunks_pending.iter().copied().collect();
+        let mut newly_requested = 0;
+        for position in candidates {
+            if newly_requested >= MAX_NEW_REQUESTS_PER_TICK {
+                break;
+            }
+            if player.chunks_requested.insert(position) {
+                to_request.push(position);
+                newly_requested += 1;
+            }
         }
-
-        let batch: Vec<(i32, i32)> = player.chunks_pending.drain(..count).collect();
-        player.chunks_sent.extend(batch.iter().copied());
-
-        batches.insert(entity, batch);
     }
 
-    if batches.is_empty() {
+    if !to_request.is_empty() {
+        to_request.sort_unstable();
+        to_request.dedup();
+        overworld.request_chunks(&to_request);
+    }
+
+    overworld.tick();
+
+    let mut ready: Vec<(i32, i32)> = Vec::new();
+    for (_, _, _, player) in query.iter_mut() {
+        for &position in &player.chunks_requested {
+            if overworld.get_chunk(position.0, position.1).is_some() {
+                ready.push(position);
+            }
+        }
+    }
+
+    if ready.is_empty() {
         return;
     }
+    ready.sort_unstable();
+    ready.dedup();
 
-    // the same chunk is often requested by several players, so generate and serialize it once
-    let mut positions: Vec<(i32, i32)> = batches.values().flatten().copied().collect();
-    positions.sort_unstable();
-    positions.dedup();
+    let payloads = serialize_chunks(overworld, &ready);
 
-    let overworld = level.overworld_mut();
-    overworld.request_chunks(&positions);
-    for _ in 0..GENERATE_TICK_LIMIT {
-        overworld.tick();
-        if positions.iter().all(|&(x, z)| overworld.get_chunk(x, z).is_some()) {
-            break;
-        }
-    }
+    for (_, mut session, player_entity, mut player) in query.iter_mut() {
+        let mut sent: Vec<(i32, i32)> = Vec::new();
 
-    let payloads = serialize_chunks(overworld, &positions);
-
-    for (entity, mut session, player_entity, player) in query.iter_mut() {
-        let Some(batch) = batches.get(&entity) else { continue };
-
-        for &(x, z) in batch {
+        for &(x, z) in &ready {
+            if !player.chunks_requested.contains(&(x, z)) {
+                continue;
+            }
             let Some(payload) = payloads.get(&(x, z)) else { continue };
 
             session.send(BedrockProtocol::LevelChunkPacket(
@@ -126,7 +136,20 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity
                 }
                 .into(),
             ));
+
+            sent.push((x, z));
         }
+
+        if sent.is_empty() {
+            continue;
+        }
+
+        for position in &sent {
+            player.chunks_requested.remove(position);
+            player.chunks_sent.insert(*position);
+        }
+        let sent: HashSet<(i32, i32)> = sent.into_iter().collect();
+        player.chunks_pending.retain(|position| !sent.contains(position));
 
         if player.chunks_pending.is_empty() {
             send_publisher_update(&mut session, player_entity, &player);

@@ -16,7 +16,7 @@ impl<const N: usize> BitArray<N> {
     pub fn new() -> Self {
         Self::with_bits(1)
     }
-    
+
     pub fn with_bits(bits: u8) -> Self {
         Self {
             bits,
