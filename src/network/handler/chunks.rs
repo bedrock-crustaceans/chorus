@@ -18,7 +18,7 @@ use bevy_tasks::ComputeTaskPool;
 use std::collections::{HashMap, HashSet, VecDeque};
 use tracing::debug;
 
-const MAX_NEW_REQUESTS_PER_TICK: usize = 16;
+const MAX_NEW_REQUESTS_PER_TICK: usize = 64;
 
 struct ChunkPayload {
     sub_chunk_count: u32,
