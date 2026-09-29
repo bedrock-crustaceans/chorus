@@ -10,8 +10,8 @@ path = "src/lib.rs"
 
 [dependencies]
 bevy_app = "0.19.0"
-bevy_ecs = { version = "0.19.0", features = ["debug"] }
-bevy_tasks = "0.19.0"
+bevy_ecs = { version = "0.19.0", features = ["debug", "multi_threaded"] }
+bevy_tasks = { version = "0.19.0", features = ["multi_threaded"] }
 crossbeam-channel = "0.5.17"
 slotmap = "1.1.1"
 
@@ -27,6 +27,7 @@ strum_macros = "0.28.0"
 rand = "0.10.0"
 glam = "0.33.2"
 indexmap = "2.14.0"
+rustc-hash = "2"
 
 jsonwebtoken = { version = "11.0.0", features = ["rust_crypto"] }
 p384 = { version = "0.14.0", features = ["ecdh", "ecdsa"] }

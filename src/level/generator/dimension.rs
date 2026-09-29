@@ -4,24 +4,26 @@ use crossbeam_channel::{Receiver, Sender};
 
 use crate::level::chunk::Chunk;
 
-use crate::level::generator::phase::{ErasedOutput, Phase};
+use crate::level::generator::phase::{Phase, PhaseValue};
 use crate::level::generator::phase_graph::{PhaseGraph, RequestHandle};
 use crate::level::generator::pos::ChunkPos;
 
 pub trait Generator: Send + Sync + Sized + 'static {
-    type Terminal: Phase<Self, Output = Chunk>;
+    type Terminal: PhaseValue<Self> + Phase<Self, Output = Chunk>;
+    type Value: Clone + Send + Sync + 'static;
 }
 
 pub trait WorldGenerator: Send + Sync {
     fn request_chunk(&self, x: i32, z: i32);
     fn tick(&mut self) -> Vec<(i32, i32, Chunk)>;
+    fn has_pending_work(&self) -> bool;
 }
 
 struct PhasedGenerator<G: Generator> {
     graph: PhaseGraph<G>,
     requests: RequestHandle<G>,
-    finished_tx: Sender<(ChunkPos, ErasedOutput)>,
-    finished_rx: Receiver<(ChunkPos, ErasedOutput)>,
+    finished_tx: Sender<(ChunkPos, G::Value)>,
+    finished_rx: Receiver<(ChunkPos, G::Value)>,
 }
 
 impl<G: Generator> WorldGenerator for PhasedGenerator<G> {
@@ -34,8 +36,12 @@ impl<G: Generator> WorldGenerator for PhasedGenerator<G> {
 
         self.finished_rx
             .try_iter()
-            .map(|(cell, output)| (cell.x, cell.z, (*output.downcast::<Chunk>().unwrap()).clone()))
+            .map(|(cell, value)| (cell.x, cell.z, (*<G::Terminal as PhaseValue<G>>::unwrap(&value).unwrap()).clone()))
             .collect()
+    }
+
+    fn has_pending_work(&self) -> bool {
+        self.graph.has_pending_work()
     }
 }
 
@@ -105,6 +111,10 @@ impl Dimension {
                 (x, z)
             })
             .collect()
+    }
+
+    pub fn has_pending_generation(&self) -> bool {
+        self.generator.has_pending_work()
     }
 
     pub fn get_chunk(&self, x: i32, z: i32) -> Option<&Chunk> {
