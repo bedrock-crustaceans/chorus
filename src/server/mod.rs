@@ -2,8 +2,9 @@ use crate::config::Config;
 use crate::network::network::Network;
 use crate::registry::Registry;
 use crate::utils::rolling_avg::RollingAvg;
-use bevy_app::{App, First, Last, Plugin, Startup};
-use bevy_ecs::prelude::{Res, Resource};
+use crate::{Tick, TickSet};
+use bevy_app::{App, Plugin, Startup};
+use bevy_ecs::prelude::{IntoScheduleConfigs, Res, Resource};
 use bevy_ecs::system::ResMut;
 use std::time::{Duration, Instant};
 use tracing::info;
@@ -88,8 +89,8 @@ impl Plugin for Server {
             mspt_avg: RollingAvg::new(20),
         })
         .add_systems(Startup, Server::start)
-        .add_systems(First, Server::start_tick)
-        .add_systems(Last, Server::end_tick)
+        .add_systems(Tick, Server::start_tick.in_set(TickSet::First))
+        .add_systems(Tick, Server::end_tick.in_set(TickSet::Last))
         .add_plugins(Registry)
         .add_plugins(Network);
     }

@@ -3,12 +3,15 @@ use bedrock::protocol::error::ProtoCodecError;
 use bedrock::protocol::{ProtoCodec, ProtoCodecLE, ProtoCodecVAR};
 use indexmap::IndexMap;
 use indexmap::map::Entry;
+use rustc_hash::FxBuildHasher;
 use std::io::{Read, Write};
+
+type PaletteMap = IndexMap<i32, u16, FxBuildHasher>;
 
 #[derive(Clone)]
 pub enum Palette {
     Uniform { value: i32 },
-    Indexed { values: IndexMap<i32, u16>, indices: BitArray<4096> },
+    Indexed { values: PaletteMap, indices: BitArray<4096> },
 }
 
 impl Palette {
@@ -17,27 +20,37 @@ impl Palette {
     }
 
     pub fn from_blocks(blocks: &[i32; 4096]) -> Self {
-        let mut values: IndexMap<i32, u16> = IndexMap::new();
-        for &value in blocks {
-            match values.entry(value) {
-                Entry::Occupied(mut occupied) => *occupied.get_mut() += 1,
-                Entry::Vacant(vacant) => {
-                    vacant.insert(1);
+        let mut unique: Vec<(i32, u16)> = Vec::new();
+        let mut block_indices = [0u16; 4096];
+
+        for (i, &value) in blocks.iter().enumerate() {
+            let index = match unique.iter().position(|&(v, _)| v == value) {
+                Some(index) => {
+                    unique[index].1 += 1;
+                    index
                 }
-            }
+                None => {
+                    unique.push((value, 1));
+                    unique.len() - 1
+                }
+            };
+            block_indices[i] = index as u16;
         }
 
-        if values.len() == 1 {
-            let (&value, _) = values.first().expect("len is 1");
-            return Self::Uniform { value };
+        if unique.len() == 1 {
+            return Self::Uniform { value: unique[0].0 };
+        }
+
+        let mut values = PaletteMap::default();
+        for (value, count) in unique {
+            values.insert(value, count);
         }
 
         let bits = BitArray::<4096>::bits_for((values.len() - 1) as u16);
         let mut indices = BitArray::<4096>::with_bits(bits);
 
-        for (i, &value) in blocks.iter().enumerate() {
-            let index = values.get_index_of(&value).expect("value was inserted above");
-            indices.set(i, index as u16);
+        for (i, &index) in block_indices.iter().enumerate() {
+            indices.set(i, index);
         }
 
         Self::Indexed { values, indices }
@@ -50,6 +63,19 @@ impl Palette {
         }
     }
 
+    pub fn count(&self, value: i32) -> u32 {
+        match self {
+            Self::Uniform { value: v } => {
+                if *v == value {
+                    4096
+                } else {
+                    0
+                }
+            }
+            Self::Indexed { values, .. } => values.get(&value).copied().unwrap_or(0) as u32,
+        }
+    }
+
     pub fn set(&mut self, index: usize, value: i32) {
         match self {
             Self::Uniform { value: val } => {
@@ -57,7 +83,7 @@ impl Palette {
                     return;
                 }
 
-                let mut values = IndexMap::new();
+                let mut values = PaletteMap::default();
                 let mut indices = BitArray::<4096>::new();
 
                 values.insert(*val, 4096);

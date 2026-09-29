@@ -16,11 +16,13 @@ use crate::network::login::auth::LoginAuthOIDC;
 use crate::network::session::Session;
 use crate::network::session::state::SessionStateChangedMessage;
 use crate::network::transport::{ActiveTransport, SessionId};
+use crate::{JobQueue, Tick, TickSet};
 use bedrock::network::info::MINECRAFT_EDITION_MOTD;
 use bedrock::network::motd::BedrockMOTD;
 use bedrock::protocol::ProtoVersion;
-use bevy_app::{App, Last, Plugin, PostUpdate, PreUpdate, Startup};
+use bevy_app::{App, Plugin, PostUpdate, PreUpdate, Startup};
 use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemId;
 use bevy_nethernet::prelude::*;
 use bevy_raknet::prelude::*;
 use std::collections::HashMap;
@@ -33,10 +35,16 @@ pub struct NetworkState {
     sessions: HashMap<SessionId, Entity>,
 }
 
+#[derive(Resource)]
+struct ReceiveJob(SystemId);
+
 pub struct Network;
 
 impl Plugin for Network {
     fn build(&self, app: &mut App) {
+        let receive_job = app.world_mut().register_system(Network::receive);
+        app.insert_resource(ReceiveJob(receive_job));
+
         app.add_plugins(PacketHandlers)
             .add_plugins(LoginAuthOIDC)
             .add_plugins(RakServerPlugin)
@@ -46,12 +54,12 @@ impl Plugin for Network {
             .add_systems(
                 PreUpdate,
                 // chained (rather than run as one system) so a newly-spawned Session's Commands are
-                // applied before `receive` looks it up - otherwise a packet from a session that
-                // connected this same tick would find no entity and get silently dropped
-                (Network::accept, Network::receive).chain().after(RakServerSet).after(NetherServerSet).after(NetherHttpServerSet),
+                // applied before the queued `receive` job looks it up - otherwise a packet from a
+                // session that connected this same tick would find no entity and get silently dropped
+                (Network::accept, Network::queue_receive).chain().after(RakServerSet).after(NetherServerSet).after(NetherHttpServerSet),
             )
             .add_systems(PostUpdate, Network::flush)
-            .add_systems(Last, BandwidthTracker::sample)
+            .add_systems(Tick, BandwidthTracker::sample.in_set(TickSet::Last))
             .init_resource::<BandwidthTracker>()
             .init_resource::<NetworkState>()
             .add_message::<PacketReceivedMessage>()
@@ -173,9 +181,11 @@ impl Network {
         }
     }
 
-    /// Routes inbound datagrams into their `Session`. Runs after [`Network::accept`] (with its
-    /// Commands applied in between) so a session that connected this same tick already has one.
-    pub fn receive(
+    fn queue_receive(job: Res<ReceiveJob>, mut jobs: ResMut<JobQueue>) {
+        jobs.push(job.0);
+    }
+
+    fn receive(
         mut rak_server: Option<ResMut<RakServer>>,
         mut nether_lan: Option<ResMut<NetherServer>>,
         mut nether_http: Option<ResMut<NetherHttpServer>>,
@@ -183,12 +193,16 @@ impl Network {
         bandwidth: Res<BandwidthTracker>,
         mut query: Query<&mut Session>,
         mut events: MessageWriter<PacketReceivedMessage>,
+        job: Res<ReceiveJob>,
+        mut jobs: ResMut<JobQueue>,
     ) {
         let Some(mut transport) = ActiveTransport::from_resources(&mut rak_server, &mut nether_lan, &mut nether_http) else {
             return;
         };
 
+        let mut any = false;
         while let Some((id, data)) = transport.recv() {
+            any = true;
             bandwidth.counters().add_received(data.len() as u64);
 
             let Some(&entity) = state.sessions.get(&id) else {
@@ -201,6 +215,10 @@ impl Network {
             for packet in session.decode(data.into_vec()) {
                 events.write(PacketReceivedMessage { entity, packet });
             }
+        }
+
+        if any {
+            jobs.push(job.0);
         }
     }
 

@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use crate::level::chunk::Chunk;
 use crate::level::generator::dimension::Generator;
-use crate::level::generator::phase::{Phase, PhaseInputs};
+use crate::level::generator::phase::{Phase, PhaseInputs, PhaseValue};
 use crate::level::generator::pos::ChunkPos;
 use rand::prelude::IndexedRandom;
 use rand::rng;
@@ -15,9 +17,20 @@ pub struct RandomGenerator {
 
 impl Generator for RandomGenerator {
     type Terminal = RandomPhase;
+    type Value = Arc<Chunk>;
 }
 
 pub struct RandomPhase;
+
+impl PhaseValue<RandomGenerator> for RandomPhase {
+    fn wrap(output: Arc<Self::Output>) -> Arc<Chunk> {
+        output
+    }
+
+    fn unwrap(value: &Arc<Chunk>) -> Option<Arc<Self::Output>> {
+        Some(value.clone())
+    }
+}
 
 impl Phase<RandomGenerator> for RandomPhase {
     type Output = Chunk;

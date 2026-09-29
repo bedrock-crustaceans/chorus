@@ -20,9 +20,10 @@ impl SubChunk {
     }
 
     pub fn from_blocks(blocks: &[i32; 4096], air_id: i32, biome: i32) -> Self {
-        let non_air_count = blocks.iter().filter(|&&block_id| block_id != air_id).count() as u32;
+        let palette = Palette::from_blocks(blocks);
+        let non_air_count = 4096 - palette.count(air_id);
         Self {
-            blocks: vec![Palette::from_blocks(blocks), Palette::new(air_id)],
+            blocks: vec![palette, Palette::new(air_id)],
             biomes: Palette::new(biome),
             air_id,
             non_air_count,

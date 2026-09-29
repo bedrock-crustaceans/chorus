@@ -1,6 +1,7 @@
+use crate::config::Config;
 use bedrock::auth::auth_oidc::AuthOIDC;
 use bevy_app::{App, Plugin, Startup};
-use bevy_ecs::prelude::{Commands, Resource};
+use bevy_ecs::prelude::{Commands, Res, Resource};
 use tracing::debug;
 
 #[derive(Resource)]
@@ -15,7 +16,12 @@ impl Plugin for LoginAuthOIDC {
 }
 
 impl LoginAuthOIDC {
-    pub fn fetch_oidc(mut commands: Commands) {
+    pub fn fetch_oidc(config: Res<Config>, mut commands: Commands) {
+        if !config.online_mode {
+            debug!("Skipping Auth OIDC fetch, online_mode is disabled");
+            return;
+        }
+
         if let Ok(oidc) = AuthOIDC::fetch() {
             debug!("Auth OIDC fetch succeeded");
             commands.insert_resource(Auth(oidc))

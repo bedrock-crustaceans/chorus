@@ -1,3 +1,4 @@
+use crate::JobQueue;
 use crate::block::block_id;
 use crate::level::BlockUpdatedMessage;
 use crate::level::generator::dimension::Dimension;
@@ -5,8 +6,11 @@ use crate::level::generator::r#impl::random::RandomGenerator;
 use crate::registry::block_registry::BlockRegistry;
 use bevy_ecs::message::MessageWriter;
 use bevy_ecs::prelude::{Commands, Resource};
-use bevy_ecs::system::Res;
+use bevy_ecs::system::{Res, ResMut, SystemId};
 use std::collections::HashMap;
+
+#[derive(Resource)]
+pub(crate) struct PollGenerationJob(pub(crate) SystemId);
 
 #[derive(Resource)]
 pub struct Level {
@@ -41,6 +45,26 @@ impl Level {
         level.dimensions.insert(0, overworld);
 
         commands.insert_resource(level);
+    }
+
+    pub(crate) fn queue_poll_generation(job: Res<PollGenerationJob>, mut jobs: ResMut<JobQueue>) {
+        jobs.push(job.0);
+    }
+
+    pub(crate) fn poll_generation(mut level: ResMut<Level>, job: Res<PollGenerationJob>, mut jobs: ResMut<JobQueue>) {
+        let mut keep_going = false;
+        for dimension in level.dimensions.values_mut() {
+            if !dimension.tick().is_empty() {
+                keep_going = true;
+            }
+            if dimension.has_pending_generation() {
+                keep_going = true;
+            }
+        }
+
+        if keep_going {
+            jobs.push(job.0);
+        }
     }
 
     pub fn dimension(&self, id: i32) -> Option<&Dimension> {

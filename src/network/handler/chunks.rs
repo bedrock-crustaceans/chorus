@@ -18,8 +18,6 @@ use bevy_tasks::ComputeTaskPool;
 use std::collections::{HashMap, HashSet, VecDeque};
 use tracing::debug;
 
-const MAX_NEW_REQUESTS_PER_TICK: usize = 64;
-
 struct ChunkPayload {
     sub_chunk_count: u32,
     sub_chunk_limit: u16,
@@ -78,14 +76,9 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity
         }
 
         let candidates: Vec<(i32, i32)> = player.chunks_pending.iter().copied().collect();
-        let mut newly_requested = 0;
         for position in candidates {
-            if newly_requested >= MAX_NEW_REQUESTS_PER_TICK {
-                break;
-            }
             if player.chunks_requested.insert(position) {
                 to_request.push(position);
-                newly_requested += 1;
             }
         }
     }
@@ -95,8 +88,6 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity
         to_request.dedup();
         overworld.request_chunks(&to_request);
     }
-
-    overworld.tick();
 
     let mut ready: Vec<(i32, i32)> = Vec::new();
     for (_, _, _, player) in query.iter_mut() {
@@ -151,9 +142,7 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity
         let sent: HashSet<(i32, i32)> = sent.into_iter().collect();
         player.chunks_pending.retain(|position| !sent.contains(position));
 
-        if player.chunks_pending.is_empty() {
-            send_publisher_update(&mut session, player_entity, &player);
-        }
+        send_publisher_update(&mut session, player_entity, &player);
     }
 }
 

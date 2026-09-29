@@ -10,7 +10,8 @@ use crate::network::handler::play::{announce_join_quit, broadcast_block_updates,
 use crate::network::handler::request::handle_request;
 use crate::network::handler::resource::handle_resource;
 use crate::network::handler::setup::{handle_setup, on_enter_setup};
-use bevy_app::{App, Plugin, Update};
+use crate::{Tick, TickSet};
+use bevy_app::{App, Plugin};
 use bevy_ecs::prelude::{Entity, Message};
 use bevy_ecs::schedule::IntoScheduleConfigs;
 
@@ -37,9 +38,7 @@ pub struct PacketHandlers;
 impl Plugin for PacketHandlers {
     fn build(&self, app: &mut App) {
         app.add_systems(
-            Update,
-            // chained so that a state change reaches its entry logic within the same tick instead
-            // of waiting for the next one - these all touch Session, so they never ran in parallel
+            Tick,
             (
                 (handle_request, handle_login, handle_handshake, handle_resource).chain(),
                 (on_enter_setup, handle_setup).chain(),
@@ -49,7 +48,8 @@ impl Plugin for PacketHandlers {
                 (update_chunk_order, send_pending_chunks, handle_sub_chunk_request).chain(),
                 (broadcast_block_updates, broadcast_level_events, broadcast_level_sounds).chain(),
             )
-                .chain(),
+                .chain()
+                .in_set(TickSet::Update),
         );
     }
 }

@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use crate::level::chunk::Chunk;
 use crate::level::generator::dimension::Generator;
-use crate::level::generator::phase::{Phase, PhaseInputs};
+use crate::level::generator::phase::{Phase, PhaseInputs, PhaseValue};
 use crate::level::generator::pos::ChunkPos;
 
 pub struct FlatLayer {
@@ -18,9 +20,20 @@ pub struct FlatGenerator {
 
 impl Generator for FlatGenerator {
     type Terminal = FlatPhase;
+    type Value = Arc<Chunk>;
 }
 
 pub struct FlatPhase;
+
+impl PhaseValue<FlatGenerator> for FlatPhase {
+    fn wrap(output: Arc<Self::Output>) -> Arc<Chunk> {
+        output
+    }
+
+    fn unwrap(value: &Arc<Chunk>) -> Option<Arc<Self::Output>> {
+        Some(value.clone())
+    }
+}
 
 impl Phase<FlatGenerator> for FlatPhase {
     type Output = Chunk;
