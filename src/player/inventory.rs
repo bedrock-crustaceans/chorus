@@ -1,4 +1,5 @@
 use crate::item::item_stack::ItemStack;
+use bevy_ecs::prelude::Component;
 
 pub const MAIN_SIZE: usize = 36;
 pub const HOTBAR_SIZE: usize = 9;
@@ -55,6 +56,7 @@ impl Inventory {
     }
 }
 
+#[derive(Component)]
 pub struct PlayerInventory {
     main: Inventory,
     offhand: Inventory,

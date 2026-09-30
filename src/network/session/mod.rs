@@ -15,6 +15,11 @@ use tracing::{debug, error};
 
 pub mod state;
 
+pub struct Batch {
+    pub data: Vec<u8>,
+    pub immediate: bool,
+}
+
 #[derive(Component)]
 pub struct Session {
     entity: Entity,
@@ -29,7 +34,7 @@ pub struct Session {
     out_q: Vec<BedrockProtocol>,
     // already-encoded batches waiting to go out ahead of `out_q`, e.g. immediate sends
     // made under compression/encryption settings that have since changed
-    pending_wire: Vec<Vec<u8>>,
+    pending_wire: Vec<Batch>,
 
     pub unhandled_packets: HashMap<&'static str, usize>,
 }
@@ -66,7 +71,7 @@ impl Session {
     /// retroactively apply to it.
     pub fn send_immediate(&mut self, packet: BedrockProtocol) {
         self.flush_queue();
-        self.encode_now(vec![packet]);
+        self.encode_now(vec![packet], true);
     }
 
     pub fn send(&mut self, packet: BedrockProtocol) {
@@ -76,20 +81,20 @@ impl Session {
     fn flush_queue(&mut self) {
         let out = take(&mut self.out_q);
         if !out.is_empty() {
-            self.encode_now(out);
+            self.encode_now(out, false);
         }
     }
 
-    fn encode_now(&mut self, packets: Vec<BedrockProtocol>) {
+    fn encode_now(&mut self, packets: Vec<BedrockProtocol>, immediate: bool) {
         match encode_packets(&packets, self.compression.as_ref(), self.encryption.as_mut()) {
-            Ok(stream) => self.pending_wire.push(stream),
+            Ok(data) => self.pending_wire.push(Batch { data, immediate }),
             Err(err) => error!("error encoding packets, dropping batch {:?}", err),
         }
     }
 
     /// Drains everything encoded this tick for [`Network::flush`](crate::network::network::Network::flush)
     /// to hand to the transport, in the order it was produced.
-    pub fn take_outgoing(&mut self) -> Vec<Vec<u8>> {
+    pub fn take_outgoing(&mut self) -> Vec<Batch> {
         self.flush_queue();
         take(&mut self.pending_wire)
     }

@@ -1,3 +1,4 @@
+use crate::network::session::Batch;
 use bedrock::network::info::RAKNET_GAMEPACKET_ID;
 use bevy_ecs::prelude::ResMut;
 use bevy_nethernet::prelude::{NetherHttpServer, NetherServer, NetherSessionId};
@@ -69,20 +70,21 @@ impl<'a> ActiveTransport<'a> {
         }
     }
 
-    pub fn send(&mut self, id: &SessionId, data: Vec<u8>) {
+    pub fn send(&mut self, id: &SessionId, batch: Batch) {
         match (self, id) {
             (Self::RakNet(server), SessionId::RakNet(id)) => {
-                let mut buf = Vec::with_capacity(data.len() + 1);
+                let mut buf = Vec::with_capacity(batch.data.len() + 1);
                 buf.push(RAKNET_GAMEPACKET_ID);
-                buf.extend_from_slice(&data);
+                buf.extend_from_slice(&batch.data);
 
-                let _ = server.send(*id, buf, RakReliability::ReliableOrdered, RakPriority::Immediate);
+                let priority = if batch.immediate { RakPriority::Immediate } else { RakPriority::Normal };
+                let _ = server.send(*id, buf, RakReliability::ReliableOrdered, priority);
             }
             (Self::NetherNet { lan, .. }, SessionId::NetherNetLan(id)) => {
-                let _ = lan.send(id, &data);
+                let _ = lan.send(id, &batch.data);
             }
             (Self::NetherNet { http, .. }, SessionId::NetherNetHttp(id)) => {
-                let _ = http.send(id, &data);
+                let _ = http.send(id, &batch.data);
             }
             _ => {}
         }

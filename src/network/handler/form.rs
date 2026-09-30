@@ -1,5 +1,5 @@
 use crate::network::BedrockProtocol;
-use crate::player::Player;
+use crate::player::forms::PendingForms;
 use bedrock::protocol::ProtoVersionPackets;
 use bevy_ecs::message::{Message, MessageWriter};
 use bevy_ecs::prelude::Entity;
@@ -13,10 +13,10 @@ pub struct FormResponseMessage {
 pub fn handle_modal_form_response(
     entity: Entity,
     packet: &<BedrockProtocol as ProtoVersionPackets>::ModalFormResponsePacket,
-    player: &mut Player,
+    forms: &mut PendingForms,
     form_writer: &mut MessageWriter<FormResponseMessage>,
 ) {
-    let Some((_form, on_response)) = player.forms_pending.remove(&packet.form_id) else {
+    let Some((_form, on_response)) = forms.take(packet.form_id) else {
         return;
     };
 

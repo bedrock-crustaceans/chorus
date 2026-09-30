@@ -1,7 +1,10 @@
 use crate::command::command_definition::CommandDefinition;
 use crate::command::parameter::{CommandOverload, CommandParameter, CommandParameterType};
 use crate::const_command;
+use crate::entity::components::actor_id::ActorId;
 use crate::network::BedrockProtocol;
+use crate::network::session::Session;
+use crate::player::forms::PendingForms;
 use atomicow::CowArc;
 use bedrock::form::elems::button::Button;
 use bedrock::form::forms::Form;
@@ -29,19 +32,23 @@ pub const DEBUG_COMMAND: CommandDefinition = const_command! {
             ])
         }
     ],
-    execute: |_, sender, args| {
+    execute: |context, args| {
         match args.first() {
-            Some(&"unhandled") => sender.reply(format!("Unhandled Packets: {:#?}", sender.session().unhandled_packets)),
+            Some(&"unhandled") => {
+                let Some(session) = context.get::<Session>() else {
+                    return Err("must be sent by player!".to_owned());
+                };
+                let report = format!("Unhandled Packets: {:#?}", session.unhandled_packets);
+                context.reply(report);
+            }
             Some(&"form") => {
-                let name = sender.name().to_owned();
-                let (session, player) = sender.split();
-
-                let Some(player) = player else {
+                let name = context.sender_name().to_owned();
+                let Some((mut session, mut forms)) = context.components_mut::<(&mut Session, &mut PendingForms)>() else {
                     return Err("must be sent by player!".to_owned());
                 };
 
-                player.send_form(
-                    session,
+                forms.send(
+                    &mut session,
                     Form::Simple(SimpleForm {
                         body: format!("Hello {}!", name),
                         buttons: vec![
@@ -59,9 +66,7 @@ pub const DEBUG_COMMAND: CommandDefinition = const_command! {
                 );
             }
             Some(&"speed") => {
-                let (session, player) = sender.split();
-
-                let Some(player) = player else {
+                let Some((mut session, actor)) = context.components_mut::<(&mut Session, &ActorId)>() else {
                     return Err("must be sent by player!".to_owned());
                 };
 
@@ -76,7 +81,7 @@ pub const DEBUG_COMMAND: CommandDefinition = const_command! {
                 session.send(BedrockProtocol::UpdateAbilitiesPacket(
                     UpdateAbilitiesPacket {
                         data: SerializedAbilitiesData {
-                            target_player_raw_id: player.unique_id(),
+                            target_player_raw_id: actor.unique_id,
                             player_permissions: 1,
                             command_permissions: CommandPermissionLevel::Any,
                             layers: vec![SerializedLayer {

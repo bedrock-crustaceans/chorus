@@ -10,7 +10,7 @@ pub struct Pig;
 
 impl Pig {
     pub fn new() -> (Entity, EntityMob, Pig, Ageable, Breedable) {
-        let entity = Entity::default(entity_id::PIG.to_string(), rand::random::<i64>());
+        let entity = Entity::default(entity_id::PIG.to_string());
         let entity_mob = EntityMob::default();
         let pig = Pig {};
         let ageable = Ageable::default();

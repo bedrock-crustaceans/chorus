@@ -8,8 +8,11 @@ pub mod level;
 mod palette;
 pub mod sub_chunk;
 
-use bevy_ecs::prelude::Message;
+use bevy_ecs::prelude::{Component, Message};
 use glam::Vec3;
+
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DimensionId(pub i32);
 
 #[derive(Message, Clone)]
 pub struct BlockUpdatedMessage {

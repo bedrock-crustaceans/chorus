@@ -1,6 +1,7 @@
 use crate::command::command_definition::CommandDefinition;
 use crate::command::parameter::{CommandOverload, CommandParameter, CommandParameterType};
 use crate::const_command;
+use crate::network::session::Session;
 use crate::player::gamemode::Gamemode;
 use atomicow::CowArc;
 use bedrock::protocol::v898::packets::CommandPermissionLevelString;
@@ -21,7 +22,7 @@ pub const GAMEMODE_COMMAND: CommandDefinition = const_command! {
             ])
         }
     ],
-    execute: |_, sender, args| {
+    execute: |context, args| {
         let Some(&argument) = args.first() else {
             return Err("Usage: /gamemode <gameMode: string>".to_owned());
         };
@@ -30,19 +31,17 @@ pub const GAMEMODE_COMMAND: CommandDefinition = const_command! {
             return Err(format!("\"{argument}\" is not a valid game mode."));
         };
 
-        let (session, player) = sender.split();
-
-        let Some(player) = player else {
+        let Some((mut session, mut current)) = context.components_mut::<(&mut Session, &mut Gamemode)>() else {
             return Err("must be sent by player!".to_owned());
         };
 
-        if player.gamemode() == gamemode {
+        if *current == gamemode {
             return Err("Your game mode was not changed.".to_owned());
         }
 
-        player.set_gamemode(session, gamemode);
+        current.set(&mut session, gamemode);
 
-        sender.reply(format!("Set own game mode to {}", gamemode.name()));
+        context.reply(format!("Set own game mode to {}", gamemode.name()));
         Ok(())
     }
 };

@@ -1,6 +1,10 @@
+use crate::network::BedrockProtocol;
+use crate::network::session::Session;
 use bedrock::protocol::v662::enums::GameType;
+use bedrock::protocol::v662::packets::SetPlayerGameTypePacket;
+use bevy_ecs::prelude::Component;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Gamemode {
     #[default]
     Survival,
@@ -36,5 +40,18 @@ impl Gamemode {
             Self::Adventure => GameType::Adventure,
             Self::Spectator => GameType::Spectator,
         }
+    }
+}
+
+impl Gamemode {
+    pub fn set(&mut self, session: &mut Session, gamemode: Gamemode) {
+        *self = gamemode;
+
+        session.send(BedrockProtocol::SetPlayerGameTypePacket(
+            SetPlayerGameTypePacket {
+                player_game_type: gamemode.game_type(),
+            }
+            .into(),
+        ));
     }
 }

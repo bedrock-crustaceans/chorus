@@ -1,100 +1,71 @@
+use crate::entity::components::actor_id::ActorId;
+use crate::entity::components::transform::Transform;
+use crate::level::DimensionId;
 use crate::network::BedrockProtocol;
 use crate::network::session::Session;
-use crate::player::block_break::BlockBreakHandler;
+use crate::player::block_break::BlockBreaking;
+use crate::player::chunk_view::ChunkView;
+use crate::player::forms::PendingForms;
 use crate::player::gamemode::Gamemode;
 use crate::player::inventory::PlayerInventory;
-use bedrock::form::forms::Form;
-use bedrock::protocol::v662::packets::{ModalFormRequestPacket, SetPlayerGameTypePacket};
+use bedrock::protocol::v662::types::ActorRuntimeID;
+use bedrock::protocol::v2168::enums::PlayerPositionMode;
+use bedrock::protocol::v2168::packets::MovePlayerPacket;
+use bedrock::protocol::v2168::types::MovePlayerTeleportData;
 use bevy_ecs::prelude::*;
-use std::collections::{HashMap, HashSet, VecDeque};
+use glam::Vec3;
 
 pub mod block_break;
+pub mod chunk_view;
+pub mod forms;
 pub mod gamemode;
 pub mod identity;
 pub mod inventory;
 
-#[derive(Component)]
-pub struct Player {
-    unique_id: i64,
-    runtime_id: u64,
-    gamemode: Gamemode,
+pub const PLAYER_EYE_HEIGHT: f32 = 1.62;
 
-    pub dimension: i32,
-    pub(crate) chunks_dimension: i32,
-    pub(crate) dimension_changes: i32,
-    pub chunks_radius: i32,
-    pub chunks_center: Option<(i32, i32)>,
-    pub chunks_pending: VecDeque<(i32, i32)>,
-    pub chunks_requested: HashSet<(i32, i32)>,
-    pub chunks_sent: HashSet<(i32, i32)>,
+const TELEPORT_ARRIVAL_DISTANCE: f32 = 1.0;
 
-    pub block_break: Option<BlockBreakHandler>,
-    pub inventory: PlayerInventory,
+#[derive(Component, Default)]
+#[require(DimensionId, ChunkView, BlockBreaking, PlayerInventory, PendingForms, Gamemode, PendingTeleport)]
+pub struct Player;
 
-    pub forms_id: u32,
-    pub forms_pending: HashMap<u32, (Form, Box<dyn FnOnce() + Send + Sync>)>,
-}
+#[derive(Component, Default)]
+pub struct PendingTeleport(Option<Vec3>);
 
-impl Player {
-    pub fn new(runtime_id: u64) -> Self {
-        Self {
-            unique_id: rand::random(),
-            runtime_id,
-            gamemode: Gamemode::default(),
-
-            dimension: 0,
-            chunks_dimension: 0,
-            dimension_changes: 0,
-            chunks_radius: 0,
-            chunks_center: None,
-            chunks_pending: VecDeque::new(),
-            chunks_requested: HashSet::new(),
-            chunks_sent: HashSet::new(),
-
-            block_break: None,
-            inventory: PlayerInventory::new(),
-
-            forms_id: 0,
-            forms_pending: HashMap::new(),
+impl PendingTeleport {
+    pub(crate) fn accepts(&mut self, reported: Vec3) -> bool {
+        match self.0 {
+            Some(destination) if reported.distance_squared(destination) > TELEPORT_ARRIVAL_DISTANCE * TELEPORT_ARRIVAL_DISTANCE => false,
+            Some(_) => {
+                self.0 = None;
+                true
+            }
+            None => true,
         }
     }
+}
 
-    pub fn unique_id(&self) -> i64 {
-        self.unique_id
-    }
+pub fn teleport(session: &mut Session, actor: &ActorId, transform: &mut Transform, pending: &mut PendingTeleport, feet: Vec3) {
+    let eye = feet + Vec3::new(0.0, PLAYER_EYE_HEIGHT, 0.0);
+    transform.position = eye;
+    pending.0 = Some(eye);
 
-    pub fn runtime_id(&self) -> u64 {
-        self.runtime_id
-    }
-
-    pub fn gamemode(&self) -> Gamemode {
-        self.gamemode
-    }
-
-    pub fn set_gamemode(&mut self, session: &mut Session, gamemode: Gamemode) {
-        self.gamemode = gamemode;
-
-        session.send(BedrockProtocol::SetPlayerGameTypePacket(
-            SetPlayerGameTypePacket {
-                player_game_type: gamemode.game_type(),
-            }
-            .into(),
-        ));
-    }
-
-    pub fn send_form<F>(&mut self, session: &mut Session, form: Form, on_response: F)
-    where
-        F: FnOnce() + Send + Sync + 'static,
-    {
-        let Ok(json) = facet_json::to_string(&form) else {
-            return;
-        };
-
-        let id = self.forms_id;
-        self.forms_id += 1;
-
-        session.send(BedrockProtocol::ModalFormRequestPacket(ModalFormRequestPacket { form_id: id, form_ui_json: json }.into()));
-
-        self.forms_pending.insert(id, (form, Box::new(on_response)));
-    }
+    session.send(BedrockProtocol::MovePlayerPacket(
+        MovePlayerPacket {
+            player_runtime_id: ActorRuntimeID(actor.runtime_id),
+            position: (eye.x, eye.y, eye.z),
+            rotation: (0.0, 0.0),
+            y_head_rotation: 0.0,
+            position_mode: PlayerPositionMode::Teleport,
+            on_ground: false,
+            riding_runtime_id: ActorRuntimeID(0),
+            teleport_data: Some(MovePlayerTeleportData {
+                teleportation_cause: 0,
+                source_actor_type: 0,
+            }),
+            tick: 0,
+        }
+        .into(),
+    ));
 }

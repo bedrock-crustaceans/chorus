@@ -4,4 +4,3 @@ pub mod context;
 pub mod dispatch;
 pub mod r#impl;
 pub mod parameter;
-pub mod sender;

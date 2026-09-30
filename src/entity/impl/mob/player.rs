@@ -8,7 +8,7 @@ pub struct Player {}
 
 impl Player {
     pub fn new() -> (Entity, EntityMob, Player) {
-        let entity = Entity::default(entity_id::PLAYER.to_string(), rand::random::<i64>());
+        let entity = Entity::default(entity_id::PLAYER.to_string());
         let entity_mob = EntityMob::default();
         let player = Player {};
 

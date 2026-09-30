@@ -10,5 +10,5 @@ pub const CAMERASHAKE_COMMAND: CommandDefinition = const_command! {
     overloads: [
         // TODO
     ],
-    execute: |_, _, _| { Ok(()) },
+    execute: |_, _| { Ok(()) },
 };

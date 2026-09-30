@@ -1,11 +1,16 @@
 use crate::config::Config;
+use crate::entity::components::actor_id::ActorId;
+use crate::entity::components::transform::Transform;
 use crate::entity::entity::Entity as PlayerEntity;
+use crate::level::DimensionId;
 use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
-use crate::player::Player;
+use crate::player::chunk_view::ChunkView;
+use crate::player::gamemode::Gamemode;
+use crate::player::{PLAYER_EYE_HEIGHT, Player};
 use crate::registry::item_registry::ItemRegistry;
 use crate::server::ServerState;
 use bedrock::protocol::v662::enums::{ChatRestrictionLevel, Difficulty, EditorWorldType, GamePublishSetting, GameType, GeneratorType, PlayStatus, PlayerPermissionLevel, SpawnBiomeType};
@@ -28,8 +33,6 @@ use indexmap::IndexMap;
 use nbtx::ValueList;
 use tracing::{debug, warn};
 
-const PLAYER_EYE_HEIGHT: f32 = 1.62;
-
 pub fn on_enter_setup(
     mut sessions: Query<&mut Session>,
     mut server_state: ResMut<ServerState>,
@@ -47,7 +50,10 @@ pub fn on_enter_setup(
             continue;
         };
 
-        let player = Player::new(server_state.get_runtime_id());
+        let actor = ActorId {
+            unique_id: rand::random(),
+            runtime_id: server_state.get_runtime_id(),
+        };
 
         session.send_immediate(BedrockProtocol::VoxelShapesPacket(
             VoxelShapesPacket {
@@ -74,22 +80,22 @@ pub fn on_enter_setup(
 
         let spawn = level.spawn;
         let position = spawn.as_vec3() + Vec3::new(0.5, PLAYER_EYE_HEIGHT, 0.5);
-        send_start_game(&player, position, spawn, &mut session);
+        send_start_game(&actor, Gamemode::default(), position, spawn, &mut session);
 
         session.send_immediate(BedrockProtocol::ItemComponentPacket(items.to_packet().into()));
 
-        let mut entity = PlayerEntity::default("minecraft:player".to_string(), player.unique_id());
-        entity.position = position;
-        commands.entity(ev.entity).insert((player, entity));
+        commands
+            .entity(ev.entity)
+            .insert((Player, actor, Transform::at(position), PlayerEntity::default("minecraft:player".to_string()), DimensionId(0)));
     }
 }
 
-fn send_start_game(player: &Player, position: Vec3, spawn: IVec3, session: &mut Session) {
+fn send_start_game(actor: &ActorId, gamemode: Gamemode, position: Vec3, spawn: IVec3, session: &mut Session) {
     session.send_immediate(BedrockProtocol::StartGamePacket(
         StartGamePacket {
-            target_actor_id: ActorUniqueID(player.unique_id()),
-            target_runtime_id: ActorRuntimeID(player.runtime_id()),
-            actor_game_type: player.gamemode().game_type(),
+            target_actor_id: ActorUniqueID(actor.unique_id),
+            target_runtime_id: ActorRuntimeID(actor.runtime_id),
+            actor_game_type: gamemode.game_type(),
             position: (position.x, position.y, position.z),
             rotation: Default::default(),
             settings: LevelSettings {
@@ -189,18 +195,18 @@ pub fn handle_setup(
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     items: Res<ItemRegistry>,
     mut state_writer: MessageWriter<SessionStateChangedMessage>,
-    mut query: Query<(&mut Player, &mut Session)>,
+    mut query: Query<(&mut ChunkView, &ActorId, &mut Session)>,
 ) {
     for ev in packet_reader.read() {
-        let Ok((mut player, mut session)) = query.get_mut(ev.entity) else {
+        let Ok((mut view, actor, mut session)) = query.get_mut(ev.entity) else {
             continue;
         };
         if session.get_state() != SessionState::Setup {
             continue;
         }
         match &ev.packet {
-            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(&config, packet, &mut player, &mut session, &items),
-            BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => handle_set_local_player_as_initialized(packet, &player, &mut session, &mut state_writer),
+            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(&config, packet, &mut view, &mut session, &items),
+            BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => handle_set_local_player_as_initialized(packet, actor, &mut session, &mut state_writer),
             packet => {
                 let count = session.unhandled_packets.entry(packet.as_ref().meta().name).or_insert(0);
                 *count = count.saturating_add(1);
@@ -209,12 +215,12 @@ pub fn handle_setup(
     }
 }
 
-fn handle_request_chunk_radius(config: &Config, packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, player: &mut Player, session: &mut Session, items: &ItemRegistry) {
+fn handle_request_chunk_radius(config: &Config, packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, view: &mut ChunkView, session: &mut Session, items: &ItemRegistry) {
     let radius = packet.chunk_radius.min(config.max_view_distance);
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
 
     // the queue itself is filled by update_chunk_order, which also keeps it following the player
-    player.chunks_radius = radius;
+    view.radius = radius;
 
     session.send(BedrockProtocol::ChunkRadiusUpdatedPacket(ChunkRadiusUpdatedPacket { chunk_radius: radius }.into()));
 
@@ -227,12 +233,12 @@ fn handle_request_chunk_radius(config: &Config, packet: &<BedrockProtocol as Pro
 
 fn handle_set_local_player_as_initialized(
     packet: &<BedrockProtocol as ProtoVersionPackets>::SetLocalPlayerAsInitializedPacket,
-    player: &Player,
+    actor: &ActorId,
     session: &mut Session,
     state_writer: &mut MessageWriter<SessionStateChangedMessage>,
 ) {
-    if packet.player_id.0 != player.runtime_id() {
-        warn!("received unexpected player_id {}, expected {}", packet.player_id.0, player.runtime_id());
+    if packet.player_id.0 != actor.runtime_id {
+        warn!("received unexpected player_id {}, expected {}", packet.player_id.0, actor.runtime_id);
         return;
     };
 

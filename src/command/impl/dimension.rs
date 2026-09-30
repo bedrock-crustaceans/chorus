@@ -1,6 +1,7 @@
 use crate::command::command_definition::CommandDefinition;
 use crate::command::parameter::{CommandOverload, CommandParameter, CommandParameterType};
 use crate::const_command;
+use crate::level::DimensionId;
 use crate::level::level::Level;
 use atomicow::CowArc;
 use bedrock::protocol::v898::packets::CommandPermissionLevelString;
@@ -21,7 +22,7 @@ pub const DIMENSION_COMMAND: CommandDefinition = const_command! {
             ])
         }
     ],
-    execute: |context, sender, args| {
+    execute: |context, args| {
         let Some(id) = args.first().and_then(|argument| argument.parse::<i32>().ok()) else {
             return Err("Usage: /dimension <id: int>".to_owned());
         };
@@ -31,16 +32,15 @@ pub const DIMENSION_COMMAND: CommandDefinition = const_command! {
         };
         let name = dimension.name();
 
-        let (_, player) = sender.split();
-        let Some(player) = player else {
+        let Some(mut current) = context.get_mut::<DimensionId>() else {
             return Err("must be sent by player!".to_owned());
         };
-        if player.dimension == id {
+        if current.0 == id {
             return Err(format!("Already in {name}."));
         }
-        player.dimension = id;
+        current.0 = id;
 
-        sender.reply(format!("Moving to {name}"));
+        context.reply(format!("Moving to {name}"));
         Ok(())
     }
 };
