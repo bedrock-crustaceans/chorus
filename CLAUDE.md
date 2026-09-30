@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Chorus is Minecraft Bedrock Edition server software written in Rust. It is built on top of [`bedrock-rs`](https://github.com/bedrock-crustaceans/bedrock-rs) (vendored under `libs/bedrock-rs`) and uses Bevy ECS as the server tick/scheduling backbone.
+Chorus is Minecraft Bedrock Edition server software written in Rust. It is built on top of [`bedrock-rs`](https://github.com/bedrock-crustaceans/bedrock-rs) (pulled as a git dependency from its `main` branch in `Cargo.toml`) and uses Bevy ECS as the server tick/scheduling backbone.
 
 ## Commands
 
@@ -28,7 +28,7 @@ cargo fmt
 cargo clippy
 ```
 
-There are no tests at this time. The workspace has one internal crate: `crates/raknet`.
+There are no tests at this time. There is no Cargo workspace and no internal crates; RakNet and NetherNet transports come from the `bevy-raknet` and `bevy-nethernet` git dependencies. To develop against a local bedrock-rs checkout, add a `[patch."https://github.com/bedrock-crustaceans/bedrock-rs"]` section to `Cargo.toml`.
 
 ## Architecture
 
@@ -92,4 +92,4 @@ Use the `const_block!` / `const_permutation!` macros for compile-time static def
 
 ### Protocol version
 
-`BedrockProtocol` is a type alias for `V975` from `bedrock-rs` (`src/network/mod.rs`). To change the protocol version, update this alias and adjust any version-specific packet imports.
+`BedrockProtocol` is a type alias for `V2193` from `bedrock-rs` (`src/network/mod.rs`). To change the protocol version, update this alias and adjust any version-specific packet imports.
