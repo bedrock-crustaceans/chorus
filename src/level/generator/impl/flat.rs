@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
+use crate::error::phase::PhaseError;
 use crate::level::chunk::Chunk;
 use crate::level::generator::dimension::Generator;
-use crate::level::generator::phase::{Phase, PhaseInputs, PhaseValue};
+use crate::level::generator::phase::{Phase, PhaseInputs};
 use crate::level::generator::pos::ChunkPos;
 
 pub struct FlatLayer {
@@ -20,25 +19,14 @@ pub struct FlatGenerator {
 
 impl Generator for FlatGenerator {
     type Terminal = FlatPhase;
-    type Value = Arc<Chunk>;
 }
 
 pub struct FlatPhase;
 
-impl PhaseValue<FlatGenerator> for FlatPhase {
-    fn wrap(output: Arc<Self::Output>) -> Arc<Chunk> {
-        output
-    }
-
-    fn unwrap(value: &Arc<Chunk>) -> Option<Arc<Self::Output>> {
-        Some(value.clone())
-    }
-}
-
 impl Phase<FlatGenerator> for FlatPhase {
     type Output = Chunk;
 
-    fn run(generator: &FlatGenerator, cell: ChunkPos, _inputs: &PhaseInputs<FlatGenerator>) -> Chunk {
+    fn run(generator: &FlatGenerator, cell: ChunkPos, _inputs: &mut PhaseInputs<FlatGenerator>) -> Result<Chunk, PhaseError> {
         let mut chunk = Chunk::new(cell.x, cell.z, generator.min_sub_chunk_y, generator.sub_chunk_count, generator.air_id, generator.biome);
 
         let mut y = 0i32;
@@ -53,6 +41,6 @@ impl Phase<FlatGenerator> for FlatPhase {
             }
         }
 
-        chunk
+        Ok(chunk)
     }
 }
