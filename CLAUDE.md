@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Chorus is Minecraft Bedrock Edition server software written in Rust. It is built on top of [`bedrock-rs`](https://github.com/bedrock-crustaceans/bedrock-rs) (pulled as a git dependency from its `main` branch in `Cargo.toml`) and uses Bevy ECS as the server tick/scheduling backbone.
+Chorus is Minecraft Bedrock Edition server software written in Rust. It is built on top of [`bedrock-rs`](https://github.com/bedrock-crustaceans/bedrock-rs) and uses Bevy ECS (`bevy_app` / `bevy_ecs`, no full Bevy) as the server tick/scheduling backbone.
+
+`bedrock-rs`, `bevy-raknet`, `bevy-nethernet` and `nbtx` are git dependencies pinned to `branch = "main"` in `Cargo.toml`; nothing is vendored. To develop against a local checkout of one of them, add a temporary `[patch]` section and do not commit it.
 
 ## Commands
 
@@ -28,68 +30,90 @@ cargo fmt
 cargo clippy
 ```
 
-There are no tests at this time. There is no Cargo workspace and no internal crates; RakNet and NetherNet transports come from the `bevy-raknet` and `bevy-nethernet` git dependencies. To develop against a local bedrock-rs checkout, add a `[patch."https://github.com/bedrock-crustaceans/bedrock-rs"]` section to `Cargo.toml`.
+There are no tests at this time. The package is a single crate (`src/lib.rs` + `src/main.rs`); there is no workspace.
 
 ## Architecture
 
-### Bevy ECS as the tick loop
+### Custom tick loop on Bevy ECS
 
-`Chorus::init()` (`src/lib.rs`) constructs a Bevy `App` configured to tick at 20 Hz via `ScheduleRunnerPlugin` + `Time<Fixed>`. All game logic lives in Bevy systems, resources, and components.
+`Chorus::init()` (`src/lib.rs`) builds a Bevy `App` with `ChorusPlugin` and a custom runner, `LoopRunner::run`. Game logic runs in a custom `Tick` schedule with three chained sets, `TickSet::First`, `TickSet::Update`, `TickSet::Last`. There is no Bevy `FixedUpdate`.
+
+- `run_fixed_tick` (added to `RunFixedMainLoop`) accumulates elapsed time in `TickClock` and runs the `Tick` schedule once per 50 ms (`TICK_RATE = 20.0` in `src/server/mod.rs`), catching up at most `MAX_TICKS_PER_UPDATE = 5` ticks per `app.update()`.
+- After each update, `LoopRunner` drains the `JobQueue` resource (a queue of registered `SystemId`s) until the tick deadline, then spin-sleeps the remainder. Use `JobQueue::push` for deferred work that should use spare time in the tick (e.g. `Level::queue_poll_generation`).
+- `Server::start_tick` / `Server::end_tick` run in `TickSet::First` / `TickSet::Last` and maintain `ServerState` (tick counter, runtime-ID generator) and `ServerMetrics` (TPS / MSPT).
 
 ### Plugin tree
 
 ```
-Server (src/server.rs)
-├── Registry (src/registry/)   — registers block definitions into BlockRegistry
-└── Network (src/network/network.rs)
-    ├── PacketHandlers          — per-state packet routing systems
-    └── LoginAuthOIDC           — optional OIDC auth resource
+ChorusPlugin (src/lib.rs)        — Config::setup(), Tick schedule, TaskPoolPlugin, logger
+└── Server (src/server/mod.rs)   — ServerState, ServerMetrics, tick metrics
+    ├── Registry (src/registry/) — Startup: BlockRegistry, CommandRegistry, ResourcePacks, ItemRegistry, Level::init
+    └── Network (src/network/network.rs)
+        ├── PacketHandlers        — all packet handler systems, in Tick / TickSet::Update
+        ├── LoginAuthOIDC         — optional OIDC auth resource
+        ├── RakServerPlugin       — bevy-raknet transport
+        ├── NetherServerPlugin    — bevy-nethernet LAN signaling transport
+        └── NetherHttpServerPlugin
 ```
-
-`Server::build` inserts `ServerState` (tick counter + runtime-ID generator) and wires `FixedFirst`/`FixedLast` systems for tick metrics.
 
 ### Network & Session lifecycle
 
-The `Network` plugin owns a Tokio runtime and a `bedrock-rs` RakNet `Listener`. A background task accepts incoming connections and sends them through a `crossbeam_channel` to the ECS world.
+`Network::init` (Startup) binds either a RakNet or a NetherNet server depending on `config.transport`. `Network::accept` and `Network::queue_receive` run in `PreUpdate` (after the transport plugins' sets), and `Network::flush` runs in `PostUpdate`.
 
-Each connection becomes a `Session` Bevy component (`src/network/session/mod.rs`) spawned onto an entity. `Session` bridges the synchronous ECS world to an async Tokio task via two `mpsc` channels (`ConnectionEvent` outbound, `BedrockProtocol` inbound).
+Each connection becomes a `Session` Bevy component (`src/network/session/mod.rs`) on its own entity. `Session` owns the connection's `SessionState`, compression and encryption settings, and an outgoing packet queue that `flush` encodes and sends.
 
-`Session` holds a `SessionState` state machine:
+`SessionState` (`src/network/session/state.rs`) is a state machine:
 
 ```
 Request → Login → Handshake (if encryption) → Resource → Setup → Play
 ```
 
-State transitions emit a `SessionStateChangedMessage` which handler systems observe to run entry logic (`on_enter_setup`, etc.).
+State transitions emit a `SessionStateChangedMessage`, which handler systems observe to run entry logic (`on_enter_setup`, `on_enter_play`).
 
 ### Packet routing
 
-`PacketHandlers` runs five systems every `FixedUpdate` tick. Each system reads `PacketReceivedMessage`, filters by `SessionState`, and dispatches to the relevant handler:
+`PacketHandlers` (`src/network/handler/mod.rs`) registers all handler systems in the `Tick` schedule inside `TickSet::Update`, as one long `.chain()` of grouped systems. Each state handler reads `PacketReceivedMessage`, filters by `SessionState`, and dispatches:
 
-| Handler file | State |
+| Handler file | Responsibility |
 |---|---|
-| `handler/request.rs` | `Request` |
-| `handler/login.rs` | `Login` |
-| `handler/handshake.rs` | `Handshake` |
-| `handler/resource.rs` | `Resource` |
-| `handler/setup.rs` | `Setup` / `Play` |
+| `handler/request.rs` | `Request` state |
+| `handler/login.rs` | `Login` state |
+| `handler/handshake.rs` | `Handshake` state |
+| `handler/resource.rs` | `Resource` state: pack info, chunk serving, pack stack |
+| `handler/setup.rs` | `Setup` state: StartGame, item/creative/biome packets |
+| `handler/play.rs` | `Play` state: movement, join/quit, block update broadcasts |
+| `handler/block.rs` | block break/place actions and level event broadcasts |
+| `handler/inventory.rs` | inventory transactions and held item |
+| `handler/chat.rs` | chat and broadcast messages |
+| `handler/chunks.rs` | chunk ordering, sending, unloading, sub-chunk requests |
+| `handler/form.rs` | form responses |
+
+Commands are dispatched by `dispatch_commands` (`src/command/dispatch.rs`), an exclusive `&mut World` system in the same chain.
 
 ### Block system
 
 `BlockDefinition` (`src/block/block_definition.rs`) declares a block's identifier, states (combinatorial state values), base components, and conditional permutation overrides. `BlockDefinition::generate()` expands all permutations, computes FNV hashes, and returns maps from hash → `BlockPermutation` and hash → `BlockComponents`.
 
-Use the `const_block!` / `const_permutation!` macros for compile-time static definitions (see `src/block/impl/grass_block.rs` for a minimal example). Runtime-allocated definitions use `BlockDefinition::new(...)`.
+Use the `const_block!` / `const_permutation!` macros for compile-time static definitions (see `src/block/impl/grass_block.rs` for a minimal example). Runtime-allocated definitions use `BlockDefinition::new(...)`. All vanilla blocks are hand-written consts under `src/block/impl/` and collected in `DEFINITIONS`.
 
 `BlockRegistry` (`src/registry/block_registry.rs`) is a Bevy `Resource`. Add new blocks by calling `registry.register_all([...])` inside `BlockRegistry::init`.
 
+### Items and vanilla data
+
+`ItemRegistry` (`src/registry/item_registry.rs`) is built from `src/resources/item_palette.json` and `src/resources/creative_items.json` at startup. The other files under `src/resources/` (block palette, biome definitions, entity identifiers, recipes, etc.) are vanilla data dumps that are mostly not wired up yet.
+
+### Level
+
+`Level` (`src/level/level.rs`) is a single global resource. There is no world persistence; `Level::init` builds an in-memory generated world after `BlockRegistry::init`. Chunk generation is polled through the `JobQueue`.
+
 ### Resource packs
 
-`ResourcePacks::load` (`src/resource/mod.rs`) is a startup system that scans the configured `resource_packs_directory` for `.mcpack` / `.zip` files and loads them into the `ResourcePacks` Bevy resource.
+`ResourcePacks::load` (`src/resource/mod.rs`) is a startup system that scans the configured `resource_packs_directory` for `.mcpack` / `.zip` files and loads them into the `ResourcePacks` Bevy resource. Behavior packs are not loaded yet; `behavior_packs_directory` is only created.
 
 ### Configuration
 
-`chorus.toml` is read (or created with defaults) at startup by `Config::setup()`. Key fields: `ip`, `port`, `threads`, `online_mode`, `encryption`, `resource_packs_directory`, `behavior_packs_directory`, `log_level`.
+`chorus.toml` is read (or created with defaults) at startup by `Config::setup()` (`src/config/mod.rs`). Fields: `ip`, `port`, `name`, `sub_name`, `max_players`, `threads`, `transport` (`RakNet` | `NetherNet`), `nethernet_http_port`, `log_to_file`, `logs_directory`, `resource_packs_directory`, `behavior_packs_directory`, `level_name`, `level_seed`, `online_mode`, `encryption`, `log_level`, `force_accept_resource_packs`, `force_disable_vibrant_visuals`, `max_view_distance`, `max_generation_distance`.
 
 ### Protocol version
 
-`BedrockProtocol` is a type alias for `V2193` from `bedrock-rs` (`src/network/mod.rs`). To change the protocol version, update this alias and adjust any version-specific packet imports.
+`BedrockProtocol` is a type alias for `V2193` from `bedrock-rs` (`src/network/mod.rs`). The matching `protocol-v2193` feature is enabled in `Cargo.toml`. To change the protocol version, update the alias, the Cargo feature, and any version-specific packet imports (handlers import packet types from the specific `bedrock::protocol::vNNN` module where they were introduced).
