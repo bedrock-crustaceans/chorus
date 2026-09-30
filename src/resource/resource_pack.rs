@@ -85,7 +85,7 @@ impl ResourcePack {
             s
         };
 
-        let manifest: Manifest = facet_json::from_str(&manifest_str).map_err(ResourcePackError::Json)?;
+        let manifest: Manifest = facet_json::from_str_jsonc(&manifest_str).map_err(ResourcePackError::Json)?;
 
         let version = format_version(&manifest.header.version).map_err(ResourcePackError::Version)?;
         let has_scripts = manifest.modules.iter().any(|m| m.module_type == "script");
