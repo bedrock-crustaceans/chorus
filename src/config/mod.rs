@@ -38,6 +38,7 @@ pub struct Config {
     pub force_accept_resource_packs: bool,
     pub force_disable_vibrant_visuals: bool,
     pub max_view_distance: i32,
+    pub max_generation_distance: i32,
 }
 
 impl Default for Config {
@@ -63,6 +64,7 @@ impl Default for Config {
             force_accept_resource_packs: false,
             force_disable_vibrant_visuals: false,
             max_view_distance: 8,
+            max_generation_distance: 8,
         }
     }
 }

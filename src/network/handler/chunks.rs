@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::generator::dimension::Dimension;
 use crate::level::level::Level;
@@ -66,34 +67,37 @@ pub fn update_chunk_order(mut query: Query<(&mut Session, &PlayerEntity, &mut Pl
     }
 }
 
-pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity, &mut Player)>, mut level: ResMut<Level>) {
+pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity, &mut Player)>, mut level: ResMut<Level>, config: Res<Config>) {
     let overworld = level.overworld_mut();
 
     let mut to_request: Vec<(i32, i32)> = Vec::new();
+    let mut seen: HashSet<(i32, i32)> = HashSet::new();
     for (_, _, _, mut player) in query.iter_mut() {
-        if player.chunks_radius == 0 {
-            continue;
-        }
+        let Some(center) = player.chunks_center else { continue };
+        let generation_radius = player.chunks_radius.min(config.max_generation_distance);
 
-        let candidates: Vec<(i32, i32)> = player.chunks_pending.iter().copied().collect();
+        let candidates: Vec<(i32, i32)> = player
+            .chunks_pending
+            .iter()
+            .copied()
+            .filter(|&(x, z)| (x - center.0).pow(2) + (z - center.1).pow(2) <= generation_radius.pow(2))
+            .collect();
         for position in candidates {
-            if player.chunks_requested.insert(position) {
+            if player.chunks_requested.insert(position) && seen.insert(position) {
                 to_request.push(position);
             }
         }
     }
 
     if !to_request.is_empty() {
-        to_request.sort_unstable();
-        to_request.dedup();
         overworld.request_chunks(&to_request);
     }
 
-    let mut ready: Vec<(i32, i32)> = Vec::new();
+    let mut ready: HashSet<(i32, i32)> = HashSet::new();
     for (_, _, _, player) in query.iter_mut() {
-        for &position in &player.chunks_requested {
+        for &position in &player.chunks_pending {
             if overworld.get_chunk(position.0, position.1).is_some() {
-                ready.push(position);
+                ready.insert(position);
             }
         }
     }
@@ -101,18 +105,14 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity
     if ready.is_empty() {
         return;
     }
-    ready.sort_unstable();
-    ready.dedup();
+    let ready: Vec<(i32, i32)> = ready.into_iter().collect();
 
     let payloads = serialize_chunks(overworld, &ready);
 
     for (_, mut session, player_entity, mut player) in query.iter_mut() {
         let mut sent: Vec<(i32, i32)> = Vec::new();
 
-        for &(x, z) in &ready {
-            if !player.chunks_requested.contains(&(x, z)) {
-                continue;
-            }
+        for &(x, z) in &player.chunks_pending {
             let Some(payload) = payloads.get(&(x, z)) else { continue };
 
             session.send(BedrockProtocol::LevelChunkPacket(

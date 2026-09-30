@@ -1,3 +1,5 @@
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use std::sync::Arc;
 
 use bevy_tasks::AsyncComputeTaskPool;
@@ -39,7 +41,9 @@ pub struct PhaseGraph<G: Generator> {
     requests_rx: Receiver<Request<G>>,
     completions_tx: Sender<(NodeKey, G::Value)>,
     completions_rx: Receiver<(NodeKey, G::Value)>,
-    pending_dispatch: Vec<NodeKey>,
+    pending_dispatch: BinaryHeap<Reverse<(u64, NodeKey)>>,
+    next_priority: u64,
+    in_flight: usize,
 }
 
 impl<G: Generator> PhaseGraph<G> {
@@ -54,7 +58,9 @@ impl<G: Generator> PhaseGraph<G> {
             requests_rx,
             completions_tx,
             completions_rx,
-            pending_dispatch: Vec::new(),
+            pending_dispatch: BinaryHeap::new(),
+            next_priority: 0,
+            in_flight: 0,
         }
     }
 
@@ -71,11 +77,12 @@ impl<G: Generator> PhaseGraph<G> {
     }
 
     pub fn has_pending_work(&self) -> bool {
-        !self.pending_dispatch.is_empty() || !self.requests_rx.is_empty()
+        !self.pending_dispatch.is_empty() || !self.requests_rx.is_empty() || self.in_flight > 0
     }
 
     pub fn tick(&mut self) {
         while let Ok((key, output)) = self.completions_rx.try_recv() {
+            self.in_flight -= 1;
             self.complete(key, output);
         }
 
@@ -83,14 +90,15 @@ impl<G: Generator> PhaseGraph<G> {
             self.request(request.descriptor, request.cell, request.notify);
         }
 
-        // zero threads means dispatch runs inline, so cap this to one node per tick
-        if AsyncComputeTaskPool::get().thread_num() > 0 {
-            while let Some(key) = self.pending_dispatch.pop() {
-                self.dispatch(key);
-            }
-        } else if let Some(key) = self.pending_dispatch.pop() {
+        let max_in_flight = (AsyncComputeTaskPool::get().thread_num() * 2).max(1);
+        while self.in_flight < max_in_flight {
+            let Some(Reverse((_, key))) = self.pending_dispatch.pop() else { break };
             self.dispatch(key);
         }
+    }
+
+    fn push_ready(&mut self, key: NodeKey) {
+        self.pending_dispatch.push(Reverse((self.graph.nodes[key].priority, key)));
     }
 
     fn request(&mut self, descriptor: PhaseDescriptor<G>, cell: ChunkPos, notify: Option<Sender<(ChunkPos, G::Value)>>) {
@@ -113,6 +121,9 @@ impl<G: Generator> PhaseGraph<G> {
                 None => Some(0),
             }
         }
+
+        let priority = self.next_priority;
+        self.next_priority += 1;
 
         let mut work = vec![Step::Enter { descriptor, cell, hop: 0, notify }];
 
@@ -141,6 +152,7 @@ impl<G: Generator> PhaseGraph<G> {
                         descriptor,
                         cell,
                         hop,
+                        priority,
                         deps: Vec::new(),
                         dependents: Vec::new(),
                         status: NodeStatus::Pending { remaining: 0 },
@@ -180,7 +192,7 @@ impl<G: Generator> PhaseGraph<G> {
                     self.graph.nodes[key].deps = deps;
 
                     if remaining == 0 {
-                        self.pending_dispatch.push(key);
+                        self.push_ready(key);
                     } else {
                         self.graph.nodes[key].status = NodeStatus::Pending { remaining };
                     }
@@ -206,6 +218,7 @@ impl<G: Generator> PhaseGraph<G> {
             .collect();
 
         self.graph.nodes[key].status = NodeStatus::Running;
+        self.in_flight += 1;
 
         let pool = AsyncComputeTaskPool::get();
         if pool.thread_num() > 0 {
@@ -247,7 +260,7 @@ impl<G: Generator> PhaseGraph<G> {
                 _ => false,
             };
             if ready {
-                self.pending_dispatch.push(dependent_key);
+                self.push_ready(dependent_key);
             }
         }
 

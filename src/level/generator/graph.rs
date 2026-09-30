@@ -18,6 +18,7 @@ pub(crate) struct Node<G: Generator> {
     pub descriptor: PhaseDescriptor<G>,
     pub cell: ChunkPos,
     pub hop: u32,
+    pub priority: u64,
     pub deps: Vec<NodeKey>,
     pub dependents: Vec<NodeKey>,
     pub status: NodeStatus<G>,

@@ -83,7 +83,7 @@ pub const DEBUG_COMMAND: CommandDefinition = const_command! {
                                 serialized_layer: SerializedAbilitiesLayer::Base,
                                 abilities_set: 0xFFFFF,
                                 ability_values,
-                                fly_speed: 4.0,
+                                fly_speed: 1.0,
                                 vertical_fly_speed: 1.0,
                                 walk_speed: 0.1,
                             }],
