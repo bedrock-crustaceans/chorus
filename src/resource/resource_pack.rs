@@ -3,8 +3,7 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 
-use bedrock::addon::manifest::AddonManifest;
-use bedrock::addon::version::AddonSemanticVersion;
+use facet::Facet;
 use uuid::Uuid;
 
 pub const CHUNK_SIZE: u64 = 1024 * 1024;
@@ -22,7 +21,8 @@ pub struct ResourcePack {
 pub enum ResourcePackError {
     Io(std::io::Error),
     Zip(zip::result::ZipError),
-    Json(serde_json::Error),
+    Json(facet_json::DeserializeError),
+    Version(semver::Error),
     MissingManifest,
 }
 
@@ -32,9 +32,39 @@ impl fmt::Display for ResourcePackError {
             Self::Io(e) => write!(f, "IO error: {e}"),
             Self::Zip(e) => write!(f, "zip error: {e}"),
             Self::Json(e) => write!(f, "JSON error: {e}"),
+            Self::Version(e) => write!(f, "invalid version: {e}"),
             Self::MissingManifest => write!(f, "manifest.json not found in archive"),
         }
     }
+}
+
+/// The subset of a pack's `manifest.json` the server needs to identify it.
+#[derive(Facet, Debug, Clone)]
+struct Manifest {
+    header: ManifestHeader,
+    modules: Vec<ManifestModule>,
+}
+
+#[derive(Facet, Debug, Clone)]
+struct ManifestHeader {
+    name: String,
+    version: ManifestVersion,
+    uuid: Uuid,
+}
+
+#[derive(Facet, Debug, Clone)]
+struct ManifestModule {
+    #[facet(rename = "type")]
+    module_type: String,
+}
+
+/// A manifest version, either a vector `[a, b, c]` or a SemVer string.
+#[derive(Facet, Debug, Clone)]
+#[facet(untagged)]
+#[repr(u8)]
+enum ManifestVersion {
+    Vector([u32; 3]),
+    SemVer(String),
 }
 
 impl ResourcePack {
@@ -55,9 +85,9 @@ impl ResourcePack {
             s
         };
 
-        let manifest: AddonManifest = serde_json::from_str(&manifest_str).map_err(ResourcePackError::Json)?;
+        let manifest: Manifest = facet_json::from_str_jsonc(&manifest_str).map_err(ResourcePackError::Json)?;
 
-        let version = format_version(&manifest.header.version);
+        let version = format_version(&manifest.header.version).map_err(ResourcePackError::Version)?;
         let has_scripts = manifest.modules.iter().any(|m| m.module_type == "script");
 
         Ok(Self {
@@ -89,9 +119,12 @@ impl ResourcePack {
     }
 }
 
-fn format_version(ver: &AddonSemanticVersion) -> String {
+fn format_version(ver: &ManifestVersion) -> Result<String, semver::Error> {
     match ver {
-        AddonSemanticVersion::Vector([a, b, c]) => format!("{a}.{b}.{c}"),
-        AddonSemanticVersion::SemVer(v) => format!("{}.{}.{}", v.major, v.minor, v.patch),
+        ManifestVersion::Vector([a, b, c]) => Ok(format!("{a}.{b}.{c}")),
+        ManifestVersion::SemVer(v) => {
+            let v = semver::Version::parse(v)?;
+            Ok(format!("{}.{}.{}", v.major, v.minor, v.patch))
+        }
     }
 }
