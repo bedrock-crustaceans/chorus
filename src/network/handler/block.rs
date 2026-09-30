@@ -157,14 +157,14 @@ fn place_block(
     }
 
     let air_id = registry.get_block_id("minecraft:air").unwrap_or(0);
-    if level.get_block(0, position.x, position.y, position.z, 0) != Some(air_id) {
+    if level.get_block(player.chunks_dimension, position.x, position.y, position.z, 0) != Some(air_id) {
         debug!("{} is not free", position);
         return;
     }
 
     debug!("placing block {} at {}", block_id, position);
 
-    level.set_block(0, position.x, position.y, position.z, 0, block_id, block_writer);
+    level.set_block(player.chunks_dimension, position.x, position.y, position.z, 0, block_id, block_writer);
 
     place_writer.write(BlockPlaceMessage {
         entity: player_entity,
@@ -179,7 +179,7 @@ fn attack_block(action: &BlockAction, entity: &PlayerEntity, player: &mut Player
         return;
     }
 
-    let Some(block_id) = level.get_block(0, action.position.x, action.position.y, action.position.z, 0) else {
+    let Some(block_id) = level.get_block(player.chunks_dimension, action.position.x, action.position.y, action.position.z, 0) else {
         return;
     };
 
@@ -202,6 +202,7 @@ fn attack_block(action: &BlockAction, entity: &PlayerEntity, player: &mut Player
     player.block_break = Some(BlockBreakHandler::new(action.position, action.face, block_id, speed));
 
     event_writer.write(LevelEventMessage {
+        dimension_id: player.chunks_dimension,
         event_id: level_event(LevelEvent::StartBlockCracking),
         position: action.position.as_vec3(),
         data: (65535. * speed) as i32,
@@ -214,6 +215,7 @@ fn stop_break(player: &mut Player, event_writer: &mut MessageWriter<LevelEventMe
     };
 
     event_writer.write(LevelEventMessage {
+        dimension_id: player.chunks_dimension,
         event_id: level_event(LevelEvent::StopBlockCracking),
         position: handler.position().as_vec3(),
         data: 0,
@@ -239,7 +241,7 @@ fn break_block(
     }
 
     let position = action.position;
-    let Some(block_id) = level.get_block(0, position.x, position.y, position.z, 0) else {
+    let Some(block_id) = level.get_block(player.chunks_dimension, position.x, position.y, position.z, 0) else {
         return;
     };
 
@@ -260,12 +262,13 @@ fn break_block(
     }
 
     event_writer.write(LevelEventMessage {
+        dimension_id: player.chunks_dimension,
         event_id: level_event(LevelEvent::ParticlesDestroyBlock),
         position: position.as_vec3() + Vec3::splat(0.5),
         data: block_id,
     });
 
-    level.set_block(0, position.x, position.y, position.z, 0, air_id, block_writer);
+    level.set_block(player.chunks_dimension, position.x, position.y, position.z, 0, air_id, block_writer);
 
     break_writer.write(BlockBreakMessage {
         entity: player_entity,
@@ -276,6 +279,7 @@ fn break_block(
 
 pub fn update_block_breaking(mut query: Query<(&PlayerEntity, &mut Player)>, mut event_writer: MessageWriter<LevelEventMessage>, mut sound_writer: MessageWriter<LevelSoundMessage>) {
     for (entity, mut player) in query.iter_mut() {
+        let dimension_id = player.chunks_dimension;
         let Some(handler) = player.block_break.as_mut() else {
             continue;
         };
@@ -286,12 +290,14 @@ pub fn update_block_breaking(mut query: Query<(&PlayerEntity, &mut Player)>, mut
                 let position = handler.position().as_vec3();
 
                 event_writer.write(LevelEventMessage {
+                    dimension_id,
                     event_id: level_event(LevelEvent::ParticlesCrackBlock),
                     position,
                     data: handler.block_id() | (handler.face() << 24),
                 });
 
                 sound_writer.write(LevelSoundMessage {
+                    dimension_id,
                     name: SOUND_HIT,
                     position,
                     data: handler.block_id(),
@@ -302,10 +308,10 @@ pub fn update_block_breaking(mut query: Query<(&PlayerEntity, &mut Player)>, mut
     }
 }
 
-pub fn broadcast_level_events(mut reader: MessageReader<LevelEventMessage>, mut sessions: Query<&mut Session>) {
+pub fn broadcast_level_events(mut reader: MessageReader<LevelEventMessage>, mut sessions: Query<(&mut Session, &Player)>) {
     for msg in reader.read() {
-        for mut session in &mut sessions {
-            if session.get_state() != SessionState::Play {
+        for (mut session, player) in &mut sessions {
+            if session.get_state() != SessionState::Play || player.chunks_dimension != msg.dimension_id {
                 continue;
             }
 
@@ -321,10 +327,10 @@ pub fn broadcast_level_events(mut reader: MessageReader<LevelEventMessage>, mut 
     }
 }
 
-pub fn broadcast_level_sounds(mut reader: MessageReader<LevelSoundMessage>, mut sessions: Query<&mut Session>) {
+pub fn broadcast_level_sounds(mut reader: MessageReader<LevelSoundMessage>, mut sessions: Query<(&mut Session, &Player)>) {
     for msg in reader.read() {
-        for mut session in &mut sessions {
-            if session.get_state() != SessionState::Play {
+        for (mut session, player) in &mut sessions {
+            if session.get_state() != SessionState::Play || player.chunks_dimension != msg.dimension_id {
                 continue;
             }
 

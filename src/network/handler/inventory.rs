@@ -154,7 +154,7 @@ pub fn handle_inventory_packets(
             // middle click - the client asks the server to hand it the block it is looking at
             BedrockProtocol::BlockPickRequestPacket(packet) => {
                 let position = &packet.position;
-                let Some(block_id) = level.get_block(0, position.x, position.y, position.z, 0) else {
+                let Some(block_id) = level.get_block(player.chunks_dimension, position.x, position.y, position.z, 0) else {
                     continue;
                 };
 

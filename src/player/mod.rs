@@ -19,6 +19,9 @@ pub struct Player {
     runtime_id: u64,
     gamemode: Gamemode,
 
+    pub dimension: i32,
+    pub(crate) chunks_dimension: i32,
+    pub(crate) dimension_changes: i32,
     pub chunks_radius: i32,
     pub chunks_center: Option<(i32, i32)>,
     pub chunks_pending: VecDeque<(i32, i32)>,
@@ -39,6 +42,9 @@ impl Player {
             runtime_id,
             gamemode: Gamemode::default(),
 
+            dimension: 0,
+            chunks_dimension: 0,
+            dimension_changes: 0,
             chunks_radius: 0,
             chunks_center: None,
             chunks_pending: VecDeque::new(),

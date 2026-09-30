@@ -6,14 +6,17 @@ use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
 use crate::player::Player;
-use bedrock::protocol::v662::packets::NetworkChunkPublisherUpdatePacket;
-use bedrock::protocol::v662::types::{BlockPos, ChunkPos};
+use bedrock::protocol::v662::enums::{PlayStatus, PlayerActionType};
+use bedrock::protocol::v662::packets::{NetworkChunkPublisherUpdatePacket, PlayerActionPacket};
+use bedrock::protocol::v662::types::{ActorRuntimeID, BlockPos, ChunkPos};
+use bedrock::protocol::v712::packets::ChangeDimensionPacket;
+use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bedrock::protocol::v2168::packets::LevelChunkPacket;
 use bedrock::protocol::v2168::types::SubChunkPos;
 use bedrock::protocol::v2193::packets::{HeightMapDataType, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult};
 use bevy_ecs::change_detection::ResMut;
 use bevy_ecs::message::MessageReader;
-use bevy_ecs::prelude::{Entity, Query};
+use bevy_ecs::prelude::{Entity, Local, Query};
 use bevy_ecs::system::Res;
 use bevy_tasks::ComputeTaskPool;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -25,8 +28,13 @@ struct ChunkPayload {
     data: Vec<u8>,
 }
 
-pub fn update_chunk_order(mut query: Query<(&mut Session, &PlayerEntity, &mut Player)>) {
+pub fn update_chunk_order(mut query: Query<(&mut Session, &PlayerEntity, &mut Player)>, mut level: ResMut<Level>) {
+    let mut left_view: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
     for (mut session, entity, mut player) in query.iter_mut() {
+        if player.chunks_dimension != player.dimension {
+            switch_dimension(&mut session, entity, &mut player, &mut left_view);
+        }
+
         if player.chunks_radius == 0 {
             continue;
         }
@@ -58,6 +66,8 @@ pub fn update_chunk_order(mut query: Query<(&mut Session, &PlayerEntity, &mut Pl
         // if the player ever comes back
         let in_view: HashSet<(i32, i32)> = wanted.iter().copied().collect();
         player.chunks_sent.retain(|position| in_view.contains(position));
+        let left = player.chunks_requested.iter().copied().filter(|position| !in_view.contains(position));
+        left_view.entry(player.chunks_dimension).or_default().extend(left);
         player.chunks_requested.retain(|position| in_view.contains(position));
 
         let pending: VecDeque<(i32, i32)> = wanted.into_iter().filter(|position| !player.chunks_sent.contains(position)).collect();
@@ -65,13 +75,76 @@ pub fn update_chunk_order(mut query: Query<(&mut Session, &PlayerEntity, &mut Pl
 
         send_publisher_update(&mut session, entity, &player);
     }
+
+    for (id, mut positions) in left_view {
+        positions.retain(|position| query.iter().all(|(_, _, player)| player.chunks_dimension != id || !player.chunks_requested.contains(position)));
+        if let Some(dimension) = level.dimension_mut(id)
+            && !positions.is_empty()
+        {
+            dimension.cancel_chunks(&positions);
+        }
+    }
+}
+
+fn switch_dimension(session: &mut Session, entity: &PlayerEntity, player: &mut Player, abandoned: &mut HashMap<i32, Vec<(i32, i32)>>) {
+    let requested = std::mem::take(&mut player.chunks_requested);
+    abandoned.entry(player.chunks_dimension).or_default().extend(requested);
+    player.chunks_sent.clear();
+    player.chunks_pending.clear();
+    player.chunks_center = None;
+    player.block_break = None;
+    player.chunks_dimension = player.dimension;
+    player.dimension_changes += 1;
+
+    session.send(BedrockProtocol::ChangeDimensionPacket(
+        ChangeDimensionPacket {
+            dimension_id: player.dimension,
+            position: (entity.position.x, entity.position.y, entity.position.z),
+            respawn: false,
+            loading_screen_id: Some(player.dimension_changes),
+        }
+        .into(),
+    ));
+    session.send_play_status(PlayStatus::PlayerSpawn, false);
+
+    let origin = || NetworkBlockPosition { x: 0, y: 0, z: 0 };
+    session.send(BedrockProtocol::PlayerActionPacket(
+        PlayerActionPacket {
+            player_runtime_id: ActorRuntimeID(player.runtime_id()),
+            action: PlayerActionType::ChangeDimensionAck,
+            block_position: origin(),
+            result_pos: origin(),
+            face: 0,
+        }
+        .into(),
+    ));
+}
+
+const UNLOAD_MARGIN: i32 = 2;
+const UNLOAD_INTERVAL_TICKS: u32 = 20;
+
+pub fn unload_distant_chunks(players: Query<&Player>, mut level: ResMut<Level>, mut ticks: Local<u32>) {
+    *ticks += 1;
+    if *ticks < UNLOAD_INTERVAL_TICKS {
+        return;
+    }
+    *ticks = 0;
+
+    for (&id, dimension) in &mut level.dimensions {
+        let views: Vec<((i32, i32), i32)> = players
+            .iter()
+            .filter(|player| player.chunks_dimension == id)
+            .filter_map(|player| Some((player.chunks_center?, player.chunks_radius + UNLOAD_MARGIN)))
+            .collect();
+        let unloaded = dimension.unload_chunks(|x, z| views.iter().any(|&((center_x, center_z), radius)| (x - center_x).pow(2) + (z - center_z).pow(2) <= radius * radius));
+        if unloaded > 0 {
+            debug!("unloaded {unloaded} chunks no player is near in {}", dimension.name());
+        }
+    }
 }
 
 pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity, &mut Player)>, mut level: ResMut<Level>, config: Res<Config>) {
-    let overworld = level.overworld_mut();
-
-    let mut to_request: Vec<(i32, i32)> = Vec::new();
-    let mut seen: HashSet<(i32, i32)> = HashSet::new();
+    let mut to_request: HashMap<i32, (Vec<(i32, i32)>, HashSet<(i32, i32)>)> = HashMap::new();
     for (_, _, _, mut player) in query.iter_mut() {
         let Some(center) = player.chunks_center else { continue };
         let generation_radius = player.chunks_radius.min(config.max_generation_distance);
@@ -82,34 +155,41 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity
             .copied()
             .filter(|&(x, z)| (x - center.0).pow(2) + (z - center.1).pow(2) <= generation_radius.pow(2))
             .collect();
+        let (positions, seen) = to_request.entry(player.chunks_dimension).or_default();
         for position in candidates {
             if player.chunks_requested.insert(position) && seen.insert(position) {
-                to_request.push(position);
+                positions.push(position);
             }
         }
     }
 
-    if !to_request.is_empty() {
-        overworld.request_chunks(&to_request);
-    }
-
-    let mut ready: HashSet<(i32, i32)> = HashSet::new();
-    for (_, _, _, player) in query.iter_mut() {
-        for &position in &player.chunks_pending {
-            if overworld.get_chunk(position.0, position.1).is_some() {
-                ready.insert(position);
-            }
+    for (id, (positions, _)) in to_request {
+        if let Some(dimension) = level.dimension_mut(id) {
+            dimension.request_chunks(&positions);
         }
     }
 
-    if ready.is_empty() {
+    let mut ready: HashMap<i32, HashSet<(i32, i32)>> = HashMap::new();
+    for (_, _, _, player) in query.iter() {
+        let Some(dimension) = level.dimension(player.chunks_dimension) else { continue };
+        let ready = ready.entry(player.chunks_dimension).or_default();
+        ready.extend(player.chunks_pending.iter().copied().filter(|&(x, z)| dimension.get_chunk(x, z).is_some()));
+    }
+
+    let payloads: HashMap<i32, HashMap<(i32, i32), ChunkPayload>> = ready
+        .into_iter()
+        .filter(|(_, positions)| !positions.is_empty())
+        .filter_map(|(id, positions)| {
+            let positions: Vec<(i32, i32)> = positions.into_iter().collect();
+            Some((id, serialize_chunks(level.dimension(id)?, &positions)))
+        })
+        .collect();
+    if payloads.is_empty() {
         return;
     }
-    let ready: Vec<(i32, i32)> = ready.into_iter().collect();
-
-    let payloads = serialize_chunks(overworld, &ready);
 
     for (_, mut session, player_entity, mut player) in query.iter_mut() {
+        let Some(payloads) = payloads.get(&player.chunks_dimension) else { continue };
         let mut sent: Vec<(i32, i32)> = Vec::new();
 
         for &(x, z) in &player.chunks_pending {
@@ -118,7 +198,7 @@ pub fn send_pending_chunks(mut query: Query<(Entity, &mut Session, &PlayerEntity
             session.send(BedrockProtocol::LevelChunkPacket(
                 LevelChunkPacket {
                     chunk_position: ChunkPos { x, z },
-                    dimension_id: 0,
+                    dimension_id: player.chunks_dimension,
                     sub_chunk_count: payload.sub_chunk_count,
                     client_request_sub_chunk_limit: None,
                     cache_enabled: false,
@@ -162,7 +242,7 @@ fn send_publisher_update(session: &mut Session, entity: &PlayerEntity, player: &
 }
 
 fn serialize_chunks(dimension: &Dimension, positions: &[(i32, i32)]) -> HashMap<(i32, i32), ChunkPayload> {
-    let min_y = dimension.min_sub_chunk_y;
+    let min_y = dimension.dimension_type.min_sub_chunk_y();
 
     let serialized = ComputeTaskPool::get().scope(|scope| {
         for &(x, z) in positions {
