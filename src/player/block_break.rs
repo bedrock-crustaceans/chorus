@@ -1,3 +1,4 @@
+use bevy_ecs::prelude::Component;
 use glam::{IVec3, Vec3};
 
 const FX_INTERVAL_TICKS: u32 = 5;
@@ -6,6 +7,11 @@ const MAX_PLAYER_DISTANCE: f32 = 16.0;
 pub enum BreakTick {
     Continue { fx: bool },
     Stop,
+}
+
+#[derive(Component, Default)]
+pub struct BlockBreaking {
+    pub current: Option<BlockBreakHandler>,
 }
 
 pub struct BlockBreakHandler {

@@ -253,7 +253,7 @@ impl Network {
 
         for (entity, mut session) in query.iter_mut() {
             for batch in session.take_outgoing() {
-                bandwidth.counters().add_sent(batch.len() as u64);
+                bandwidth.counters().add_sent(batch.data.len() as u64);
                 transport.send(&session.id, batch);
             }
 

@@ -1,13 +1,8 @@
 use bevy_ecs::prelude::Component;
-use glam::{Vec2, Vec3};
 use std::collections::HashMap;
 
 #[derive(Component)]
 pub struct Entity {
-    pub position: Vec3,
-    pub rotation: Vec2,
-    pub velocity: Vec3,
-
     // NBT fields
     pub chested: bool,
     pub color: u8,
@@ -39,13 +34,10 @@ pub struct Entity {
     pub links_tag: Option<HashMap<String, nbtx::Value>>,
     pub loot_dropped: bool,
     pub mark_variant: i32,
-    // motion -> velocity
     pub on_ground: bool,
     pub owner_new: i64,
     pub persistent: bool,
     pub portal_cooldown: i32,
-    // pos -> position
-    // rotation -> rotation
     pub saddled: bool,
     pub sheared: bool,
     pub show_bottom: bool,
@@ -54,16 +46,12 @@ pub struct Entity {
     pub strength: i32,
     pub strength_max: i32,
     pub tags: Option<Vec<String>>,
-    pub unique_id: i64,
     pub variant: i32,
 }
 
 impl Entity {
-    pub fn default(identifier: String, unique_id: i64) -> Self {
+    pub fn default(identifier: String) -> Self {
         Self {
-            position: Vec3::ZERO,
-            rotation: Vec2::ZERO,
-            velocity: Vec3::ZERO,
             chested: false,
             color: 0,
             color2: 0,
@@ -106,7 +94,6 @@ impl Entity {
             strength: 0,
             strength_max: 0,
             tags: None,
-            unique_id,
             variant: 0,
         }
     }

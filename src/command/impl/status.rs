@@ -1,11 +1,10 @@
 use crate::command::command_definition::CommandDefinition;
 use crate::command::context::CommandContext;
-use crate::command::sender::CommandSender;
 use crate::const_command;
 use crate::level::generator::dimension::Dimension;
 use crate::level::level::Level;
 use crate::network::bandwidth::BandwidthTracker;
-use crate::player::Player;
+use crate::level::DimensionId;
 use crate::server::{ServerMetrics, ServerState};
 use crate::utils::process::process_stats;
 use bedrock::protocol::v898::packets::CommandPermissionLevelString;
@@ -16,41 +15,45 @@ pub const STATUS_COMMAND: CommandDefinition = const_command! {
     aliases: [],
     permission: CommandPermissionLevelString::GameDirectors,
     overloads: [],
-    execute: |context, sender, _| {
-        sender.reply("§a---- §rServer status§a ----§r");
+    execute: |context, _| {
+        let mut lines = vec!["§a---- §rServer status§a ----§r".to_owned()];
 
         let state = context.resource::<ServerState>();
-        sender.reply(format!("§6Uptime: §c{}", format_uptime(state.uptime().as_secs())));
+        lines.push(format!("§6Uptime: §c{}", format_uptime(state.uptime().as_secs())));
 
         let metrics = context.resource::<ServerMetrics>();
         let color = tps_color(metrics.tps());
 
-        sender.reply(format!("§6Current TPS: {color}{} ({}%)", format_float(metrics.tps()), format_float(metrics.tick_usage())));
-        sender.reply(format!("§6Average TPS: {color}{} ({}%)", format_float(metrics.tps_average()), format_float(metrics.tick_usage_average())));
+        lines.push(format!("§6Current TPS: {color}{} ({}%)", format_float(metrics.tps()), format_float(metrics.tick_usage())));
+        lines.push(format!("§6Average TPS: {color}{} ({}%)", format_float(metrics.tps_average()), format_float(metrics.tick_usage_average())));
 
         let bandwidth = context.resource::<BandwidthTracker>();
 
-        sender.reply(format!("§6Network upload: §c{} kB/s", format_float(bandwidth.average_sent() / 1024.)));
-        sender.reply(format!("§6Network download: §c{} kB/s", format_float(bandwidth.average_received() / 1024.)));
+        lines.push(format!("§6Network upload: §c{} kB/s", format_float(bandwidth.average_sent() / 1024.)));
+        lines.push(format!("§6Network download: §c{} kB/s", format_float(bandwidth.average_received() / 1024.)));
 
         if let Some(stats) = process_stats() {
             // the thread count has no portable source, so the line is skipped where it is unknown
             if let Some(threads) = stats.threads {
-                sender.reply(format!("§6Thread count: §c{threads}"));
+                lines.push(format!("§6Thread count: §c{threads}"));
             }
 
-            sender.reply(format!("§6Total memory: §c{} MB.", format_megabytes(stats.resident_bytes)));
-            sender.reply(format!("§6Total virtual memory: §c{} MB.", format_megabytes(stats.virtual_bytes)));
+            lines.push(format!("§6Total memory: §c{} MB.", format_megabytes(stats.resident_bytes)));
+            lines.push(format!("§6Total virtual memory: §c{} MB.", format_megabytes(stats.virtual_bytes)));
         }
 
-        report_worlds(context, sender);
+        lines.extend(report_worlds(context));
 
+        for line in lines {
+            context.reply(line);
+        }
         Ok(())
     }
 };
 
-fn report_worlds(context: &CommandContext, sender: &mut CommandSender) {
+fn report_worlds(context: &CommandContext) -> Vec<String> {
     let level = context.resource::<Level>();
+    let mut lines = Vec::new();
 
     let mut dimensions: Vec<&Dimension> = level.dimensions.values().collect();
     dimensions.sort_by_key(|dimension| dimension.id());
@@ -59,17 +62,18 @@ fn report_worlds(context: &CommandContext, sender: &mut CommandSender) {
         let entities = context
             .world()
             .iter_entities()
-            .filter(|entity| entity.get::<Player>().is_some_and(|player| player.dimension == dimension.id()))
+            .filter(|entity| entity.get::<DimensionId>().is_some_and(|id| id.0 == dimension.id()))
             .count();
 
         // chunks are never ticked, so both the ticking count and the time spent on them are zero
-        sender.reply(format!(
+        lines.push(format!(
             "§6World \"{}\": §c{}§a loaded chunks, §c0§a ticking chunks, §c{}§a entities. Time §e0ms",
             dimension.name(),
             format_thousands(dimension.chunk_count()),
             format_thousands(entities)
         ));
     }
+    lines
 }
 
 fn tps_color(tps: f64) -> &'static str {

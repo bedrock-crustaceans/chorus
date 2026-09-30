@@ -1,5 +1,6 @@
 use crate::command::dispatch::{CommandPreprocessMessage, CommandRequestedMessage};
-use crate::entity::entity::Entity as PlayerEntity;
+use crate::entity::components::actor_id::ActorId;
+use crate::entity::components::transform::Transform;
 use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
@@ -7,7 +8,9 @@ use crate::network::handler::chat::{BroadcastMessage, PlayerChatMessage, handle_
 use crate::network::handler::form::{FormResponseMessage, handle_modal_form_response};
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
-use crate::player::Player;
+use crate::player::PendingTeleport;
+use crate::player::chunk_view::ChunkView;
+use crate::player::forms::PendingForms;
 use crate::player::identity::PlayerIdentity;
 use crate::registry::command_registry::CommandRegistry;
 use bedrock::protocol::v662::enums::{ActorFlags, CommandPermissionLevel};
@@ -36,7 +39,7 @@ pub struct PlayerQuitMessage {
 }
 
 pub fn on_enter_play(
-    mut sessions: Query<(&mut Session, &Player, &PlayerIdentity)>,
+    mut sessions: Query<(&mut Session, &ActorId, &PlayerIdentity)>,
     commands: Res<CommandRegistry>,
     mut state_reader: MessageReader<SessionStateChangedMessage>,
     mut join_writer: MessageWriter<PlayerJoinedMessage>,
@@ -45,7 +48,7 @@ pub fn on_enter_play(
         if ev.to != SessionState::Play {
             continue;
         }
-        let Ok((mut session, player, identity)) = sessions.get_mut(ev.entity) else {
+        let Ok((mut session, actor, identity)) = sessions.get_mut(ev.entity) else {
             continue;
         };
 
@@ -64,7 +67,7 @@ pub fn on_enter_play(
 
         session.send(BedrockProtocol::SetActorDataPacket(
             SetActorDataPacket {
-                target_runtime_id: ActorRuntimeID(player.runtime_id()),
+                target_runtime_id: ActorRuntimeID(actor.runtime_id),
                 actor_data: vec![DataItem {
                     data_item_id: 0,
                     data_item_type: DataItemType::Int64(flags),
@@ -88,7 +91,7 @@ pub fn on_enter_play(
         session.send(BedrockProtocol::UpdateAbilitiesPacket(
             UpdateAbilitiesPacket {
                 data: SerializedAbilitiesData {
-                    target_player_raw_id: player.unique_id(),
+                    target_player_raw_id: actor.unique_id,
                     player_permissions: 1,
                     command_permissions: CommandPermissionLevel::Any,
                     layers: vec![SerializedLayer {
@@ -117,7 +120,7 @@ pub fn on_enter_play(
 
         session.send(BedrockProtocol::UpdateAttributesPacket(
             UpdateAttributesPacket {
-                target_runtime_id: ActorRuntimeID(player.runtime_id()),
+                target_runtime_id: ActorRuntimeID(actor.runtime_id),
                 attribute_list: vec![
                     attribute("minecraft:movement", 0.0, f32::MAX, 0.1),
                     attribute("minecraft:underwater_movement", 0.0, f32::MAX, 0.02),
@@ -176,10 +179,10 @@ pub fn handle_play(
     mut command_writer: MessageWriter<CommandRequestedMessage>,
     mut move_writer: MessageWriter<PlayerMoveMessage>,
     mut form_writer: MessageWriter<FormResponseMessage>,
-    mut query: Query<(&mut PlayerEntity, &mut Player, &mut Session, &PlayerIdentity)>,
+    mut query: Query<(&mut Transform, &mut PendingTeleport, &mut PendingForms, &mut Session, &PlayerIdentity)>,
 ) {
     for ev in packet_reader.read() {
-        let Ok((mut entity, mut player, mut session, identity)) = query.get_mut(ev.entity) else {
+        let Ok((mut transform, mut pending_teleport, mut forms, mut session, identity)) = query.get_mut(ev.entity) else {
             continue;
         };
 
@@ -194,18 +197,22 @@ pub fn handle_play(
                 let (pitch, yaw) = packet.player_rotation;
                 let new_rotation = Vec2::new(pitch, yaw);
 
-                if new_position != entity.position || new_rotation != entity.rotation {
+                if !pending_teleport.accepts(new_position) {
+                    continue;
+                }
+
+                if new_position != transform.position || new_rotation != transform.rotation {
                     move_writer.write(PlayerMoveMessage {
                         entity: ev.entity,
-                        from_position: entity.position,
+                        from_position: transform.position,
                         to_position: new_position,
-                        from_rotation: entity.rotation,
+                        from_rotation: transform.rotation,
                         to_rotation: new_rotation,
                     });
                 }
 
-                entity.position = new_position;
-                entity.rotation = new_rotation;
+                transform.position = new_position;
+                transform.rotation = new_rotation;
             }
             BedrockProtocol::TextPacket(packet) => handle_text(ev.entity, packet, identity, &mut chat_writer),
             BedrockProtocol::CommandRequestPacket(packet) => {
@@ -219,7 +226,7 @@ pub fn handle_play(
                     line: packet.command.clone(),
                 });
             }
-            BedrockProtocol::ModalFormResponsePacket(packet) => handle_modal_form_response(ev.entity, packet, &mut player, &mut form_writer),
+            BedrockProtocol::ModalFormResponsePacket(packet) => handle_modal_form_response(ev.entity, packet, &mut forms, &mut form_writer),
             packet => {
                 let count = session.unhandled_packets.entry(packet.as_ref().meta().name).or_insert(0);
                 *count = count.saturating_add(1);
@@ -228,10 +235,10 @@ pub fn handle_play(
     }
 }
 
-pub fn broadcast_block_updates(mut reader: MessageReader<BlockUpdatedMessage>, mut query: Query<(&mut Session, &Player)>) {
+pub fn broadcast_block_updates(mut reader: MessageReader<BlockUpdatedMessage>, mut query: Query<(&mut Session, &ChunkView)>) {
     for msg in reader.read() {
-        for (mut session, player) in &mut query {
-            if player.chunks_dimension != msg.dimension_id {
+        for (mut session, view) in &mut query {
+            if view.dimension != msg.dimension_id {
                 continue;
             }
             session.send(BedrockProtocol::UpdateBlockPacket(

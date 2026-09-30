@@ -1,12 +1,13 @@
+use crate::entity::components::actor_id::ActorId;
 use crate::item::item_stack::ItemStack;
 use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
-use crate::player::Player;
+use crate::player::chunk_view::ChunkView;
 use crate::player::gamemode::Gamemode;
-use crate::player::inventory::Inventory;
+use crate::player::inventory::{Inventory, PlayerInventory};
 use crate::registry::block_registry::BlockRegistry;
 use crate::registry::item_registry::ItemRegistry;
 use bedrock::protocol::v662::enums::{ContainerID, ContainerType};
@@ -43,21 +44,21 @@ pub struct PlayerItemHeldMessage {
     pub slot: u8,
 }
 
-pub fn send_initial_inventory(mut sessions: Query<(&mut Session, &mut Player)>, mut state_reader: MessageReader<SessionStateChangedMessage>) {
+pub fn send_initial_inventory(mut sessions: Query<(&mut Session, &mut PlayerInventory, &ActorId)>, mut state_reader: MessageReader<SessionStateChangedMessage>) {
     for ev in state_reader.read() {
         if ev.to != SessionState::Play {
             continue;
         }
 
-        let Ok((mut session, mut player)) = sessions.get_mut(ev.entity) else {
+        let Ok((mut session, mut inventory, actor)) = sessions.get_mut(ev.entity) else {
             continue;
         };
 
         for container in [ContainerID::Inventory, ContainerID::Offhand, ContainerID::Armor] {
-            send_content(&mut session, &mut player, container);
+            send_content(&mut session, &mut inventory, container);
         }
 
-        send_held_item(&mut session, &player);
+        send_held_item(&mut session, &inventory, actor);
     }
 }
 
@@ -66,13 +67,13 @@ pub fn handle_inventory_packets(
     blocks: Res<BlockRegistry>,
     items: Res<ItemRegistry>,
     level: Res<Level>,
-    mut query: Query<(&mut Session, &mut Player)>,
+    mut query: Query<(&mut Session, &mut PlayerInventory, &ActorId, &Gamemode, &ChunkView)>,
     mut open_writer: MessageWriter<InventoryOpenMessage>,
     mut close_writer: MessageWriter<InventoryCloseMessage>,
     mut held_writer: MessageWriter<PlayerItemHeldMessage>,
 ) {
     for ev in packet_reader.read() {
-        let Ok((mut session, mut player)) = query.get_mut(ev.entity) else {
+        let Ok((mut session, mut inventory, actor, gamemode, view)) = query.get_mut(ev.entity) else {
             continue;
         };
         if session.get_state() != SessionState::Play {
@@ -85,14 +86,14 @@ pub fn handle_inventory_packets(
                     continue;
                 }
 
-                debug!("opening inventory for {}", player.unique_id());
+                debug!("opening inventory for {}", actor.unique_id);
 
                 session.send(BedrockProtocol::ContainerOpenPacket(
                     ContainerOpenPacket {
                         container_id: PLAYER_WINDOW,
                         container_type: ContainerType::Inventory,
                         position: NetworkBlockPosition { x: 0, y: 0, z: 0 },
-                        target_actor_id: ActorUniqueID(player.unique_id()),
+                        target_actor_id: ActorUniqueID(actor.unique_id),
                     }
                     .into(),
                 ));
@@ -126,8 +127,8 @@ pub fn handle_inventory_packets(
                 }
 
                 let slot = packet.selected_slot as u8;
-                if !player.inventory.set_held_slot(slot) {
-                    send_held_item(&mut session, &player);
+                if !inventory.set_held_slot(slot) {
+                    send_held_item(&mut session, &inventory, actor);
                     continue;
                 }
 
@@ -145,16 +146,16 @@ pub fn handle_inventory_packets(
                 let known = item.is_empty() || blocks.get_permutation(item.block_runtime_id).is_some();
                 if !known {
                     debug!("refusing unknown item {} in slot {}", item.id, slot);
-                    send_held_item(&mut session, &player);
+                    send_held_item(&mut session, &inventory, actor);
                     continue;
                 }
 
-                player.inventory.main_mut().set(slot as usize, item);
+                inventory.main_mut().set(slot as usize, item);
             }
             // middle click - the client asks the server to hand it the block it is looking at
             BedrockProtocol::BlockPickRequestPacket(packet) => {
                 let position = &packet.position;
-                let Some(block_id) = level.get_block(player.chunks_dimension, position.x, position.y, position.z, 0) else {
+                let Some(block_id) = level.get_block(view.dimension, position.x, position.y, position.z, 0) else {
                     continue;
                 };
 
@@ -168,13 +169,13 @@ pub fn handle_inventory_packets(
                 };
 
                 // only creative players get a stack they do not own yet
-                let allow_new = player.gamemode() == Gamemode::Creative;
-                if !player.inventory.pick_item(item, allow_new) {
+                let allow_new = *gamemode == Gamemode::Creative;
+                if !inventory.pick_item(item, allow_new) {
                     continue;
                 }
 
-                send_content(&mut session, &mut player, ContainerID::Inventory);
-                send_held_item(&mut session, &player);
+                send_content(&mut session, &mut inventory, ContainerID::Inventory);
+                send_held_item(&mut session, &inventory, actor);
             }
             _ => {}
         }
@@ -194,13 +195,13 @@ fn picked_item(blocks: &BlockRegistry, items: &ItemRegistry, block_id: i32) -> O
     })
 }
 
-fn send_content(session: &mut Session, player: &mut Player, container: ContainerID) {
-    let size = inventory(player, &container).size();
+fn send_content(session: &mut Session, inventory: &mut PlayerInventory, container: ContainerID) {
+    let size = container_of(inventory, &container).size();
     let mut slots = Vec::with_capacity(size);
 
     for slot in 0..size {
-        let item = inventory(player, &container).get(slot).copied().unwrap_or_else(ItemStack::air);
-        let net_id = (!item.is_empty()).then(|| player.inventory.next_stack_id());
+        let item = container_of(inventory, &container).get(slot).copied().unwrap_or_else(ItemStack::air);
+        let net_id = (!item.is_empty()).then(|| inventory.next_stack_id());
 
         slots.push(item.to_descriptor(net_id));
     }
@@ -219,13 +220,13 @@ fn send_content(session: &mut Session, player: &mut Player, container: Container
     ));
 }
 
-fn send_held_item(session: &mut Session, player: &Player) {
-    let held_slot = player.inventory.held_slot() as i8;
+fn send_held_item(session: &mut Session, inventory: &PlayerInventory, actor: &ActorId) {
+    let held_slot = inventory.held_slot() as i8;
 
     session.send(BedrockProtocol::MobEquipmentPacket(
         MobEquipmentPacket {
-            target_runtime_id: ActorRuntimeID(player.runtime_id()),
-            item: player.inventory.held_item().to_descriptor(None),
+            target_runtime_id: ActorRuntimeID(actor.runtime_id),
+            item: inventory.held_item().to_descriptor(None),
             slot: held_slot,
             selected_slot: held_slot,
             container_id: ContainerID::Inventory,
@@ -234,10 +235,10 @@ fn send_held_item(session: &mut Session, player: &Player) {
     ));
 }
 
-fn inventory<'a>(player: &'a Player, container: &ContainerID) -> &'a Inventory {
+fn container_of<'a>(inventory: &'a PlayerInventory, container: &ContainerID) -> &'a Inventory {
     match container {
-        ContainerID::Offhand => player.inventory.offhand(),
-        ContainerID::Armor => player.inventory.armor(),
-        _ => player.inventory.main(),
+        ContainerID::Offhand => inventory.offhand(),
+        ContainerID::Armor => inventory.armor(),
+        _ => inventory.main(),
     }
 }

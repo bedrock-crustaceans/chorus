@@ -8,9 +8,9 @@ pub const PING_COMMAND: CommandDefinition = const_command! {
     aliases: [],
     permission: CommandPermissionLevelString::Any,
     overloads: [],
-    execute: |_, sender, _| {
-        let name = sender.name().to_string();
-        sender.reply(format!("Pong, {name}!"));
+    execute: |context, _| {
+        let name = context.sender_name().to_string();
+        context.reply(format!("Pong, {name}!"));
         Ok(())
     },
 };

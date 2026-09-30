@@ -2,6 +2,7 @@ use crate::block::block_definition::BlockDefinition;
 use crate::block::block_permutation::BlockPermutation;
 use crate::block::component::block_components::BlockComponents;
 use crate::block::r#impl::DEFINITIONS;
+use crate::block::state::block_state::BlockState;
 use atomicow::CowArc;
 use bevy_ecs::prelude::{Commands, Resource};
 use rand::prelude::IteratorRandom;
@@ -86,6 +87,22 @@ impl BlockRegistry {
 
     pub fn get_block_id(&self, identifier: &str) -> Option<i32> {
         self.default_hash.get(identifier).copied()
+    }
+
+    pub fn get_block_id_with_states(&self, identifier: &str, states: &[(&str, BlockState)]) -> Option<i32> {
+        let definition = self.definitions.get(identifier)?;
+        let mut values = self.permutations.get(self.default_hash.get(identifier)?)?.get_states().clone();
+
+        for (name, value) in states {
+            let state = definition.states.iter().find(|state| state.identifier().as_ref() == *name)?;
+            if !(0..state.values_len() as i32).contains(&state.index_of(value)) {
+                return None;
+            }
+            values.insert(state.identifier().clone(), value.clone());
+        }
+
+        let index = BlockPermutation::compute_index(&values, definition.states.as_ref());
+        self.indexed_hash.get(&(definition.identifier.clone(), index)).copied()
     }
 
     pub fn get_components(&self, hash: i32) -> Option<&BlockComponents> {

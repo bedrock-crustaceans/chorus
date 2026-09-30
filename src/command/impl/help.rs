@@ -1,6 +1,5 @@
 use crate::command::command_definition::CommandDefinition;
 use crate::command::parameter::{CommandOverload, CommandParameter, CommandParameterType};
-use crate::command::sender::CommandSender;
 use crate::const_command;
 use crate::registry::command_registry::CommandRegistry;
 use atomicow::CowArc;
@@ -33,7 +32,7 @@ pub const HELP_COMMAND: CommandDefinition = const_command! {
             ])
         },
     ],
-    execute: |context, sender, args| {
+    execute: |context, args| {
         let registry = context.registry();
 
         let mut name_parts = args.to_vec();
@@ -47,42 +46,43 @@ pub const HELP_COMMAND: CommandDefinition = const_command! {
         }
 
         let name = name_parts.join(" ");
-        if name.is_empty() {
-            list(registry, sender, page);
-            return Ok(());
-        }
-
-        let Some(command) = registry.get(&name) else {
-            return Err(format!("No command matching \"{name}\" found."));
+        let lines = if name.is_empty() {
+            list(registry, page)
+        } else {
+            let Some(command) = registry.get(&name) else {
+                return Err(format!("No command matching \"{name}\" found."));
+            };
+            describe(command)
         };
 
-        describe(command, sender);
+        for line in lines {
+            context.reply(line);
+        }
         Ok(())
     }
 };
 
-fn list(registry: &CommandRegistry, sender: &mut CommandSender, page: usize) {
+fn list(registry: &CommandRegistry, page: usize) -> Vec<String> {
     let mut commands: Vec<&CommandDefinition> = registry.commands().collect();
     commands.sort_by_key(|a| a.name.to_lowercase());
 
     let total_pages = commands.len().div_ceil(PAGE_SIZE).max(1);
     let page = page.min(total_pages);
 
-    sender.reply(format!("§2--- Showing help page {page} of {total_pages} (/help <page>) ---"));
-
+    let mut lines = vec![format!("§2--- Showing help page {page} of {total_pages} (/help <page>) ---")];
     for command in commands.iter().skip((page - 1) * PAGE_SIZE).take(PAGE_SIZE) {
-        sender.reply(format!("§2/{}: §r{}", command.name, command.description));
+        lines.push(format!("§2/{}: §r{}", command.name, command.description));
     }
+    lines
 }
 
-fn describe(command: &CommandDefinition, sender: &mut CommandSender) {
-    sender.reply(format!("§e--------- §fHelp: /{} §e---------", command.name));
-    sender.reply(format!("§6Description: §f{}", command.description));
-    sender.reply(format!("§6Usage: §f{}", command.usage().replace('\n', "\n§f")));
+fn describe(command: &CommandDefinition) -> Vec<String> {
+    let mut lines = vec![format!("§e--------- §fHelp: /{} §e---------", command.name), format!("§6Description: §f{}", command.description), format!("§6Usage: §f{}", command.usage().replace('\n', "\n§f"))];
 
     let mut aliases: Vec<_> = command.aliases.to_vec();
     aliases.sort_unstable();
     if !aliases.is_empty() {
-        sender.reply(format!("§6Aliases: §f{}", aliases.join(", ")));
+        lines.push(format!("§6Aliases: §f{}", aliases.join(", ")));
     }
+    lines
 }

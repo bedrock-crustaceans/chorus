@@ -1,7 +1,6 @@
 use crate::command::command_definition::CommandDefinition;
 use crate::command::context::CommandContext;
 use crate::command::r#impl::DEFINITIONS;
-use crate::command::sender::CommandSender;
 use atomicow::CowArc;
 use bedrock::protocol::v898::packets::{AvailableCommandsPacket, CommandsEntry};
 use bevy_ecs::prelude::{Commands, Resource};
@@ -67,7 +66,7 @@ impl CommandRegistry {
         self.commands.iter().map(|c| c.as_ref())
     }
 
-    pub fn dispatch(&self, context: &CommandContext, line: &str, sender: &mut CommandSender) {
+    pub fn dispatch(context: &mut CommandContext, line: &str) {
         let line = line.trim().trim_start_matches('/');
 
         let mut parts = line.split_whitespace();
@@ -76,13 +75,13 @@ impl CommandRegistry {
         };
         let args: Vec<&str> = parts.collect();
 
-        let Some(command) = self.get(name) else {
-            sender.reply(format!("§cUnknown command: {name}"));
+        let Some(execute) = context.registry().get(name).map(|command| command.execute) else {
+            context.reply(format!("§cUnknown command: {name}"));
             return;
         };
 
-        if let Err(err) = (command.execute)(context, sender, &args) {
-            sender.reply(format!("§c{err}"));
+        if let Err(err) = execute(context, &args) {
+            context.reply(format!("§c{err}"));
         }
     }
 
