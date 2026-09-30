@@ -2,10 +2,10 @@ use crate::command::command_definition::CommandDefinition;
 use crate::command::context::CommandContext;
 use crate::command::sender::CommandSender;
 use crate::const_command;
-use crate::level::DimensionId;
 use crate::level::generator::dimension::Dimension;
 use crate::level::level::Level;
 use crate::network::bandwidth::BandwidthTracker;
+use crate::player::Player;
 use crate::server::{ServerMetrics, ServerState};
 use crate::utils::process::process_stats;
 use bedrock::protocol::v898::packets::CommandPermissionLevelString;
@@ -53,13 +53,13 @@ fn report_worlds(context: &CommandContext, sender: &mut CommandSender) {
     let level = context.resource::<Level>();
 
     let mut dimensions: Vec<&Dimension> = level.dimensions.values().collect();
-    dimensions.sort_by_key(|dimension| dimension.id);
+    dimensions.sort_by_key(|dimension| dimension.id());
 
     for dimension in dimensions {
         let entities = context
             .world()
             .iter_entities()
-            .filter(|entity| entity.get::<DimensionId>().is_some_and(|id| id.0 == dimension.id))
+            .filter(|entity| entity.get::<Player>().is_some_and(|player| player.dimension == dimension.id()))
             .count();
 
         // chunks are never ticked, so both the ticking count and the time spent on them are zero

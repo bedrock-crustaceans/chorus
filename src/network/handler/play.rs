@@ -228,9 +228,12 @@ pub fn handle_play(
     }
 }
 
-pub fn broadcast_block_updates(mut reader: MessageReader<BlockUpdatedMessage>, mut query: Query<&mut Session>) {
+pub fn broadcast_block_updates(mut reader: MessageReader<BlockUpdatedMessage>, mut query: Query<(&mut Session, &Player)>) {
     for msg in reader.read() {
-        for mut session in &mut query {
+        for (mut session, player) in &mut query {
+            if player.chunks_dimension != msg.dimension_id {
+                continue;
+            }
             session.send(BedrockProtocol::UpdateBlockPacket(
                 UpdateBlockPacket {
                     block_position: NetworkBlockPosition { x: msg.x, y: msg.y, z: msg.z },

@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::entity::entity::Entity as PlayerEntity;
-use crate::level::DimensionId;
+use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
@@ -23,14 +23,18 @@ use bedrock::protocol::{ProtoVersion, ProtoVersionPackets};
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Commands, Query};
 use bevy_ecs::system::{Res, ResMut};
+use glam::{IVec3, Vec3};
 use indexmap::IndexMap;
 use nbtx::ValueList;
 use tracing::{debug, warn};
+
+const PLAYER_EYE_HEIGHT: f32 = 1.62;
 
 pub fn on_enter_setup(
     mut sessions: Query<&mut Session>,
     mut server_state: ResMut<ServerState>,
     items: Res<ItemRegistry>,
+    level: Res<Level>,
     mut state_reader: MessageReader<SessionStateChangedMessage>,
     mut commands: Commands,
 ) {
@@ -68,22 +72,25 @@ pub fn on_enter_setup(
             .into(),
         ));
 
-        send_start_game(&player, &mut session);
+        let spawn = level.spawn;
+        let position = spawn.as_vec3() + Vec3::new(0.5, PLAYER_EYE_HEIGHT, 0.5);
+        send_start_game(&player, position, spawn, &mut session);
 
         session.send_immediate(BedrockProtocol::ItemComponentPacket(items.to_packet().into()));
 
-        let entity = PlayerEntity::default("minecraft:player".to_string(), player.unique_id());
-        commands.entity(ev.entity).insert((player, entity, DimensionId(0)));
+        let mut entity = PlayerEntity::default("minecraft:player".to_string(), player.unique_id());
+        entity.position = position;
+        commands.entity(ev.entity).insert((player, entity));
     }
 }
 
-fn send_start_game(player: &Player, session: &mut Session) {
+fn send_start_game(player: &Player, position: Vec3, spawn: IVec3, session: &mut Session) {
     session.send_immediate(BedrockProtocol::StartGamePacket(
         StartGamePacket {
             target_actor_id: ActorUniqueID(player.unique_id()),
             target_runtime_id: ActorRuntimeID(player.runtime_id()),
             actor_game_type: player.gamemode().game_type(),
-            position: (0.5, 6.0, 0.5), // TODO: those shouldn't be hardcoded, maybe player db?
+            position: (position.x, position.y, position.z),
             rotation: Default::default(),
             settings: LevelSettings {
                 seed: 0,
@@ -96,7 +103,7 @@ fn send_start_game(player: &Player, session: &mut Session) {
                 game_type: GameType::Survival,
                 is_hardcore_enabled: false,
                 game_difficulty: Difficulty::Peaceful,
-                default_spawn_block_position: NetworkBlockPosition { x: 0, y: 4, z: 0 },
+                default_spawn_block_position: NetworkBlockPosition { x: spawn.x, y: spawn.y, z: spawn.z },
                 achievements_disabled: false,
                 editor_world_type: EditorWorldType::NonEditor,
                 is_created_in_editor: false,
