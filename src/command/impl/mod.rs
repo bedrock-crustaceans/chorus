@@ -16,6 +16,7 @@ commands! {
     list::LIST_COMMAND,
 
     gamemode::GAMEMODE_COMMAND,
+    dimension::DIMENSION_COMMAND,
 
     aimassist::AIMASSIST_COMMAND,
     camera::CAMERA_COMMAND,

@@ -2,16 +2,14 @@ pub mod biome;
 mod bit_array;
 pub mod chunk;
 pub mod chunk_state;
+pub mod dimension_type;
 pub mod generator;
 pub mod level;
 mod palette;
 pub mod sub_chunk;
 
-use bevy_ecs::prelude::{Component, Message};
+use bevy_ecs::prelude::Message;
 use glam::Vec3;
-
-#[derive(Component, Clone, Copy, Debug)]
-pub struct DimensionId(pub i32);
 
 #[derive(Message, Clone)]
 pub struct BlockUpdatedMessage {
@@ -25,6 +23,7 @@ pub struct BlockUpdatedMessage {
 
 #[derive(Message, Clone)]
 pub struct LevelEventMessage {
+    pub dimension_id: i32,
     pub event_id: i32,
     pub position: Vec3,
     pub data: i32,
@@ -32,6 +31,7 @@ pub struct LevelEventMessage {
 
 #[derive(Message, Clone)]
 pub struct LevelSoundMessage {
+    pub dimension_id: i32,
     pub name: &'static str,
     pub position: Vec3,
     pub data: i32,

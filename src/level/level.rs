@@ -1,12 +1,14 @@
 use crate::JobQueue;
 use crate::block::block_id;
 use crate::level::BlockUpdatedMessage;
+use crate::level::dimension_type::DimensionType;
 use crate::level::generator::dimension::Dimension;
 use crate::level::generator::r#impl::random::RandomGenerator;
 use crate::registry::block_registry::BlockRegistry;
 use bevy_ecs::message::MessageWriter;
 use bevy_ecs::prelude::{Commands, Resource};
 use bevy_ecs::system::{Res, ResMut, SystemId};
+use glam::IVec3;
 use std::collections::HashMap;
 
 #[derive(Resource)]
@@ -15,6 +17,7 @@ pub(crate) struct PollGenerationJob(pub(crate) SystemId);
 #[derive(Resource)]
 pub struct Level {
     pub dimensions: HashMap<i32, Dimension>,
+    pub spawn: IVec3,
 }
 
 impl Level {
@@ -35,13 +38,16 @@ impl Level {
             biome: 1,
             air_id: registry.get_block_id(block_id::AIR).unwrap(),
             block_ids: registry.get_all_block_ids(),
-            min_sub_chunk_y: -4,
-            sub_chunk_count: 24,
+            min_sub_chunk_y: DimensionType::Overworld.min_sub_chunk_y(),
+            sub_chunk_count: DimensionType::Overworld.sub_chunk_count(),
         };
 
-        let overworld = Dimension::new(0, -4, 19, generator);
+        let overworld = Dimension::new(DimensionType::Overworld, generator);
 
-        let mut level = Level { dimensions: HashMap::new() };
+        let mut level = Level {
+            dimensions: HashMap::new(),
+            spawn: IVec3::new(0, 6, 0),
+        };
         level.dimensions.insert(0, overworld);
 
         commands.insert_resource(level);
