@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::moveable_component::{MoveableComponent, Movement};
@@ -6,7 +7,7 @@ use crate::block::state::common::MINECRAFT_CARDINAL_DIRECTION;
 use crate::const_block;
 
 pub const CARVED_PUMPKIN: BlockDefinition = const_block! {
-    identifier: "minecraft:carved_pumpkin",
+    identifier: block_id::CARVED_PUMPKIN,
     states: [MINECRAFT_CARDINAL_DIRECTION],
     components: [
         MapColorComponent { r: 216, g: 127, b: 51, a: 255 },

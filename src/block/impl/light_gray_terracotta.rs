@@ -1,8 +1,9 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::const_block;
 
 pub const LIGHT_GRAY_TERRACOTTA: BlockDefinition = const_block! {
-    identifier: "minecraft:light_gray_terracotta",
+    identifier: block_id::LIGHT_GRAY_TERRACOTTA,
     states: [],
     components: [],
     permutations: [],

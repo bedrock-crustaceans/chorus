@@ -1,8 +1,9 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::const_block;
 
 pub const LIGHT_GRAY_SHULKER_BOX: BlockDefinition = const_block! {
-    identifier: "minecraft:light_gray_shulker_box",
+    identifier: block_id::LIGHT_GRAY_SHULKER_BOX,
     states: [],
     components: [],
     permutations: [],

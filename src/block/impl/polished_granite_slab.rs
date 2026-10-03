@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -9,7 +10,7 @@ use crate::{const_block, const_permutation};
 use glam::Vec3;
 
 pub const POLISHED_GRANITE_SLAB: BlockDefinition = const_block! {
-    identifier: "minecraft:polished_granite_slab",
+    identifier: block_id::POLISHED_GRANITE_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [
         TransparentComponent { transparent: true },

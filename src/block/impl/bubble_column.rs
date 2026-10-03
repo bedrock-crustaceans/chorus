@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -10,7 +11,7 @@ use crate::block::state::common::DRAG_DOWN;
 use crate::const_block;
 
 pub const BUBBLE_COLUMN: BlockDefinition = const_block! {
-    identifier: "minecraft:bubble_column",
+    identifier: block_id::BUBBLE_COLUMN,
     states: [DRAG_DOWN],
     components: [
         SolidComponent { solid: false },

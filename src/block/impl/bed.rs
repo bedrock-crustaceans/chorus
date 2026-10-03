@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -9,7 +10,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const BED: BlockDefinition = const_block! {
-    identifier: "minecraft:bed",
+    identifier: block_id::BED,
     states: [DIRECTION, HEAD_PIECE_BIT, OCCUPIED_BIT],
     components: [
         TransparentComponent { transparent: true },

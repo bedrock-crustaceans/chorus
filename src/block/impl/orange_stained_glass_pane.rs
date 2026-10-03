@@ -1,13 +1,15 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::solid_component::SolidComponent;
 use crate::block::component::transparent_component::TransparentComponent;
+use crate::block::state::common::{MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST};
 use crate::const_block;
 
 pub const ORANGE_STAINED_GLASS_PANE: BlockDefinition = const_block! {
-    identifier: "minecraft:orange_stained_glass_pane",
-    states: [],
+    identifier: block_id::ORANGE_STAINED_GLASS_PANE,
+    states: [MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST],
     components: [
         SolidComponent { solid: false },
         TransparentComponent { transparent: true },

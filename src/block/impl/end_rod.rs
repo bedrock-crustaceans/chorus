@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::light_emission_component::LightEmissionComponent;
@@ -9,7 +10,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const END_ROD: BlockDefinition = const_block! {
-    identifier: "minecraft:end_rod",
+    identifier: block_id::END_ROD,
     states: [FACING_DIRECTION],
     components: [
         TransparentComponent { transparent: true },

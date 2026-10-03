@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::light_emission_component::LightEmissionComponent;
@@ -12,7 +13,7 @@ use crate::block::state::common::MULTI_FACE_DIRECTION_BITS;
 use crate::const_block;
 
 pub const GLOW_LICHEN: BlockDefinition = const_block! {
-    identifier: "minecraft:glow_lichen",
+    identifier: block_id::GLOW_LICHEN,
     states: [MULTI_FACE_DIRECTION_BITS],
     components: [
         SolidComponent { solid: false },

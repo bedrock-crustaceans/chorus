@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -8,7 +9,7 @@ use crate::block::state::common::{PERSISTENT_BIT, UPDATE_BIT};
 use crate::const_block;
 
 pub const MANGROVE_LEAVES: BlockDefinition = const_block! {
-    identifier: "minecraft:mangrove_leaves",
+    identifier: block_id::MANGROVE_LEAVES,
     states: [PERSISTENT_BIT, UPDATE_BIT],
     components: [
         TransparentComponent { transparent: true },

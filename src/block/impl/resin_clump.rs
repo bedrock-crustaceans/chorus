@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -11,7 +12,7 @@ use crate::block::state::common::MULTI_FACE_DIRECTION_BITS;
 use crate::const_block;
 
 pub const RESIN_CLUMP: BlockDefinition = const_block! {
-    identifier: "minecraft:resin_clump",
+    identifier: block_id::RESIN_CLUMP,
     states: [MULTI_FACE_DIRECTION_BITS],
     components: [
         SolidComponent { solid: false },

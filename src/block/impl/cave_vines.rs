@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -8,7 +9,7 @@ use crate::block::state::common::GROWING_PLANT_AGE;
 use crate::const_block;
 
 pub const CAVE_VINES: BlockDefinition = const_block! {
-    identifier: "minecraft:cave_vines",
+    identifier: block_id::CAVE_VINES,
     states: [GROWING_PLANT_AGE],
     components: [
         SolidComponent { solid: false },

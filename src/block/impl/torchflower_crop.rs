@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -11,7 +12,7 @@ use crate::block::state::common::GROWTH;
 use crate::const_block;
 
 pub const TORCHFLOWER_CROP: BlockDefinition = const_block! {
-    identifier: "minecraft:torchflower_crop",
+    identifier: block_id::TORCHFLOWER_CROP,
     states: [GROWTH],
     components: [
         SolidComponent { solid: false },

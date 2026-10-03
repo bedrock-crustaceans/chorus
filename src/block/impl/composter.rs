@@ -1,11 +1,12 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::block::state::common::COMPOSTER_FILL_LEVEL;
 use crate::const_block;
 
 pub const COMPOSTER: BlockDefinition = const_block! {
-    identifier: "minecraft:composter",
+    identifier: block_id::COMPOSTER,
     states: [COMPOSTER_FILL_LEVEL],
     components: [
         MapColorComponent { r: 143, g: 119, b: 72, a: 255 },

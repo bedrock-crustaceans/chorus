@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -7,8 +8,8 @@ use crate::block::state::common::PILLAR_AXIS;
 use crate::const_block;
 use glam::Vec3;
 
-pub const CHAIN: BlockDefinition = const_block! {
-    identifier: "minecraft:chain",
+pub const WEATHERED_COPPER_CHAIN: BlockDefinition = const_block! {
+    identifier: block_id::WEATHERED_COPPER_CHAIN,
     states: [PILLAR_AXIS],
     components: [
         TransparentComponent { transparent: true },

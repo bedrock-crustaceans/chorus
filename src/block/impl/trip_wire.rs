@@ -1,16 +1,19 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
-use crate::block::state::common::{ATTACHED_BIT, DISARMED_BIT, POWERED_BIT, SUSPENDED_BIT};
+use crate::block::state::common::{
+    ATTACHED_BIT, DISARMED_BIT, MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST, POWERED_BIT, SUSPENDED_BIT,
+};
 use crate::const_block;
 use glam::Vec3;
 
 pub const TRIP_WIRE: BlockDefinition = const_block! {
-    identifier: "minecraft:trip_wire",
-    states: [ATTACHED_BIT, DISARMED_BIT, POWERED_BIT, SUSPENDED_BIT],
+    identifier: block_id::TRIP_WIRE,
+    states: [ATTACHED_BIT, DISARMED_BIT, POWERED_BIT, SUSPENDED_BIT, MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST],
     components: [
         TransparentComponent { transparent: true },
         InternalFrictionComponent { internal_friction: 0.95 },

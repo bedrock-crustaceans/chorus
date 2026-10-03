@@ -1,10 +1,11 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::const_block;
 
 pub const SOUL_SOIL: BlockDefinition = const_block! {
-    identifier: "minecraft:soul_soil",
+    identifier: block_id::SOUL_SOIL,
     states: [],
     components: [
         MapColorComponent { r: 102, g: 76, b: 51, a: 255 },

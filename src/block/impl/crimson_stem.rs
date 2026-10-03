@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -6,7 +7,7 @@ use crate::block::state::common::PILLAR_AXIS;
 use crate::const_block;
 
 pub const CRIMSON_STEM: BlockDefinition = const_block! {
-    identifier: "minecraft:crimson_stem",
+    identifier: block_id::CRIMSON_STEM,
     states: [PILLAR_AXIS],
     components: [
         MapColorComponent { r: 148, g: 63, b: 97, a: 255 },

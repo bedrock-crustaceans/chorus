@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::light_emission_component::LightEmissionComponent;
@@ -11,7 +12,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const BREWING_STAND: BlockDefinition = const_block! {
-    identifier: "minecraft:brewing_stand",
+    identifier: block_id::BREWING_STAND,
     states: [BREWING_STAND_SLOT_A_BIT, BREWING_STAND_SLOT_B_BIT, BREWING_STAND_SLOT_C_BIT],
     components: [
         SolidComponent { solid: false },

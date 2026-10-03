@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -9,7 +10,7 @@ use crate::block::state::common::{AGE_BIT, BAMBOO_LEAF_SIZE, BAMBOO_STALK_THICKN
 use crate::const_block;
 
 pub const BAMBOO: BlockDefinition = const_block! {
-    identifier: "minecraft:bamboo",
+    identifier: block_id::BAMBOO,
     states: [AGE_BIT, BAMBOO_LEAF_SIZE, BAMBOO_STALK_THICKNESS],
     components: [
         TransparentComponent { transparent: true },

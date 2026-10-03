@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::light_emission_component::LightEmissionComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -9,7 +10,7 @@ use crate::block::state::common::GROWING_PLANT_AGE;
 use crate::const_block;
 
 pub const CAVE_VINES_BODY_WITH_BERRIES: BlockDefinition = const_block! {
-    identifier: "minecraft:cave_vines_body_with_berries",
+    identifier: block_id::CAVE_VINES_BODY_WITH_BERRIES,
     states: [GROWING_PLANT_AGE],
     components: [
         SolidComponent { solid: false },

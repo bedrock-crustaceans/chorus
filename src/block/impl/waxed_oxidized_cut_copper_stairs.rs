@@ -1,16 +1,17 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
-use crate::block::state::common::{UPSIDE_DOWN_BIT, WEIRDO_DIRECTION};
+use crate::block::state::common::{MINECRAFT_CORNER, UPSIDE_DOWN_BIT, WEIRDO_DIRECTION};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
 pub const WAXED_OXIDIZED_CUT_COPPER_STAIRS: BlockDefinition = const_block! {
-    identifier: "minecraft:waxed_oxidized_cut_copper_stairs",
-    states: [UPSIDE_DOWN_BIT, WEIRDO_DIRECTION],
+    identifier: block_id::WAXED_OXIDIZED_CUT_COPPER_STAIRS,
+    states: [UPSIDE_DOWN_BIT, WEIRDO_DIRECTION, MINECRAFT_CORNER],
     components: [
         TransparentComponent { transparent: true },
         MapColorComponent { r: 22, g: 126, b: 134, a: 255 },

@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_emission_component::LightEmissionComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -7,7 +8,7 @@ use crate::block::state::common::BLOOM;
 use crate::const_block;
 
 pub const SCULK_CATALYST: BlockDefinition = const_block! {
-    identifier: "minecraft:sculk_catalyst",
+    identifier: block_id::SCULK_CATALYST,
     states: [BLOOM],
     components: [
         MapColorComponent { r: 13, g: 18, b: 23, a: 255 },

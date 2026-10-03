@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_emission_component::LightEmissionComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -6,7 +7,7 @@ use crate::block::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 
 pub const CRYING_OBSIDIAN: BlockDefinition = const_block! {
-    identifier: "minecraft:crying_obsidian",
+    identifier: block_id::CRYING_OBSIDIAN,
     states: [],
     components: [
         MapColorComponent { r: 25, g: 25, b: 25, a: 255 },

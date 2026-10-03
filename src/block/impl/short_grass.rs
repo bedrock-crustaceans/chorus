@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
@@ -11,7 +12,7 @@ use crate::block::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
 pub const SHORT_GRASS: BlockDefinition = const_block! {
-    identifier: "minecraft:short_grass",
+    identifier: block_id::SHORT_GRASS,
     states: [],
     components: [
         SolidComponent { solid: false },

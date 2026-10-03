@@ -1,10 +1,11 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::const_block;
 
 pub const GREEN_CONCRETE_POWDER: BlockDefinition = const_block! {
-    identifier: "minecraft:green_concrete_powder",
+    identifier: block_id::GREEN_CONCRETE_POWDER,
     states: [],
     components: [
         MapColorComponent { r: 102, g: 127, b: 51, a: 255 },

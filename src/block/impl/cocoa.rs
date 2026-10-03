@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -10,7 +11,7 @@ use crate::{const_block, const_permutation};
 use glam::Vec3;
 
 pub const COCOA: BlockDefinition = const_block! {
-    identifier: "minecraft:cocoa",
+    identifier: block_id::COCOA,
     states: [AGE_3, DIRECTION],
     components: [
         TransparentComponent { transparent: true },

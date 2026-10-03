@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -11,7 +12,7 @@ use crate::block::state::common::AGE_BIT;
 use crate::const_block;
 
 pub const BIRCH_SAPLING: BlockDefinition = const_block! {
-    identifier: "minecraft:birch_sapling",
+    identifier: block_id::BIRCH_SAPLING,
     states: [AGE_BIT],
     components: [
         SolidComponent { solid: false },

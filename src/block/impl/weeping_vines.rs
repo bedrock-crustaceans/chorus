@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -12,7 +13,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const WEEPING_VINES: BlockDefinition = const_block! {
-    identifier: "minecraft:weeping_vines",
+    identifier: block_id::WEEPING_VINES,
     states: [WEEPING_VINES_AGE],
     components: [
         SolidComponent { solid: false },

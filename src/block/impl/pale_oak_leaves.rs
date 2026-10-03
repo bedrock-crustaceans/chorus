@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -9,7 +10,7 @@ use crate::block::state::common::{PERSISTENT_BIT, UPDATE_BIT};
 use crate::const_block;
 
 pub const PALE_OAK_LEAVES: BlockDefinition = const_block! {
-    identifier: "minecraft:pale_oak_leaves",
+    identifier: block_id::PALE_OAK_LEAVES,
     states: [PERSISTENT_BIT, UPDATE_BIT],
     components: [
         TransparentComponent { transparent: true },

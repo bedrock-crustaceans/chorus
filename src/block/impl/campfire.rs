@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::light_emission_component::LightEmissionComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -9,7 +10,7 @@ use crate::block::state::common::{EXTINGUISHED, MINECRAFT_CARDINAL_DIRECTION};
 use crate::{const_block, const_permutation};
 
 pub const CAMPFIRE: BlockDefinition = const_block! {
-    identifier: "minecraft:campfire",
+    identifier: block_id::CAMPFIRE,
     states: [EXTINGUISHED, MINECRAFT_CARDINAL_DIRECTION],
     components: [
         TransparentComponent { transparent: true },

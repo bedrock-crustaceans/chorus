@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -12,7 +13,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const HEAVY_WEIGHTED_PRESSURE_PLATE: BlockDefinition = const_block! {
-    identifier: "minecraft:heavy_weighted_pressure_plate",
+    identifier: block_id::HEAVY_WEIGHTED_PRESSURE_PLATE,
     states: [REDSTONE_SIGNAL],
     components: [
         SolidComponent { solid: false },

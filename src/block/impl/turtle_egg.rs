@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -11,7 +12,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const TURTLE_EGG: BlockDefinition = const_block! {
-    identifier: "minecraft:turtle_egg",
+    identifier: block_id::TURTLE_EGG,
     states: [CRACKED_STATE, TURTLE_EGG_COUNT],
     components: [
         SolidComponent { solid: false },

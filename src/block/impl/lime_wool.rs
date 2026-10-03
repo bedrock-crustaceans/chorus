@@ -1,11 +1,12 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::const_block;
 
 pub const LIME_WOOL: BlockDefinition = const_block! {
-    identifier: "minecraft:lime_wool",
+    identifier: block_id::LIME_WOOL,
     states: [],
     components: [
         MapColorComponent { r: 127, g: 204, b: 25, a: 255 },

@@ -1,10 +1,11 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::const_block;
 
 pub const COAL_ORE: BlockDefinition = const_block! {
-    identifier: "minecraft:coal_ore",
+    identifier: block_id::COAL_ORE,
     states: [],
     components: [
         MapColorComponent { r: 112, g: 112, b: 112, a: 255 },

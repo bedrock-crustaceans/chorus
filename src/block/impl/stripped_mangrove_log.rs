@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -6,7 +7,7 @@ use crate::block::state::common::PILLAR_AXIS;
 use crate::const_block;
 
 pub const STRIPPED_MANGROVE_LOG: BlockDefinition = const_block! {
-    identifier: "minecraft:stripped_mangrove_log",
+    identifier: block_id::STRIPPED_MANGROVE_LOG,
     states: [PILLAR_AXIS],
     components: [
         MapColorComponent { r: 153, g: 51, b: 51, a: 255 },

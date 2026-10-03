@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -10,7 +11,7 @@ use crate::block::state::common::{ATTACHED_BIT, FACING_DIRECTION, GROUND_SIGN_DI
 use crate::const_block;
 
 pub const WARPED_HANGING_SIGN: BlockDefinition = const_block! {
-    identifier: "minecraft:warped_hanging_sign",
+    identifier: block_id::WARPED_HANGING_SIGN,
     states: [ATTACHED_BIT, FACING_DIRECTION, GROUND_SIGN_DIRECTION, HANGING],
     components: [
         SolidComponent { solid: false },

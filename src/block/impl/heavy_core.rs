@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -9,7 +10,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const HEAVY_CORE: BlockDefinition = const_block! {
-    identifier: "minecraft:heavy_core",
+    identifier: block_id::HEAVY_CORE,
     states: [],
     components: [
         SolidComponent { solid: false },

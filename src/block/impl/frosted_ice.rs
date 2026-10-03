@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::friction_component::FrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -8,7 +9,7 @@ use crate::block::state::common::AGE_4;
 use crate::const_block;
 
 pub const FROSTED_ICE: BlockDefinition = const_block! {
-    identifier: "minecraft:frosted_ice",
+    identifier: block_id::FROSTED_ICE,
     states: [AGE_4],
     components: [
         TransparentComponent { transparent: true },

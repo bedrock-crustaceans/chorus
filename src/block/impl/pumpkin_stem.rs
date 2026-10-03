@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -11,7 +12,7 @@ use crate::block::state::common::{FACING_DIRECTION, GROWTH};
 use crate::const_block;
 
 pub const PUMPKIN_STEM: BlockDefinition = const_block! {
-    identifier: "minecraft:pumpkin_stem",
+    identifier: block_id::PUMPKIN_STEM,
     states: [FACING_DIRECTION, GROWTH],
     components: [
         SolidComponent { solid: false },

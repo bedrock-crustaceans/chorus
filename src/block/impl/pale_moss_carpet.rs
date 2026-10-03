@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -11,7 +12,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const PALE_MOSS_CARPET: BlockDefinition = const_block! {
-    identifier: "minecraft:pale_moss_carpet",
+    identifier: block_id::PALE_MOSS_CARPET,
     states: [PALE_MOSS_CARPET_SIDE_EAST, PALE_MOSS_CARPET_SIDE_NORTH, PALE_MOSS_CARPET_SIDE_SOUTH, PALE_MOSS_CARPET_SIDE_WEST, UPPER_BLOCK_BIT],
     components: [
         SolidComponent { solid: false },

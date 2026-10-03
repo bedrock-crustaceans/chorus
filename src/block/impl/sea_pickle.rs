@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -12,7 +13,7 @@ use crate::block::state::common::{CLUSTER_COUNT, DEAD_BIT};
 use crate::{const_block, const_permutation};
 
 pub const SEA_PICKLE: BlockDefinition = const_block! {
-    identifier: "minecraft:sea_pickle",
+    identifier: block_id::SEA_PICKLE,
     states: [CLUSTER_COUNT, DEAD_BIT],
     components: [
         SolidComponent { solid: false },

@@ -1,10 +1,11 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::const_block;
 
 pub const RAW_COPPER_BLOCK: BlockDefinition = const_block! {
-    identifier: "minecraft:raw_copper_block",
+    identifier: block_id::RAW_COPPER_BLOCK,
     states: [],
     components: [
         MapColorComponent { r: 216, g: 127, b: 51, a: 255 },

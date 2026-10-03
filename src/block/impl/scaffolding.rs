@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -11,7 +12,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const SCAFFOLDING: BlockDefinition = const_block! {
-    identifier: "minecraft:scaffolding",
+    identifier: block_id::SCAFFOLDING,
     states: [STABILITY, STABILITY_CHECK],
     components: [
         SolidComponent { solid: false },

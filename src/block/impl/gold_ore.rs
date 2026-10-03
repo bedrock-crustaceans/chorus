@@ -1,10 +1,11 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::const_block;
 
 pub const GOLD_ORE: BlockDefinition = const_block! {
-    identifier: "minecraft:gold_ore",
+    identifier: block_id::GOLD_ORE,
     states: [],
     components: [
         MapColorComponent { r: 112, g: 112, b: 112, a: 255 },

@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -10,7 +11,7 @@ use crate::{const_block, const_permutation};
 use glam::Vec3;
 
 pub const LADDER: BlockDefinition = const_block! {
-    identifier: "minecraft:ladder",
+    identifier: block_id::LADDER,
     states: [FACING_DIRECTION],
     components: [
         SolidComponent { solid: false },

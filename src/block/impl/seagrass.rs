@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -12,7 +13,7 @@ use crate::block::state::common::SEA_GRASS_TYPE;
 use crate::const_block;
 
 pub const SEAGRASS: BlockDefinition = const_block! {
-    identifier: "minecraft:seagrass",
+    identifier: block_id::SEAGRASS,
     states: [SEA_GRASS_TYPE],
     components: [
         SolidComponent { solid: false },

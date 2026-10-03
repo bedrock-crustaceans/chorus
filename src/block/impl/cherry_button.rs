@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -10,7 +11,7 @@ use crate::block::state::common::{BUTTON_PRESSED_BIT, FACING_DIRECTION};
 use crate::const_block;
 
 pub const CHERRY_BUTTON: BlockDefinition = const_block! {
-    identifier: "minecraft:cherry_button",
+    identifier: block_id::CHERRY_BUTTON,
     states: [BUTTON_PRESSED_BIT, FACING_DIRECTION],
     components: [
         SolidComponent { solid: false },

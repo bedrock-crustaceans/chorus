@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -8,7 +9,7 @@ use crate::block::state::common::FACING_DIRECTION;
 use crate::const_block;
 
 pub const PISTON: BlockDefinition = const_block! {
-    identifier: "minecraft:piston",
+    identifier: block_id::PISTON,
     states: [FACING_DIRECTION],
     components: [
         SolidComponent { solid: false },

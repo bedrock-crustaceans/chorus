@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::moveable_component::{MoveableComponent, Movement};
@@ -6,7 +7,7 @@ use crate::block::state::common::FACING_DIRECTION;
 use crate::const_block;
 
 pub const RED_GLAZED_TERRACOTTA: BlockDefinition = const_block! {
-    identifier: "minecraft:red_glazed_terracotta",
+    identifier: block_id::RED_GLAZED_TERRACOTTA,
     states: [FACING_DIRECTION],
     components: [
         MapColorComponent { r: 153, g: 51, b: 51, a: 255 },

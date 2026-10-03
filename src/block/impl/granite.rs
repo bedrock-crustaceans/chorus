@@ -1,10 +1,11 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::const_block;
 
 pub const GRANITE: BlockDefinition = const_block! {
-    identifier: "minecraft:granite",
+    identifier: block_id::GRANITE,
     states: [],
     components: [
         MapColorComponent { r: 151, g: 109, b: 77, a: 255 },

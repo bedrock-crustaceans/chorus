@@ -9,6 +9,7 @@ pub mod acacia_log;
 pub mod acacia_planks;
 pub mod acacia_pressure_plate;
 pub mod acacia_sapling;
+pub mod acacia_shelf;
 pub mod acacia_slab;
 pub mod acacia_stairs;
 pub mod acacia_standing_sign;
@@ -47,6 +48,7 @@ pub mod bamboo_mosaic_stairs;
 pub mod bamboo_planks;
 pub mod bamboo_pressure_plate;
 pub mod bamboo_sapling;
+pub mod bamboo_shelf;
 pub mod bamboo_slab;
 pub mod bamboo_stairs;
 pub mod bamboo_standing_sign;
@@ -74,6 +76,7 @@ pub mod birch_log;
 pub mod birch_planks;
 pub mod birch_pressure_plate;
 pub mod birch_sapling;
+pub mod birch_shelf;
 pub mod birch_slab;
 pub mod birch_stairs;
 pub mod birch_standing_sign;
@@ -84,13 +87,19 @@ pub mod black_candle;
 pub mod black_candle_cake;
 pub mod black_carpet;
 pub mod black_concrete;
+pub mod black_concrete_double_slab;
 pub mod black_concrete_powder;
+pub mod black_concrete_slab;
+pub mod black_concrete_stairs;
 pub mod black_glazed_terracotta;
 pub mod black_shulker_box;
 pub mod black_stained_glass;
 pub mod black_stained_glass_pane;
 pub mod black_terracotta;
 pub mod black_wool;
+pub mod black_wool_double_slab;
+pub mod black_wool_slab;
+pub mod black_wool_stairs;
 pub mod blackstone;
 pub mod blackstone_double_slab;
 pub mod blackstone_slab;
@@ -101,7 +110,10 @@ pub mod blue_candle;
 pub mod blue_candle_cake;
 pub mod blue_carpet;
 pub mod blue_concrete;
+pub mod blue_concrete_double_slab;
 pub mod blue_concrete_powder;
+pub mod blue_concrete_slab;
+pub mod blue_concrete_stairs;
 pub mod blue_glazed_terracotta;
 pub mod blue_ice;
 pub mod blue_orchid;
@@ -110,6 +122,9 @@ pub mod blue_stained_glass;
 pub mod blue_stained_glass_pane;
 pub mod blue_terracotta;
 pub mod blue_wool;
+pub mod blue_wool_double_slab;
+pub mod blue_wool_slab;
+pub mod blue_wool_stairs;
 pub mod bone_block;
 pub mod bookshelf;
 pub mod border_block;
@@ -127,7 +142,10 @@ pub mod brown_candle;
 pub mod brown_candle_cake;
 pub mod brown_carpet;
 pub mod brown_concrete;
+pub mod brown_concrete_double_slab;
 pub mod brown_concrete_powder;
+pub mod brown_concrete_slab;
+pub mod brown_concrete_stairs;
 pub mod brown_glazed_terracotta;
 pub mod brown_mushroom;
 pub mod brown_mushroom_block;
@@ -136,6 +154,9 @@ pub mod brown_stained_glass;
 pub mod brown_stained_glass_pane;
 pub mod brown_terracotta;
 pub mod brown_wool;
+pub mod brown_wool_double_slab;
+pub mod brown_wool_slab;
+pub mod brown_wool_stairs;
 pub mod bubble_column;
 pub mod bubble_coral;
 pub mod bubble_coral_block;
@@ -148,6 +169,7 @@ pub mod cactus_flower;
 pub mod cake;
 pub mod calcite;
 pub mod calibrated_sculk_sensor;
+pub mod camera;
 pub mod campfire;
 pub mod candle;
 pub mod candle_cake;
@@ -158,8 +180,9 @@ pub mod cauldron;
 pub mod cave_vines;
 pub mod cave_vines_body_with_berries;
 pub mod cave_vines_head_with_berries;
-pub mod chain;
 pub mod chain_command_block;
+pub mod chalkboard;
+pub mod chemical_heat;
 pub mod cherry_button;
 pub mod cherry_door;
 pub mod cherry_double_slab;
@@ -171,6 +194,7 @@ pub mod cherry_log;
 pub mod cherry_planks;
 pub mod cherry_pressure_plate;
 pub mod cherry_sapling;
+pub mod cherry_shelf;
 pub mod cherry_slab;
 pub mod cherry_stairs;
 pub mod cherry_standing_sign;
@@ -180,6 +204,7 @@ pub mod cherry_wood;
 pub mod chest;
 pub mod chipped_anvil;
 pub mod chiseled_bookshelf;
+pub mod chiseled_cinnabar;
 pub mod chiseled_copper;
 pub mod chiseled_deepslate;
 pub mod chiseled_nether_bricks;
@@ -189,10 +214,21 @@ pub mod chiseled_red_sandstone;
 pub mod chiseled_resin_bricks;
 pub mod chiseled_sandstone;
 pub mod chiseled_stone_bricks;
+pub mod chiseled_sulfur;
 pub mod chiseled_tuff;
 pub mod chiseled_tuff_bricks;
 pub mod chorus_flower;
 pub mod chorus_plant;
+pub mod cinnabar;
+pub mod cinnabar_brick_double_slab;
+pub mod cinnabar_brick_slab;
+pub mod cinnabar_brick_stairs;
+pub mod cinnabar_brick_wall;
+pub mod cinnabar_bricks;
+pub mod cinnabar_double_slab;
+pub mod cinnabar_slab;
+pub mod cinnabar_stairs;
+pub mod cinnabar_wall;
 pub mod clay;
 pub mod client_request_placeholder_block;
 pub mod closed_eyeblossom;
@@ -209,14 +245,25 @@ pub mod cobblestone_double_slab;
 pub mod cobblestone_slab;
 pub mod cobblestone_wall;
 pub mod cocoa;
+pub mod colored_torch_blue;
+pub mod colored_torch_green;
+pub mod colored_torch_purple;
+pub mod colored_torch_red;
 pub mod command_block;
 pub mod composter;
+pub mod compound_creator;
 pub mod conduit;
+pub mod copper_bars;
 pub mod copper_block;
 pub mod copper_bulb;
+pub mod copper_chain;
+pub mod copper_chest;
 pub mod copper_door;
+pub mod copper_golem_statue;
 pub mod copper_grate;
+pub mod copper_lantern;
 pub mod copper_ore;
+pub mod copper_torch;
 pub mod copper_trapdoor;
 pub mod cornflower;
 pub mod cracked_deepslate_bricks;
@@ -240,6 +287,7 @@ pub mod crimson_nylium;
 pub mod crimson_planks;
 pub mod crimson_pressure_plate;
 pub mod crimson_roots;
+pub mod crimson_shelf;
 pub mod crimson_slab;
 pub mod crimson_stairs;
 pub mod crimson_standing_sign;
@@ -260,13 +308,19 @@ pub mod cyan_candle;
 pub mod cyan_candle_cake;
 pub mod cyan_carpet;
 pub mod cyan_concrete;
+pub mod cyan_concrete_double_slab;
 pub mod cyan_concrete_powder;
+pub mod cyan_concrete_slab;
+pub mod cyan_concrete_stairs;
 pub mod cyan_glazed_terracotta;
 pub mod cyan_shulker_box;
 pub mod cyan_stained_glass;
 pub mod cyan_stained_glass_pane;
 pub mod cyan_terracotta;
 pub mod cyan_wool;
+pub mod cyan_wool_double_slab;
+pub mod cyan_wool_slab;
+pub mod cyan_wool_stairs;
 pub mod damaged_anvil;
 pub mod dandelion;
 pub mod dark_oak_button;
@@ -280,6 +334,7 @@ pub mod dark_oak_log;
 pub mod dark_oak_planks;
 pub mod dark_oak_pressure_plate;
 pub mod dark_oak_sapling;
+pub mod dark_oak_shelf;
 pub mod dark_oak_slab;
 pub mod dark_oak_stairs;
 pub mod dark_oak_trapdoor;
@@ -334,6 +389,9 @@ pub mod deepslate_tile_stairs;
 pub mod deepslate_tile_wall;
 pub mod deepslate_tiles;
 pub mod deny;
+pub mod deprecated_anvil;
+pub mod deprecated_purpur_block_1;
+pub mod deprecated_purpur_block_2;
 pub mod detector_rail;
 pub mod diamond_block;
 pub mod diamond_ore;
@@ -352,6 +410,126 @@ pub mod dried_ghast;
 pub mod dried_kelp_block;
 pub mod dripstone_block;
 pub mod dropper;
+pub mod element_0;
+pub mod element_1;
+pub mod element_10;
+pub mod element_100;
+pub mod element_101;
+pub mod element_102;
+pub mod element_103;
+pub mod element_104;
+pub mod element_105;
+pub mod element_106;
+pub mod element_107;
+pub mod element_108;
+pub mod element_109;
+pub mod element_11;
+pub mod element_110;
+pub mod element_111;
+pub mod element_112;
+pub mod element_113;
+pub mod element_114;
+pub mod element_115;
+pub mod element_116;
+pub mod element_117;
+pub mod element_118;
+pub mod element_12;
+pub mod element_13;
+pub mod element_14;
+pub mod element_15;
+pub mod element_16;
+pub mod element_17;
+pub mod element_18;
+pub mod element_19;
+pub mod element_2;
+pub mod element_20;
+pub mod element_21;
+pub mod element_22;
+pub mod element_23;
+pub mod element_24;
+pub mod element_25;
+pub mod element_26;
+pub mod element_27;
+pub mod element_28;
+pub mod element_29;
+pub mod element_3;
+pub mod element_30;
+pub mod element_31;
+pub mod element_32;
+pub mod element_33;
+pub mod element_34;
+pub mod element_35;
+pub mod element_36;
+pub mod element_37;
+pub mod element_38;
+pub mod element_39;
+pub mod element_4;
+pub mod element_40;
+pub mod element_41;
+pub mod element_42;
+pub mod element_43;
+pub mod element_44;
+pub mod element_45;
+pub mod element_46;
+pub mod element_47;
+pub mod element_48;
+pub mod element_49;
+pub mod element_5;
+pub mod element_50;
+pub mod element_51;
+pub mod element_52;
+pub mod element_53;
+pub mod element_54;
+pub mod element_55;
+pub mod element_56;
+pub mod element_57;
+pub mod element_58;
+pub mod element_59;
+pub mod element_6;
+pub mod element_60;
+pub mod element_61;
+pub mod element_62;
+pub mod element_63;
+pub mod element_64;
+pub mod element_65;
+pub mod element_66;
+pub mod element_67;
+pub mod element_68;
+pub mod element_69;
+pub mod element_7;
+pub mod element_70;
+pub mod element_71;
+pub mod element_72;
+pub mod element_73;
+pub mod element_74;
+pub mod element_75;
+pub mod element_76;
+pub mod element_77;
+pub mod element_78;
+pub mod element_79;
+pub mod element_8;
+pub mod element_80;
+pub mod element_81;
+pub mod element_82;
+pub mod element_83;
+pub mod element_84;
+pub mod element_85;
+pub mod element_86;
+pub mod element_87;
+pub mod element_88;
+pub mod element_89;
+pub mod element_9;
+pub mod element_90;
+pub mod element_91;
+pub mod element_92;
+pub mod element_93;
+pub mod element_94;
+pub mod element_95;
+pub mod element_96;
+pub mod element_97;
+pub mod element_98;
+pub mod element_99;
+pub mod element_constructor;
 pub mod emerald_block;
 pub mod emerald_ore;
 pub mod enchanting_table;
@@ -368,14 +546,20 @@ pub mod end_stone_brick_wall;
 pub mod ender_chest;
 pub mod exposed_chiseled_copper;
 pub mod exposed_copper;
+pub mod exposed_copper_bars;
 pub mod exposed_copper_bulb;
+pub mod exposed_copper_chain;
+pub mod exposed_copper_chest;
 pub mod exposed_copper_door;
+pub mod exposed_copper_golem_statue;
 pub mod exposed_copper_grate;
+pub mod exposed_copper_lantern;
 pub mod exposed_copper_trapdoor;
 pub mod exposed_cut_copper;
 pub mod exposed_cut_copper_slab;
 pub mod exposed_cut_copper_stairs;
 pub mod exposed_double_cut_copper_slab;
+pub mod exposed_lightning_rod;
 pub mod farmland;
 pub mod fence_gate;
 pub mod fern;
@@ -403,6 +587,7 @@ pub mod glowingobsidian;
 pub mod glowstone;
 pub mod gold_block;
 pub mod gold_ore;
+pub mod golden_dandelion;
 pub mod golden_rail;
 pub mod granite;
 pub mod granite_double_slab;
@@ -416,26 +601,72 @@ pub mod gray_candle;
 pub mod gray_candle_cake;
 pub mod gray_carpet;
 pub mod gray_concrete;
+pub mod gray_concrete_double_slab;
 pub mod gray_concrete_powder;
+pub mod gray_concrete_slab;
+pub mod gray_concrete_stairs;
 pub mod gray_glazed_terracotta;
 pub mod gray_shulker_box;
 pub mod gray_stained_glass;
 pub mod gray_stained_glass_pane;
 pub mod gray_terracotta;
 pub mod gray_wool;
+pub mod gray_wool_double_slab;
+pub mod gray_wool_slab;
+pub mod gray_wool_stairs;
 pub mod green_candle;
 pub mod green_candle_cake;
 pub mod green_carpet;
 pub mod green_concrete;
+pub mod green_concrete_double_slab;
 pub mod green_concrete_powder;
+pub mod green_concrete_slab;
+pub mod green_concrete_stairs;
 pub mod green_glazed_terracotta;
 pub mod green_shulker_box;
 pub mod green_stained_glass;
 pub mod green_stained_glass_pane;
 pub mod green_terracotta;
 pub mod green_wool;
+pub mod green_wool_double_slab;
+pub mod green_wool_slab;
+pub mod green_wool_stairs;
 pub mod grindstone;
 pub mod hanging_roots;
+pub mod hard_black_stained_glass;
+pub mod hard_black_stained_glass_pane;
+pub mod hard_blue_stained_glass;
+pub mod hard_blue_stained_glass_pane;
+pub mod hard_brown_stained_glass;
+pub mod hard_brown_stained_glass_pane;
+pub mod hard_cyan_stained_glass;
+pub mod hard_cyan_stained_glass_pane;
+pub mod hard_glass;
+pub mod hard_glass_pane;
+pub mod hard_gray_stained_glass;
+pub mod hard_gray_stained_glass_pane;
+pub mod hard_green_stained_glass;
+pub mod hard_green_stained_glass_pane;
+pub mod hard_light_blue_stained_glass;
+pub mod hard_light_blue_stained_glass_pane;
+pub mod hard_light_gray_stained_glass;
+pub mod hard_light_gray_stained_glass_pane;
+pub mod hard_lime_stained_glass;
+pub mod hard_lime_stained_glass_pane;
+pub mod hard_magenta_stained_glass;
+pub mod hard_magenta_stained_glass_pane;
+pub mod hard_orange_stained_glass;
+pub mod hard_orange_stained_glass_pane;
+pub mod hard_pink_stained_glass;
+pub mod hard_pink_stained_glass_pane;
+pub mod hard_purple_stained_glass;
+pub mod hard_purple_stained_glass_pane;
+pub mod hard_red_stained_glass;
+pub mod hard_red_stained_glass_pane;
+pub mod hard_white_stained_glass;
+pub mod hard_white_stained_glass_pane;
+pub mod hard_yellow_stained_glass;
+pub mod hard_yellow_stained_glass_pane;
 pub mod hardened_clay;
 pub mod hay_block;
 pub mod heavy_core;
@@ -460,6 +691,7 @@ pub mod info_update2;
 pub mod invisible_bedrock;
 pub mod iron_bars;
 pub mod iron_block;
+pub mod iron_chain;
 pub mod iron_door;
 pub mod iron_ore;
 pub mod iron_trapdoor;
@@ -476,6 +708,7 @@ pub mod jungle_log;
 pub mod jungle_planks;
 pub mod jungle_pressure_plate;
 pub mod jungle_sapling;
+pub mod jungle_shelf;
 pub mod jungle_slab;
 pub mod jungle_stairs;
 pub mod jungle_standing_sign;
@@ -483,6 +716,7 @@ pub mod jungle_trapdoor;
 pub mod jungle_wall_sign;
 pub mod jungle_wood;
 pub mod kelp;
+pub mod lab_table;
 pub mod ladder;
 pub mod lantern;
 pub mod lapis_block;
@@ -513,23 +747,35 @@ pub mod light_blue_candle;
 pub mod light_blue_candle_cake;
 pub mod light_blue_carpet;
 pub mod light_blue_concrete;
+pub mod light_blue_concrete_double_slab;
 pub mod light_blue_concrete_powder;
+pub mod light_blue_concrete_slab;
+pub mod light_blue_concrete_stairs;
 pub mod light_blue_glazed_terracotta;
 pub mod light_blue_shulker_box;
 pub mod light_blue_stained_glass;
 pub mod light_blue_stained_glass_pane;
 pub mod light_blue_terracotta;
 pub mod light_blue_wool;
+pub mod light_blue_wool_double_slab;
+pub mod light_blue_wool_slab;
+pub mod light_blue_wool_stairs;
 pub mod light_gray_candle;
 pub mod light_gray_candle_cake;
 pub mod light_gray_carpet;
 pub mod light_gray_concrete;
+pub mod light_gray_concrete_double_slab;
 pub mod light_gray_concrete_powder;
+pub mod light_gray_concrete_slab;
+pub mod light_gray_concrete_stairs;
 pub mod light_gray_shulker_box;
 pub mod light_gray_stained_glass;
 pub mod light_gray_stained_glass_pane;
 pub mod light_gray_terracotta;
 pub mod light_gray_wool;
+pub mod light_gray_wool_double_slab;
+pub mod light_gray_wool_slab;
+pub mod light_gray_wool_stairs;
 pub mod light_weighted_pressure_plate;
 pub mod lightning_rod;
 pub mod lilac;
@@ -538,13 +784,19 @@ pub mod lime_candle;
 pub mod lime_candle_cake;
 pub mod lime_carpet;
 pub mod lime_concrete;
+pub mod lime_concrete_double_slab;
 pub mod lime_concrete_powder;
+pub mod lime_concrete_slab;
+pub mod lime_concrete_stairs;
 pub mod lime_glazed_terracotta;
 pub mod lime_shulker_box;
 pub mod lime_stained_glass;
 pub mod lime_stained_glass_pane;
 pub mod lime_terracotta;
 pub mod lime_wool;
+pub mod lime_wool_double_slab;
+pub mod lime_wool_slab;
+pub mod lime_wool_stairs;
 pub mod lit_blast_furnace;
 pub mod lit_deepslate_redstone_ore;
 pub mod lit_furnace;
@@ -558,13 +810,19 @@ pub mod magenta_candle;
 pub mod magenta_candle_cake;
 pub mod magenta_carpet;
 pub mod magenta_concrete;
+pub mod magenta_concrete_double_slab;
 pub mod magenta_concrete_powder;
+pub mod magenta_concrete_slab;
+pub mod magenta_concrete_stairs;
 pub mod magenta_glazed_terracotta;
 pub mod magenta_shulker_box;
 pub mod magenta_stained_glass;
 pub mod magenta_stained_glass_pane;
 pub mod magenta_terracotta;
 pub mod magenta_wool;
+pub mod magenta_wool_double_slab;
+pub mod magenta_wool_slab;
+pub mod magenta_wool_stairs;
 pub mod magma;
 pub mod mangrove_button;
 pub mod mangrove_door;
@@ -578,12 +836,14 @@ pub mod mangrove_planks;
 pub mod mangrove_pressure_plate;
 pub mod mangrove_propagule;
 pub mod mangrove_roots;
+pub mod mangrove_shelf;
 pub mod mangrove_slab;
 pub mod mangrove_stairs;
 pub mod mangrove_standing_sign;
 pub mod mangrove_trapdoor;
 pub mod mangrove_wall_sign;
 pub mod mangrove_wood;
+pub mod material_reducer;
 pub mod medium_amethyst_bud;
 pub mod melon_block;
 pub mod melon_stem;
@@ -634,6 +894,7 @@ pub mod oak_leaves;
 pub mod oak_log;
 pub mod oak_planks;
 pub mod oak_sapling;
+pub mod oak_shelf;
 pub mod oak_slab;
 pub mod oak_stairs;
 pub mod oak_wood;
@@ -645,25 +906,38 @@ pub mod orange_candle;
 pub mod orange_candle_cake;
 pub mod orange_carpet;
 pub mod orange_concrete;
+pub mod orange_concrete_double_slab;
 pub mod orange_concrete_powder;
+pub mod orange_concrete_slab;
+pub mod orange_concrete_stairs;
 pub mod orange_glazed_terracotta;
+pub mod orange_poplar_leaves;
 pub mod orange_shulker_box;
 pub mod orange_stained_glass;
 pub mod orange_stained_glass_pane;
 pub mod orange_terracotta;
 pub mod orange_tulip;
 pub mod orange_wool;
+pub mod orange_wool_double_slab;
+pub mod orange_wool_slab;
+pub mod orange_wool_stairs;
 pub mod oxeye_daisy;
 pub mod oxidized_chiseled_copper;
 pub mod oxidized_copper;
+pub mod oxidized_copper_bars;
 pub mod oxidized_copper_bulb;
+pub mod oxidized_copper_chain;
+pub mod oxidized_copper_chest;
 pub mod oxidized_copper_door;
+pub mod oxidized_copper_golem_statue;
 pub mod oxidized_copper_grate;
+pub mod oxidized_copper_lantern;
 pub mod oxidized_copper_trapdoor;
 pub mod oxidized_cut_copper;
 pub mod oxidized_cut_copper_slab;
 pub mod oxidized_cut_copper_stairs;
 pub mod oxidized_double_cut_copper_slab;
+pub mod oxidized_lightning_rod;
 pub mod packed_ice;
 pub mod packed_mud;
 pub mod pale_hanging_moss;
@@ -680,6 +954,7 @@ pub mod pale_oak_log;
 pub mod pale_oak_planks;
 pub mod pale_oak_pressure_plate;
 pub mod pale_oak_sapling;
+pub mod pale_oak_shelf;
 pub mod pale_oak_slab;
 pub mod pale_oak_stairs;
 pub mod pale_oak_standing_sign;
@@ -695,7 +970,10 @@ pub mod pink_candle;
 pub mod pink_candle_cake;
 pub mod pink_carpet;
 pub mod pink_concrete;
+pub mod pink_concrete_double_slab;
 pub mod pink_concrete_powder;
+pub mod pink_concrete_slab;
+pub mod pink_concrete_stairs;
 pub mod pink_glazed_terracotta;
 pub mod pink_petals;
 pub mod pink_shulker_box;
@@ -704,6 +982,9 @@ pub mod pink_stained_glass_pane;
 pub mod pink_terracotta;
 pub mod pink_tulip;
 pub mod pink_wool;
+pub mod pink_wool_double_slab;
+pub mod pink_wool_slab;
+pub mod pink_wool_stairs;
 pub mod piston;
 pub mod piston_arm_collision;
 pub mod pitcher_crop;
@@ -728,6 +1009,11 @@ pub mod polished_blackstone_pressure_plate;
 pub mod polished_blackstone_slab;
 pub mod polished_blackstone_stairs;
 pub mod polished_blackstone_wall;
+pub mod polished_cinnabar;
+pub mod polished_cinnabar_double_slab;
+pub mod polished_cinnabar_slab;
+pub mod polished_cinnabar_stairs;
+pub mod polished_cinnabar_wall;
 pub mod polished_deepslate;
 pub mod polished_deepslate_double_slab;
 pub mod polished_deepslate_slab;
@@ -741,14 +1027,37 @@ pub mod polished_granite;
 pub mod polished_granite_double_slab;
 pub mod polished_granite_slab;
 pub mod polished_granite_stairs;
+pub mod polished_sulfur;
+pub mod polished_sulfur_double_slab;
+pub mod polished_sulfur_slab;
+pub mod polished_sulfur_stairs;
+pub mod polished_sulfur_wall;
 pub mod polished_tuff;
 pub mod polished_tuff_double_slab;
 pub mod polished_tuff_slab;
 pub mod polished_tuff_stairs;
 pub mod polished_tuff_wall;
+pub mod poplar_button;
+pub mod poplar_door;
+pub mod poplar_double_slab;
+pub mod poplar_fence;
+pub mod poplar_fence_gate;
+pub mod poplar_hanging_sign;
+pub mod poplar_log;
+pub mod poplar_planks;
+pub mod poplar_pressure_plate;
+pub mod poplar_sapling;
+pub mod poplar_shelf;
+pub mod poplar_slab;
+pub mod poplar_stairs;
+pub mod poplar_standing_sign;
+pub mod poplar_trapdoor;
+pub mod poplar_wall_sign;
+pub mod poplar_wood;
 pub mod poppy;
 pub mod portal;
 pub mod potatoes;
+pub mod potent_sulfur;
 pub mod powder_snow;
 pub mod powered_comparator;
 pub mod powered_repeater;
@@ -767,13 +1076,19 @@ pub mod purple_candle;
 pub mod purple_candle_cake;
 pub mod purple_carpet;
 pub mod purple_concrete;
+pub mod purple_concrete_double_slab;
 pub mod purple_concrete_powder;
+pub mod purple_concrete_slab;
+pub mod purple_concrete_stairs;
 pub mod purple_glazed_terracotta;
 pub mod purple_shulker_box;
 pub mod purple_stained_glass;
 pub mod purple_stained_glass_pane;
 pub mod purple_terracotta;
 pub mod purple_wool;
+pub mod purple_wool_double_slab;
+pub mod purple_wool_slab;
+pub mod purple_wool_stairs;
 pub mod purpur_block;
 pub mod purpur_double_slab;
 pub mod purpur_pillar;
@@ -794,7 +1109,10 @@ pub mod red_candle;
 pub mod red_candle_cake;
 pub mod red_carpet;
 pub mod red_concrete;
+pub mod red_concrete_double_slab;
 pub mod red_concrete_powder;
+pub mod red_concrete_slab;
+pub mod red_concrete_stairs;
 pub mod red_glazed_terracotta;
 pub mod red_mushroom;
 pub mod red_mushroom_block;
@@ -803,18 +1121,23 @@ pub mod red_nether_brick_double_slab;
 pub mod red_nether_brick_slab;
 pub mod red_nether_brick_stairs;
 pub mod red_nether_brick_wall;
+pub mod red_poplar_leaves;
 pub mod red_sand;
 pub mod red_sandstone;
 pub mod red_sandstone_double_slab;
 pub mod red_sandstone_slab;
 pub mod red_sandstone_stairs;
 pub mod red_sandstone_wall;
+pub mod red_shrub;
 pub mod red_shulker_box;
 pub mod red_stained_glass;
 pub mod red_stained_glass_pane;
 pub mod red_terracotta;
 pub mod red_tulip;
 pub mod red_wool;
+pub mod red_wool_double_slab;
+pub mod red_wool_slab;
+pub mod red_wool_stairs;
 pub mod redstone_block;
 pub mod redstone_lamp;
 pub mod redstone_ore;
@@ -848,6 +1171,7 @@ pub mod sculk_vein;
 pub mod sea_lantern;
 pub mod sea_pickle;
 pub mod seagrass;
+pub mod shelf_mushroom;
 pub mod short_dry_grass;
 pub mod short_grass;
 pub mod shroomlight;
@@ -896,6 +1220,7 @@ pub mod spruce_log;
 pub mod spruce_planks;
 pub mod spruce_pressure_plate;
 pub mod spruce_sapling;
+pub mod spruce_shelf;
 pub mod spruce_slab;
 pub mod spruce_stairs;
 pub mod spruce_standing_sign;
@@ -917,6 +1242,7 @@ pub mod stone_pressure_plate;
 pub mod stone_stairs;
 pub mod stonecutter;
 pub mod stonecutter_block;
+pub mod straw_bed;
 pub mod stripped_acacia_log;
 pub mod stripped_acacia_wood;
 pub mod stripped_bamboo_block;
@@ -936,12 +1262,25 @@ pub mod stripped_oak_log;
 pub mod stripped_oak_wood;
 pub mod stripped_pale_oak_log;
 pub mod stripped_pale_oak_wood;
+pub mod stripped_poplar_log;
+pub mod stripped_poplar_wood;
 pub mod stripped_spruce_log;
 pub mod stripped_spruce_wood;
 pub mod stripped_warped_hyphae;
 pub mod stripped_warped_stem;
 pub mod structure_block;
 pub mod structure_void;
+pub mod sulfur;
+pub mod sulfur_brick_double_slab;
+pub mod sulfur_brick_slab;
+pub mod sulfur_brick_stairs;
+pub mod sulfur_brick_wall;
+pub mod sulfur_bricks;
+pub mod sulfur_double_slab;
+pub mod sulfur_slab;
+pub mod sulfur_spike;
+pub mod sulfur_stairs;
+pub mod sulfur_wall;
 pub mod sunflower;
 pub mod suspicious_gravel;
 pub mod suspicious_sand;
@@ -975,6 +1314,8 @@ pub mod tuff_stairs;
 pub mod tuff_wall;
 pub mod turtle_egg;
 pub mod twisting_vines;
+pub mod underwater_tnt;
+pub mod underwater_torch;
 pub mod undyed_shulker_box;
 pub mod unknown;
 pub mod unlit_redstone_torch;
@@ -997,6 +1338,7 @@ pub mod warped_nylium;
 pub mod warped_planks;
 pub mod warped_pressure_plate;
 pub mod warped_roots;
+pub mod warped_shelf;
 pub mod warped_slab;
 pub mod warped_stairs;
 pub mod warped_standing_sign;
@@ -1008,9 +1350,14 @@ pub mod water;
 pub mod waterlily;
 pub mod waxed_chiseled_copper;
 pub mod waxed_copper;
+pub mod waxed_copper_bars;
 pub mod waxed_copper_bulb;
+pub mod waxed_copper_chain;
+pub mod waxed_copper_chest;
 pub mod waxed_copper_door;
+pub mod waxed_copper_golem_statue;
 pub mod waxed_copper_grate;
+pub mod waxed_copper_lantern;
 pub mod waxed_copper_trapdoor;
 pub mod waxed_cut_copper;
 pub mod waxed_cut_copper_slab;
@@ -1018,44 +1365,69 @@ pub mod waxed_cut_copper_stairs;
 pub mod waxed_double_cut_copper_slab;
 pub mod waxed_exposed_chiseled_copper;
 pub mod waxed_exposed_copper;
+pub mod waxed_exposed_copper_bars;
 pub mod waxed_exposed_copper_bulb;
+pub mod waxed_exposed_copper_chain;
+pub mod waxed_exposed_copper_chest;
 pub mod waxed_exposed_copper_door;
+pub mod waxed_exposed_copper_golem_statue;
 pub mod waxed_exposed_copper_grate;
+pub mod waxed_exposed_copper_lantern;
 pub mod waxed_exposed_copper_trapdoor;
 pub mod waxed_exposed_cut_copper;
 pub mod waxed_exposed_cut_copper_slab;
 pub mod waxed_exposed_cut_copper_stairs;
 pub mod waxed_exposed_double_cut_copper_slab;
+pub mod waxed_exposed_lightning_rod;
+pub mod waxed_lightning_rod;
 pub mod waxed_oxidized_chiseled_copper;
 pub mod waxed_oxidized_copper;
+pub mod waxed_oxidized_copper_bars;
 pub mod waxed_oxidized_copper_bulb;
+pub mod waxed_oxidized_copper_chain;
+pub mod waxed_oxidized_copper_chest;
 pub mod waxed_oxidized_copper_door;
+pub mod waxed_oxidized_copper_golem_statue;
 pub mod waxed_oxidized_copper_grate;
+pub mod waxed_oxidized_copper_lantern;
 pub mod waxed_oxidized_copper_trapdoor;
 pub mod waxed_oxidized_cut_copper;
 pub mod waxed_oxidized_cut_copper_slab;
 pub mod waxed_oxidized_cut_copper_stairs;
 pub mod waxed_oxidized_double_cut_copper_slab;
+pub mod waxed_oxidized_lightning_rod;
 pub mod waxed_weathered_chiseled_copper;
 pub mod waxed_weathered_copper;
+pub mod waxed_weathered_copper_bars;
 pub mod waxed_weathered_copper_bulb;
+pub mod waxed_weathered_copper_chain;
+pub mod waxed_weathered_copper_chest;
 pub mod waxed_weathered_copper_door;
+pub mod waxed_weathered_copper_golem_statue;
 pub mod waxed_weathered_copper_grate;
+pub mod waxed_weathered_copper_lantern;
 pub mod waxed_weathered_copper_trapdoor;
 pub mod waxed_weathered_cut_copper;
 pub mod waxed_weathered_cut_copper_slab;
 pub mod waxed_weathered_cut_copper_stairs;
 pub mod waxed_weathered_double_cut_copper_slab;
+pub mod waxed_weathered_lightning_rod;
 pub mod weathered_chiseled_copper;
 pub mod weathered_copper;
+pub mod weathered_copper_bars;
 pub mod weathered_copper_bulb;
+pub mod weathered_copper_chain;
+pub mod weathered_copper_chest;
 pub mod weathered_copper_door;
+pub mod weathered_copper_golem_statue;
 pub mod weathered_copper_grate;
+pub mod weathered_copper_lantern;
 pub mod weathered_copper_trapdoor;
 pub mod weathered_cut_copper;
 pub mod weathered_cut_copper_slab;
 pub mod weathered_cut_copper_stairs;
 pub mod weathered_double_cut_copper_slab;
+pub mod weathered_lightning_rod;
 pub mod web;
 pub mod weeping_vines;
 pub mod wet_sponge;
@@ -1064,7 +1436,10 @@ pub mod white_candle;
 pub mod white_candle_cake;
 pub mod white_carpet;
 pub mod white_concrete;
+pub mod white_concrete_double_slab;
 pub mod white_concrete_powder;
+pub mod white_concrete_slab;
+pub mod white_concrete_stairs;
 pub mod white_glazed_terracotta;
 pub mod white_shulker_box;
 pub mod white_stained_glass;
@@ -1072,6 +1447,9 @@ pub mod white_stained_glass_pane;
 pub mod white_terracotta;
 pub mod white_tulip;
 pub mod white_wool;
+pub mod white_wool_double_slab;
+pub mod white_wool_slab;
+pub mod white_wool_stairs;
 pub mod wildflowers;
 pub mod wither_rose;
 pub mod wither_skeleton_skull;
@@ -1082,13 +1460,20 @@ pub mod yellow_candle;
 pub mod yellow_candle_cake;
 pub mod yellow_carpet;
 pub mod yellow_concrete;
+pub mod yellow_concrete_double_slab;
 pub mod yellow_concrete_powder;
+pub mod yellow_concrete_slab;
+pub mod yellow_concrete_stairs;
 pub mod yellow_glazed_terracotta;
+pub mod yellow_poplar_leaves;
 pub mod yellow_shulker_box;
 pub mod yellow_stained_glass;
 pub mod yellow_stained_glass_pane;
 pub mod yellow_terracotta;
 pub mod yellow_wool;
+pub mod yellow_wool_double_slab;
+pub mod yellow_wool_slab;
+pub mod yellow_wool_stairs;
 pub mod zombie_head;
 
 use crate::block::block_definition::BlockDefinition;
@@ -1105,6 +1490,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &acacia_planks::ACACIA_PLANKS,
     &acacia_pressure_plate::ACACIA_PRESSURE_PLATE,
     &acacia_sapling::ACACIA_SAPLING,
+    &acacia_shelf::ACACIA_SHELF,
     &acacia_slab::ACACIA_SLAB,
     &acacia_stairs::ACACIA_STAIRS,
     &acacia_standing_sign::ACACIA_STANDING_SIGN,
@@ -1143,6 +1529,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &bamboo_planks::BAMBOO_PLANKS,
     &bamboo_pressure_plate::BAMBOO_PRESSURE_PLATE,
     &bamboo_sapling::BAMBOO_SAPLING,
+    &bamboo_shelf::BAMBOO_SHELF,
     &bamboo_slab::BAMBOO_SLAB,
     &bamboo_stairs::BAMBOO_STAIRS,
     &bamboo_standing_sign::BAMBOO_STANDING_SIGN,
@@ -1170,6 +1557,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &birch_planks::BIRCH_PLANKS,
     &birch_pressure_plate::BIRCH_PRESSURE_PLATE,
     &birch_sapling::BIRCH_SAPLING,
+    &birch_shelf::BIRCH_SHELF,
     &birch_slab::BIRCH_SLAB,
     &birch_stairs::BIRCH_STAIRS,
     &birch_standing_sign::BIRCH_STANDING_SIGN,
@@ -1180,13 +1568,19 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &black_candle_cake::BLACK_CANDLE_CAKE,
     &black_carpet::BLACK_CARPET,
     &black_concrete::BLACK_CONCRETE,
+    &black_concrete_double_slab::BLACK_CONCRETE_DOUBLE_SLAB,
     &black_concrete_powder::BLACK_CONCRETE_POWDER,
+    &black_concrete_slab::BLACK_CONCRETE_SLAB,
+    &black_concrete_stairs::BLACK_CONCRETE_STAIRS,
     &black_glazed_terracotta::BLACK_GLAZED_TERRACOTTA,
     &black_shulker_box::BLACK_SHULKER_BOX,
     &black_stained_glass::BLACK_STAINED_GLASS,
     &black_stained_glass_pane::BLACK_STAINED_GLASS_PANE,
     &black_terracotta::BLACK_TERRACOTTA,
     &black_wool::BLACK_WOOL,
+    &black_wool_double_slab::BLACK_WOOL_DOUBLE_SLAB,
+    &black_wool_slab::BLACK_WOOL_SLAB,
+    &black_wool_stairs::BLACK_WOOL_STAIRS,
     &blackstone::BLACKSTONE,
     &blackstone_double_slab::BLACKSTONE_DOUBLE_SLAB,
     &blackstone_slab::BLACKSTONE_SLAB,
@@ -1197,7 +1591,10 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &blue_candle_cake::BLUE_CANDLE_CAKE,
     &blue_carpet::BLUE_CARPET,
     &blue_concrete::BLUE_CONCRETE,
+    &blue_concrete_double_slab::BLUE_CONCRETE_DOUBLE_SLAB,
     &blue_concrete_powder::BLUE_CONCRETE_POWDER,
+    &blue_concrete_slab::BLUE_CONCRETE_SLAB,
+    &blue_concrete_stairs::BLUE_CONCRETE_STAIRS,
     &blue_glazed_terracotta::BLUE_GLAZED_TERRACOTTA,
     &blue_ice::BLUE_ICE,
     &blue_orchid::BLUE_ORCHID,
@@ -1206,6 +1603,9 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &blue_stained_glass_pane::BLUE_STAINED_GLASS_PANE,
     &blue_terracotta::BLUE_TERRACOTTA,
     &blue_wool::BLUE_WOOL,
+    &blue_wool_double_slab::BLUE_WOOL_DOUBLE_SLAB,
+    &blue_wool_slab::BLUE_WOOL_SLAB,
+    &blue_wool_stairs::BLUE_WOOL_STAIRS,
     &bone_block::BONE_BLOCK,
     &bookshelf::BOOKSHELF,
     &border_block::BORDER_BLOCK,
@@ -1223,7 +1623,10 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &brown_candle_cake::BROWN_CANDLE_CAKE,
     &brown_carpet::BROWN_CARPET,
     &brown_concrete::BROWN_CONCRETE,
+    &brown_concrete_double_slab::BROWN_CONCRETE_DOUBLE_SLAB,
     &brown_concrete_powder::BROWN_CONCRETE_POWDER,
+    &brown_concrete_slab::BROWN_CONCRETE_SLAB,
+    &brown_concrete_stairs::BROWN_CONCRETE_STAIRS,
     &brown_glazed_terracotta::BROWN_GLAZED_TERRACOTTA,
     &brown_mushroom::BROWN_MUSHROOM,
     &brown_mushroom_block::BROWN_MUSHROOM_BLOCK,
@@ -1232,6 +1635,9 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &brown_stained_glass_pane::BROWN_STAINED_GLASS_PANE,
     &brown_terracotta::BROWN_TERRACOTTA,
     &brown_wool::BROWN_WOOL,
+    &brown_wool_double_slab::BROWN_WOOL_DOUBLE_SLAB,
+    &brown_wool_slab::BROWN_WOOL_SLAB,
+    &brown_wool_stairs::BROWN_WOOL_STAIRS,
     &bubble_column::BUBBLE_COLUMN,
     &bubble_coral::BUBBLE_CORAL,
     &bubble_coral_block::BUBBLE_CORAL_BLOCK,
@@ -1244,6 +1650,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &cake::CAKE,
     &calcite::CALCITE,
     &calibrated_sculk_sensor::CALIBRATED_SCULK_SENSOR,
+    &camera::CAMERA,
     &campfire::CAMPFIRE,
     &candle::CANDLE,
     &candle_cake::CANDLE_CAKE,
@@ -1254,8 +1661,9 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &cave_vines::CAVE_VINES,
     &cave_vines_body_with_berries::CAVE_VINES_BODY_WITH_BERRIES,
     &cave_vines_head_with_berries::CAVE_VINES_HEAD_WITH_BERRIES,
-    &chain::CHAIN,
     &chain_command_block::CHAIN_COMMAND_BLOCK,
+    &chalkboard::CHALKBOARD,
+    &chemical_heat::CHEMICAL_HEAT,
     &cherry_button::CHERRY_BUTTON,
     &cherry_door::CHERRY_DOOR,
     &cherry_double_slab::CHERRY_DOUBLE_SLAB,
@@ -1267,6 +1675,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &cherry_planks::CHERRY_PLANKS,
     &cherry_pressure_plate::CHERRY_PRESSURE_PLATE,
     &cherry_sapling::CHERRY_SAPLING,
+    &cherry_shelf::CHERRY_SHELF,
     &cherry_slab::CHERRY_SLAB,
     &cherry_stairs::CHERRY_STAIRS,
     &cherry_standing_sign::CHERRY_STANDING_SIGN,
@@ -1276,6 +1685,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &chest::CHEST,
     &chipped_anvil::CHIPPED_ANVIL,
     &chiseled_bookshelf::CHISELED_BOOKSHELF,
+    &chiseled_cinnabar::CHISELED_CINNABAR,
     &chiseled_copper::CHISELED_COPPER,
     &chiseled_deepslate::CHISELED_DEEPSLATE,
     &chiseled_nether_bricks::CHISELED_NETHER_BRICKS,
@@ -1285,10 +1695,21 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &chiseled_resin_bricks::CHISELED_RESIN_BRICKS,
     &chiseled_sandstone::CHISELED_SANDSTONE,
     &chiseled_stone_bricks::CHISELED_STONE_BRICKS,
+    &chiseled_sulfur::CHISELED_SULFUR,
     &chiseled_tuff::CHISELED_TUFF,
     &chiseled_tuff_bricks::CHISELED_TUFF_BRICKS,
     &chorus_flower::CHORUS_FLOWER,
     &chorus_plant::CHORUS_PLANT,
+    &cinnabar::CINNABAR,
+    &cinnabar_brick_double_slab::CINNABAR_BRICK_DOUBLE_SLAB,
+    &cinnabar_brick_slab::CINNABAR_BRICK_SLAB,
+    &cinnabar_brick_stairs::CINNABAR_BRICK_STAIRS,
+    &cinnabar_brick_wall::CINNABAR_BRICK_WALL,
+    &cinnabar_bricks::CINNABAR_BRICKS,
+    &cinnabar_double_slab::CINNABAR_DOUBLE_SLAB,
+    &cinnabar_slab::CINNABAR_SLAB,
+    &cinnabar_stairs::CINNABAR_STAIRS,
+    &cinnabar_wall::CINNABAR_WALL,
     &clay::CLAY,
     &client_request_placeholder_block::CLIENT_REQUEST_PLACEHOLDER_BLOCK,
     &closed_eyeblossom::CLOSED_EYEBLOSSOM,
@@ -1305,14 +1726,25 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &cobblestone_slab::COBBLESTONE_SLAB,
     &cobblestone_wall::COBBLESTONE_WALL,
     &cocoa::COCOA,
+    &colored_torch_blue::COLORED_TORCH_BLUE,
+    &colored_torch_green::COLORED_TORCH_GREEN,
+    &colored_torch_purple::COLORED_TORCH_PURPLE,
+    &colored_torch_red::COLORED_TORCH_RED,
     &command_block::COMMAND_BLOCK,
     &composter::COMPOSTER,
+    &compound_creator::COMPOUND_CREATOR,
     &conduit::CONDUIT,
+    &copper_bars::COPPER_BARS,
     &copper_block::COPPER_BLOCK,
     &copper_bulb::COPPER_BULB,
+    &copper_chain::COPPER_CHAIN,
+    &copper_chest::COPPER_CHEST,
     &copper_door::COPPER_DOOR,
+    &copper_golem_statue::COPPER_GOLEM_STATUE,
     &copper_grate::COPPER_GRATE,
+    &copper_lantern::COPPER_LANTERN,
     &copper_ore::COPPER_ORE,
+    &copper_torch::COPPER_TORCH,
     &copper_trapdoor::COPPER_TRAPDOOR,
     &cornflower::CORNFLOWER,
     &cracked_deepslate_bricks::CRACKED_DEEPSLATE_BRICKS,
@@ -1336,6 +1768,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &crimson_planks::CRIMSON_PLANKS,
     &crimson_pressure_plate::CRIMSON_PRESSURE_PLATE,
     &crimson_roots::CRIMSON_ROOTS,
+    &crimson_shelf::CRIMSON_SHELF,
     &crimson_slab::CRIMSON_SLAB,
     &crimson_stairs::CRIMSON_STAIRS,
     &crimson_standing_sign::CRIMSON_STANDING_SIGN,
@@ -1356,13 +1789,19 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &cyan_candle_cake::CYAN_CANDLE_CAKE,
     &cyan_carpet::CYAN_CARPET,
     &cyan_concrete::CYAN_CONCRETE,
+    &cyan_concrete_double_slab::CYAN_CONCRETE_DOUBLE_SLAB,
     &cyan_concrete_powder::CYAN_CONCRETE_POWDER,
+    &cyan_concrete_slab::CYAN_CONCRETE_SLAB,
+    &cyan_concrete_stairs::CYAN_CONCRETE_STAIRS,
     &cyan_glazed_terracotta::CYAN_GLAZED_TERRACOTTA,
     &cyan_shulker_box::CYAN_SHULKER_BOX,
     &cyan_stained_glass::CYAN_STAINED_GLASS,
     &cyan_stained_glass_pane::CYAN_STAINED_GLASS_PANE,
     &cyan_terracotta::CYAN_TERRACOTTA,
     &cyan_wool::CYAN_WOOL,
+    &cyan_wool_double_slab::CYAN_WOOL_DOUBLE_SLAB,
+    &cyan_wool_slab::CYAN_WOOL_SLAB,
+    &cyan_wool_stairs::CYAN_WOOL_STAIRS,
     &damaged_anvil::DAMAGED_ANVIL,
     &dandelion::DANDELION,
     &dark_oak_button::DARK_OAK_BUTTON,
@@ -1376,6 +1815,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &dark_oak_planks::DARK_OAK_PLANKS,
     &dark_oak_pressure_plate::DARK_OAK_PRESSURE_PLATE,
     &dark_oak_sapling::DARK_OAK_SAPLING,
+    &dark_oak_shelf::DARK_OAK_SHELF,
     &dark_oak_slab::DARK_OAK_SLAB,
     &dark_oak_stairs::DARK_OAK_STAIRS,
     &dark_oak_trapdoor::DARK_OAK_TRAPDOOR,
@@ -1430,6 +1870,9 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &deepslate_tile_wall::DEEPSLATE_TILE_WALL,
     &deepslate_tiles::DEEPSLATE_TILES,
     &deny::DENY,
+    &deprecated_anvil::DEPRECATED_ANVIL,
+    &deprecated_purpur_block_1::DEPRECATED_PURPUR_BLOCK_1,
+    &deprecated_purpur_block_2::DEPRECATED_PURPUR_BLOCK_2,
     &detector_rail::DETECTOR_RAIL,
     &diamond_block::DIAMOND_BLOCK,
     &diamond_ore::DIAMOND_ORE,
@@ -1448,6 +1891,126 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &dried_kelp_block::DRIED_KELP_BLOCK,
     &dripstone_block::DRIPSTONE_BLOCK,
     &dropper::DROPPER,
+    &element_0::ELEMENT_0,
+    &element_1::ELEMENT_1,
+    &element_10::ELEMENT_10,
+    &element_100::ELEMENT_100,
+    &element_101::ELEMENT_101,
+    &element_102::ELEMENT_102,
+    &element_103::ELEMENT_103,
+    &element_104::ELEMENT_104,
+    &element_105::ELEMENT_105,
+    &element_106::ELEMENT_106,
+    &element_107::ELEMENT_107,
+    &element_108::ELEMENT_108,
+    &element_109::ELEMENT_109,
+    &element_11::ELEMENT_11,
+    &element_110::ELEMENT_110,
+    &element_111::ELEMENT_111,
+    &element_112::ELEMENT_112,
+    &element_113::ELEMENT_113,
+    &element_114::ELEMENT_114,
+    &element_115::ELEMENT_115,
+    &element_116::ELEMENT_116,
+    &element_117::ELEMENT_117,
+    &element_118::ELEMENT_118,
+    &element_12::ELEMENT_12,
+    &element_13::ELEMENT_13,
+    &element_14::ELEMENT_14,
+    &element_15::ELEMENT_15,
+    &element_16::ELEMENT_16,
+    &element_17::ELEMENT_17,
+    &element_18::ELEMENT_18,
+    &element_19::ELEMENT_19,
+    &element_2::ELEMENT_2,
+    &element_20::ELEMENT_20,
+    &element_21::ELEMENT_21,
+    &element_22::ELEMENT_22,
+    &element_23::ELEMENT_23,
+    &element_24::ELEMENT_24,
+    &element_25::ELEMENT_25,
+    &element_26::ELEMENT_26,
+    &element_27::ELEMENT_27,
+    &element_28::ELEMENT_28,
+    &element_29::ELEMENT_29,
+    &element_3::ELEMENT_3,
+    &element_30::ELEMENT_30,
+    &element_31::ELEMENT_31,
+    &element_32::ELEMENT_32,
+    &element_33::ELEMENT_33,
+    &element_34::ELEMENT_34,
+    &element_35::ELEMENT_35,
+    &element_36::ELEMENT_36,
+    &element_37::ELEMENT_37,
+    &element_38::ELEMENT_38,
+    &element_39::ELEMENT_39,
+    &element_4::ELEMENT_4,
+    &element_40::ELEMENT_40,
+    &element_41::ELEMENT_41,
+    &element_42::ELEMENT_42,
+    &element_43::ELEMENT_43,
+    &element_44::ELEMENT_44,
+    &element_45::ELEMENT_45,
+    &element_46::ELEMENT_46,
+    &element_47::ELEMENT_47,
+    &element_48::ELEMENT_48,
+    &element_49::ELEMENT_49,
+    &element_5::ELEMENT_5,
+    &element_50::ELEMENT_50,
+    &element_51::ELEMENT_51,
+    &element_52::ELEMENT_52,
+    &element_53::ELEMENT_53,
+    &element_54::ELEMENT_54,
+    &element_55::ELEMENT_55,
+    &element_56::ELEMENT_56,
+    &element_57::ELEMENT_57,
+    &element_58::ELEMENT_58,
+    &element_59::ELEMENT_59,
+    &element_6::ELEMENT_6,
+    &element_60::ELEMENT_60,
+    &element_61::ELEMENT_61,
+    &element_62::ELEMENT_62,
+    &element_63::ELEMENT_63,
+    &element_64::ELEMENT_64,
+    &element_65::ELEMENT_65,
+    &element_66::ELEMENT_66,
+    &element_67::ELEMENT_67,
+    &element_68::ELEMENT_68,
+    &element_69::ELEMENT_69,
+    &element_7::ELEMENT_7,
+    &element_70::ELEMENT_70,
+    &element_71::ELEMENT_71,
+    &element_72::ELEMENT_72,
+    &element_73::ELEMENT_73,
+    &element_74::ELEMENT_74,
+    &element_75::ELEMENT_75,
+    &element_76::ELEMENT_76,
+    &element_77::ELEMENT_77,
+    &element_78::ELEMENT_78,
+    &element_79::ELEMENT_79,
+    &element_8::ELEMENT_8,
+    &element_80::ELEMENT_80,
+    &element_81::ELEMENT_81,
+    &element_82::ELEMENT_82,
+    &element_83::ELEMENT_83,
+    &element_84::ELEMENT_84,
+    &element_85::ELEMENT_85,
+    &element_86::ELEMENT_86,
+    &element_87::ELEMENT_87,
+    &element_88::ELEMENT_88,
+    &element_89::ELEMENT_89,
+    &element_9::ELEMENT_9,
+    &element_90::ELEMENT_90,
+    &element_91::ELEMENT_91,
+    &element_92::ELEMENT_92,
+    &element_93::ELEMENT_93,
+    &element_94::ELEMENT_94,
+    &element_95::ELEMENT_95,
+    &element_96::ELEMENT_96,
+    &element_97::ELEMENT_97,
+    &element_98::ELEMENT_98,
+    &element_99::ELEMENT_99,
+    &element_constructor::ELEMENT_CONSTRUCTOR,
     &emerald_block::EMERALD_BLOCK,
     &emerald_ore::EMERALD_ORE,
     &enchanting_table::ENCHANTING_TABLE,
@@ -1464,14 +2027,20 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &ender_chest::ENDER_CHEST,
     &exposed_chiseled_copper::EXPOSED_CHISELED_COPPER,
     &exposed_copper::EXPOSED_COPPER,
+    &exposed_copper_bars::EXPOSED_COPPER_BARS,
     &exposed_copper_bulb::EXPOSED_COPPER_BULB,
+    &exposed_copper_chain::EXPOSED_COPPER_CHAIN,
+    &exposed_copper_chest::EXPOSED_COPPER_CHEST,
     &exposed_copper_door::EXPOSED_COPPER_DOOR,
+    &exposed_copper_golem_statue::EXPOSED_COPPER_GOLEM_STATUE,
     &exposed_copper_grate::EXPOSED_COPPER_GRATE,
+    &exposed_copper_lantern::EXPOSED_COPPER_LANTERN,
     &exposed_copper_trapdoor::EXPOSED_COPPER_TRAPDOOR,
     &exposed_cut_copper::EXPOSED_CUT_COPPER,
     &exposed_cut_copper_slab::EXPOSED_CUT_COPPER_SLAB,
     &exposed_cut_copper_stairs::EXPOSED_CUT_COPPER_STAIRS,
     &exposed_double_cut_copper_slab::EXPOSED_DOUBLE_CUT_COPPER_SLAB,
+    &exposed_lightning_rod::EXPOSED_LIGHTNING_ROD,
     &farmland::FARMLAND,
     &fence_gate::FENCE_GATE,
     &fern::FERN,
@@ -1499,6 +2068,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &glowstone::GLOWSTONE,
     &gold_block::GOLD_BLOCK,
     &gold_ore::GOLD_ORE,
+    &golden_dandelion::GOLDEN_DANDELION,
     &golden_rail::GOLDEN_RAIL,
     &granite::GRANITE,
     &granite_double_slab::GRANITE_DOUBLE_SLAB,
@@ -1512,26 +2082,72 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &gray_candle_cake::GRAY_CANDLE_CAKE,
     &gray_carpet::GRAY_CARPET,
     &gray_concrete::GRAY_CONCRETE,
+    &gray_concrete_double_slab::GRAY_CONCRETE_DOUBLE_SLAB,
     &gray_concrete_powder::GRAY_CONCRETE_POWDER,
+    &gray_concrete_slab::GRAY_CONCRETE_SLAB,
+    &gray_concrete_stairs::GRAY_CONCRETE_STAIRS,
     &gray_glazed_terracotta::GRAY_GLAZED_TERRACOTTA,
     &gray_shulker_box::GRAY_SHULKER_BOX,
     &gray_stained_glass::GRAY_STAINED_GLASS,
     &gray_stained_glass_pane::GRAY_STAINED_GLASS_PANE,
     &gray_terracotta::GRAY_TERRACOTTA,
     &gray_wool::GRAY_WOOL,
+    &gray_wool_double_slab::GRAY_WOOL_DOUBLE_SLAB,
+    &gray_wool_slab::GRAY_WOOL_SLAB,
+    &gray_wool_stairs::GRAY_WOOL_STAIRS,
     &green_candle::GREEN_CANDLE,
     &green_candle_cake::GREEN_CANDLE_CAKE,
     &green_carpet::GREEN_CARPET,
     &green_concrete::GREEN_CONCRETE,
+    &green_concrete_double_slab::GREEN_CONCRETE_DOUBLE_SLAB,
     &green_concrete_powder::GREEN_CONCRETE_POWDER,
+    &green_concrete_slab::GREEN_CONCRETE_SLAB,
+    &green_concrete_stairs::GREEN_CONCRETE_STAIRS,
     &green_glazed_terracotta::GREEN_GLAZED_TERRACOTTA,
     &green_shulker_box::GREEN_SHULKER_BOX,
     &green_stained_glass::GREEN_STAINED_GLASS,
     &green_stained_glass_pane::GREEN_STAINED_GLASS_PANE,
     &green_terracotta::GREEN_TERRACOTTA,
     &green_wool::GREEN_WOOL,
+    &green_wool_double_slab::GREEN_WOOL_DOUBLE_SLAB,
+    &green_wool_slab::GREEN_WOOL_SLAB,
+    &green_wool_stairs::GREEN_WOOL_STAIRS,
     &grindstone::GRINDSTONE,
     &hanging_roots::HANGING_ROOTS,
+    &hard_black_stained_glass::HARD_BLACK_STAINED_GLASS,
+    &hard_black_stained_glass_pane::HARD_BLACK_STAINED_GLASS_PANE,
+    &hard_blue_stained_glass::HARD_BLUE_STAINED_GLASS,
+    &hard_blue_stained_glass_pane::HARD_BLUE_STAINED_GLASS_PANE,
+    &hard_brown_stained_glass::HARD_BROWN_STAINED_GLASS,
+    &hard_brown_stained_glass_pane::HARD_BROWN_STAINED_GLASS_PANE,
+    &hard_cyan_stained_glass::HARD_CYAN_STAINED_GLASS,
+    &hard_cyan_stained_glass_pane::HARD_CYAN_STAINED_GLASS_PANE,
+    &hard_glass::HARD_GLASS,
+    &hard_glass_pane::HARD_GLASS_PANE,
+    &hard_gray_stained_glass::HARD_GRAY_STAINED_GLASS,
+    &hard_gray_stained_glass_pane::HARD_GRAY_STAINED_GLASS_PANE,
+    &hard_green_stained_glass::HARD_GREEN_STAINED_GLASS,
+    &hard_green_stained_glass_pane::HARD_GREEN_STAINED_GLASS_PANE,
+    &hard_light_blue_stained_glass::HARD_LIGHT_BLUE_STAINED_GLASS,
+    &hard_light_blue_stained_glass_pane::HARD_LIGHT_BLUE_STAINED_GLASS_PANE,
+    &hard_light_gray_stained_glass::HARD_LIGHT_GRAY_STAINED_GLASS,
+    &hard_light_gray_stained_glass_pane::HARD_LIGHT_GRAY_STAINED_GLASS_PANE,
+    &hard_lime_stained_glass::HARD_LIME_STAINED_GLASS,
+    &hard_lime_stained_glass_pane::HARD_LIME_STAINED_GLASS_PANE,
+    &hard_magenta_stained_glass::HARD_MAGENTA_STAINED_GLASS,
+    &hard_magenta_stained_glass_pane::HARD_MAGENTA_STAINED_GLASS_PANE,
+    &hard_orange_stained_glass::HARD_ORANGE_STAINED_GLASS,
+    &hard_orange_stained_glass_pane::HARD_ORANGE_STAINED_GLASS_PANE,
+    &hard_pink_stained_glass::HARD_PINK_STAINED_GLASS,
+    &hard_pink_stained_glass_pane::HARD_PINK_STAINED_GLASS_PANE,
+    &hard_purple_stained_glass::HARD_PURPLE_STAINED_GLASS,
+    &hard_purple_stained_glass_pane::HARD_PURPLE_STAINED_GLASS_PANE,
+    &hard_red_stained_glass::HARD_RED_STAINED_GLASS,
+    &hard_red_stained_glass_pane::HARD_RED_STAINED_GLASS_PANE,
+    &hard_white_stained_glass::HARD_WHITE_STAINED_GLASS,
+    &hard_white_stained_glass_pane::HARD_WHITE_STAINED_GLASS_PANE,
+    &hard_yellow_stained_glass::HARD_YELLOW_STAINED_GLASS,
+    &hard_yellow_stained_glass_pane::HARD_YELLOW_STAINED_GLASS_PANE,
     &hardened_clay::HARDENED_CLAY,
     &hay_block::HAY_BLOCK,
     &heavy_core::HEAVY_CORE,
@@ -1556,6 +2172,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &invisible_bedrock::INVISIBLE_BEDROCK,
     &iron_bars::IRON_BARS,
     &iron_block::IRON_BLOCK,
+    &iron_chain::IRON_CHAIN,
     &iron_door::IRON_DOOR,
     &iron_ore::IRON_ORE,
     &iron_trapdoor::IRON_TRAPDOOR,
@@ -1572,6 +2189,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &jungle_planks::JUNGLE_PLANKS,
     &jungle_pressure_plate::JUNGLE_PRESSURE_PLATE,
     &jungle_sapling::JUNGLE_SAPLING,
+    &jungle_shelf::JUNGLE_SHELF,
     &jungle_slab::JUNGLE_SLAB,
     &jungle_stairs::JUNGLE_STAIRS,
     &jungle_standing_sign::JUNGLE_STANDING_SIGN,
@@ -1579,6 +2197,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &jungle_wall_sign::JUNGLE_WALL_SIGN,
     &jungle_wood::JUNGLE_WOOD,
     &kelp::KELP,
+    &lab_table::LAB_TABLE,
     &ladder::LADDER,
     &lantern::LANTERN,
     &lapis_block::LAPIS_BLOCK,
@@ -1609,23 +2228,35 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &light_blue_candle_cake::LIGHT_BLUE_CANDLE_CAKE,
     &light_blue_carpet::LIGHT_BLUE_CARPET,
     &light_blue_concrete::LIGHT_BLUE_CONCRETE,
+    &light_blue_concrete_double_slab::LIGHT_BLUE_CONCRETE_DOUBLE_SLAB,
     &light_blue_concrete_powder::LIGHT_BLUE_CONCRETE_POWDER,
+    &light_blue_concrete_slab::LIGHT_BLUE_CONCRETE_SLAB,
+    &light_blue_concrete_stairs::LIGHT_BLUE_CONCRETE_STAIRS,
     &light_blue_glazed_terracotta::LIGHT_BLUE_GLAZED_TERRACOTTA,
     &light_blue_shulker_box::LIGHT_BLUE_SHULKER_BOX,
     &light_blue_stained_glass::LIGHT_BLUE_STAINED_GLASS,
     &light_blue_stained_glass_pane::LIGHT_BLUE_STAINED_GLASS_PANE,
     &light_blue_terracotta::LIGHT_BLUE_TERRACOTTA,
     &light_blue_wool::LIGHT_BLUE_WOOL,
+    &light_blue_wool_double_slab::LIGHT_BLUE_WOOL_DOUBLE_SLAB,
+    &light_blue_wool_slab::LIGHT_BLUE_WOOL_SLAB,
+    &light_blue_wool_stairs::LIGHT_BLUE_WOOL_STAIRS,
     &light_gray_candle::LIGHT_GRAY_CANDLE,
     &light_gray_candle_cake::LIGHT_GRAY_CANDLE_CAKE,
     &light_gray_carpet::LIGHT_GRAY_CARPET,
     &light_gray_concrete::LIGHT_GRAY_CONCRETE,
+    &light_gray_concrete_double_slab::LIGHT_GRAY_CONCRETE_DOUBLE_SLAB,
     &light_gray_concrete_powder::LIGHT_GRAY_CONCRETE_POWDER,
+    &light_gray_concrete_slab::LIGHT_GRAY_CONCRETE_SLAB,
+    &light_gray_concrete_stairs::LIGHT_GRAY_CONCRETE_STAIRS,
     &light_gray_shulker_box::LIGHT_GRAY_SHULKER_BOX,
     &light_gray_stained_glass::LIGHT_GRAY_STAINED_GLASS,
     &light_gray_stained_glass_pane::LIGHT_GRAY_STAINED_GLASS_PANE,
     &light_gray_terracotta::LIGHT_GRAY_TERRACOTTA,
     &light_gray_wool::LIGHT_GRAY_WOOL,
+    &light_gray_wool_double_slab::LIGHT_GRAY_WOOL_DOUBLE_SLAB,
+    &light_gray_wool_slab::LIGHT_GRAY_WOOL_SLAB,
+    &light_gray_wool_stairs::LIGHT_GRAY_WOOL_STAIRS,
     &light_weighted_pressure_plate::LIGHT_WEIGHTED_PRESSURE_PLATE,
     &lightning_rod::LIGHTNING_ROD,
     &lilac::LILAC,
@@ -1634,13 +2265,19 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &lime_candle_cake::LIME_CANDLE_CAKE,
     &lime_carpet::LIME_CARPET,
     &lime_concrete::LIME_CONCRETE,
+    &lime_concrete_double_slab::LIME_CONCRETE_DOUBLE_SLAB,
     &lime_concrete_powder::LIME_CONCRETE_POWDER,
+    &lime_concrete_slab::LIME_CONCRETE_SLAB,
+    &lime_concrete_stairs::LIME_CONCRETE_STAIRS,
     &lime_glazed_terracotta::LIME_GLAZED_TERRACOTTA,
     &lime_shulker_box::LIME_SHULKER_BOX,
     &lime_stained_glass::LIME_STAINED_GLASS,
     &lime_stained_glass_pane::LIME_STAINED_GLASS_PANE,
     &lime_terracotta::LIME_TERRACOTTA,
     &lime_wool::LIME_WOOL,
+    &lime_wool_double_slab::LIME_WOOL_DOUBLE_SLAB,
+    &lime_wool_slab::LIME_WOOL_SLAB,
+    &lime_wool_stairs::LIME_WOOL_STAIRS,
     &lit_blast_furnace::LIT_BLAST_FURNACE,
     &lit_deepslate_redstone_ore::LIT_DEEPSLATE_REDSTONE_ORE,
     &lit_furnace::LIT_FURNACE,
@@ -1654,13 +2291,19 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &magenta_candle_cake::MAGENTA_CANDLE_CAKE,
     &magenta_carpet::MAGENTA_CARPET,
     &magenta_concrete::MAGENTA_CONCRETE,
+    &magenta_concrete_double_slab::MAGENTA_CONCRETE_DOUBLE_SLAB,
     &magenta_concrete_powder::MAGENTA_CONCRETE_POWDER,
+    &magenta_concrete_slab::MAGENTA_CONCRETE_SLAB,
+    &magenta_concrete_stairs::MAGENTA_CONCRETE_STAIRS,
     &magenta_glazed_terracotta::MAGENTA_GLAZED_TERRACOTTA,
     &magenta_shulker_box::MAGENTA_SHULKER_BOX,
     &magenta_stained_glass::MAGENTA_STAINED_GLASS,
     &magenta_stained_glass_pane::MAGENTA_STAINED_GLASS_PANE,
     &magenta_terracotta::MAGENTA_TERRACOTTA,
     &magenta_wool::MAGENTA_WOOL,
+    &magenta_wool_double_slab::MAGENTA_WOOL_DOUBLE_SLAB,
+    &magenta_wool_slab::MAGENTA_WOOL_SLAB,
+    &magenta_wool_stairs::MAGENTA_WOOL_STAIRS,
     &magma::MAGMA,
     &mangrove_button::MANGROVE_BUTTON,
     &mangrove_door::MANGROVE_DOOR,
@@ -1674,12 +2317,14 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &mangrove_pressure_plate::MANGROVE_PRESSURE_PLATE,
     &mangrove_propagule::MANGROVE_PROPAGULE,
     &mangrove_roots::MANGROVE_ROOTS,
+    &mangrove_shelf::MANGROVE_SHELF,
     &mangrove_slab::MANGROVE_SLAB,
     &mangrove_stairs::MANGROVE_STAIRS,
     &mangrove_standing_sign::MANGROVE_STANDING_SIGN,
     &mangrove_trapdoor::MANGROVE_TRAPDOOR,
     &mangrove_wall_sign::MANGROVE_WALL_SIGN,
     &mangrove_wood::MANGROVE_WOOD,
+    &material_reducer::MATERIAL_REDUCER,
     &medium_amethyst_bud::MEDIUM_AMETHYST_BUD,
     &melon_block::MELON_BLOCK,
     &melon_stem::MELON_STEM,
@@ -1730,6 +2375,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &oak_log::OAK_LOG,
     &oak_planks::OAK_PLANKS,
     &oak_sapling::OAK_SAPLING,
+    &oak_shelf::OAK_SHELF,
     &oak_slab::OAK_SLAB,
     &oak_stairs::OAK_STAIRS,
     &oak_wood::OAK_WOOD,
@@ -1741,25 +2387,38 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &orange_candle_cake::ORANGE_CANDLE_CAKE,
     &orange_carpet::ORANGE_CARPET,
     &orange_concrete::ORANGE_CONCRETE,
+    &orange_concrete_double_slab::ORANGE_CONCRETE_DOUBLE_SLAB,
     &orange_concrete_powder::ORANGE_CONCRETE_POWDER,
+    &orange_concrete_slab::ORANGE_CONCRETE_SLAB,
+    &orange_concrete_stairs::ORANGE_CONCRETE_STAIRS,
     &orange_glazed_terracotta::ORANGE_GLAZED_TERRACOTTA,
+    &orange_poplar_leaves::ORANGE_POPLAR_LEAVES,
     &orange_shulker_box::ORANGE_SHULKER_BOX,
     &orange_stained_glass::ORANGE_STAINED_GLASS,
     &orange_stained_glass_pane::ORANGE_STAINED_GLASS_PANE,
     &orange_terracotta::ORANGE_TERRACOTTA,
     &orange_tulip::ORANGE_TULIP,
     &orange_wool::ORANGE_WOOL,
+    &orange_wool_double_slab::ORANGE_WOOL_DOUBLE_SLAB,
+    &orange_wool_slab::ORANGE_WOOL_SLAB,
+    &orange_wool_stairs::ORANGE_WOOL_STAIRS,
     &oxeye_daisy::OXEYE_DAISY,
     &oxidized_chiseled_copper::OXIDIZED_CHISELED_COPPER,
     &oxidized_copper::OXIDIZED_COPPER,
+    &oxidized_copper_bars::OXIDIZED_COPPER_BARS,
     &oxidized_copper_bulb::OXIDIZED_COPPER_BULB,
+    &oxidized_copper_chain::OXIDIZED_COPPER_CHAIN,
+    &oxidized_copper_chest::OXIDIZED_COPPER_CHEST,
     &oxidized_copper_door::OXIDIZED_COPPER_DOOR,
+    &oxidized_copper_golem_statue::OXIDIZED_COPPER_GOLEM_STATUE,
     &oxidized_copper_grate::OXIDIZED_COPPER_GRATE,
+    &oxidized_copper_lantern::OXIDIZED_COPPER_LANTERN,
     &oxidized_copper_trapdoor::OXIDIZED_COPPER_TRAPDOOR,
     &oxidized_cut_copper::OXIDIZED_CUT_COPPER,
     &oxidized_cut_copper_slab::OXIDIZED_CUT_COPPER_SLAB,
     &oxidized_cut_copper_stairs::OXIDIZED_CUT_COPPER_STAIRS,
     &oxidized_double_cut_copper_slab::OXIDIZED_DOUBLE_CUT_COPPER_SLAB,
+    &oxidized_lightning_rod::OXIDIZED_LIGHTNING_ROD,
     &packed_ice::PACKED_ICE,
     &packed_mud::PACKED_MUD,
     &pale_hanging_moss::PALE_HANGING_MOSS,
@@ -1776,6 +2435,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &pale_oak_planks::PALE_OAK_PLANKS,
     &pale_oak_pressure_plate::PALE_OAK_PRESSURE_PLATE,
     &pale_oak_sapling::PALE_OAK_SAPLING,
+    &pale_oak_shelf::PALE_OAK_SHELF,
     &pale_oak_slab::PALE_OAK_SLAB,
     &pale_oak_stairs::PALE_OAK_STAIRS,
     &pale_oak_standing_sign::PALE_OAK_STANDING_SIGN,
@@ -1791,7 +2451,10 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &pink_candle_cake::PINK_CANDLE_CAKE,
     &pink_carpet::PINK_CARPET,
     &pink_concrete::PINK_CONCRETE,
+    &pink_concrete_double_slab::PINK_CONCRETE_DOUBLE_SLAB,
     &pink_concrete_powder::PINK_CONCRETE_POWDER,
+    &pink_concrete_slab::PINK_CONCRETE_SLAB,
+    &pink_concrete_stairs::PINK_CONCRETE_STAIRS,
     &pink_glazed_terracotta::PINK_GLAZED_TERRACOTTA,
     &pink_petals::PINK_PETALS,
     &pink_shulker_box::PINK_SHULKER_BOX,
@@ -1800,6 +2463,9 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &pink_terracotta::PINK_TERRACOTTA,
     &pink_tulip::PINK_TULIP,
     &pink_wool::PINK_WOOL,
+    &pink_wool_double_slab::PINK_WOOL_DOUBLE_SLAB,
+    &pink_wool_slab::PINK_WOOL_SLAB,
+    &pink_wool_stairs::PINK_WOOL_STAIRS,
     &piston::PISTON,
     &piston_arm_collision::PISTON_ARM_COLLISION,
     &pitcher_crop::PITCHER_CROP,
@@ -1824,6 +2490,11 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &polished_blackstone_slab::POLISHED_BLACKSTONE_SLAB,
     &polished_blackstone_stairs::POLISHED_BLACKSTONE_STAIRS,
     &polished_blackstone_wall::POLISHED_BLACKSTONE_WALL,
+    &polished_cinnabar::POLISHED_CINNABAR,
+    &polished_cinnabar_double_slab::POLISHED_CINNABAR_DOUBLE_SLAB,
+    &polished_cinnabar_slab::POLISHED_CINNABAR_SLAB,
+    &polished_cinnabar_stairs::POLISHED_CINNABAR_STAIRS,
+    &polished_cinnabar_wall::POLISHED_CINNABAR_WALL,
     &polished_deepslate::POLISHED_DEEPSLATE,
     &polished_deepslate_double_slab::POLISHED_DEEPSLATE_DOUBLE_SLAB,
     &polished_deepslate_slab::POLISHED_DEEPSLATE_SLAB,
@@ -1837,14 +2508,37 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &polished_granite_double_slab::POLISHED_GRANITE_DOUBLE_SLAB,
     &polished_granite_slab::POLISHED_GRANITE_SLAB,
     &polished_granite_stairs::POLISHED_GRANITE_STAIRS,
+    &polished_sulfur::POLISHED_SULFUR,
+    &polished_sulfur_double_slab::POLISHED_SULFUR_DOUBLE_SLAB,
+    &polished_sulfur_slab::POLISHED_SULFUR_SLAB,
+    &polished_sulfur_stairs::POLISHED_SULFUR_STAIRS,
+    &polished_sulfur_wall::POLISHED_SULFUR_WALL,
     &polished_tuff::POLISHED_TUFF,
     &polished_tuff_double_slab::POLISHED_TUFF_DOUBLE_SLAB,
     &polished_tuff_slab::POLISHED_TUFF_SLAB,
     &polished_tuff_stairs::POLISHED_TUFF_STAIRS,
     &polished_tuff_wall::POLISHED_TUFF_WALL,
+    &poplar_button::POPLAR_BUTTON,
+    &poplar_door::POPLAR_DOOR,
+    &poplar_double_slab::POPLAR_DOUBLE_SLAB,
+    &poplar_fence::POPLAR_FENCE,
+    &poplar_fence_gate::POPLAR_FENCE_GATE,
+    &poplar_hanging_sign::POPLAR_HANGING_SIGN,
+    &poplar_log::POPLAR_LOG,
+    &poplar_planks::POPLAR_PLANKS,
+    &poplar_pressure_plate::POPLAR_PRESSURE_PLATE,
+    &poplar_sapling::POPLAR_SAPLING,
+    &poplar_shelf::POPLAR_SHELF,
+    &poplar_slab::POPLAR_SLAB,
+    &poplar_stairs::POPLAR_STAIRS,
+    &poplar_standing_sign::POPLAR_STANDING_SIGN,
+    &poplar_trapdoor::POPLAR_TRAPDOOR,
+    &poplar_wall_sign::POPLAR_WALL_SIGN,
+    &poplar_wood::POPLAR_WOOD,
     &poppy::POPPY,
     &portal::PORTAL,
     &potatoes::POTATOES,
+    &potent_sulfur::POTENT_SULFUR,
     &powder_snow::POWDER_SNOW,
     &powered_comparator::POWERED_COMPARATOR,
     &powered_repeater::POWERED_REPEATER,
@@ -1863,13 +2557,19 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &purple_candle_cake::PURPLE_CANDLE_CAKE,
     &purple_carpet::PURPLE_CARPET,
     &purple_concrete::PURPLE_CONCRETE,
+    &purple_concrete_double_slab::PURPLE_CONCRETE_DOUBLE_SLAB,
     &purple_concrete_powder::PURPLE_CONCRETE_POWDER,
+    &purple_concrete_slab::PURPLE_CONCRETE_SLAB,
+    &purple_concrete_stairs::PURPLE_CONCRETE_STAIRS,
     &purple_glazed_terracotta::PURPLE_GLAZED_TERRACOTTA,
     &purple_shulker_box::PURPLE_SHULKER_BOX,
     &purple_stained_glass::PURPLE_STAINED_GLASS,
     &purple_stained_glass_pane::PURPLE_STAINED_GLASS_PANE,
     &purple_terracotta::PURPLE_TERRACOTTA,
     &purple_wool::PURPLE_WOOL,
+    &purple_wool_double_slab::PURPLE_WOOL_DOUBLE_SLAB,
+    &purple_wool_slab::PURPLE_WOOL_SLAB,
+    &purple_wool_stairs::PURPLE_WOOL_STAIRS,
     &purpur_block::PURPUR_BLOCK,
     &purpur_double_slab::PURPUR_DOUBLE_SLAB,
     &purpur_pillar::PURPUR_PILLAR,
@@ -1890,7 +2590,10 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &red_candle_cake::RED_CANDLE_CAKE,
     &red_carpet::RED_CARPET,
     &red_concrete::RED_CONCRETE,
+    &red_concrete_double_slab::RED_CONCRETE_DOUBLE_SLAB,
     &red_concrete_powder::RED_CONCRETE_POWDER,
+    &red_concrete_slab::RED_CONCRETE_SLAB,
+    &red_concrete_stairs::RED_CONCRETE_STAIRS,
     &red_glazed_terracotta::RED_GLAZED_TERRACOTTA,
     &red_mushroom::RED_MUSHROOM,
     &red_mushroom_block::RED_MUSHROOM_BLOCK,
@@ -1899,18 +2602,23 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &red_nether_brick_slab::RED_NETHER_BRICK_SLAB,
     &red_nether_brick_stairs::RED_NETHER_BRICK_STAIRS,
     &red_nether_brick_wall::RED_NETHER_BRICK_WALL,
+    &red_poplar_leaves::RED_POPLAR_LEAVES,
     &red_sand::RED_SAND,
     &red_sandstone::RED_SANDSTONE,
     &red_sandstone_double_slab::RED_SANDSTONE_DOUBLE_SLAB,
     &red_sandstone_slab::RED_SANDSTONE_SLAB,
     &red_sandstone_stairs::RED_SANDSTONE_STAIRS,
     &red_sandstone_wall::RED_SANDSTONE_WALL,
+    &red_shrub::RED_SHRUB,
     &red_shulker_box::RED_SHULKER_BOX,
     &red_stained_glass::RED_STAINED_GLASS,
     &red_stained_glass_pane::RED_STAINED_GLASS_PANE,
     &red_terracotta::RED_TERRACOTTA,
     &red_tulip::RED_TULIP,
     &red_wool::RED_WOOL,
+    &red_wool_double_slab::RED_WOOL_DOUBLE_SLAB,
+    &red_wool_slab::RED_WOOL_SLAB,
+    &red_wool_stairs::RED_WOOL_STAIRS,
     &redstone_block::REDSTONE_BLOCK,
     &redstone_lamp::REDSTONE_LAMP,
     &redstone_ore::REDSTONE_ORE,
@@ -1944,6 +2652,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &sea_lantern::SEA_LANTERN,
     &sea_pickle::SEA_PICKLE,
     &seagrass::SEAGRASS,
+    &shelf_mushroom::SHELF_MUSHROOM,
     &short_dry_grass::SHORT_DRY_GRASS,
     &short_grass::SHORT_GRASS,
     &shroomlight::SHROOMLIGHT,
@@ -1992,6 +2701,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &spruce_planks::SPRUCE_PLANKS,
     &spruce_pressure_plate::SPRUCE_PRESSURE_PLATE,
     &spruce_sapling::SPRUCE_SAPLING,
+    &spruce_shelf::SPRUCE_SHELF,
     &spruce_slab::SPRUCE_SLAB,
     &spruce_stairs::SPRUCE_STAIRS,
     &spruce_standing_sign::SPRUCE_STANDING_SIGN,
@@ -2013,6 +2723,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &stone_stairs::STONE_STAIRS,
     &stonecutter::STONECUTTER,
     &stonecutter_block::STONECUTTER_BLOCK,
+    &straw_bed::STRAW_BED,
     &stripped_acacia_log::STRIPPED_ACACIA_LOG,
     &stripped_acacia_wood::STRIPPED_ACACIA_WOOD,
     &stripped_bamboo_block::STRIPPED_BAMBOO_BLOCK,
@@ -2032,12 +2743,25 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &stripped_oak_wood::STRIPPED_OAK_WOOD,
     &stripped_pale_oak_log::STRIPPED_PALE_OAK_LOG,
     &stripped_pale_oak_wood::STRIPPED_PALE_OAK_WOOD,
+    &stripped_poplar_log::STRIPPED_POPLAR_LOG,
+    &stripped_poplar_wood::STRIPPED_POPLAR_WOOD,
     &stripped_spruce_log::STRIPPED_SPRUCE_LOG,
     &stripped_spruce_wood::STRIPPED_SPRUCE_WOOD,
     &stripped_warped_hyphae::STRIPPED_WARPED_HYPHAE,
     &stripped_warped_stem::STRIPPED_WARPED_STEM,
     &structure_block::STRUCTURE_BLOCK,
     &structure_void::STRUCTURE_VOID,
+    &sulfur::SULFUR,
+    &sulfur_brick_double_slab::SULFUR_BRICK_DOUBLE_SLAB,
+    &sulfur_brick_slab::SULFUR_BRICK_SLAB,
+    &sulfur_brick_stairs::SULFUR_BRICK_STAIRS,
+    &sulfur_brick_wall::SULFUR_BRICK_WALL,
+    &sulfur_bricks::SULFUR_BRICKS,
+    &sulfur_double_slab::SULFUR_DOUBLE_SLAB,
+    &sulfur_slab::SULFUR_SLAB,
+    &sulfur_spike::SULFUR_SPIKE,
+    &sulfur_stairs::SULFUR_STAIRS,
+    &sulfur_wall::SULFUR_WALL,
     &sunflower::SUNFLOWER,
     &suspicious_gravel::SUSPICIOUS_GRAVEL,
     &suspicious_sand::SUSPICIOUS_SAND,
@@ -2071,6 +2795,8 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &tuff_wall::TUFF_WALL,
     &turtle_egg::TURTLE_EGG,
     &twisting_vines::TWISTING_VINES,
+    &underwater_tnt::UNDERWATER_TNT,
+    &underwater_torch::UNDERWATER_TORCH,
     &undyed_shulker_box::UNDYED_SHULKER_BOX,
     &unknown::UNKNOWN,
     &unlit_redstone_torch::UNLIT_REDSTONE_TORCH,
@@ -2093,6 +2819,7 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &warped_planks::WARPED_PLANKS,
     &warped_pressure_plate::WARPED_PRESSURE_PLATE,
     &warped_roots::WARPED_ROOTS,
+    &warped_shelf::WARPED_SHELF,
     &warped_slab::WARPED_SLAB,
     &warped_stairs::WARPED_STAIRS,
     &warped_standing_sign::WARPED_STANDING_SIGN,
@@ -2104,9 +2831,14 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &waterlily::WATERLILY,
     &waxed_chiseled_copper::WAXED_CHISELED_COPPER,
     &waxed_copper::WAXED_COPPER,
+    &waxed_copper_bars::WAXED_COPPER_BARS,
     &waxed_copper_bulb::WAXED_COPPER_BULB,
+    &waxed_copper_chain::WAXED_COPPER_CHAIN,
+    &waxed_copper_chest::WAXED_COPPER_CHEST,
     &waxed_copper_door::WAXED_COPPER_DOOR,
+    &waxed_copper_golem_statue::WAXED_COPPER_GOLEM_STATUE,
     &waxed_copper_grate::WAXED_COPPER_GRATE,
+    &waxed_copper_lantern::WAXED_COPPER_LANTERN,
     &waxed_copper_trapdoor::WAXED_COPPER_TRAPDOOR,
     &waxed_cut_copper::WAXED_CUT_COPPER,
     &waxed_cut_copper_slab::WAXED_CUT_COPPER_SLAB,
@@ -2114,44 +2846,69 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &waxed_double_cut_copper_slab::WAXED_DOUBLE_CUT_COPPER_SLAB,
     &waxed_exposed_chiseled_copper::WAXED_EXPOSED_CHISELED_COPPER,
     &waxed_exposed_copper::WAXED_EXPOSED_COPPER,
+    &waxed_exposed_copper_bars::WAXED_EXPOSED_COPPER_BARS,
     &waxed_exposed_copper_bulb::WAXED_EXPOSED_COPPER_BULB,
+    &waxed_exposed_copper_chain::WAXED_EXPOSED_COPPER_CHAIN,
+    &waxed_exposed_copper_chest::WAXED_EXPOSED_COPPER_CHEST,
     &waxed_exposed_copper_door::WAXED_EXPOSED_COPPER_DOOR,
+    &waxed_exposed_copper_golem_statue::WAXED_EXPOSED_COPPER_GOLEM_STATUE,
     &waxed_exposed_copper_grate::WAXED_EXPOSED_COPPER_GRATE,
+    &waxed_exposed_copper_lantern::WAXED_EXPOSED_COPPER_LANTERN,
     &waxed_exposed_copper_trapdoor::WAXED_EXPOSED_COPPER_TRAPDOOR,
     &waxed_exposed_cut_copper::WAXED_EXPOSED_CUT_COPPER,
     &waxed_exposed_cut_copper_slab::WAXED_EXPOSED_CUT_COPPER_SLAB,
     &waxed_exposed_cut_copper_stairs::WAXED_EXPOSED_CUT_COPPER_STAIRS,
     &waxed_exposed_double_cut_copper_slab::WAXED_EXPOSED_DOUBLE_CUT_COPPER_SLAB,
+    &waxed_exposed_lightning_rod::WAXED_EXPOSED_LIGHTNING_ROD,
+    &waxed_lightning_rod::WAXED_LIGHTNING_ROD,
     &waxed_oxidized_chiseled_copper::WAXED_OXIDIZED_CHISELED_COPPER,
     &waxed_oxidized_copper::WAXED_OXIDIZED_COPPER,
+    &waxed_oxidized_copper_bars::WAXED_OXIDIZED_COPPER_BARS,
     &waxed_oxidized_copper_bulb::WAXED_OXIDIZED_COPPER_BULB,
+    &waxed_oxidized_copper_chain::WAXED_OXIDIZED_COPPER_CHAIN,
+    &waxed_oxidized_copper_chest::WAXED_OXIDIZED_COPPER_CHEST,
     &waxed_oxidized_copper_door::WAXED_OXIDIZED_COPPER_DOOR,
+    &waxed_oxidized_copper_golem_statue::WAXED_OXIDIZED_COPPER_GOLEM_STATUE,
     &waxed_oxidized_copper_grate::WAXED_OXIDIZED_COPPER_GRATE,
+    &waxed_oxidized_copper_lantern::WAXED_OXIDIZED_COPPER_LANTERN,
     &waxed_oxidized_copper_trapdoor::WAXED_OXIDIZED_COPPER_TRAPDOOR,
     &waxed_oxidized_cut_copper::WAXED_OXIDIZED_CUT_COPPER,
     &waxed_oxidized_cut_copper_slab::WAXED_OXIDIZED_CUT_COPPER_SLAB,
     &waxed_oxidized_cut_copper_stairs::WAXED_OXIDIZED_CUT_COPPER_STAIRS,
     &waxed_oxidized_double_cut_copper_slab::WAXED_OXIDIZED_DOUBLE_CUT_COPPER_SLAB,
+    &waxed_oxidized_lightning_rod::WAXED_OXIDIZED_LIGHTNING_ROD,
     &waxed_weathered_chiseled_copper::WAXED_WEATHERED_CHISELED_COPPER,
     &waxed_weathered_copper::WAXED_WEATHERED_COPPER,
+    &waxed_weathered_copper_bars::WAXED_WEATHERED_COPPER_BARS,
     &waxed_weathered_copper_bulb::WAXED_WEATHERED_COPPER_BULB,
+    &waxed_weathered_copper_chain::WAXED_WEATHERED_COPPER_CHAIN,
+    &waxed_weathered_copper_chest::WAXED_WEATHERED_COPPER_CHEST,
     &waxed_weathered_copper_door::WAXED_WEATHERED_COPPER_DOOR,
+    &waxed_weathered_copper_golem_statue::WAXED_WEATHERED_COPPER_GOLEM_STATUE,
     &waxed_weathered_copper_grate::WAXED_WEATHERED_COPPER_GRATE,
+    &waxed_weathered_copper_lantern::WAXED_WEATHERED_COPPER_LANTERN,
     &waxed_weathered_copper_trapdoor::WAXED_WEATHERED_COPPER_TRAPDOOR,
     &waxed_weathered_cut_copper::WAXED_WEATHERED_CUT_COPPER,
     &waxed_weathered_cut_copper_slab::WAXED_WEATHERED_CUT_COPPER_SLAB,
     &waxed_weathered_cut_copper_stairs::WAXED_WEATHERED_CUT_COPPER_STAIRS,
     &waxed_weathered_double_cut_copper_slab::WAXED_WEATHERED_DOUBLE_CUT_COPPER_SLAB,
+    &waxed_weathered_lightning_rod::WAXED_WEATHERED_LIGHTNING_ROD,
     &weathered_chiseled_copper::WEATHERED_CHISELED_COPPER,
     &weathered_copper::WEATHERED_COPPER,
+    &weathered_copper_bars::WEATHERED_COPPER_BARS,
     &weathered_copper_bulb::WEATHERED_COPPER_BULB,
+    &weathered_copper_chain::WEATHERED_COPPER_CHAIN,
+    &weathered_copper_chest::WEATHERED_COPPER_CHEST,
     &weathered_copper_door::WEATHERED_COPPER_DOOR,
+    &weathered_copper_golem_statue::WEATHERED_COPPER_GOLEM_STATUE,
     &weathered_copper_grate::WEATHERED_COPPER_GRATE,
+    &weathered_copper_lantern::WEATHERED_COPPER_LANTERN,
     &weathered_copper_trapdoor::WEATHERED_COPPER_TRAPDOOR,
     &weathered_cut_copper::WEATHERED_CUT_COPPER,
     &weathered_cut_copper_slab::WEATHERED_CUT_COPPER_SLAB,
     &weathered_cut_copper_stairs::WEATHERED_CUT_COPPER_STAIRS,
     &weathered_double_cut_copper_slab::WEATHERED_DOUBLE_CUT_COPPER_SLAB,
+    &weathered_lightning_rod::WEATHERED_LIGHTNING_ROD,
     &web::WEB,
     &weeping_vines::WEEPING_VINES,
     &wet_sponge::WET_SPONGE,
@@ -2160,7 +2917,10 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &white_candle_cake::WHITE_CANDLE_CAKE,
     &white_carpet::WHITE_CARPET,
     &white_concrete::WHITE_CONCRETE,
+    &white_concrete_double_slab::WHITE_CONCRETE_DOUBLE_SLAB,
     &white_concrete_powder::WHITE_CONCRETE_POWDER,
+    &white_concrete_slab::WHITE_CONCRETE_SLAB,
+    &white_concrete_stairs::WHITE_CONCRETE_STAIRS,
     &white_glazed_terracotta::WHITE_GLAZED_TERRACOTTA,
     &white_shulker_box::WHITE_SHULKER_BOX,
     &white_stained_glass::WHITE_STAINED_GLASS,
@@ -2168,6 +2928,9 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &white_terracotta::WHITE_TERRACOTTA,
     &white_tulip::WHITE_TULIP,
     &white_wool::WHITE_WOOL,
+    &white_wool_double_slab::WHITE_WOOL_DOUBLE_SLAB,
+    &white_wool_slab::WHITE_WOOL_SLAB,
+    &white_wool_stairs::WHITE_WOOL_STAIRS,
     &wildflowers::WILDFLOWERS,
     &wither_rose::WITHER_ROSE,
     &wither_skeleton_skull::WITHER_SKELETON_SKULL,
@@ -2178,12 +2941,19 @@ pub const DEFINITIONS: &[&BlockDefinition] = &[
     &yellow_candle_cake::YELLOW_CANDLE_CAKE,
     &yellow_carpet::YELLOW_CARPET,
     &yellow_concrete::YELLOW_CONCRETE,
+    &yellow_concrete_double_slab::YELLOW_CONCRETE_DOUBLE_SLAB,
     &yellow_concrete_powder::YELLOW_CONCRETE_POWDER,
+    &yellow_concrete_slab::YELLOW_CONCRETE_SLAB,
+    &yellow_concrete_stairs::YELLOW_CONCRETE_STAIRS,
     &yellow_glazed_terracotta::YELLOW_GLAZED_TERRACOTTA,
+    &yellow_poplar_leaves::YELLOW_POPLAR_LEAVES,
     &yellow_shulker_box::YELLOW_SHULKER_BOX,
     &yellow_stained_glass::YELLOW_STAINED_GLASS,
     &yellow_stained_glass_pane::YELLOW_STAINED_GLASS_PANE,
     &yellow_terracotta::YELLOW_TERRACOTTA,
     &yellow_wool::YELLOW_WOOL,
+    &yellow_wool_double_slab::YELLOW_WOOL_DOUBLE_SLAB,
+    &yellow_wool_slab::YELLOW_WOOL_SLAB,
+    &yellow_wool_stairs::YELLOW_WOOL_STAIRS,
     &zombie_head::ZOMBIE_HEAD,
 ];
