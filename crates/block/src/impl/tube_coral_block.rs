@@ -1,0 +1,15 @@
+use crate::block_definition::BlockDefinition;
+use crate::block_id;
+use crate::component::map_color_component::MapColorComponent;
+use crate::component::mineable_component::MineableComponent;
+use crate::const_block;
+
+pub const TUBE_CORAL_BLOCK: BlockDefinition = const_block! {
+    identifier: block_id::TUBE_CORAL_BLOCK,
+    states: [],
+    components: [
+        MapColorComponent { r: 51, g: 76, b: 178, a: 255 },
+        MineableComponent::hardness(1.5),
+    ],
+    permutations: [],
+};

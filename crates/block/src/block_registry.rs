@@ -1,0 +1,123 @@
+use crate::block_definition::BlockDefinition;
+use crate::block_permutation::BlockPermutation;
+use crate::component::block_components::BlockComponents;
+use crate::r#impl::DEFINITIONS;
+use crate::state::block_state::BlockState;
+use atomicow::CowArc;
+use bevy_ecs::prelude::{Commands, Resource};
+use rand::prelude::IteratorRandom;
+use std::collections::HashMap;
+use tracing::{info, warn};
+
+#[derive(Resource)]
+pub struct BlockRegistry {
+    definitions: HashMap<CowArc<'static, str>, CowArc<'static, BlockDefinition>>,
+
+    default_hash: HashMap<CowArc<'static, str>, i32>,
+    indexed_hash: HashMap<(CowArc<'static, str>, u16), i32>,
+
+    permutations: HashMap<i32, BlockPermutation>,
+    components: HashMap<i32, BlockComponents>,
+}
+
+impl Default for BlockRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BlockRegistry {
+    pub fn new() -> Self {
+        Self {
+            definitions: HashMap::new(),
+
+            default_hash: HashMap::new(),
+            indexed_hash: HashMap::new(),
+
+            permutations: HashMap::new(),
+            components: HashMap::new(),
+        }
+    }
+
+    pub fn init(mut commands: Commands) {
+        let mut registry = Self::new();
+
+        registry.register_all(DEFINITIONS.iter().copied());
+
+        commands.insert_resource(registry);
+    }
+
+    pub fn register<D>(&mut self, definition: D)
+    where
+        D: Into<CowArc<'static, BlockDefinition>>,
+    {
+        let definition = definition.into();
+
+        if let Err(message) = definition.validate() {
+            warn!("failed to register {:?}: {}", definition.identifier, message);
+            return;
+        }
+
+        let (default, permutations, components) = definition.generate();
+
+        self.default_hash.insert(definition.identifier.clone(), default);
+
+        let indexed_hashes: HashMap<(CowArc<'static, str>, u16), i32> = permutations.iter().map(|(hash, p)| ((definition.identifier.clone(), p.get_index()), *hash)).collect();
+
+        self.indexed_hash.extend(indexed_hashes);
+        self.permutations.extend(permutations);
+        self.components.extend(components);
+
+        self.definitions.insert(definition.identifier.clone(), definition);
+    }
+
+    pub fn register_all<I, D>(&mut self, definitions: I)
+    where
+        I: IntoIterator<Item = D>,
+        D: Into<CowArc<'static, BlockDefinition>>,
+    {
+        let before = self.definitions.len();
+
+        for def in definitions {
+            self.register(def);
+        }
+
+        info!("registered {} blocks", self.definitions.len() - before);
+    }
+
+    pub fn get_block_id(&self, identifier: &str) -> Option<i32> {
+        self.default_hash.get(identifier).copied()
+    }
+
+    pub fn get_block_id_with_states(&self, identifier: &str, states: &[(&str, BlockState)]) -> Option<i32> {
+        let definition = self.definitions.get(identifier)?;
+        let mut values = self.permutations.get(self.default_hash.get(identifier)?)?.get_states().clone();
+
+        for (name, value) in states {
+            let state = definition.states.iter().find(|state| state.identifier().as_ref() == *name)?;
+            if !(0..state.values_len() as i32).contains(&state.index_of(value)) {
+                return None;
+            }
+            values.insert(state.identifier().clone(), value.clone());
+        }
+
+        let index = BlockPermutation::compute_index(&values, definition.states.as_ref());
+        self.indexed_hash.get(&(definition.identifier.clone(), index)).copied()
+    }
+
+    pub fn get_components(&self, hash: i32) -> Option<&BlockComponents> {
+        self.components.get(&hash)
+    }
+
+    pub fn get_permutation(&self, hash: i32) -> Option<&BlockPermutation> {
+        self.permutations.get(&hash)
+    }
+
+    pub fn get_random(&self) -> i32 {
+        *self.default_hash.values().choose(&mut rand::rng()).expect("no hash found")
+    }
+
+    pub fn get_all_block_ids(&self) -> Vec<i32> {
+        self.default_hash.values().copied().collect()
+    }
+}

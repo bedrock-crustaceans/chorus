@@ -1,0 +1,66 @@
+use crate::block_definition::BlockDefinition;
+use crate::block_id;
+use crate::component::collision_box_component::CollisionBoxComponent;
+use crate::component::internal_friction_component::InternalFrictionComponent;
+use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::map_color_component::MapColorComponent;
+use crate::component::mineable_component::MineableComponent;
+use crate::component::moveable_component::{MoveableComponent, Movement};
+use crate::component::replaceable_component::ReplaceableComponent;
+use crate::component::transparent_component::TransparentComponent;
+use crate::state::common::{COVERED_BIT, HEIGHT};
+use crate::{const_block, const_permutation};
+use glam::Vec3;
+
+pub const SNOW_LAYER: BlockDefinition = const_block! {
+    identifier: block_id::SNOW_LAYER,
+    states: [COVERED_BIT, HEIGHT],
+    components: [
+        TransparentComponent { transparent: true },
+        MapColorComponent { r: 255, g: 255, b: 255, a: 255 },
+        InternalFrictionComponent { internal_friction: 0.95 },
+        LightDampeningComponent { dampening: 1 },
+        ReplaceableComponent { replaceable: true },
+        MineableComponent::hardness(0.2),
+        MoveableComponent { movement: Movement::Break, sticky: false },
+        CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.125, 1.0), enabled: false },
+    ],
+    permutations: [
+        const_permutation! {
+            condition: |it| it["height"] == 1,
+            components: [CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.25, 1.0), enabled: false }]
+        },
+        const_permutation! {
+            condition: |it| it["height"] == 2,
+            components: [CollisionBoxComponent { origin: Vec3::new(0.0, 0.0, 0.0), size: Vec3::new(1.0, 0.375, 1.0), enabled: false }]
+        },
+        const_permutation! {
+            condition: |it| (it["height"] == 3) || (it["height"] == 4) || (it["height"] == 5) || (it["height"] == 6) || (it["height"] == 7),
+            components: [InternalFrictionComponent { internal_friction: 1.0 }]
+        },
+        const_permutation! {
+            condition: |it| it["height"] == 3,
+            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.5, 1.0))]
+        },
+        const_permutation! {
+            condition: |it| it["height"] == 4,
+            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.625, 1.0))]
+        },
+        const_permutation! {
+            condition: |it| it["height"] == 5,
+            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.75, 1.0))]
+        },
+        const_permutation! {
+            condition: |it| it["height"] == 6,
+            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.875, 1.0))]
+        },
+        const_permutation! {
+            condition: |it| it["height"] == 7,
+            components: [ReplaceableComponent { replaceable: false }]
+        },
+        const_permutation! {
+            condition: |it| it["height"] == 7,
+            components: [CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 1.0, 1.0))]
+        },
+    ],
+};

@@ -1,0 +1,22 @@
+[package]
+name = "chorus_level"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+chorus_core.workspace = true
+chorus_block.workspace = true
+bedrock.workspace = true
+bevy_ecs.workspace = true
+glam.workspace = true
+indexmap.workspace = true
+nbtx.workspace = true
+rustc-hash.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+bevy_tasks.workspace = true
+crossbeam-channel.workspace = true
+slotmap.workspace = true
