@@ -6,6 +6,13 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/../raknet/raknet-tokio/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/../raknet/raknet/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/block/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/chunk/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/core/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/entity/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/item/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/level/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/worldgen/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/protocol/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/run" />

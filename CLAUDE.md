@@ -30,7 +30,29 @@ cargo fmt
 cargo clippy
 ```
 
-There are no tests at this time. The package is a single crate (`src/lib.rs` + `src/main.rs`); there is no workspace.
+```bash
+# Build or test one crate
+cargo build -p chorus_worldgen
+cargo test -p chorus_worldgen
+
+# Worldgen regression checks (ignored by default; run in release)
+cargo test --release -p chorus_worldgen -- --ignored output_checksum --nocapture
+```
+
+### Workspace layout
+
+Chorus is a Cargo workspace. The root package `chorus` (`src/`) is the server: network, commands, players, forms, resource packs, the tick loop and the binary. Lower layers live in `crates/`:
+
+| Crate | Path | Contents |
+|---|---|---|
+| `chorus_core` | `crates/core` | config, math, utils, version info, shared errors, the `BedrockProtocol` alias, tick schedule types (`Tick`, `TickSet`, `TickClock`, `JobQueue`, `TICK_RATE`) |
+| `chorus_block` | `crates/block` | block definitions, states, components, `block_registry`, block permutation hashing |
+| `chorus_entity` | `crates/entity` | entity components and NBT structs |
+| `chorus_item` | `crates/item` | item stacks, `item_registry` and its bundled JSON |
+| `chorus_level` | `crates/level` | world state: chunk, sub-chunk, palettes, biome ids and the biome definition list, dimension types, the `Level` resource, level messages, and the generation framework under `generator` (`Dimension`, `Generator`, `WorldGenerator`, the phase graph, phase errors) |
+| `chorus_worldgen` | `crates/worldgen` | the concrete generators: `flat`, `random`, `void` and `overworld` |
+
+Dependencies only point downwards (core, then block, then item and level, then worldgen, then the root). The root `chorus` crate re-exports the old module paths (`chorus::block`, `chorus::level`, `chorus::level::generator::r#impl` for worldgen, `chorus::error`, `chorus::utils`, `chorus::registry::block_registry`, ...), so app code and downstream users such as Pyrite keep their imports. Shared dependency versions live in `[workspace.dependencies]`.
 
 ## Architecture
 
@@ -38,7 +60,7 @@ There are no tests at this time. The package is a single crate (`src/lib.rs` + `
 
 `Chorus::init()` (`src/lib.rs`) builds a Bevy `App` with `ChorusPlugin` and a custom runner, `LoopRunner::run`. Game logic runs in a custom `Tick` schedule with three chained sets, `TickSet::First`, `TickSet::Update`, `TickSet::Last`. There is no Bevy `FixedUpdate`.
 
-- `run_fixed_tick` (added to `RunFixedMainLoop`) accumulates elapsed time in `TickClock` and runs the `Tick` schedule once per 50 ms (`TICK_RATE = 20.0` in `src/server/mod.rs`), catching up at most `MAX_TICKS_PER_UPDATE = 5` ticks per `app.update()`.
+- `run_fixed_tick` (added to `RunFixedMainLoop`) accumulates elapsed time in `TickClock` and runs the `Tick` schedule once per 50 ms (`TICK_RATE = 20.0` in `crates/core/src/schedule.rs`), catching up at most `MAX_TICKS_PER_UPDATE = 5` ticks per `app.update()`.
 - After each update, `LoopRunner` drains the `JobQueue` resource (a queue of registered `SystemId`s) until the tick deadline, then spin-sleeps the remainder. Use `JobQueue::push` for deferred work that should use spare time in the tick (e.g. `Level::queue_poll_generation`).
 - `Server::start_tick` / `Server::end_tick` run in `TickSet::First` / `TickSet::Last` and maintain `ServerState` (tick counter, runtime-ID generator) and `ServerMetrics` (TPS / MSPT).
 
@@ -47,7 +69,7 @@ There are no tests at this time. The package is a single crate (`src/lib.rs` + `
 ```
 ChorusPlugin (src/lib.rs)        — Config::setup(), Tick schedule, TaskPoolPlugin, logger
 └── Server (src/server/mod.rs)   — ServerState, ServerMetrics, tick metrics
-    ├── Registry (src/registry/) — Startup: BlockRegistry, CommandRegistry, ResourcePacks, ItemRegistry, Level::init
+    ├── Registry (src/registry/) — Startup: BlockRegistry, CommandRegistry, ResourcePacks, ItemRegistry, init_level; generation polling
     └── Network (src/network/network.rs)
         ├── PacketHandlers        — all packet handler systems, in Tick / TickSet::Update
         ├── LoginAuthOIDC         — optional OIDC auth resource
@@ -92,19 +114,19 @@ Commands are dispatched by `dispatch_commands` (`src/command/dispatch.rs`), an e
 
 ### Block system
 
-`BlockDefinition` (`src/block/block_definition.rs`) declares a block's identifier, states (combinatorial state values), base components, and conditional permutation overrides. `BlockDefinition::generate()` expands all permutations, computes FNV hashes, and returns maps from hash → `BlockPermutation` and hash → `BlockComponents`.
+`BlockDefinition` (`crates/block/src/block_definition.rs`) declares a block's identifier, states (combinatorial state values), base components, and conditional permutation overrides. `BlockDefinition::generate()` expands all permutations, computes FNV hashes, and returns maps from hash → `BlockPermutation` and hash → `BlockComponents`.
 
-Use the `const_block!` / `const_permutation!` macros for compile-time static definitions (see `src/block/impl/grass_block.rs` for a minimal example). Runtime-allocated definitions use `BlockDefinition::new(...)`. All vanilla blocks are hand-written consts under `src/block/impl/` and collected in `DEFINITIONS`.
+Use the `const_block!` / `const_permutation!` macros for compile-time static definitions (see `crates/block/src/impl/grass_block.rs` for a minimal example). Runtime-allocated definitions use `BlockDefinition::new(...)`. All vanilla blocks are hand-written consts under `crates/block/src/impl/` and collected in `DEFINITIONS`.
 
-`BlockRegistry` (`src/registry/block_registry.rs`) is a Bevy `Resource`. Add new blocks by calling `registry.register_all([...])` inside `BlockRegistry::init`.
+`BlockRegistry` (`crates/block/src/block_registry.rs`) is a Bevy `Resource`. Add new blocks by calling `registry.register_all([...])` inside `BlockRegistry::init`.
 
 ### Items and vanilla data
 
-`ItemRegistry` (`src/registry/item_registry.rs`) is built from `src/resources/item_palette.json` and `src/resources/creative_items.json` at startup. The other files under `src/resources/` (block palette, biome definitions, entity identifiers, recipes, etc.) are vanilla data dumps that are mostly not wired up yet.
+`ItemRegistry` (`crates/item/src/item_registry.rs`) is built from `crates/item/resources/item_palette.json` and `crates/item/resources/creative_items.json` at startup. The biome definition list sent to clients is built from `crates/level/resources/biome_definitions.json`.
 
 ### Level
 
-`Level` (`src/level/level.rs`) is a single global resource. There is no world persistence; `Level::init` builds an in-memory generated world after `BlockRegistry::init`. Chunk generation is polled through the `JobQueue`.
+`Level` (`crates/level/src/level.rs`) is a single global resource, created by `init_level` (`src/registry/mod.rs`), which picks the overworld generator. There is no world persistence; `init_level` builds an in-memory generated world after `BlockRegistry::init`. Chunk generation is polled through the `JobQueue`.
 
 ### Resource packs
 
@@ -112,8 +134,8 @@ Use the `const_block!` / `const_permutation!` macros for compile-time static def
 
 ### Configuration
 
-`chorus.toml` is read (or created with defaults) at startup by `Config::setup()` (`src/config/mod.rs`). Fields: `ip`, `port`, `name`, `sub_name`, `max_players`, `threads`, `transport` (`RakNet` | `NetherNet`), `nethernet_http_port`, `log_to_file`, `logs_directory`, `resource_packs_directory`, `behavior_packs_directory`, `level_name`, `level_seed`, `online_mode`, `encryption`, `log_level`, `force_accept_resource_packs`, `force_disable_vibrant_visuals`, `max_view_distance`, `max_generation_distance`.
+`chorus.toml` is read (or created with defaults) at startup by `Config::setup()` (`crates/core/src/config.rs`). Fields: `ip`, `port`, `name`, `sub_name`, `max_players`, `threads`, `transport` (`RakNet` | `NetherNet`), `nethernet_http_port`, `log_to_file`, `logs_directory`, `resource_packs_directory`, `behavior_packs_directory`, `level_name`, `level_seed`, `online_mode`, `encryption`, `log_level`, `force_accept_resource_packs`, `force_disable_vibrant_visuals`, `max_view_distance`, `max_generation_distance`.
 
 ### Protocol version
 
-`BedrockProtocol` is a type alias for `V2193` from `bedrock-rs` (`src/network/mod.rs`). The matching `protocol-v2193` feature is enabled in `Cargo.toml`. To change the protocol version, update the alias, the Cargo feature, and any version-specific packet imports (handlers import packet types from the specific `bedrock::protocol::vNNN` module where they were introduced).
+`BedrockProtocol` is a type alias for `V2193` from `bedrock-rs` (`crates/core/src/protocol.rs`, re-exported from `chorus::network`). The matching `protocol-v2193` feature is enabled on the workspace `bedrock` dependency in the root `Cargo.toml`. To change the protocol version, update the alias, the Cargo feature, and any version-specific packet imports (handlers import packet types from the specific `bedrock::protocol::vNNN` module where they were introduced).

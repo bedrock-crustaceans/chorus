@@ -70,7 +70,7 @@ impl BlockBreakHandler {
             return BreakTick::Stop;
         }
 
-        let fx = self.fx_ticker % FX_INTERVAL_TICKS == 0;
+        let fx = self.fx_ticker.is_multiple_of(FX_INTERVAL_TICKS);
         self.fx_ticker += 1;
 
         BreakTick::Continue { fx }

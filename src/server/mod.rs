@@ -9,7 +9,7 @@ use bevy_ecs::system::ResMut;
 use std::time::{Duration, Instant};
 use tracing::info;
 
-pub const TICK_RATE: f64 = 20.0;
+pub use chorus_core::schedule::TICK_RATE;
 
 pub struct Server;
 

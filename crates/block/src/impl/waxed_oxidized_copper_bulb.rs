@@ -1,0 +1,23 @@
+use crate::block_definition::BlockDefinition;
+use crate::block_id;
+use crate::component::light_emission_component::LightEmissionComponent;
+use crate::component::map_color_component::MapColorComponent;
+use crate::component::mineable_component::MineableComponent;
+use crate::state::common::{LIT, POWERED_BIT};
+use crate::{const_block, const_permutation};
+
+pub const WAXED_OXIDIZED_COPPER_BULB: BlockDefinition = const_block! {
+    identifier: block_id::WAXED_OXIDIZED_COPPER_BULB,
+    states: [LIT, POWERED_BIT],
+    components: [
+        MapColorComponent { r: 22, g: 126, b: 134, a: 255 },
+        LightEmissionComponent { emission: 4 },
+        MineableComponent::hardness(3.0),
+    ],
+    permutations: [
+        const_permutation! {
+            condition: |it| it["lit"] == false,
+            components: [LightEmissionComponent { emission: 0 }]
+        },
+    ],
+};
