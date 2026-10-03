@@ -2,7 +2,7 @@ use crate::command::command_definition::CommandDefinition;
 use crate::command::context::CommandContext;
 use crate::command::r#impl::DEFINITIONS;
 use atomicow::CowArc;
-use bedrock::protocol::v898::packets::{AvailableCommandsPacket, CommandsEntry};
+use bedrock::protocol::v898::packets::{AvailableCommandsPacket, CommandsEntry, EnumDataEntry, OverloadsEntry};
 use bevy_ecs::prelude::{Commands, Resource};
 use std::collections::HashMap;
 use tracing::{debug, info};
@@ -86,29 +86,85 @@ impl CommandRegistry {
     }
 
     pub fn to_packet(&self) -> AvailableCommandsPacket {
+        let mut enum_values = Vec::new();
+        let mut enum_data = Vec::new();
         let commands = self
             .commands
             .iter()
-            .map(|command| CommandsEntry {
-                name: command.name.to_string(),
-                description: command.description.to_string(),
-                flags: 0,
-                permission_level: command.permission.clone(),
-                alias_enum: -1,
-                chained_sub_command_indices: vec![],
-                overloads: command.overloads.iter().map(|overload| overload.to_entry()).collect(),
+            .map(|command| {
+                let alias_enum = if command.aliases.is_empty() {
+                    -1
+                } else {
+                    let values = std::iter::once(&command.name)
+                        .chain(command.aliases.iter())
+                        .map(|name| {
+                            enum_values.push(name.to_string());
+                            (enum_values.len() - 1) as u32
+                        })
+                        .collect();
+                    enum_data.push(EnumDataEntry {
+                        name: format!("{}Aliases", command.name),
+                        values,
+                    });
+                    (enum_data.len() - 1) as i32
+                };
+                let mut overloads: Vec<_> = command.overloads.iter().map(|overload| overload.to_entry()).collect();
+                if overloads.is_empty() {
+                    overloads.push(OverloadsEntry {
+                        is_chaining: false,
+                        parameter_data: vec![],
+                    });
+                }
+                CommandsEntry {
+                    name: command.name.to_string(),
+                    description: command.description.to_string(),
+                    flags: 0,
+                    permission_level: command.permission.clone(),
+                    alias_enum,
+                    chained_sub_command_indices: vec![],
+                    overloads,
+                }
             })
             .collect();
 
         AvailableCommandsPacket {
-            enum_values: vec![],
+            enum_values,
             sub_command_values: vec![],
             post_fixes: vec![],
-            enum_data: vec![],
+            enum_data,
             chained_sub_command_data: vec![],
             commands,
             soft_enums: vec![],
             constraints: vec![],
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CommandRegistry;
+    use crate::command::r#impl::DEFINITIONS;
+    use bedrock::protocol::ProtoCodec;
+    use bedrock::protocol::v898::packets::AvailableCommandsPacket;
+
+    #[test]
+    fn available_commands_round_trip() {
+        let mut registry = CommandRegistry::new();
+        registry.register_all(DEFINITIONS.iter().copied());
+        let packet = registry.to_packet();
+
+        let mut bytes = Vec::new();
+        packet.serialize(&mut bytes).expect("serialize");
+        let decoded = AvailableCommandsPacket::deserialize(&mut bytes.as_slice()).expect("deserialize");
+
+        assert_eq!(decoded.commands.len(), registry.commands().count());
+        for command in &decoded.commands {
+            assert!(!command.overloads.is_empty(), "{} has no overloads", command.name);
+            if command.alias_enum >= 0 {
+                let aliases = &decoded.enum_data[command.alias_enum as usize];
+                assert!(aliases.values.iter().all(|&index| (index as usize) < decoded.enum_values.len()));
+                assert_eq!(decoded.enum_values[aliases.values[0] as usize], command.name);
+            }
         }
     }
 }
