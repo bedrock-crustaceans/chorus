@@ -626,5 +626,10 @@ fn request_main_thread_cost() {
     }
     durations.sort();
     let over = durations.iter().filter(|d| d.as_millis() >= 5).count();
-    println!("{ticks} generator ticks in 5s, p99 {:?}, p99.99 {:?}, worst {:?}, {over} at 5ms or more", durations[durations.len() * 99 / 100], durations[durations.len() * 9999 / 10000], durations.last().unwrap());
+    println!(
+        "{ticks} generator ticks in 5s, p99 {:?}, p99.99 {:?}, worst {:?}, {over} at 5ms or more",
+        durations[durations.len() * 99 / 100],
+        durations[durations.len() * 9999 / 10000],
+        durations.last().unwrap()
+    );
 }
