@@ -1,5 +1,4 @@
 pub mod config;
-pub mod error;
 pub mod info;
 pub mod math;
 pub mod protocol;

@@ -1,4 +1,4 @@
-use crate::error::invalid_index::InvalidIndexError;
+use super::InvalidIndexError;
 use crate::math::enums::axis::Axis;
 use crate::math::enums::axis_direction::AxisDirection;
 use crate::math::enums::compass_rose_direction::CompassRoseDirection;

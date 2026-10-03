@@ -45,14 +45,14 @@ Chorus is a Cargo workspace. The root package `chorus` (`src/`) is the server: n
 
 | Crate | Path | Contents |
 |---|---|---|
-| `chorus_core` | `crates/core` | config, math, utils, version info, shared errors, the `BedrockProtocol` alias, tick schedule types (`Tick`, `TickSet`, `TickClock`, `JobQueue`, `TICK_RATE`) |
+| `chorus_core` | `crates/core` | config, math, utils, version info, the `BedrockProtocol` alias, tick schedule types (`Tick`, `TickSet`, `TickClock`, `JobQueue`, `TICK_RATE`). Error types live in the module that uses them. |
 | `chorus_block` | `crates/block` | block definitions, states, components, `block_registry`, block permutation hashing |
 | `chorus_entity` | `crates/entity` | entity components and NBT structs |
 | `chorus_item` | `crates/item` | item stacks, `item_registry` and its bundled JSON |
 | `chorus_level` | `crates/level` | world state: chunk, sub-chunk, palettes, biome ids and the biome definition list, dimension types, the `Level` resource, level messages, and the generation framework under `generator` (`Dimension`, `Generator`, `WorldGenerator`, the phase graph, phase errors) |
 | `chorus_worldgen` | `crates/worldgen` | the concrete generators: `flat`, `random`, `void` and `overworld` |
 
-Dependencies only point downwards (core, then block, then item and level, then worldgen, then the root). The root `chorus` crate re-exports the old module paths (`chorus::block`, `chorus::level`, `chorus::level::generator::r#impl` for worldgen, `chorus::error`, `chorus::utils`, `chorus::registry::block_registry`, ...), so app code and downstream users such as Pyrite keep their imports. Shared dependency versions live in `[workspace.dependencies]`.
+Dependencies only point downwards (core, then block, then item and level, then worldgen, then the root). The root `chorus` crate re-exports the old module paths (`chorus::block`, `chorus::level`, `chorus::level::generator::r#impl` for worldgen, `chorus::utils`, `chorus::registry::block_registry`, ...), so app code and downstream users such as Pyrite keep their imports. Shared dependency versions live in `[workspace.dependencies]`.
 
 ## Architecture
 
