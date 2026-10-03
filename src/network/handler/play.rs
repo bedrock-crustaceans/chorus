@@ -93,7 +93,7 @@ pub fn on_enter_play(
                 data: SerializedAbilitiesData {
                     target_player_raw_id: actor.unique_id,
                     player_permissions: 1,
-                    command_permissions: CommandPermissionLevel::Any,
+                    command_permissions: CommandPermissionLevel::GameDirectors,
                     layers: vec![SerializedLayer {
                         serialized_layer: SerializedAbilitiesLayer::Base,
                         abilities_set: 0xFFFFF,
