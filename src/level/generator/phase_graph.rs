@@ -62,22 +62,26 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn request(&mut self, cell: ChunkPos) {
+    fn request(&mut self, cell: ChunkPos, rank: u32) {
         let root = PhaseDescriptor::of::<G::Terminal>();
         let root_key = (root.phase, cell, 0);
+        let priority = ((rank as u64) << 32) | (self.next_priority & u32::MAX as u64);
+        self.next_priority += 1;
 
         if let Some(&key) = self.graph.index.get(&root_key) {
             let node = &mut self.graph.nodes[key];
             match &node.status {
                 NodeStatus::Done(outcome) => self.finished.push((cell, outcome.clone())),
-                _ => node.requested = true,
+                _ => {
+                    node.requested = true;
+                    self.reprioritize(key, priority);
+                }
             }
             return;
         }
 
-        let priority = self.next_priority;
-        self.next_priority += 1;
         self.insert(root, cell, priority);
+        self.reprioritize(self.graph.index[&root_key], priority);
 
         let key = self.graph.index[&root_key];
         let node = &mut self.graph.nodes[key];
@@ -206,6 +210,23 @@ impl<G: Generator> PhaseGraph<G> {
                         self.graph.nodes[key].status = NodeStatus::Pending { remaining };
                     }
                 }
+            }
+        }
+    }
+
+    fn reprioritize(&mut self, root: NodeKey, priority: u64) {
+        let mut stack = vec![root];
+        while let Some(key) = stack.pop() {
+            let Some(node) = self.graph.nodes.get_mut(key) else { continue };
+            let NodeStatus::Pending { remaining } = node.status else { continue };
+            if node.priority == priority && key != root {
+                continue;
+            }
+            node.priority = priority;
+            if remaining == 0 {
+                self.pending_dispatch.push(Reverse((priority, key)));
+            } else {
+                stack.extend(node.deps.iter().copied());
             }
         }
     }
@@ -425,8 +446,13 @@ impl<G: Generator> PhaseGraph<G> {
     }
 
     fn pop_ready(&mut self) -> Option<NodeKey> {
-        while let Some(Reverse((_, key))) = self.pending_dispatch.pop() {
-            if self.graph.nodes.get(key).is_some_and(|node| matches!(node.status, NodeStatus::Pending { .. })) {
+        while let Some(Reverse((priority, key))) = self.pending_dispatch.pop() {
+            if self
+                .graph
+                .nodes
+                .get(key)
+                .is_some_and(|node| node.priority == priority && matches!(node.status, NodeStatus::Pending { .. }))
+            {
                 return Some(key);
             }
         }
@@ -435,8 +461,8 @@ impl<G: Generator> PhaseGraph<G> {
 }
 
 impl<G: Generator> WorldGenerator for PhaseGraph<G> {
-    fn request_chunk(&mut self, x: i32, z: i32) {
-        self.request(ChunkPos::new(x, z));
+    fn request_chunk(&mut self, x: i32, z: i32, priority: u32) {
+        self.request(ChunkPos::new(x, z), priority);
     }
 
     fn cancel_chunk(&mut self, x: i32, z: i32) {
