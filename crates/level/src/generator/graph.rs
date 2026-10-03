@@ -24,6 +24,7 @@ pub(crate) struct Node<G: Generator> {
     pub descriptor: PhaseDescriptor<G>,
     pub cell: ChunkPos,
     pub hop: u32,
+    pub order: u64,
     pub priority: u64,
     pub requested: bool,
     pub retained: Option<u64>,

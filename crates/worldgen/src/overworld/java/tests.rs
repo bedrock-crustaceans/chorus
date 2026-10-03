@@ -414,12 +414,8 @@ fn moving_center_generates_nearest_first() {
     let mut dimension = Dimension::new(DimensionType::Overworld, generator);
     let positions: Vec<(i32, i32)> = (-8..=16).flat_map(|x| (-8..=8).map(move |z| (x, z))).collect();
     let request_around = |dimension: &mut Dimension, center: (i32, i32)| {
-        let distance = |&(x, z): &(i32, i32)| ((x - center.0).pow(2) + (z - center.1).pow(2)) as u32;
-        let mut ranked: Vec<_> = positions.iter().map(|position| (*position, distance(position))).collect();
-        ranked.sort_unstable_by_key(|&(_, rank)| std::cmp::Reverse(rank));
-        for ((x, z), rank) in ranked {
-            dimension.request_chunk(x, z, rank);
-        }
+        dimension.set_focus(&[center]);
+        dimension.request_chunks(&positions);
     };
     request_around(&mut dimension, (0, 0));
     let mut done = 0;
@@ -591,4 +587,44 @@ fn survival_audit() {
         far.iter().filter(|p| near_edge(p)).count(),
         far.iter().filter(|p| near_edge(p)).take(5).collect::<Vec<_>>()
     );
+}
+
+#[test]
+#[ignore]
+fn request_main_thread_cost() {
+    use chorus_level::dimension_type::DimensionType;
+    use chorus_level::generator::dimension::Dimension;
+    bevy_tasks::AsyncComputeTaskPool::get_or_init(|| bevy_tasks::TaskPoolBuilder::new().num_threads(1).build());
+    let (generator, _) = generator(0);
+    let mut dimension = Dimension::new(DimensionType::Overworld, generator);
+    let radius: i32 = std::env::var("REQUEST_RADIUS").ok().and_then(|r| r.parse().ok()).unwrap_or(32);
+    let request = |dimension: &mut Dimension, center: (i32, i32)| {
+        let positions: Vec<(i32, i32)> = (-radius..=radius)
+            .flat_map(|dx| (-radius..=radius).map(move |dz| (dx, dz)))
+            .filter(|&(dx, dz)| dx * dx + dz * dz <= radius * radius)
+            .map(|(dx, dz)| (center.0 + dx, center.1 + dz))
+            .collect();
+        let start = Instant::now();
+        dimension.set_focus(&[center]);
+        dimension.request_chunks(&positions);
+        (positions.len(), start.elapsed())
+    };
+    let (count, first) = request(&mut dimension, (0, 0));
+    println!("initial request of {count} chunks: {first:?}");
+    for step in 1..=3 {
+        let (count, moved) = request(&mut dimension, (step, 0));
+        println!("focus move by {step} chunk(s) plus new requests, {count} chunks in view: {moved:?}");
+    }
+    let start = Instant::now();
+    let mut ticks = 0;
+    let mut durations = Vec::new();
+    while start.elapsed() < std::time::Duration::from_secs(5) {
+        let tick = Instant::now();
+        dimension.tick();
+        durations.push(tick.elapsed());
+        ticks += 1;
+    }
+    durations.sort();
+    let over = durations.iter().filter(|d| d.as_millis() >= 5).count();
+    println!("{ticks} generator ticks in 5s, p99 {:?}, p99.99 {:?}, worst {:?}, {over} at 5ms or more", durations[durations.len() * 99 / 100], durations[durations.len() * 9999 / 10000], durations.last().unwrap());
 }
