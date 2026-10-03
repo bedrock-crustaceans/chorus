@@ -1,15 +1,16 @@
 use crate::JobQueue;
-use crate::block::block_id;
+use crate::config::Config;
 use crate::level::BlockUpdatedMessage;
 use crate::level::dimension_type::DimensionType;
 use crate::level::generator::dimension::Dimension;
-use crate::level::generator::r#impl::random::RandomGenerator;
+use crate::level::generator::r#impl::overworld::{Java, OverworldGenerator};
 use crate::registry::block_registry::BlockRegistry;
 use bevy_ecs::message::MessageWriter;
 use bevy_ecs::prelude::{Commands, Resource};
 use bevy_ecs::system::{Res, ResMut, SystemId};
 use glam::IVec3;
 use std::collections::HashMap;
+use tracing::info;
 
 #[derive(Resource)]
 pub(crate) struct PollGenerationJob(pub(crate) SystemId);
@@ -21,34 +22,13 @@ pub struct Level {
 }
 
 impl Level {
-    pub fn init(mut commands: Commands, registry: Res<BlockRegistry>) {
-        // let generator = FlatGenerator {
-        //     layers: vec![
-        //         FlatLayer { block_id: registry.get_block_id(block_id::BEDROCK).unwrap_or(0), height: 1 },
-        //         FlatLayer { block_id: registry.get_block_id(block_id::DIRT).unwrap_or(0), height: 2 },
-        //         FlatLayer { block_id: registry.get_block_id(block_id::GRASS_BLOCK).unwrap_or(0), height: 1 },
-        //     ],
-        //     biome: 1,
-        //     air_id: registry.get_block_id(block_id::AIR).unwrap(),
-        //     min_sub_chunk_y: -4,
-        //     sub_chunk_count: 24,
-        // };
+    pub fn init(mut commands: Commands, registry: Res<BlockRegistry>, config: Res<Config>) {
+        let generator = OverworldGenerator::<Java>::new(config.level_seed as i64, &registry);
+        let spawn = generator.find_spawn();
+        info!("overworld spawn at {spawn}");
 
-        let generator = RandomGenerator {
-            biome: 1,
-            air_id: registry.get_block_id(block_id::AIR).unwrap(),
-            block_ids: registry.get_all_block_ids(),
-            min_sub_chunk_y: DimensionType::Overworld.min_sub_chunk_y(),
-            sub_chunk_count: DimensionType::Overworld.sub_chunk_count(),
-        };
-
-        let overworld = Dimension::new(DimensionType::Overworld, generator);
-
-        let mut level = Level {
-            dimensions: HashMap::new(),
-            spawn: IVec3::new(0, 6, 0),
-        };
-        level.dimensions.insert(0, overworld);
+        let mut level = Level { dimensions: HashMap::new(), spawn };
+        level.dimensions.insert(0, Dimension::new(DimensionType::Overworld, generator));
 
         commands.insert_resource(level);
     }

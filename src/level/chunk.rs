@@ -6,6 +6,13 @@ pub struct Chunk {
     pub z: i32,
     sub_chunks: Vec<SubChunk>,
     min_sub_chunk_y: i8,
+    block_entities: Vec<BlockEntity>,
+}
+
+#[derive(Clone)]
+pub struct BlockEntity {
+    pub y: i32,
+    pub data: nbtx::Value,
 }
 
 impl Chunk {
@@ -15,6 +22,35 @@ impl Chunk {
             z,
             sub_chunks: (0..count).map(|_| SubChunk::new(air_id, biome)).collect(),
             min_sub_chunk_y,
+            block_entities: Vec::new(),
+        }
+    }
+
+    pub fn from_sub_chunks(x: i32, z: i32, min_sub_chunk_y: i8, sub_chunks: Vec<SubChunk>, block_entities: Vec<BlockEntity>) -> Self {
+        Self {
+            x,
+            z,
+            sub_chunks,
+            min_sub_chunk_y,
+            block_entities,
+        }
+    }
+
+    pub fn serialize_block_entities(&self, sub_y: Option<i8>) -> Vec<u8> {
+        let mut buf = Vec::new();
+        for entity in self.block_entities.iter().filter(|entity| sub_y.is_none_or(|sub_y| (entity.y >> 4) as i8 == sub_y)) {
+            buf.extend(nbtx::to_varint_bytes(&entity.data).expect("block entity nbt serializes"));
+        }
+        buf
+    }
+
+    pub fn set_biome(&mut self, x: u8, y: i32, z: u8, biome: i32) -> bool {
+        match self.get_sub_chunk_mut((y >> 4) as i8) {
+            Some(sub_chunk) => {
+                sub_chunk.set_biome(x, (y & 0xF) as u8, z, biome);
+                true
+            }
+            None => false,
         }
     }
 
@@ -35,6 +71,10 @@ impl Chunk {
         let sub_y = (y >> 4) as i8;
         let local_y = (y & 0xF) as u8;
         Some(self.get_sub_chunk(sub_y)?.get(x, local_y, z, layer))
+    }
+
+    pub fn get_biome(&self, x: u8, y: i32, z: u8) -> Option<i32> {
+        Some(self.get_sub_chunk((y >> 4) as i8)?.get_biome(x, (y & 0xF) as u8, z))
     }
 
     pub fn set_block(&mut self, x: u8, y: i32, z: u8, layer: usize, block_id: i32) -> bool {
@@ -73,9 +113,7 @@ impl Chunk {
         }
 
         buf.push(0u8); // border blocks
-
-        // let block_entities = nbtx::Value::List(vec![]);
-        // buf.extend(nbtx::to_net_bytes(&block_entities).unwrap());
+        buf.extend(self.serialize_block_entities(None));
 
         buf
     }

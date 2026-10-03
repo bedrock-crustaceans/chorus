@@ -302,7 +302,11 @@ pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>
                 (Some(chunk), Some(_)) => match chunk.get_sub_chunk(cy as i8) {
                     None => (SubChunkRequestResult::SuccessAllAir, None),
                     Some(sc) if sc.is_all_air() => (SubChunkRequestResult::SuccessAllAir, None),
-                    Some(sc) => (SubChunkRequestResult::Success, Some(sc.serialize_network(cy as i8))),
+                    Some(sc) => {
+                        let mut data = sc.serialize_network(cy as i8);
+                        data.extend(chunk.serialize_block_entities(Some(cy as i8)));
+                        (SubChunkRequestResult::Success, Some(data))
+                    }
                 },
                 _ => (SubChunkRequestResult::LevelChunkDoesntExist, None),
             };

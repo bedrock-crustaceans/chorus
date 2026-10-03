@@ -30,6 +30,25 @@ impl SubChunk {
         }
     }
 
+    pub fn from_layers(blocks: &[i32; 4096], extra: Option<&[i32; 4096]>, biomes: &[i32; 4096], air_id: i32) -> Self {
+        let palette = Palette::from_blocks(blocks);
+        let non_air_count = 4096 - palette.count(air_id);
+        Self {
+            blocks: vec![palette, extra.map_or_else(|| Palette::new(air_id), Palette::from_blocks)],
+            biomes: Palette::from_blocks(biomes),
+            air_id,
+            non_air_count,
+        }
+    }
+
+    pub fn set_biome(&mut self, x: u8, y: u8, z: u8, biome: i32) {
+        self.biomes.set(Self::index(x, y, z), biome);
+    }
+
+    pub fn get_biome(&self, x: u8, y: u8, z: u8) -> i32 {
+        self.biomes.get(Self::index(x, y, z))
+    }
+
     pub fn get(&self, x: u8, y: u8, z: u8, layer: usize) -> i32 {
         debug_assert!(x < 16 && y < 16 && z < 16 && layer < 2);
         self.blocks[layer].get(Self::index(x, y, z))

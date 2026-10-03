@@ -20,20 +20,27 @@ impl Palette {
     }
 
     pub fn from_blocks(blocks: &[i32; 4096]) -> Self {
+        if blocks.iter().all(|&value| value == blocks[0]) {
+            return Self::Uniform { value: blocks[0] };
+        }
+
         let mut unique: Vec<(i32, u16)> = Vec::new();
         let mut block_indices = [0u16; 4096];
+        let mut last: Option<(i32, usize)> = None;
 
         for (i, &value) in blocks.iter().enumerate() {
-            let index = match unique.iter().position(|&(v, _)| v == value) {
-                Some(index) => {
-                    unique[index].1 += 1;
-                    index
-                }
-                None => {
-                    unique.push((value, 1));
-                    unique.len() - 1
-                }
+            let index = match last {
+                Some((previous, index)) if previous == value => index,
+                _ => match unique.iter().position(|&(v, _)| v == value) {
+                    Some(index) => index,
+                    None => {
+                        unique.push((value, 0));
+                        unique.len() - 1
+                    }
+                },
             };
+            unique[index].1 += 1;
+            last = Some((value, index));
             block_indices[i] = index as u16;
         }
 
