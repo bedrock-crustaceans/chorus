@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::level::Level;
 use crate::level::dimension_type::DimensionType;
 use crate::level::generator::dimension::Dimension;
-use crate::level::generator::r#impl::overworld::{Bedrock, OverworldGenerator};
+use crate::level::generator::r#impl::overworld::{Java, OverworldGenerator};
 use crate::level::level::PollGenerationJob;
 use crate::registry::block_registry::BlockRegistry;
 use crate::resource::ResourcePacks;
@@ -40,7 +40,7 @@ impl Plugin for Registry {
 }
 
 pub fn init_level(mut commands: Commands, registry: Res<BlockRegistry>, config: Res<Config>) {
-    let generator = OverworldGenerator::<Bedrock>::new(config.level_seed as i64, &registry);
+    let generator = OverworldGenerator::<Java>::new(config.level_seed as i64, &registry);
     let spawn = generator.find_spawn();
 
     info!("overworld spawn at {spawn}");
