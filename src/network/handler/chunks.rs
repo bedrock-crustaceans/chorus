@@ -124,6 +124,7 @@ fn switch_dimension(session: &mut Session, transform: &Transform, view: &mut Chu
 }
 
 const UNLOAD_MARGIN: i32 = 2;
+const MAX_NEW_REQUESTS_PER_TICK: usize = 256;
 const UNLOAD_INTERVAL_TICKS: u32 = 20;
 
 pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>, mut ticks: Local<u32>) {
@@ -147,31 +148,34 @@ pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>,
 }
 
 pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut ChunkView)>, mut level: ResMut<Level>, config: Res<Config>) {
-    let mut to_request: HashMap<i32, HashMap<(i32, i32), u32>> = HashMap::new();
+    let mut focus: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
+    let mut to_request: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
     for (_, _, mut view) in query.iter_mut() {
         let Some(center) = view.center else { continue };
         let generation_radius = view.radius.min(config.max_generation_distance);
-        let distance = |(x, z): (i32, i32)| ((x - center.0).pow(2) + (z - center.1).pow(2)) as u32;
+        focus.entry(view.dimension).or_default().push(center);
 
-        let moved = view.prioritized_center != Some(center);
-        view.prioritized_center = Some(center);
-        let candidates: Vec<(i32, i32)> = view.pending.iter().copied().filter(|&position| distance(position) <= generation_radius.pow(2) as u32).collect();
-        let positions = to_request.entry(view.dimension).or_default();
-        for position in candidates {
-            if view.requested.insert(position) || moved {
-                let rank = positions.entry(position).or_insert(u32::MAX);
-                *rank = (*rank).min(distance(position));
+        let mut new_requests = Vec::new();
+        for &(x, z) in &view.pending {
+            if new_requests.len() >= MAX_NEW_REQUESTS_PER_TICK {
+                break;
+            }
+            if (x - center.0).pow(2) + (z - center.1).pow(2) <= generation_radius.pow(2) && !view.requested.contains(&(x, z)) {
+                new_requests.push((x, z));
             }
         }
+        view.requested.extend(new_requests.iter().copied());
+        to_request.entry(view.dimension).or_default().extend(new_requests);
     }
 
+    for (id, centers) in focus {
+        if let Some(dimension) = level.dimension_mut(id) {
+            dimension.set_focus(&centers);
+        }
+    }
     for (id, positions) in to_request {
-        let Some(dimension) = level.dimension_mut(id) else { continue };
-        let mut positions: Vec<((i32, i32), u32)> = positions.into_iter().collect();
-        // farthest first so dependencies shared with nearer chunks keep the nearer priority
-        positions.sort_unstable_by_key(|&(_, rank)| std::cmp::Reverse(rank));
-        for ((x, z), rank) in positions {
-            dimension.request_chunk(x, z, rank);
+        if let Some(dimension) = level.dimension_mut(id) {
+            dimension.request_chunks(&positions);
         }
     }
 

@@ -14,7 +14,8 @@ pub trait Generator: Send + Sync + Sized + 'static {
 }
 
 pub trait WorldGenerator: Send + Sync {
-    fn request_chunk(&mut self, x: i32, z: i32, priority: u32);
+    fn request_chunk(&mut self, x: i32, z: i32);
+    fn set_focus(&mut self, focus: &[(i32, i32)]);
     fn cancel_chunk(&mut self, x: i32, z: i32);
     fn tick(&mut self) -> Vec<(i32, i32, Result<Chunk, Arc<PhaseFailure>>)>;
     fn has_pending_work(&self) -> bool;
@@ -49,17 +50,21 @@ impl Dimension {
         self.chunks.len()
     }
 
-    pub fn request_chunk(&mut self, x: i32, z: i32, priority: u32) {
+    pub fn request_chunk(&mut self, x: i32, z: i32) {
         if self.chunks.contains_key(&(x, z)) {
             return;
         }
-        self.generator.request_chunk(x, z, priority);
+        self.generator.request_chunk(x, z);
     }
 
     pub fn request_chunks(&mut self, positions: &[(i32, i32)]) {
         for &(x, z) in positions {
-            self.request_chunk(x, z, 0);
+            self.request_chunk(x, z);
         }
+    }
+
+    pub fn set_focus(&mut self, focus: &[(i32, i32)]) {
+        self.generator.set_focus(focus);
     }
 
     pub fn cancel_chunks(&mut self, positions: &[(i32, i32)]) {

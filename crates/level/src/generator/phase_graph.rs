@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use crossbeam_channel::{Receiver, Sender};
+use rustc_hash::FxHashMap;
 
 use crate::chunk::Chunk;
 use crate::generator::dimension::{Generator, WorldGenerator};
@@ -41,7 +42,9 @@ pub struct PhaseGraph<G: Generator> {
     completions_tx: Sender<Completion>,
     completions_rx: Receiver<Completion>,
     pending_dispatch: BinaryHeap<Reverse<(u64, NodeKey)>>,
-    next_priority: u64,
+    next_order: u64,
+    focus: Vec<ChunkPos>,
+    reach: FxHashMap<PhaseId, f64>,
     in_flight: usize,
     finished: Vec<(ChunkPos, Outcome)>,
 }
@@ -56,32 +59,30 @@ impl<G: Generator> PhaseGraph<G> {
             completions_tx,
             completions_rx,
             pending_dispatch: BinaryHeap::new(),
-            next_priority: 0,
+            next_order: 0,
+            focus: Vec::new(),
+            reach: phase_reach::<G>(),
             in_flight: 0,
             finished: Vec::new(),
         }
     }
 
-    fn request(&mut self, cell: ChunkPos, rank: u32) {
+    fn request(&mut self, cell: ChunkPos) {
         let root = PhaseDescriptor::of::<G::Terminal>();
         let root_key = (root.phase, cell, 0);
-        let priority = ((rank as u64) << 32) | (self.next_priority & u32::MAX as u64);
-        self.next_priority += 1;
 
         if let Some(&key) = self.graph.index.get(&root_key) {
             let node = &mut self.graph.nodes[key];
             match &node.status {
                 NodeStatus::Done(outcome) => self.finished.push((cell, outcome.clone())),
-                _ => {
-                    node.requested = true;
-                    self.reprioritize(key, priority);
-                }
+                _ => node.requested = true,
             }
             return;
         }
 
-        self.insert(root, cell, priority);
-        self.reprioritize(self.graph.index[&root_key], priority);
+        let order = self.next_order;
+        self.next_order += 1;
+        self.insert(root, cell, order);
 
         let key = self.graph.index[&root_key];
         let node = &mut self.graph.nodes[key];
@@ -94,7 +95,7 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn insert(&mut self, descriptor: PhaseDescriptor<G>, cell: ChunkPos, priority: u64) {
+    fn insert(&mut self, descriptor: PhaseDescriptor<G>, cell: ChunkPos, order: u64) {
         enum Step<G: Generator> {
             Enter {
                 descriptor: PhaseDescriptor<G>,
@@ -128,7 +129,8 @@ impl<G: Generator> PhaseGraph<G> {
                         descriptor,
                         cell,
                         hop,
-                        priority,
+                        order,
+                        priority: 0,
                         requested: false,
                         retained: None,
                         deps: Vec::new(),
@@ -214,25 +216,43 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn reprioritize(&mut self, root: NodeKey, priority: u64) {
-        let mut stack = vec![root];
-        while let Some(key) = stack.pop() {
-            let Some(node) = self.graph.nodes.get_mut(key) else { continue };
-            let NodeStatus::Pending { remaining } = node.status else { continue };
-            if node.priority == priority && key != root {
-                continue;
-            }
-            node.priority = priority;
-            if remaining == 0 {
-                self.pending_dispatch.push(Reverse((priority, key)));
-            } else {
-                stack.extend(node.deps.iter().copied());
-            }
-        }
+    fn rank(&self, node: &Node<G>) -> u64 {
+        let Some(distance) = self
+            .focus
+            .iter()
+            .map(|focus| (((node.cell.x - focus.x) as f64).powi(2) + ((node.cell.z - focus.z) as f64).powi(2)).sqrt())
+            .reduce(f64::min)
+        else {
+            return 0;
+        };
+        let reach = self.reach.get(&node.descriptor.phase).copied().unwrap_or(0.0);
+        ((distance - reach).max(0.0) * 16.0).min(u32::MAX as f64) as u64
     }
 
     fn push_ready(&mut self, key: NodeKey) {
-        self.pending_dispatch.push(Reverse((self.graph.nodes[key].priority, key)));
+        let node = &self.graph.nodes[key];
+        let priority = (self.rank(node) << 32) | (node.order & u32::MAX as u64);
+        self.graph.nodes[key].priority = priority;
+        self.pending_dispatch.push(Reverse((priority, key)));
+    }
+
+    fn set_focus(&mut self, focus: &[(i32, i32)]) {
+        let focus: Vec<ChunkPos> = focus.iter().map(|&(x, z)| ChunkPos::new(x, z)).collect();
+        if focus == self.focus {
+            return;
+        }
+        self.focus = focus;
+        let entries = std::mem::take(&mut self.pending_dispatch);
+        for Reverse((priority, key)) in entries {
+            let ready = self
+                .graph
+                .nodes
+                .get(key)
+                .is_some_and(|node| node.priority == priority && matches!(node.status, NodeStatus::Pending { remaining: 0 }));
+            if ready {
+                self.push_ready(key);
+            }
+        }
     }
 
     fn start(&mut self, key: NodeKey) -> Result<(PhaseDescriptor<G>, ChunkPos, PhaseInputs<G>), Arc<PhaseFailure>> {
@@ -461,8 +481,12 @@ impl<G: Generator> PhaseGraph<G> {
 }
 
 impl<G: Generator> WorldGenerator for PhaseGraph<G> {
-    fn request_chunk(&mut self, x: i32, z: i32, priority: u32) {
-        self.request(ChunkPos::new(x, z), priority);
+    fn request_chunk(&mut self, x: i32, z: i32) {
+        self.request(ChunkPos::new(x, z));
+    }
+
+    fn set_focus(&mut self, focus: &[(i32, i32)]) {
+        PhaseGraph::set_focus(self, focus);
     }
 
     fn cancel_chunk(&mut self, x: i32, z: i32) {
@@ -513,4 +537,27 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
     fn has_pending_work(&self) -> bool {
         !self.pending_dispatch.is_empty() || self.in_flight > 0
     }
+}
+
+fn phase_reach<G: Generator>() -> FxHashMap<PhaseId, f64> {
+    let step = |offsets: &[(i32, i32)]| offsets.iter().map(|&(dx, dz)| ((dx * dx + dz * dz) as f64).sqrt()).fold(0.0, f64::max);
+    let mut reach = FxHashMap::default();
+    let mut stack = vec![(PhaseDescriptor::of::<G::Terminal>(), 0.0)];
+    while let Some((descriptor, distance)) = stack.pop() {
+        let requirements = (descriptor.requires)();
+        let hops = requirements
+            .iter()
+            .filter(|requirement| requirement.descriptor.phase == descriptor.phase)
+            .map(|requirement| step(requirement.offsets) * requirement.max_hops.unwrap_or(0) as f64)
+            .fold(0.0, f64::max);
+        let distance = distance + hops;
+        if reach.get(&descriptor.phase).is_some_and(|&known| known >= distance) {
+            continue;
+        }
+        reach.insert(descriptor.phase, distance);
+        for requirement in requirements.iter().filter(|requirement| requirement.descriptor.phase != descriptor.phase) {
+            stack.push((requirement.descriptor, distance + step(requirement.offsets)));
+        }
+    }
+    reach
 }
