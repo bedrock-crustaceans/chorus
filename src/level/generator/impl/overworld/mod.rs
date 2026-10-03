@@ -130,3 +130,5 @@ impl<E: Edition> OverworldGenerator<E> {
     }
 }
 
+#[cfg(test)]
+mod bds_parity;
