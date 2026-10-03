@@ -1,4 +1,4 @@
-use crate::error::invalid_index::InvalidIndexError;
+use super::InvalidIndexError;
 use crate::math::enums::block_face::BlockFace;
 use strum_macros::{Display, EnumString, VariantNames};
 

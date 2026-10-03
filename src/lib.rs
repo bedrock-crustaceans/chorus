@@ -31,12 +31,6 @@ pub mod level {
     }
 }
 
-pub mod error {
-    pub use chorus_block::error as block_permutation_create;
-    pub use chorus_core::error::*;
-    pub use chorus_level::generator::error as phase;
-}
-
 pub mod utils {
     pub use chorus_block::hash_utils;
     pub use chorus_core::utils::*;
