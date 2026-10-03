@@ -1,6 +1,6 @@
 use crate::network::BedrockProtocol;
 use bedrock::protocol::ProtoVersionTypes;
-use bedrock::protocol::v2168::types::NetworkItemStackDescriptorV2;
+use bedrock::protocol::v2168::types::{NetworkItemStackDescriptor, NetworkItemStackDescriptorV2};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ItemStack {
@@ -48,6 +48,17 @@ impl ItemStack {
             stack_size: self.count,
             aux_value: self.meta,
             net_id,
+            block_runtime_id: self.block_runtime_id as u32,
+            user_data_buffer: vec![],
+        }
+    }
+
+    pub fn to_actor_descriptor(&self) -> <BedrockProtocol as ProtoVersionTypes>::NetworkItemStackDescriptor {
+        NetworkItemStackDescriptor {
+            id: self.id,
+            stack_size: self.count,
+            aux_value: self.meta,
+            net_id: None,
             block_runtime_id: self.block_runtime_id as u32,
             user_data_buffer: vec![],
         }

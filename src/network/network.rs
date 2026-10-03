@@ -1,5 +1,6 @@
 use crate::command::dispatch::{CommandPreprocessMessage, CommandRequestedMessage};
 use crate::config::{Config, NetworkTransport};
+use crate::item::ItemTakenMessage;
 use crate::level::{BlockUpdatedMessage, LevelEventMessage, LevelSoundMessage};
 use crate::network::BedrockProtocol;
 use crate::network::bandwidth::BandwidthTracker;
@@ -73,6 +74,7 @@ impl Plugin for Network {
             .add_message::<BlockUpdatedMessage>()
             .add_message::<BlockBreakMessage>()
             .add_message::<BlockPlaceMessage>()
+            .add_message::<ItemTakenMessage>()
             .add_message::<InventoryOpenMessage>()
             .add_message::<InventoryCloseMessage>()
             .add_message::<PlayerItemHeldMessage>()

@@ -5,6 +5,7 @@ pub const MAIN_SIZE: usize = 36;
 pub const HOTBAR_SIZE: usize = 9;
 pub const OFFHAND_SIZE: usize = 1;
 pub const ARMOR_SIZE: usize = 4;
+pub const MAX_STACK_SIZE: u16 = 64;
 
 pub struct Inventory {
     slots: Vec<ItemStack>,
@@ -44,6 +45,41 @@ impl Inventory {
 
     pub fn first_empty(&self) -> Option<usize> {
         self.slots.iter().position(ItemStack::is_empty)
+    }
+
+    /// Merges into matching stacks first, then fills empty slots. Nothing is added unless all of it fits.
+    pub fn add(&mut self, item: ItemStack) -> bool {
+        let free: u32 = self
+            .slots
+            .iter()
+            .map(|slot| match slot {
+                slot if slot.is_empty() => MAX_STACK_SIZE as u32,
+                slot if slot.is_same(&item) => MAX_STACK_SIZE.saturating_sub(slot.count) as u32,
+                _ => 0,
+            })
+            .sum();
+        if free < item.count as u32 {
+            return false;
+        }
+
+        let mut remaining = item.count;
+        for slot in self.slots.iter_mut().filter(|slot| !slot.is_empty() && slot.is_same(&item)) {
+            let moved = MAX_STACK_SIZE.saturating_sub(slot.count).min(remaining);
+            slot.count += moved;
+            remaining -= moved;
+        }
+
+        for slot in self.slots.iter_mut().filter(|slot| slot.is_empty()) {
+            if remaining == 0 {
+                break;
+            }
+
+            let moved = remaining.min(MAX_STACK_SIZE);
+            *slot = ItemStack { count: moved, ..item };
+            remaining -= moved;
+        }
+
+        true
     }
 
     pub fn swap(&mut self, from: usize, to: usize) -> bool {

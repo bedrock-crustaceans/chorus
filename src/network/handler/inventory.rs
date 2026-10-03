@@ -183,7 +183,7 @@ pub fn handle_inventory_packets(
 }
 
 /// Resolves the item a block hands out when it is picked. Block and item share the identifier.
-fn picked_item(blocks: &BlockRegistry, items: &ItemRegistry, block_id: i32) -> Option<ItemStack> {
+pub(crate) fn picked_item(blocks: &BlockRegistry, items: &ItemRegistry, block_id: i32) -> Option<ItemStack> {
     let permutation = blocks.get_permutation(block_id)?;
     let id = items.get(permutation.get_identifier())?;
 
@@ -195,7 +195,7 @@ fn picked_item(blocks: &BlockRegistry, items: &ItemRegistry, block_id: i32) -> O
     })
 }
 
-fn send_content(session: &mut Session, inventory: &mut PlayerInventory, container: ContainerID) {
+pub(crate) fn send_content(session: &mut Session, inventory: &mut PlayerInventory, container: ContainerID) {
     let size = container_of(inventory, &container).size();
     let mut slots = Vec::with_capacity(size);
 
