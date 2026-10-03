@@ -1,11 +1,12 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::const_block;
 
 pub const COAL_BLOCK: BlockDefinition = const_block! {
-    identifier: "minecraft:coal_block",
+    identifier: block_id::COAL_BLOCK,
     states: [],
     components: [
         MapColorComponent { r: 25, g: 25, b: 25, a: 255 },

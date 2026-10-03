@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -9,7 +10,7 @@ use crate::block::state::common::SCULK_SENSOR_PHASE;
 use crate::const_block;
 
 pub const SCULK_SENSOR: BlockDefinition = const_block! {
-    identifier: "minecraft:sculk_sensor",
+    identifier: block_id::SCULK_SENSOR,
     states: [SCULK_SENSOR_PHASE],
     components: [
         SolidComponent { solid: false },

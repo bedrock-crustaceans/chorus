@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::light_emission_component::LightEmissionComponent;
@@ -12,7 +13,7 @@ use crate::block::state::common::AGE_16;
 use crate::const_block;
 
 pub const FIRE: BlockDefinition = const_block! {
-    identifier: "minecraft:fire",
+    identifier: block_id::FIRE,
     states: [AGE_16],
     components: [
         SolidComponent { solid: false },

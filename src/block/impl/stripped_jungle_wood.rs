@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -6,7 +7,7 @@ use crate::block::state::common::PILLAR_AXIS;
 use crate::const_block;
 
 pub const STRIPPED_JUNGLE_WOOD: BlockDefinition = const_block! {
-    identifier: "minecraft:stripped_jungle_wood",
+    identifier: block_id::STRIPPED_JUNGLE_WOOD,
     states: [PILLAR_AXIS],
     components: [
         MapColorComponent { r: 151, g: 109, b: 77, a: 255 },

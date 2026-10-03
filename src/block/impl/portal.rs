@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::light_emission_component::LightEmissionComponent;
@@ -10,7 +11,7 @@ use crate::block::state::common::PORTAL_AXIS;
 use crate::const_block;
 
 pub const PORTAL: BlockDefinition = const_block! {
-    identifier: "minecraft:portal",
+    identifier: block_id::PORTAL,
     states: [PORTAL_AXIS],
     components: [
         SolidComponent { solid: false },

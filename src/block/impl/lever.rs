@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -10,7 +11,7 @@ use crate::block::state::common::{LEVER_DIRECTION, OPEN_BIT};
 use crate::const_block;
 
 pub const LEVER: BlockDefinition = const_block! {
-    identifier: "minecraft:lever",
+    identifier: block_id::LEVER,
     states: [LEVER_DIRECTION, OPEN_BIT],
     components: [
         SolidComponent { solid: false },

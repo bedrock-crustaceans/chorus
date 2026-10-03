@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::friction_component::FrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -8,7 +9,7 @@ use crate::block::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
 pub const ICE: BlockDefinition = const_block! {
-    identifier: "minecraft:ice",
+    identifier: block_id::ICE,
     states: [],
     components: [
         TransparentComponent { transparent: true },

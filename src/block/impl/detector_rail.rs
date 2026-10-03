@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -10,7 +11,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const DETECTOR_RAIL: BlockDefinition = const_block! {
-    identifier: "minecraft:detector_rail",
+    identifier: block_id::DETECTOR_RAIL,
     states: [RAIL_DATA_BIT, RAIL_DIRECTION_6],
     components: [
         SolidComponent { solid: false },

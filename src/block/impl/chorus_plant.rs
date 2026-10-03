@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -7,7 +8,7 @@ use crate::block::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
 pub const CHORUS_PLANT: BlockDefinition = const_block! {
-    identifier: "minecraft:chorus_plant",
+    identifier: block_id::CHORUS_PLANT,
     states: [],
     components: [
         TransparentComponent { transparent: true },

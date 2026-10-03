@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -10,7 +11,7 @@ use crate::{const_block, const_permutation};
 use glam::Vec3;
 
 pub const FENCE_GATE: BlockDefinition = const_block! {
-    identifier: "minecraft:fence_gate",
+    identifier: block_id::FENCE_GATE,
     states: [IN_WALL_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT],
     components: [
         TransparentComponent { transparent: true },

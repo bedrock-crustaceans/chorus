@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -11,7 +12,7 @@ use crate::block::state::common::{MINECRAFT_CARDINAL_DIRECTION, UPPER_BLOCK_BIT}
 use crate::const_block;
 
 pub const SMALL_DRIPLEAF_BLOCK: BlockDefinition = const_block! {
-    identifier: "minecraft:small_dripleaf_block",
+    identifier: block_id::SMALL_DRIPLEAF_BLOCK,
     states: [MINECRAFT_CARDINAL_DIRECTION, UPPER_BLOCK_BIT],
     components: [
         SolidComponent { solid: false },

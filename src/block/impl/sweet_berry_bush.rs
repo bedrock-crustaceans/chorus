@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
@@ -12,7 +13,7 @@ use crate::block::state::common::GROWTH;
 use crate::{const_block, const_permutation};
 
 pub const SWEET_BERRY_BUSH: BlockDefinition = const_block! {
-    identifier: "minecraft:sweet_berry_bush",
+    identifier: block_id::SWEET_BERRY_BUSH,
     states: [GROWTH],
     components: [
         SolidComponent { solid: false },

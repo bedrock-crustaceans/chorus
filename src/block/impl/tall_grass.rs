@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
@@ -12,7 +13,7 @@ use crate::block::state::common::UPPER_BLOCK_BIT;
 use crate::const_block;
 
 pub const TALL_GRASS: BlockDefinition = const_block! {
-    identifier: "minecraft:tall_grass",
+    identifier: block_id::TALL_GRASS,
     states: [UPPER_BLOCK_BIT],
     components: [
         SolidComponent { solid: false },

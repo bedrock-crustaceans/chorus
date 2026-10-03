@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -8,7 +9,7 @@ use crate::block::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
 pub const POWDER_SNOW: BlockDefinition = const_block! {
-    identifier: "minecraft:powder_snow",
+    identifier: block_id::POWDER_SNOW,
     states: [],
     components: [
         SolidComponent { solid: false },

@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -6,7 +7,7 @@ use crate::block::state::common::PILLAR_AXIS;
 use crate::{const_block, const_permutation};
 
 pub const CHERRY_LOG: BlockDefinition = const_block! {
-    identifier: "minecraft:cherry_log",
+    identifier: block_id::CHERRY_LOG,
     states: [PILLAR_AXIS],
     components: [
         MapColorComponent { r: 209, g: 177, b: 161, a: 255 },

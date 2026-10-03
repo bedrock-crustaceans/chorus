@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_emission_component::LightEmissionComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::moveable_component::{MoveableComponent, Movement};
@@ -6,7 +7,7 @@ use crate::block::state::common::{CREAKING_HEART_STATE, NATURAL, PILLAR_AXIS};
 use crate::{const_block, const_permutation};
 
 pub const CREAKING_HEART: BlockDefinition = const_block! {
-    identifier: "minecraft:creaking_heart",
+    identifier: block_id::CREAKING_HEART,
     states: [CREAKING_HEART_STATE, NATURAL, PILLAR_AXIS],
     components: [
         MapColorComponent { r: 216, g: 127, b: 51, a: 255 },

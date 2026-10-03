@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::light_emission_component::LightEmissionComponent;
@@ -11,7 +12,7 @@ use crate::{const_block, const_permutation};
 use glam::Vec3;
 
 pub const END_PORTAL_FRAME: BlockDefinition = const_block! {
-    identifier: "minecraft:end_portal_frame",
+    identifier: block_id::END_PORTAL_FRAME,
     states: [END_PORTAL_EYE_BIT, MINECRAFT_CARDINAL_DIRECTION],
     components: [
         TransparentComponent { transparent: true },

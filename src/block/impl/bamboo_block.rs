@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -6,7 +7,7 @@ use crate::block::state::common::PILLAR_AXIS;
 use crate::const_block;
 
 pub const BAMBOO_BLOCK: BlockDefinition = const_block! {
-    identifier: "minecraft:bamboo_block",
+    identifier: block_id::BAMBOO_BLOCK,
     states: [PILLAR_AXIS],
     components: [
         MapColorComponent { r: 229, g: 229, b: 51, a: 255 },

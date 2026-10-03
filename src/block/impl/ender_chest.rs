@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::light_emission_component::LightEmissionComponent;
@@ -11,7 +12,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const ENDER_CHEST: BlockDefinition = const_block! {
-    identifier: "minecraft:ender_chest",
+    identifier: block_id::ENDER_CHEST,
     states: [MINECRAFT_CARDINAL_DIRECTION],
     components: [
         TransparentComponent { transparent: true },

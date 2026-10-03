@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -10,7 +11,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const POLISHED_BLACKSTONE_BRICK_WALL: BlockDefinition = const_block! {
-    identifier: "minecraft:polished_blackstone_brick_wall",
+    identifier: block_id::POLISHED_BLACKSTONE_BRICK_WALL,
     states: [WALL_CONNECTION_TYPE_EAST, WALL_CONNECTION_TYPE_NORTH, WALL_CONNECTION_TYPE_SOUTH, WALL_CONNECTION_TYPE_WEST, WALL_POST_BIT],
     components: [
         SolidComponent { solid: false },

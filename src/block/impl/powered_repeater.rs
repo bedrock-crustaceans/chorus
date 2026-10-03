@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::light_emission_component::LightEmissionComponent;
@@ -11,7 +12,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const POWERED_REPEATER: BlockDefinition = const_block! {
-    identifier: "minecraft:powered_repeater",
+    identifier: block_id::POWERED_REPEATER,
     states: [MINECRAFT_CARDINAL_DIRECTION, REPEATER_DELAY],
     components: [
         SolidComponent { solid: false },

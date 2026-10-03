@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
@@ -12,7 +13,7 @@ use crate::block::state::common::TIP;
 use crate::const_block;
 
 pub const PALE_HANGING_MOSS: BlockDefinition = const_block! {
-    identifier: "minecraft:pale_hanging_moss",
+    identifier: block_id::PALE_HANGING_MOSS,
     states: [TIP],
     components: [
         SolidComponent { solid: false },

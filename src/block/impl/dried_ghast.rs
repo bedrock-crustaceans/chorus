@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::transparent_component::TransparentComponent;
@@ -6,7 +7,7 @@ use crate::block::state::common::{MINECRAFT_CARDINAL_DIRECTION, REHYDRATION_LEVE
 use crate::const_block;
 
 pub const DRIED_GHAST: BlockDefinition = const_block! {
-    identifier: "minecraft:dried_ghast",
+    identifier: block_id::DRIED_GHAST,
     states: [MINECRAFT_CARDINAL_DIRECTION, REHYDRATION_LEVEL],
     components: [
         TransparentComponent { transparent: true },

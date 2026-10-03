@@ -1,15 +1,17 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::transparent_component::TransparentComponent;
+use crate::block::state::common::{MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST};
 use crate::const_block;
 use glam::Vec3;
 
 pub const NETHER_BRICK_FENCE: BlockDefinition = const_block! {
-    identifier: "minecraft:nether_brick_fence",
-    states: [],
+    identifier: block_id::NETHER_BRICK_FENCE,
+    states: [MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST],
     components: [
         TransparentComponent { transparent: true },
         MapColorComponent { r: 112, g: 2, b: 0, a: 255 },

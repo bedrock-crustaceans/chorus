@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -9,7 +10,7 @@ use crate::block::state::common::{PERSISTENT_BIT, UPDATE_BIT};
 use crate::const_block;
 
 pub const AZALEA_LEAVES_FLOWERED: BlockDefinition = const_block! {
-    identifier: "minecraft:azalea_leaves_flowered",
+    identifier: block_id::AZALEA_LEAVES_FLOWERED,
     states: [PERSISTENT_BIT, UPDATE_BIT],
     components: [
         TransparentComponent { transparent: true },

@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -11,7 +12,7 @@ use crate::{const_block, const_permutation};
 use glam::Vec3;
 
 pub const EXPOSED_COPPER_DOOR: BlockDefinition = const_block! {
-    identifier: "minecraft:exposed_copper_door",
+    identifier: block_id::EXPOSED_COPPER_DOOR,
     states: [DOOR_HINGE_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT, UPPER_BLOCK_BIT],
     components: [
         SolidComponent { solid: false },

@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -10,7 +11,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const LIGHT_GRAY_CARPET: BlockDefinition = const_block! {
-    identifier: "minecraft:light_gray_carpet",
+    identifier: block_id::LIGHT_GRAY_CARPET,
     states: [],
     components: [
         SolidComponent { solid: false },

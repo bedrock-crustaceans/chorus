@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -9,7 +10,7 @@ use crate::block::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
 pub const WAXED_COPPER_GRATE: BlockDefinition = const_block! {
-    identifier: "minecraft:waxed_copper_grate",
+    identifier: block_id::WAXED_COPPER_GRATE,
     states: [],
     components: [
         SolidComponent { solid: false },

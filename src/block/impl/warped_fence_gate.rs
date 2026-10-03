@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -9,7 +10,7 @@ use crate::{const_block, const_permutation};
 use glam::Vec3;
 
 pub const WARPED_FENCE_GATE: BlockDefinition = const_block! {
-    identifier: "minecraft:warped_fence_gate",
+    identifier: block_id::WARPED_FENCE_GATE,
     states: [IN_WALL_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT],
     components: [
         TransparentComponent { transparent: true },

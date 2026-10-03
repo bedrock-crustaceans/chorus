@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -10,7 +11,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const UNPOWERED_COMPARATOR: BlockDefinition = const_block! {
-    identifier: "minecraft:unpowered_comparator",
+    identifier: block_id::UNPOWERED_COMPARATOR,
     states: [MINECRAFT_CARDINAL_DIRECTION, OUTPUT_LIT_BIT, OUTPUT_SUBTRACT_BIT],
     components: [
         SolidComponent { solid: false },

@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -10,7 +11,7 @@ use crate::block::state::common::GROUND_SIGN_DIRECTION;
 use crate::const_block;
 
 pub const CHERRY_STANDING_SIGN: BlockDefinition = const_block! {
-    identifier: "minecraft:cherry_standing_sign",
+    identifier: block_id::CHERRY_STANDING_SIGN,
     states: [GROUND_SIGN_DIRECTION],
     components: [
         SolidComponent { solid: false },

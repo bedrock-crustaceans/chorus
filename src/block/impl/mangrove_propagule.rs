@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -11,7 +12,7 @@ use crate::block::state::common::{HANGING, PROPAGULE_STAGE};
 use crate::const_block;
 
 pub const MANGROVE_PROPAGULE: BlockDefinition = const_block! {
-    identifier: "minecraft:mangrove_propagule",
+    identifier: block_id::MANGROVE_PROPAGULE,
     states: [HANGING, PROPAGULE_STAGE],
     components: [
         SolidComponent { solid: false },

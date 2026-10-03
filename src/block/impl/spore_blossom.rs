@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -7,7 +8,7 @@ use crate::block::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
 pub const SPORE_BLOSSOM: BlockDefinition = const_block! {
-    identifier: "minecraft:spore_blossom",
+    identifier: block_id::SPORE_BLOSSOM,
     states: [],
     components: [
         SolidComponent { solid: false },

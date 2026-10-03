@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -11,7 +12,7 @@ use crate::block::state::common::AGE_16;
 use crate::const_block;
 
 pub const REEDS: BlockDefinition = const_block! {
-    identifier: "minecraft:reeds",
+    identifier: block_id::REEDS,
     states: [AGE_16],
     components: [
         SolidComponent { solid: false },

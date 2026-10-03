@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
@@ -11,7 +12,7 @@ use crate::block::state::common::AGE_4;
 use crate::const_block;
 
 pub const NETHER_WART: BlockDefinition = const_block! {
-    identifier: "minecraft:nether_wart",
+    identifier: block_id::NETHER_WART,
     states: [AGE_4],
     components: [
         SolidComponent { solid: false },

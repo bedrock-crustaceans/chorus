@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::flammable_component::FlammableComponent;
 use crate::block::component::internal_friction_component::InternalFrictionComponent;
@@ -13,7 +14,7 @@ use crate::{const_block, const_permutation};
 use glam::Vec3;
 
 pub const BIG_DRIPLEAF: BlockDefinition = const_block! {
-    identifier: "minecraft:big_dripleaf",
+    identifier: block_id::BIG_DRIPLEAF,
     states: [BIG_DRIPLEAF_HEAD, BIG_DRIPLEAF_TILT, MINECRAFT_CARDINAL_DIRECTION],
     components: [
         SolidComponent { solid: false },

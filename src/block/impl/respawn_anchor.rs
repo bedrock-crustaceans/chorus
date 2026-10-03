@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::light_emission_component::LightEmissionComponent;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
@@ -7,7 +8,7 @@ use crate::block::state::common::RESPAWN_ANCHOR_CHARGE;
 use crate::{const_block, const_permutation};
 
 pub const RESPAWN_ANCHOR: BlockDefinition = const_block! {
-    identifier: "minecraft:respawn_anchor",
+    identifier: block_id::RESPAWN_ANCHOR,
     states: [RESPAWN_ANCHOR_CHARGE],
     components: [
         MapColorComponent { r: 25, g: 25, b: 25, a: 255 },

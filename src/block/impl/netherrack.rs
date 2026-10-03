@@ -1,10 +1,11 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::map_color_component::MapColorComponent;
 use crate::block::component::mineable_component::MineableComponent;
 use crate::const_block;
 
 pub const NETHERRACK: BlockDefinition = const_block! {
-    identifier: "minecraft:netherrack",
+    identifier: block_id::NETHERRACK,
     states: [],
     components: [
         MapColorComponent { r: 112, g: 2, b: 0, a: 255 },

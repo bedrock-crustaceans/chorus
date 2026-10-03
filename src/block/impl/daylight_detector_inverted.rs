@@ -1,4 +1,5 @@
 use crate::block::block_definition::BlockDefinition;
+use crate::block::block_id;
 use crate::block::component::collision_box_component::CollisionBoxComponent;
 use crate::block::component::light_dampening_component::LightDampeningComponent;
 use crate::block::component::map_color_component::MapColorComponent;
@@ -10,7 +11,7 @@ use crate::const_block;
 use glam::Vec3;
 
 pub const DAYLIGHT_DETECTOR_INVERTED: BlockDefinition = const_block! {
-    identifier: "minecraft:daylight_detector_inverted",
+    identifier: block_id::DAYLIGHT_DETECTOR_INVERTED,
     states: [REDSTONE_SIGNAL],
     components: [
         SolidComponent { solid: false },
