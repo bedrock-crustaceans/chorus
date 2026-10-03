@@ -2,6 +2,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::io::{Cursor, Read};
 
 use bedrock::level::db::Database;
+use bedrock::level::subchunk::{self, SubChunk, to_offset};
+use bedrock::level::types::BlockPosition;
 
 use super::{Bedrock, OverworldGenerator};
 use chorus_block::block_registry::BlockRegistry;
@@ -105,53 +107,25 @@ fn chunk_key(x: i32, z: i32, tag: u8, sub: Option<i8>) -> Vec<u8> {
 
 struct StoredLayer {
     palette: Vec<String>,
-    indices: Vec<u16>,
+    layer: subchunk::Layer,
 }
 
 impl StoredLayer {
     fn get(&self, x: u8, y: u8, z: u8) -> &str {
-        &self.palette[self.indices[((x as usize) << 8) | ((z as usize) << 4) | y as usize] as usize]
+        let index = self.layer.indices().get(to_offset(BlockPosition(x, y, z))).unwrap_or(0);
+        &self.palette[index as usize]
     }
 }
 
 fn first_layer(data: &[u8]) -> Option<StoredLayer> {
-    let mut reader = Cursor::new(data);
-    let mut head = [0u8; 3];
-    reader.read_exact(&mut head).ok()?;
-    if head[0] != 9 || head[1] == 0 {
-        return None;
-    }
-    let mut header = [0u8; 1];
-    reader.read_exact(&mut header).ok()?;
-    let bits = (header[0] >> 1) as usize;
-    let mut indices = vec![0u16; 4096];
-    if let Some(per_word) = 32usize.checked_div(bits) {
-        for word in 0..4096usize.div_ceil(per_word) {
-            let packed = read_u32(&mut reader)?;
-            for slot in 0..per_word {
-                let index = word * per_word + slot;
-                if index < 4096 {
-                    indices[index] = ((packed >> (slot * bits)) & ((1 << bits) - 1)) as u16;
-                }
-            }
-        }
-    }
-    let count = read_u32(&mut reader)?;
-    let mut rest = &data[reader.position() as usize..];
-    let mut palette = Vec::with_capacity(count as usize);
-    for _ in 0..count {
-        let entry: HashMap<String, nbtx::Value> = nbtx::from_le_bytes(&mut rest).ok()?;
-        let name = match entry.get("name") {
-            Some(nbtx::Value::String(name)) => name.to_string(),
-            _ => return None,
-        };
-        let states: Vec<(String, String)> = match entry.get("states") {
-            Some(nbtx::Value::Compound(states)) => states.iter().map(|(k, v)| (k.to_string(), value_text(format!("{v:?}")))).collect(),
-            _ => Vec::new(),
-        };
-        palette.push(canonical(&name, states.into_iter()));
-    }
-    Some(StoredLayer { palette, indices })
+    let sub_chunk = SubChunk::from_disk_greedy(&mut Cursor::new(data)).ok()?;
+    let layer = sub_chunk.get_layer(0)?.clone();
+    let palette = layer
+        .palette()
+        .iter()
+        .map(|block| canonical(&block.name, block.states.iter().map(|(k, v)| (k.clone(), value_text(format!("{v:?}"))))))
+        .collect();
+    Some(StoredLayer { palette, layer })
 }
 
 fn read_u32(reader: &mut Cursor<&[u8]>) -> Option<u32> {
