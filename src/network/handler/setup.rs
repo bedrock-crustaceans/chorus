@@ -17,7 +17,6 @@ use bedrock::protocol::v662::enums::{ChatRestrictionLevel, Difficulty, EditorWor
 use bedrock::protocol::v662::packets::ChunkRadiusUpdatedPacket;
 use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID, BaseGameVersion, EduSharedUriResource, Experiments, NetworkPermissions, SpawnSettings};
 use bedrock::protocol::v712::packets::JigsawStructureDataPacket;
-use bedrock::protocol::v800::packets::BiomeDefinitionListPacket;
 use bedrock::protocol::v818::types::SyncedPlayerMovementSettings;
 use bedrock::protocol::v944::packets::VoxelShapesPacket;
 use bedrock::protocol::v944::types::NetworkBlockPosition;
@@ -224,7 +223,7 @@ fn handle_request_chunk_radius(config: &Config, packet: &<BedrockProtocol as Pro
 
     session.send(BedrockProtocol::ChunkRadiusUpdatedPacket(ChunkRadiusUpdatedPacket { chunk_radius: radius }.into()));
 
-    session.send(BedrockProtocol::BiomeDefinitionListPacket(BiomeDefinitionListPacket { biomes: vec![], strings: vec![] }.into()));
+    session.send(BedrockProtocol::BiomeDefinitionListPacket(crate::level::biome::definitions::definition_list().into()));
 
     session.send_play_status(PlayStatus::PlayerSpawn, false);
 

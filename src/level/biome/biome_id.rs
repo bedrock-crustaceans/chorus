@@ -29,7 +29,7 @@ pub mod BiomeID {
     pub const COLD_BEACH: i32 = 26;
     pub const BIRCH_FOREST: i32 = 27;
     pub const BIRCH_FOREST_HILLS: i32 = 28;
-    pub const ROOTED_FOREST: i32 = 29;
+    pub const ROOFED_FOREST: i32 = 29;
     pub const COLD_TAIGA: i32 = 30;
     pub const COLD_TAIGA_HILLS: i32 = 31;
     pub const MEGA_TAIGA: i32 = 32;
@@ -86,4 +86,7 @@ pub mod BiomeID {
     pub const DEEP_DARK: i32 = 190;
     pub const MANGROVE_SWAMP: i32 = 191;
     pub const CHERRY_GROVE: i32 = 192;
+    pub const PALE_GARDEN: i32 = 193;
+    pub const SULFUR_CAVES: i32 = 194;
+    pub const DAPPLED_FOREST: i32 = 195;
 }
