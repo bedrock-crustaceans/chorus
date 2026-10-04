@@ -31,6 +31,8 @@ pub struct Dimension {
     storage: Option<Arc<LevelStorage>>,
     chunk_saving: ChunkSaving,
     persist: HashSet<(i32, i32)>,
+    available: Vec<(i32, i32)>,
+    unloaded: Vec<(i32, i32)>,
     loading: HashSet<(i32, i32)>,
     cancelled: HashSet<(i32, i32)>,
     loads: (Sender<LoadResult>, Receiver<LoadResult>),
@@ -47,6 +49,8 @@ impl Dimension {
             storage: None,
             chunk_saving: ChunkSaving::default(),
             persist: HashSet::new(),
+            available: Vec::new(),
+            unloaded: Vec::new(),
             loading: HashSet::new(),
             cancelled: HashSet::new(),
             loads: crossbeam_channel::unbounded(),
@@ -71,6 +75,14 @@ impl Dimension {
             }
         }
         self.request_chunk(x, z);
+    }
+
+    pub fn take_available(&mut self) -> Vec<(i32, i32)> {
+        std::mem::take(&mut self.available)
+    }
+
+    pub fn take_unloaded(&mut self) -> Vec<(i32, i32)> {
+        std::mem::take(&mut self.unloaded)
     }
 
     pub fn is_persistent(&self) -> bool {
@@ -193,6 +205,7 @@ impl Dimension {
                 Err(failure) => error!("failed to generate chunk ({x}, {z}) in {}: {failure}", self.name()),
             }
         }
+        self.available.extend(generated.iter().copied());
         generated
     }
 
@@ -214,6 +227,7 @@ impl Dimension {
                 staged = true;
             }
             self.chunks.remove(&position);
+            self.unloaded.push(position);
             unloaded += 1;
         }
         if staged && let Some(storage) = &self.storage {

@@ -5,16 +5,20 @@ use bevy_ecs::schedule::IntoScheduleConfigs;
 
 pub mod item;
 pub mod physics;
+pub mod storage;
 pub mod viewers;
 
-/// Non-player entities: physics, which players see them, and the item entity behaviour.
 pub struct ActorPlugin;
 
 impl Plugin for ActorPlugin {
     fn build(&self, app: &mut App) {
-        app.add_message::<viewers::ActorShown>().add_systems(
+        let mut registry = storage::ActorRegistry::default();
+        registry.register(item::ITEM_IDENTIFIER, item::save_item, item::load_item);
+        app.insert_resource(registry).add_message::<viewers::ActorShown>().add_systems(
             Tick,
             (
+                storage::load_chunk_actors,
+                storage::save_unloaded_chunk_actors,
                 item::spawn_block_drops,
                 item::tick_item_entities,
                 physics::apply_physics,

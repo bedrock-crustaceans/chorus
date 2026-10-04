@@ -1,9 +1,11 @@
 use crate::actor::physics::Physics;
+use crate::actor::storage::ActorKind;
 use crate::actor::viewers::{ActorShown, Despawn, NetworkOffset, Viewers, send_to_viewers};
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::item::ItemTakenMessage;
 use crate::item::item_entity::{ItemEntity, within_pickup_reach};
+use crate::item::item_stack::ItemStack;
 use crate::level::DimensionId;
 use crate::network::BedrockProtocol;
 use crate::network::handler::inventory::{picked_item, send_content};
@@ -16,6 +18,7 @@ use crate::player::inventory::{MAX_STACK_SIZE, PlayerInventory};
 use crate::registry::block_registry::BlockRegistry;
 use crate::registry::item_registry::ItemRegistry;
 use crate::server::ServerState;
+use crate::utils::hash_utils::HashUtils;
 use crate::world::block::BlockBreakMessage;
 use bedrock::protocol::ProtoVersionPackets;
 use bedrock::protocol::v662::enums::ContainerID;
@@ -23,41 +26,131 @@ use bedrock::protocol::v662::packets::{AddItemActorPacket, TakeItemActorPacket};
 use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID};
 use bedrock::protocol::v975::enums::ActorEvent;
 use bevy_ecs::message::{MessageReader, MessageWriter};
-use bevy_ecs::prelude::{Commands, Entity, Local, Query, Res, ResMut, Without};
+use bevy_ecs::prelude::{Bundle, Commands, Entity, Local, Query, Res, ResMut, Without, World};
 use glam::Vec3;
 use std::collections::HashSet;
 
 type ActorEventPacket = <BedrockProtocol as ProtoVersionPackets>::ActorEventPacket;
 
 const MERGE_INTERVAL_TICKS: u32 = 10;
-/// How far apart two item boxes may be horizontally and still merge, like vanilla.
 const MERGE_REACH: f32 = 0.5;
 
-/// Spawns a dropped item with vanilla's small random offset and pop.
-pub fn spawn_item(commands: &mut Commands, server_state: &mut ServerState, item: ItemEntity, center: Vec3, dimension: i32) -> Entity {
+pub const ITEM_IDENTIFIER: &str = "minecraft:item";
+
+fn item_bundle(item: ItemEntity, actor: ActorId, position: Vec3, velocity: Vec3, dimension: i32) -> impl Bundle {
     let physics = Physics::item();
-    let runtime_id = server_state.get_runtime_id();
+    (
+        item,
+        actor,
+        Transform {
+            position,
+            velocity,
+            ..Transform::default()
+        },
+        DimensionId(dimension),
+        physics,
+        NetworkOffset(physics.height / 2.0),
+        Viewers::default(),
+        ActorKind(ITEM_IDENTIFIER),
+    )
+}
+
+pub fn spawn_item(commands: &mut Commands, server_state: &mut ServerState, item: ItemEntity, center: Vec3, dimension: i32) -> Entity {
     let jitter = || rand::random::<f32>() * 0.5 - 0.25;
-    let position = center + Vec3::new(jitter(), jitter() - physics.height / 2.0, jitter());
+    let position = center + Vec3::new(jitter(), jitter() - Physics::item().height / 2.0, jitter());
     let velocity = Vec3::new(rand::random::<f32>() * 0.2 - 0.1, 0.2, rand::random::<f32>() * 0.2 - 0.1);
-    commands
-        .spawn((
-            item,
-            ActorId {
-                unique_id: runtime_id as i64,
-                runtime_id,
-            },
-            Transform {
-                position,
-                velocity,
-                ..Transform::default()
-            },
-            DimensionId(dimension),
-            physics,
-            NetworkOffset(physics.height / 2.0),
-            Viewers::default(),
-        ))
-        .id()
+    let actor = ActorId {
+        unique_id: server_state.get_unique_id(),
+        runtime_id: server_state.get_runtime_id(),
+    };
+    commands.spawn(item_bundle(item, actor, position, velocity, dimension)).id()
+}
+
+fn floats(values: &[f32]) -> nbtx::Value {
+    nbtx::Value::List(nbtx::ValueList::Float(values.to_vec()))
+}
+
+fn read_floats(tag: &nbtx::Compound, key: &str) -> Option<Vec3> {
+    match tag.get(key.as_bytes()) {
+        Some(nbtx::Value::List(nbtx::ValueList::Float(values))) if values.len() >= 3 => Some(Vec3::new(values[0], values[1], values[2])),
+        _ => None,
+    }
+}
+
+pub fn save_item(world: &World, entity: Entity) -> Option<nbtx::Value> {
+    let entity = world.get_entity(entity).ok()?;
+    let (item, actor, transform) = (entity.get::<ItemEntity>()?, entity.get::<ActorId>()?, entity.get::<Transform>()?);
+    let stack = item.stack();
+    let name = world.resource::<ItemRegistry>().items().iter().find(|definition| definition.runtime_id == stack.id)?.identifier.clone();
+
+    let mut item_tag = nbtx::Compound::new();
+    item_tag.insert("Name".into(), nbtx::Value::String(name.as_str().into()));
+    item_tag.insert("Count".into(), nbtx::Value::Byte(stack.count.min(i8::MAX as u16) as i8));
+    item_tag.insert("Damage".into(), nbtx::Value::Short(stack.meta as i16));
+    item_tag.insert("WasPickedUp".into(), nbtx::Value::Byte(0));
+    if stack.block_runtime_id != 0
+        && let Some(permutation) = world.resource::<BlockRegistry>().get_permutation(stack.block_runtime_id)
+    {
+        item_tag.insert("Block".into(), permutation.to_nbt());
+    }
+
+    let offset = Physics::item().height / 2.0;
+    let (position, velocity) = (transform.position, transform.velocity);
+    let mut tag = nbtx::Compound::new();
+    tag.insert("identifier".into(), nbtx::Value::String(ITEM_IDENTIFIER.into()));
+    tag.insert("UniqueID".into(), nbtx::Value::Long(actor.unique_id));
+    tag.insert("Pos".into(), floats(&[position.x, position.y + offset, position.z]));
+    tag.insert("Motion".into(), floats(&[velocity.x, velocity.y, velocity.z]));
+    tag.insert("Rotation".into(), floats(&[0.0, 0.0]));
+    tag.insert("OnGround".into(), nbtx::Value::Byte(entity.get::<Physics>().is_some_and(|physics| physics.on_ground) as i8));
+    tag.insert("Age".into(), nbtx::Value::Short(item.age().min(i16::MAX as u32) as i16));
+    tag.insert("PickupDelay".into(), nbtx::Value::Short(item.pickup_delay().min(i16::MAX as u32) as i16));
+    tag.insert("Item".into(), nbtx::Value::Compound(item_tag));
+    Some(nbtx::Value::Compound(tag))
+}
+
+pub fn load_item(world: &mut World, nbt: &nbtx::Value, dimension: i32) -> Option<Entity> {
+    let nbtx::Value::Compound(tag) = nbt else { return None };
+    let nbtx::Value::Compound(item_tag) = tag.get("Item".as_bytes())? else { return None };
+    let nbtx::Value::String(name) = item_tag.get("Name".as_bytes())? else { return None };
+    let id = world.resource::<ItemRegistry>().get(&name.to_string())?;
+    let count = match item_tag.get("Count".as_bytes()) {
+        Some(nbtx::Value::Byte(count)) => (*count).max(1) as u16,
+        _ => 1,
+    };
+    let meta = match item_tag.get("Damage".as_bytes()) {
+        Some(nbtx::Value::Short(damage)) => *damage as u32,
+        _ => 0,
+    };
+    let block_runtime_id = match item_tag.get("Block".as_bytes()) {
+        Some(nbtx::Value::Compound(block)) => match (block.get("name".as_bytes()), block.get("states".as_bytes())) {
+            (Some(nbtx::Value::String(block_name)), Some(nbtx::Value::Compound(states))) => HashUtils::hash_block_nbt(&block_name.to_string(), states.clone()),
+            (Some(nbtx::Value::String(block_name)), _) => HashUtils::hash_block_nbt(&block_name.to_string(), nbtx::Compound::new()),
+            _ => 0,
+        },
+        _ => 0,
+    };
+    let short = |key: &str| match tag.get(key.as_bytes()) {
+        Some(nbtx::Value::Short(value)) => (*value).max(0) as u32,
+        _ => 0,
+    };
+    let stack = ItemStack { id, count, meta, block_runtime_id };
+    let position = read_floats(tag, "Pos")? - Vec3::new(0.0, Physics::item().height / 2.0, 0.0);
+    let velocity = read_floats(tag, "Motion").unwrap_or_default();
+    let mut server_state = world.resource_mut::<ServerState>();
+    let unique_id = match tag.get("UniqueID".as_bytes()) {
+        Some(nbtx::Value::Long(unique_id)) => *unique_id,
+        _ => server_state.get_unique_id(),
+    };
+    let actor = ActorId {
+        unique_id,
+        runtime_id: server_state.get_runtime_id(),
+    };
+    Some(
+        world
+            .spawn(item_bundle(ItemEntity::restore(stack, short("Age"), short("PickupDelay")), actor, position, velocity, dimension))
+            .id(),
+    )
 }
 
 pub fn spawn_block_drops(
@@ -79,7 +172,6 @@ pub fn spawn_block_drops(
     }
 }
 
-/// Sends the spawn packet of dropped items to players that just started seeing them.
 pub fn send_item_spawns(mut reader: MessageReader<ActorShown>, items: Query<(&ItemEntity, &ActorId, &Transform, &NetworkOffset)>, mut sessions: Query<&mut Session>) {
     for shown in reader.read() {
         let (Ok((item, actor, transform, offset)), Ok(mut session)) = (items.get(shown.actor), sessions.get_mut(shown.viewer)) else {
@@ -101,7 +193,6 @@ pub fn send_item_spawns(mut reader: MessageReader<ActorShown>, items: Query<(&It
     }
 }
 
-/// Counts down pickup delays and despawns items after five minutes.
 pub fn tick_item_entities(mut items: Query<(Entity, &mut ItemEntity), Without<Despawn>>, mut commands: Commands) {
     for (entity, mut item) in &mut items {
         item.tick_pickup_delay();
@@ -113,7 +204,6 @@ pub fn tick_item_entities(mut items: Query<(Entity, &mut ItemEntity), Without<De
 
 type MergeItem<'a> = (Entity, &'a mut ItemEntity, &'a ActorId, &'a Transform, &'a DimensionId, &'a Viewers);
 
-/// Merges nearby stacks of the same item into the larger one.
 pub fn merge_item_entities(mut items: Query<MergeItem, Without<Despawn>>, mut sessions: Query<&mut Session>, mut commands: Commands, mut ticks: Local<u32>) {
     *ticks += 1;
     if *ticks < MERGE_INTERVAL_TICKS {
@@ -216,5 +306,62 @@ pub fn handle_item_pickup(
         if changed && let Ok(mut session) = sessions.get_mut(player) {
             send_content(&mut session, &mut inventory, ContainerID::Inventory);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::actor::storage::{ActorRegistry, save_all_actors};
+    use crate::level::Level;
+    use crate::level::dimension_type::DimensionType;
+    use bevy_ecs::system::RunSystemOnce;
+
+    #[test]
+    fn items_round_trip_through_storage() {
+        let directory = std::env::temp_dir().join(format!("chorus_actor_storage_{}", std::process::id()));
+        let mut world = World::new();
+        world.run_system_once(ItemRegistry::init).unwrap();
+        world.run_system_once(BlockRegistry::init).unwrap();
+        world.insert_resource(ServerState::new());
+        let mut registry = ActorRegistry::default();
+        registry.register(ITEM_IDENTIFIER, save_item, load_item);
+        world.insert_resource(registry);
+        let level = Level::open(&directory, "test", 0, world.resource::<BlockRegistry>(), 1);
+        let storage = level.storage().cloned().expect("storage opens");
+        world.insert_resource(level);
+
+        let stone = world.resource::<BlockRegistry>().get_block_id("minecraft:stone").unwrap();
+        let stack = ItemStack {
+            id: world.resource::<ItemRegistry>().get("minecraft:stone").unwrap(),
+            count: 12,
+            meta: 0,
+            block_runtime_id: stone,
+        };
+        let actor = ActorId { unique_id: 42, runtime_id: 7 };
+        let position = Vec3::new(20.5, 64.0, -3.25);
+        let entity = world.spawn(item_bundle(ItemEntity::restore(stack, 100, 0), actor, position, Vec3::ZERO, 0)).id();
+
+        save_all_actors(&mut world);
+        world.despawn(entity);
+        let saved = storage.load_entities(DimensionType::Overworld, 1, -1).unwrap();
+        assert_eq!(saved.len(), 1);
+
+        let loaded = load_item(&mut world, &saved[0], 0).expect("item loads");
+        let loaded = world.entity(loaded);
+        let item = loaded.get::<ItemEntity>().unwrap();
+        assert_eq!((item.stack(), item.age()), (stack, 100));
+        assert_eq!(loaded.get::<ActorId>().unwrap().unique_id, 42);
+        assert!((loaded.get::<Transform>().unwrap().position - position).length() < 1e-5);
+
+        let moved = loaded.id();
+        world.get_mut::<Transform>(moved).unwrap().position = Vec3::new(40.0, 64.0, 40.0);
+        save_all_actors(&mut world);
+        assert!(storage.load_entities(DimensionType::Overworld, 1, -1).unwrap().is_empty(), "the old chunk no longer lists it");
+        assert_eq!(storage.load_entities(DimensionType::Overworld, 2, 2).unwrap().len(), 1);
+
+        drop(world);
+        drop(storage);
+        let _ = std::fs::remove_dir_all(directory);
     }
 }

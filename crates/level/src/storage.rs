@@ -72,6 +72,7 @@ pub struct LevelData {
     pub name: String,
     pub seed: i64,
     pub spawn: IVec3,
+    pub start_count: i64,
 }
 
 type PendingWrite = (Vec<u8>, Option<Arc<[u8]>>);
@@ -213,8 +214,6 @@ impl LevelStorage {
         });
     }
 
-    /// Starts compacting the database in the background, or one slice per tick when there are no
-    /// pool threads. Returns `false` when a compaction is already running.
     pub fn schedule_compaction(self: &Arc<Self>) -> bool {
         if self.compacting.swap(true, Ordering::AcqRel) {
             return false;
@@ -238,7 +237,6 @@ impl LevelStorage {
         self.compacting.load(Ordering::Acquire)
     }
 
-    /// Total size of the database files on disk.
     pub fn disk_size(&self) -> u64 {
         std::fs::read_dir(self.path.join("db"))
             .map(|entries| {
@@ -251,8 +249,6 @@ impl LevelStorage {
             .unwrap_or(0)
     }
 
-    /// Writes pending chunks between compaction slices, so a long compaction holding a pool
-    /// thread never leaves writes queued behind it.
     fn flush_if_idle(&self) {
         if self.pending().is_empty() || self.flushing.swap(true, Ordering::AcqRel) {
             return;
@@ -263,8 +259,6 @@ impl LevelStorage {
         self.flushing.store(false, Ordering::Release);
     }
 
-    /// Runs one compaction round on this thread when a compaction was scheduled without any pool
-    /// threads to hand it to. Called every tick so a single-threaded server never stalls on a full compaction.
     pub fn step_compaction(&self) {
         if io_pool().is_none() && self.compacting.load(Ordering::Acquire) {
             self.compact_step(TICK_COMPACTION_BUDGET);
@@ -301,7 +295,6 @@ impl LevelStorage {
         more
     }
 
-    /// Writes everything pending and compacts the whole database on this thread.
     pub fn compact_blocking(&self) -> StorageResult<()> {
         self.flush_blocking()?;
         let started = std::time::Instant::now();
@@ -341,7 +334,11 @@ impl LevelStorage {
             _ => String::new(),
         };
         let spawn = IVec3::new(int("SpawnX").unwrap_or(0), int("SpawnY").unwrap_or(i16::MAX as i32), int("SpawnZ").unwrap_or(0));
-        Ok(Some(LevelData { name, seed, spawn }))
+        let start_count = match tag.get("worldStartCount") {
+            Some(nbtx::Value::Long(count)) => *count,
+            _ => 0,
+        };
+        Ok(Some(LevelData { name, seed, spawn, start_count }))
     }
 
     pub fn write_level_data(&self, data: &LevelData) -> StorageResult<()> {
@@ -355,6 +352,7 @@ impl LevelStorage {
         tag.insert("StorageVersion".into(), nbtx::Value::Int(STORAGE_VERSION));
         tag.insert("Generator".into(), nbtx::Value::Int(1));
         tag.insert("LastPlayed".into(), nbtx::Value::Long(last_played));
+        tag.insert("worldStartCount".into(), nbtx::Value::Long(data.start_count));
         let body = nbtx::to_le_bytes(&nbtx::Value::Compound(tag))?;
 
         let mut bytes = Vec::with_capacity(body.len() + 8);
@@ -535,6 +533,55 @@ impl LevelStorage {
         let id = HashUtils::hash_block_nbt(&name.to_string(), states);
         ids.insert(raw.to_vec(), id);
         Ok(id)
+    }
+}
+
+fn digp_key(dimension: i32, x: i32, z: i32) -> Vec<u8> {
+    let mut key = b"digp".to_vec();
+    key.extend(x.to_le_bytes());
+    key.extend(z.to_le_bytes());
+    if dimension != 0 {
+        key.extend(dimension.to_le_bytes());
+    }
+    key
+}
+
+fn actor_key(id: &[u8]) -> Vec<u8> {
+    let mut key = b"actorprefix".to_vec();
+    key.extend_from_slice(id);
+    key
+}
+
+impl LevelStorage {
+    pub fn load_entities(&self, dimension: DimensionType, x: i32, z: i32) -> StorageResult<Vec<nbtx::Value>> {
+        let Some(ids) = self.get(&digp_key(dimension.id(), x, z))? else { return Ok(Vec::new()) };
+        let mut entities = Vec::with_capacity(ids.len() / 8);
+        for id in ids.chunks_exact(8) {
+            if let Some(data) = self.get(&actor_key(id))? {
+                entities.push(nbtx::from_le_bytes(&mut data.as_slice())?);
+            }
+        }
+        Ok(entities)
+    }
+
+    pub fn save_entities(&self, dimension: DimensionType, x: i32, z: i32, entities: &[(i64, nbtx::Value)], saved_elsewhere: &std::collections::HashSet<i64>) -> StorageResult<()> {
+        let digp = digp_key(dimension.id(), x, z);
+        let ids: Vec<[u8; 8]> = entities.iter().map(|(id, _)| id.to_le_bytes()).collect();
+        if let Some(old) = self.get(&digp)? {
+            let kept = |old_id: &[u8]| ids.iter().any(|id| id == old_id) || old_id.try_into().is_ok_and(|bytes: [u8; 8]| saved_elsewhere.contains(&i64::from_le_bytes(bytes)));
+            for old_id in old.chunks_exact(8).filter(|old_id| !kept(old_id)) {
+                self.remove(actor_key(old_id));
+            }
+        }
+        for ((_, nbt), id) in entities.iter().zip(&ids) {
+            self.put(actor_key(id), nbtx::to_le_bytes(nbt)?);
+        }
+        if ids.is_empty() {
+            self.remove(digp);
+        } else {
+            self.put(digp, ids.concat());
+        }
+        Ok(())
     }
 }
 

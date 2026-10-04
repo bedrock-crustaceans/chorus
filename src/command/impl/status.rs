@@ -204,7 +204,6 @@ fn players(context: &CommandContext, dimension: Option<i32>) -> usize {
         .count()
 }
 
-/// Secondary information, dimmed and in brackets.
 fn detail(text: impl AsRef<str>) -> String {
     format!("§8(§7{}§8)§f", text.as_ref().replace("§f", "§7"))
 }

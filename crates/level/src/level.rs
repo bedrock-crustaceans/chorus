@@ -17,7 +17,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info, warn};
 
-/// How long the generation poll waits when nothing finished, instead of spinning on the job queue.
 const IDLE_POLL_WAIT: Duration = Duration::from_micros(500);
 
 #[derive(Resource)]
@@ -28,6 +27,7 @@ pub struct Level {
     pub name: String,
     pub seed: i64,
     pub spawn: IVec3,
+    pub start_count: i64,
     dimensions: HashMap<i32, Dimension>,
     storage: Option<Arc<LevelStorage>>,
     chunk_saving: ChunkSaving,
@@ -57,10 +57,12 @@ impl Level {
             info!("loaded level \"{}\" from {}", level.name, path.display());
             level.seed = data.seed;
             level.spawn = data.spawn;
+            level.start_count = data.start_count;
             level.is_new = false;
         } else {
             info!("created level \"{}\" at {} with seed {seed}", level.name, path.display());
         }
+        level.start_count += 1;
         level.storage = Some(storage);
         level
     }
@@ -70,6 +72,7 @@ impl Level {
             name: name.into(),
             seed,
             spawn: IVec3::ZERO,
+            start_count: 0,
             dimensions: HashMap::new(),
             storage: None,
             chunk_saving: ChunkSaving::default(),
@@ -126,6 +129,7 @@ impl Level {
             name: self.name.clone(),
             seed: self.seed,
             spawn: self.spawn,
+            start_count: self.start_count,
         };
         if let Err(err) = storage.write_level_data(&data) {
             error!("failed to write level data: {err}");

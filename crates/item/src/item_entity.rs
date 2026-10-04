@@ -39,6 +39,23 @@ impl ItemEntity {
         moved
     }
 
+    pub fn restore(stack: ItemStack, age: u32, pickup_delay: u32) -> Self {
+        Self {
+            stack,
+            pickup_delay,
+            age,
+            on_ground: false,
+        }
+    }
+
+    pub fn age(&self) -> u32 {
+        self.age
+    }
+
+    pub fn pickup_delay(&self) -> u32 {
+        self.pickup_delay
+    }
+
     pub fn tick_age(&mut self) -> bool {
         self.age += 1;
         self.age >= DESPAWN_TICKS

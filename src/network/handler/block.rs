@@ -4,7 +4,6 @@ use crate::world::block::BlockActionMessage;
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use glam::IVec3;
 
-/// Turns block interactions in player packets into `BlockActionMessage`s.
 pub fn decode_block_actions(mut packet_reader: MessageReader<PacketReceivedMessage>, mut action_writer: MessageWriter<BlockActionMessage>) {
     for ev in packet_reader.read() {
         match &ev.packet {

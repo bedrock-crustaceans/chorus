@@ -7,7 +7,6 @@ use chorus_core::permission::PermissionLevel;
 
 pub type CommandExecutor = fn(&mut CommandContext, &CommandArgs) -> CommandResult;
 
-/// Hints for the client about where a command may be used and how it is shown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CommandFlags(pub(crate) u16);
 
@@ -20,7 +19,6 @@ impl CommandFlags {
     pub const LOCAL_SYNC: Self = Self(0x10);
     pub const EXECUTE_DISALLOWED: Self = Self(0x20);
     pub const MESSAGE_TYPE: Self = Self(0x40);
-    /// Usable without cheats enabled.
     pub const NOT_CHEAT: Self = Self(0x80);
     pub const ASYNC: Self = Self(0x100);
 
@@ -33,13 +31,6 @@ impl CommandFlags {
     }
 }
 
-/// A command, built in a const:
-///
-/// ```ignore
-/// pub const PING_COMMAND: CommandDefinition = CommandDefinition::new("ping", "Replies with pong", |context, _| { ... })
-///     .aliases(values!["p"])
-///     .permission(PermissionLevel::Member);
-/// ```
 #[derive(Debug, Clone)]
 pub struct CommandDefinition {
     pub name: CowArc<'static, str>,
@@ -48,7 +39,6 @@ pub struct CommandDefinition {
     pub permission: PermissionLevel,
     pub flags: CommandFlags,
     pub overloads: CowArc<'static, [CommandOverload]>,
-    /// Chained subcommands the command's chaining overloads lead into.
     pub chained_subcommands: CowArc<'static, [ChainedSubcommand]>,
     pub execute: CommandExecutor,
 }
