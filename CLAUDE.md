@@ -126,7 +126,9 @@ Use the `const_block!` / `const_permutation!` macros for compile-time static def
 
 ### Level
 
-`Level` (`crates/level/src/level.rs`) is a single global resource, created by `init_level` (`src/registry/mod.rs`), which picks the overworld generator. Chunk generation is polled through the `JobQueue`.
+`Level` (`crates/level/src/level.rs`) is a single global resource. Chunk generation is polled through the `JobQueue`.
+
+Level startup runs in three chained `LevelStartup` sets (`src/registry/mod.rs`): `Open` opens the world with `Level::open` (seed and spawn come from `level.dat` when it exists, `Level::is_new` says when they don't), `Dimensions` is where downstream code adds or replaces dimensions with `Level::insert_dimension(type, generator)`, and `Defaults` adds the stock overworld only if nothing registered one, picks the spawn of a new level and writes `level.dat`. `insert_dimension` attaches the level's storage automatically and saves a dimension it replaces. Pyrite hooks in with `insert_level.in_set(LevelStartup::Dimensions)`.
 
 Worlds are saved in the vanilla Bedrock LevelDB layout under `worlds/<level_name>/` (`db/`, `level.dat`, `levelname.txt`) by `LevelStorage` (`crates/level/src/storage.rs`). A `Dimension` built `with_storage` loads chunks from disk before asking its generator, marks generated and edited chunks unsaved, and saves them when they unload, on the one-minute autosave, on `/save` and on exit. The database is opened in manual compaction mode with batched writes, and compacted every five minutes, in time slices: a pool task runs `compact_step` in 50 ms slices, or with no pool threads the main thread spends about 10 ms of each tick on it, so a single-threaded server never stalls on a full compaction. An existing `level.dat` wins over `level_seed` in the config. Palette entries are written as `{name, states, version}` NBT and read back through `HashUtils::hash_block_nbt`.
 
@@ -136,7 +138,7 @@ Worlds are saved in the vanilla Bedrock LevelDB layout under `worlds/<level_name
 
 ### Configuration
 
-`chorus.toml` is read (or created with defaults) at startup by `Config::setup()` (`crates/core/src/config.rs`). Fields: `ip`, `port`, `name`, `sub_name`, `max_players`, `threads`, `transport` (`RakNet` | `NetherNet`), `nethernet_http_port`, `log_to_file`, `logs_directory`, `resource_packs_directory`, `behavior_packs_directory`, `level_name`, `level_seed`, `online_mode`, `encryption`, `log_level`, `force_accept_resource_packs`, `force_disable_vibrant_visuals`, `max_view_distance`, `max_generation_distance`, `level_compression_level` (deflate level 0-10 for the world database, default 1).
+`chorus.toml` is read (or created with defaults) at startup by `Config::setup()` (`crates/core/src/config.rs`). Fields: `ip`, `port`, `name`, `sub_name`, `max_players`, `threads`, `transport` (`RakNet` | `NetherNet`), `nethernet_http_port`, `log_to_file`, `logs_directory`, `resource_packs_directory`, `behavior_packs_directory`, `level_name`, `level_seed` (a number, or text hashed like Java's `String.hashCode`; empty text picks a random seed), `online_mode`, `encryption`, `log_level`, `force_accept_resource_packs`, `force_disable_vibrant_visuals`, `max_view_distance`, `max_generation_distance`, `level_compression_level` (deflate level 0-10 for the world database, default 1).
 
 ### Protocol version
 

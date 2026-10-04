@@ -65,7 +65,7 @@ impl Pregen {
 
     pub fn run(mut commands: Commands, pregen: Option<ResMut<Pregen>>, mut level: ResMut<Level>) {
         let Some(mut pregen) = pregen else { return };
-        let writes_backed_up = level.storage.as_ref().is_some_and(|storage| storage.pending_writes() > MAX_PENDING_WRITES);
+        let writes_backed_up = level.storage().is_some_and(|storage| storage.pending_writes() > MAX_PENDING_WRITES);
         let Some(dimension) = level.dimension_mut(pregen.dimension) else {
             warn!("stopping pregeneration, dimension {} is gone", pregen.dimension);
             commands.remove_resource::<Pregen>();
