@@ -55,7 +55,7 @@ impl LoopRunner {
 
             if let Some(exit) = app.should_exit() {
                 if let Some(mut level) = app.world_mut().get_resource_mut::<level::Level>() {
-                    let saved = level.save();
+                    let saved = level.save_blocking();
                     info!("saved {saved} chunks before exiting");
                 }
                 return exit;

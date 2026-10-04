@@ -9,8 +9,10 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tracing::error;
 
 const CHUNK_VERSION: u8 = 40;
 const SUB_CHUNK_VERSION: u8 = 9;
@@ -70,9 +72,25 @@ pub struct LevelData {
     pub spawn: IVec3,
 }
 
+type PendingWrite = (Vec<u8>, Option<Arc<[u8]>>);
+type PendingWrites = HashMap<Vec<u8>, Option<Arc<[u8]>>>;
+
+pub fn spawn_io(work: impl FnOnce() + Send + 'static) {
+    let pool = bevy_tasks::IoTaskPool::try_get()
+        .map(|pool| &**pool)
+        .filter(|pool| pool.thread_num() > 0)
+        .or_else(|| bevy_tasks::AsyncComputeTaskPool::try_get().map(|pool| &**pool).filter(|pool| pool.thread_num() > 0));
+    match pool {
+        Some(pool) => pool.spawn(async move { work() }).detach(),
+        None => work(),
+    }
+}
+
 pub struct LevelStorage {
     path: PathBuf,
     db: Mutex<Database>,
+    pending: Mutex<PendingWrites>,
+    flushing: AtomicBool,
     air_id: i32,
     block_nbt: HashMap<i32, Vec<u8>>,
     block_ids: Mutex<HashMap<Vec<u8>, i32>>,
@@ -93,6 +111,8 @@ impl LevelStorage {
         Ok(Self {
             path,
             db: Mutex::new(db),
+            pending: Mutex::new(HashMap::new()),
+            flushing: AtomicBool::new(false),
             air_id: registry.get_block_id("minecraft:air").expect("air is registered"),
             block_nbt,
             block_ids: Mutex::new(HashMap::new()),
@@ -103,17 +123,86 @@ impl LevelStorage {
         &self.path
     }
 
+    fn pending(&self) -> MutexGuard<'_, PendingWrites> {
+        self.pending.lock().expect("pending writes lock poisoned")
+    }
+
     fn get(&self, key: &[u8]) -> StorageResult<Option<Vec<u8>>> {
+        if let Some(value) = self.pending().get(key) {
+            return Ok(value.as_ref().map(|value| value.to_vec()));
+        }
         let db = self.db.lock().expect("level database lock poisoned");
         Ok(db.get(key).map_err(database_error)?.map(Vec::from))
     }
 
-    fn put(&self, key: &[u8], value: &[u8]) -> StorageResult<()> {
-        self.db.lock().expect("level database lock poisoned").insert(key, value).map_err(database_error)
+    fn put(&self, key: Vec<u8>, value: Vec<u8>) {
+        self.pending().insert(key, Some(value.into()));
     }
 
-    fn remove(&self, key: &[u8]) -> StorageResult<()> {
-        self.db.lock().expect("level database lock poisoned").remove(key).map_err(database_error)
+    fn remove(&self, key: Vec<u8>) {
+        self.pending().insert(key, None);
+    }
+
+    pub fn pending_writes(&self) -> usize {
+        self.pending().len()
+    }
+
+    fn flush(&self) -> StorageResult<()> {
+        let batch: Vec<PendingWrite> = self.pending().iter().map(|(key, value)| (key.clone(), value.clone())).collect();
+        if batch.is_empty() {
+            return Ok(());
+        }
+        {
+            let db = self.db.lock().expect("level database lock poisoned");
+            for (key, value) in &batch {
+                match value {
+                    Some(value) => db.insert(key, value),
+                    None => db.remove(key),
+                }
+                .map_err(database_error)?;
+            }
+        }
+        let mut pending = self.pending();
+        for (key, written) in batch {
+            let unchanged = match (pending.get(&key), &written) {
+                (Some(Some(current)), Some(written)) => Arc::ptr_eq(current, written),
+                (Some(None), None) => true,
+                _ => false,
+            };
+            if unchanged {
+                pending.remove(&key);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn schedule_flush(self: &Arc<Self>) {
+        if self.pending().is_empty() || self.flushing.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let storage = self.clone();
+        spawn_io(move || {
+            loop {
+                let result = storage.flush();
+                storage.flushing.store(false, Ordering::Release);
+                if let Err(err) = result {
+                    error!("failed to write level data to disk: {err}");
+                    return;
+                }
+                if storage.pending().is_empty() || storage.flushing.swap(true, Ordering::AcqRel) {
+                    return;
+                }
+            }
+        });
+    }
+
+    pub fn flush_blocking(&self) -> StorageResult<()> {
+        while self.flushing.swap(true, Ordering::AcqRel) {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let result = self.flush();
+        self.flushing.store(false, Ordering::Release);
+        result
     }
 
     pub fn read_level_data(&self) -> StorageResult<Option<LevelData>> {
@@ -166,15 +255,15 @@ impl LevelStorage {
     pub fn save_chunk(&self, dimension: DimensionType, chunk: &Chunk) -> StorageResult<()> {
         let id = dimension.id();
         let (x, z) = (chunk.x, chunk.z);
-        self.put(&key(id, x, z, TAG_VERSION, None), &[CHUNK_VERSION])?;
+        self.put(key(id, x, z, TAG_VERSION, None), vec![CHUNK_VERSION]);
 
         for (offset, sub_chunk) in chunk.sub_chunks().iter().enumerate() {
             let index = chunk.min_sub_chunk_y().wrapping_add(offset as i8);
             let sub_key = key(id, x, z, TAG_SUB_CHUNK, Some(index));
             if sub_chunk.is_all_air() && sub_chunk.layers().iter().skip(1).all(|layer| layer.count(self.air_id) == 4096) {
-                self.remove(&sub_key)?;
+                self.remove(sub_key);
             } else {
-                self.put(&sub_key, &self.encode_sub_chunk(sub_chunk, index))?;
+                self.put(sub_key, self.encode_sub_chunk(sub_chunk, index));
             }
         }
 
@@ -185,20 +274,21 @@ impl LevelStorage {
         for sub_chunk in chunk.sub_chunks() {
             sub_chunk.biomes().write_biomes_disk(&mut data_3d);
         }
-        self.put(&key(id, x, z, TAG_DATA_3D, None), &data_3d)?;
+        self.put(key(id, x, z, TAG_DATA_3D, None), data_3d);
 
         let entities_key = key(id, x, z, TAG_BLOCK_ENTITY, None);
         if chunk.block_entities().is_empty() {
-            self.remove(&entities_key)?;
+            self.remove(entities_key);
         } else {
             let mut entities = Vec::new();
             for entity in chunk.block_entities() {
                 nbtx::to_le_bytes_in(&mut entities, &entity.data)?;
             }
-            self.put(&entities_key, &entities)?;
+            self.put(entities_key, entities);
         }
 
-        self.put(&key(id, x, z, TAG_FINALIZED_STATE, None), &FINALIZED.to_le_bytes())
+        self.put(key(id, x, z, TAG_FINALIZED_STATE, None), FINALIZED.to_le_bytes().to_vec());
+        Ok(())
     }
 
     fn encode_sub_chunk(&self, sub_chunk: &SubChunk, index: i8) -> Vec<u8> {
@@ -232,10 +322,6 @@ impl LevelStorage {
             }
         }
         heights
-    }
-
-    pub fn has_chunk(&self, dimension: DimensionType, x: i32, z: i32) -> bool {
-        self.get(&key(dimension.id(), x, z, TAG_VERSION, None)).is_ok_and(|version| version.is_some())
     }
 
     pub fn load_chunk(&self, dimension: DimensionType, x: i32, z: i32) -> StorageResult<Option<Chunk>> {

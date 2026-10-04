@@ -8,7 +8,8 @@ use crate::dimension_type::DimensionType;
 use crate::generator::error::PhaseFailure;
 use crate::generator::phase::Phase;
 use crate::generator::phase_graph::PhaseGraph;
-use crate::storage::LevelStorage;
+use crate::storage::{LevelStorage, StorageResult, spawn_io};
+use crossbeam_channel::{Receiver, Sender};
 
 pub trait Generator: Send + Sync + Sized + 'static {
     type Terminal: Phase<Self, Output = Chunk>;
@@ -29,8 +30,12 @@ pub struct Dimension {
     modified: HashSet<(i32, i32)>,
     storage: Option<Arc<LevelStorage>>,
     unsaved: HashSet<(i32, i32)>,
-    loaded: Vec<(i32, i32)>,
+    loading: HashSet<(i32, i32)>,
+    cancelled: HashSet<(i32, i32)>,
+    loads: (Sender<LoadResult>, Receiver<LoadResult>),
 }
+
+type LoadResult = (i32, i32, StorageResult<Option<Chunk>>);
 
 impl Dimension {
     pub fn new<G: Generator>(dimension_type: DimensionType, generator: G) -> Self {
@@ -41,7 +46,9 @@ impl Dimension {
             modified: HashSet::new(),
             storage: None,
             unsaved: HashSet::new(),
-            loaded: Vec::new(),
+            loading: HashSet::new(),
+            cancelled: HashSet::new(),
+            loads: crossbeam_channel::unbounded(),
         }
     }
 
@@ -58,13 +65,13 @@ impl Dimension {
         self.unsaved.len()
     }
 
-    pub fn is_stored(&self, x: i32, z: i32) -> bool {
-        self.storage.as_ref().is_some_and(|storage| storage.has_chunk(self.dimension_type, x, z))
-    }
-
     pub fn save(&mut self) -> usize {
         let unsaved: Vec<(i32, i32)> = self.unsaved.iter().copied().collect();
-        unsaved.into_iter().filter(|&position| self.save_chunk(position)).count()
+        let saved = unsaved.into_iter().filter(|&position| self.save_chunk(position)).count();
+        if let Some(storage) = &self.storage {
+            storage.schedule_flush();
+        }
+        saved
     }
 
     fn save_chunk(&mut self, position: (i32, i32)) -> bool {
@@ -100,18 +107,18 @@ impl Dimension {
         if self.chunks.contains_key(&(x, z)) {
             return;
         }
-        if let Some(storage) = &self.storage {
-            match storage.load_chunk(self.dimension_type, x, z) {
-                Ok(Some(chunk)) => {
-                    self.chunks.insert((x, z), chunk);
-                    self.loaded.push((x, z));
-                    return;
-                }
-                Ok(None) => {}
-                Err(err) => warn!("failed to load chunk ({x}, {z}) in {}, regenerating it: {err}", self.name()),
-            }
+        let Some(storage) = &self.storage else {
+            self.generator.request_chunk(x, z);
+            return;
+        };
+        self.cancelled.remove(&(x, z));
+        if !self.loading.insert((x, z)) {
+            return;
         }
-        self.generator.request_chunk(x, z);
+        let (storage, sender, dimension_type) = (storage.clone(), self.loads.0.clone(), self.dimension_type);
+        spawn_io(move || {
+            let _ = sender.send((x, z, storage.load_chunk(dimension_type, x, z)));
+        });
     }
 
     pub fn request_chunks(&mut self, positions: &[(i32, i32)]) {
@@ -126,14 +133,34 @@ impl Dimension {
 
     pub fn cancel_chunks(&mut self, positions: &[(i32, i32)]) {
         for &(x, z) in positions {
-            if !self.chunks.contains_key(&(x, z)) {
+            if self.loading.contains(&(x, z)) {
+                self.cancelled.insert((x, z));
+            } else if !self.chunks.contains_key(&(x, z)) {
                 self.generator.cancel_chunk(x, z);
             }
         }
     }
 
     pub fn tick(&mut self) -> Vec<(i32, i32)> {
-        let mut generated = std::mem::take(&mut self.loaded);
+        let mut generated = Vec::new();
+        while let Ok((x, z, result)) = self.loads.1.try_recv() {
+            self.loading.remove(&(x, z));
+            let cancelled = self.cancelled.remove(&(x, z));
+            match result {
+                Ok(Some(chunk)) => {
+                    self.chunks.entry((x, z)).or_insert(chunk);
+                    generated.push((x, z));
+                }
+                Ok(None) if !cancelled => self.generator.request_chunk(x, z),
+                Ok(None) => {}
+                Err(err) => {
+                    warn!("failed to load chunk ({x}, {z}) in {}, regenerating it: {err}", self.name());
+                    if !cancelled {
+                        self.generator.request_chunk(x, z);
+                    }
+                }
+            }
+        }
         for (x, z, result) in self.generator.tick() {
             match result {
                 Ok(chunk) => {
@@ -153,6 +180,7 @@ impl Dimension {
         let persistent = self.storage.is_some();
         let unloading: Vec<(i32, i32)> = self.chunks.keys().copied().filter(|&(x, z)| !keep(x, z) && (persistent || !self.modified.contains(&(x, z)))).collect();
         let mut unloaded = 0;
+        let staged = unloading.iter().any(|position| self.unsaved.contains(position));
         for position in unloading {
             if self.unsaved.contains(&position) && !self.save_chunk(position) {
                 continue;
@@ -161,11 +189,14 @@ impl Dimension {
             self.modified.remove(&position);
             unloaded += 1;
         }
+        if staged && let Some(storage) = &self.storage {
+            storage.schedule_flush();
+        }
         unloaded
     }
 
     pub fn has_pending_generation(&self) -> bool {
-        self.generator.has_pending_work()
+        self.generator.has_pending_work() || !self.loading.is_empty()
     }
 
     pub fn get_chunk(&self, x: i32, z: i32) -> Option<&Chunk> {
