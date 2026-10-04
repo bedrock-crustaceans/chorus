@@ -1,47 +1,31 @@
 use crate::command::command_definition::CommandDefinition;
-use crate::command::parameter::{CommandOverload, CommandParameter, CommandParameterType};
-use crate::const_command;
+use crate::command::parameter::{CommandEnum, CommandParameter};
+use crate::values;
 use crate::entity::components::actor_id::ActorId;
 use crate::network::BedrockProtocol;
 use crate::network::session::Session;
 use crate::player::forms::PendingForms;
-use atomicow::CowArc;
 use bedrock::form::elems::button::Button;
 use bedrock::form::forms::Form;
 use bedrock::form::forms::simple::SimpleForm;
-use bedrock::protocol::v662::enums::{CommandPermissionLevel};
 use bedrock::protocol::v662::packets::UpdateAbilitiesPacket;
 use bedrock::protocol::v776::enums::AbilitiesIndex;
 use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitiesLayer, SerializedLayer};
-use bedrock::protocol::v898::packets::CommandPermissionLevelString;
+use chorus_core::permission::PermissionLevel;
 use tracing::info;
 
-pub const DEBUG_COMMAND: CommandDefinition = const_command! {
-    name: "debug",
-    description: "Used for debugging",
-    aliases: [],
-    permission: CommandPermissionLevelString::Any,
-    overloads: [
-        CommandOverload {
-            parameters: CowArc::Static(&[
-                CommandParameter {
-                    name: CowArc::Static("feature"),
-                    kind: CommandParameterType::String,
-                    optional: false
-                }
-            ])
-        }
-    ],
-    execute: |context, args| {
-        match args.first() {
-            Some(&"unhandled") => {
+const FEATURE: CommandEnum = CommandEnum::new("DebugFeature", values!["unhandled", "form", "speed"]);
+
+pub const DEBUG_COMMAND: CommandDefinition = CommandDefinition::new("debug", "Used for debugging", |context, args| {
+        match args.string("feature") {
+            Some("unhandled") => {
                 let Some(session) = context.get::<Session>() else {
                     return Err("must be sent by player!".to_owned());
                 };
                 let report = format!("Unhandled Packets: {:#?}", session.unhandled_packets);
                 context.reply(report);
             }
-            Some(&"form") => {
+            Some("form") => {
                 let name = context.sender_name().to_owned();
                 let Some((mut session, mut forms)) = context.components_mut::<(&mut Session, &mut PendingForms)>() else {
                     return Err("must be sent by player!".to_owned());
@@ -65,7 +49,8 @@ pub const DEBUG_COMMAND: CommandDefinition = const_command! {
                     },
                 );
             }
-            Some(&"speed") => {
+            Some("speed") => {
+                let level = context.permission_level();
                 let Some((mut session, actor)) = context.components_mut::<(&mut Session, &ActorId)>() else {
                     return Err("must be sent by player!".to_owned());
                 };
@@ -83,7 +68,7 @@ pub const DEBUG_COMMAND: CommandDefinition = const_command! {
                         data: SerializedAbilitiesData {
                             target_player_raw_id: actor.unique_id,
                             player_permissions: 1,
-                            command_permissions: CommandPermissionLevel::GameDirectors,
+                            command_permissions: level.into(),
                             layers: vec![SerializedLayer {
                                 serialized_layer: SerializedAbilitiesLayer::Base,
                                 abilities_set: 0xFFFFF,
@@ -100,5 +85,6 @@ pub const DEBUG_COMMAND: CommandDefinition = const_command! {
             _ => {}
         }
         Ok(())
-    }
-};
+})
+.permission(PermissionLevel::Operator)
+.overloads(crate::overloads![[CommandParameter::enumeration("feature", FEATURE)]]);

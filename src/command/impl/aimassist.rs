@@ -1,14 +1,5 @@
 use crate::command::command_definition::CommandDefinition;
-use crate::const_command;
-use bedrock::protocol::v898::packets::CommandPermissionLevelString;
+use chorus_core::permission::PermissionLevel;
 
-pub const AIMASSIST_COMMAND: CommandDefinition = const_command! {
-    name: "aimassist",
-    description: "Enable Aim Assist",
-    aliases: [],
-    permission: CommandPermissionLevelString::GameDirectors,
-    overloads: [
-        // TODO
-    ],
-    execute: |_, _| { Ok(()) },
-};
+pub const AIMASSIST_COMMAND: CommandDefinition =
+    CommandDefinition::new("aimassist", "Enable Aim Assist", |_, _| Err("/aimassist is not implemented yet".to_owned())).permission(PermissionLevel::Operator);

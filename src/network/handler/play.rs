@@ -1,4 +1,6 @@
 use crate::command::dispatch::{CommandPreprocessMessage, CommandRequestedMessage};
+use crate::command::permission::CommandPermission;
+use crate::config::Config;
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::level::BlockUpdatedMessage;
@@ -13,7 +15,7 @@ use crate::player::chunk_view::ChunkView;
 use crate::player::forms::PendingForms;
 use crate::player::identity::PlayerIdentity;
 use crate::registry::command_registry::CommandRegistry;
-use bedrock::protocol::v662::enums::{ActorFlags, CommandPermissionLevel};
+use bedrock::protocol::v662::enums::ActorFlags;
 use bedrock::protocol::v662::packets::{SetActorDataPacket, UpdateAbilitiesPacket, UpdateBlockPacket};
 use bedrock::protocol::v662::types::{ActorRuntimeID, DataItem, PropertySyncData};
 use bedrock::protocol::v729::packets::{AttributeData, UpdateAttributesPacket};
@@ -22,7 +24,7 @@ use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitie
 use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bedrock::protocol::v2168::enums::DataItemType;
 use bevy_ecs::message::{Message, MessageReader, MessageWriter};
-use bevy_ecs::prelude::{Entity, Query, Res};
+use bevy_ecs::prelude::{Commands, Entity, Query, Res};
 use glam::{Vec2, Vec3};
 use tracing::{debug, info};
 
@@ -41,6 +43,8 @@ pub struct PlayerQuitMessage {
 pub fn on_enter_play(
     mut sessions: Query<(&mut Session, &ActorId, &PlayerIdentity)>,
     commands: Res<CommandRegistry>,
+    config: Res<Config>,
+    mut entities: Commands,
     mut state_reader: MessageReader<SessionStateChangedMessage>,
     mut join_writer: MessageWriter<PlayerJoinedMessage>,
 ) {
@@ -55,6 +59,9 @@ pub fn on_enter_play(
         debug!("on_enter_play");
 
         info!("{} joined the game", identity.name());
+
+        let permission = config.permissions.level_of(identity.name(), identity.xuid());
+        entities.entity(ev.entity).insert(CommandPermission(permission));
 
         join_writer.write(PlayerJoinedMessage {
             entity: ev.entity,
@@ -93,7 +100,7 @@ pub fn on_enter_play(
                 data: SerializedAbilitiesData {
                     target_player_raw_id: actor.unique_id,
                     player_permissions: 1,
-                    command_permissions: CommandPermissionLevel::GameDirectors,
+                    command_permissions: permission.into(),
                     layers: vec![SerializedLayer {
                         serialized_layer: SerializedAbilitiesLayer::Base,
                         abilities_set: 0xFFFFF,
