@@ -16,6 +16,7 @@ commands! {
     list::LIST_COMMAND,
     save::SAVE_COMMAND,
     stop::STOP_COMMAND,
+    generate::GENERATE_COMMAND,
 
     gamemode::GAMEMODE_COMMAND,
     dimension::DIMENSION_COMMAND,

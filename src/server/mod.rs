@@ -10,6 +10,8 @@ use bevy_ecs::system::ResMut;
 use std::time::{Duration, Instant};
 use tracing::info;
 
+pub mod pregen;
+
 pub use chorus_core::schedule::TICK_RATE;
 
 pub struct Server;
@@ -91,6 +93,7 @@ impl Plugin for Server {
         })
         .add_systems(Startup, Server::start)
         .add_systems(Tick, Server::start_tick.in_set(TickSet::First))
+        .add_systems(Tick, pregen::Pregen::run.in_set(TickSet::First).after(Server::start_tick))
         .add_systems(Tick, Server::end_tick.in_set(TickSet::Last))
         .add_plugins(Registry)
         .add_plugins(ConsolePlugin)
