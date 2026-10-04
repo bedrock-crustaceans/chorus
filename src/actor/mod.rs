@@ -1,10 +1,11 @@
+use crate::Tick;
 use crate::schedule::GameSet;
-use crate::{Tick, TickSet};
 use bevy_app::{App, Plugin};
 use bevy_ecs::schedule::IntoScheduleConfigs;
 
 pub mod item;
 pub mod physics;
+pub mod player;
 pub mod storage;
 pub mod viewers;
 
@@ -19,6 +20,8 @@ impl Plugin for ActorPlugin {
             (
                 storage::load_chunk_actors,
                 storage::save_unloaded_chunk_actors,
+                player::handle_player_joins,
+                player::handle_player_quits,
                 item::spawn_block_drops,
                 item::tick_item_entities,
                 physics::apply_physics,
@@ -26,12 +29,12 @@ impl Plugin for ActorPlugin {
                 item::handle_item_pickup,
                 viewers::update_viewers,
                 item::send_item_spawns,
+                player::send_player_spawns,
                 viewers::broadcast_movement,
                 viewers::despawn_actors,
             )
                 .chain()
-                .in_set(GameSet::Actors)
-                .in_set(TickSet::Update),
+                .in_set(GameSet::Actors),
         );
     }
 }

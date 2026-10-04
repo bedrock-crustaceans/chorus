@@ -61,7 +61,10 @@ pub fn handle_login(
             continue;
         }
 
-        commands.entity(ev.entity).insert(PlayerIdentity::new(request.auth_data.xname.clone(), request.auth_data.xid.clone()));
+        commands.entity(ev.entity).insert((
+            PlayerIdentity::new(request.auth_data.xname.clone(), request.auth_data.xid.clone()),
+            crate::player::skin::PlayerAppearance::from_client_data(&request.client_data),
+        ));
 
         login_writer.write(PlayerLoginMessage {
             entity: ev.entity,

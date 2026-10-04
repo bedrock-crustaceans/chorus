@@ -1,5 +1,5 @@
+use crate::Tick;
 use crate::schedule::GameSet;
-use crate::{Tick, TickSet};
 use bevy_app::{App, Plugin};
 use bevy_ecs::schedule::IntoScheduleConfigs;
 
@@ -20,8 +20,7 @@ impl Plugin for WorldPlugin {
                 (block::broadcast_block_updates, block::broadcast_level_events, block::broadcast_level_sounds)
                     .chain()
                     .in_set(GameSet::Broadcast),
-            )
-                .in_set(TickSet::Update),
+            ),
         );
     }
 }

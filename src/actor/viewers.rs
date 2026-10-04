@@ -43,6 +43,10 @@ fn remove_packet(actor: &ActorId) -> BedrockProtocol {
     )
 }
 
+fn angle(degrees: f32) -> i8 {
+    (degrees.rem_euclid(360.0) / 360.0 * 256.0) as i32 as i8
+}
+
 pub fn update_viewers(
     mut actors: Query<(Entity, &Transform, &DimensionId, &ActorId, &mut Viewers), Without<Despawn>>,
     mut sessions: Query<&mut Session>,
@@ -59,7 +63,9 @@ pub fn update_viewers(
         let chunk = ((transform.position.x.floor() as i32) >> 4, (transform.position.z.floor() as i32) >> 4);
         let wanted: HashSet<Entity> = players
             .iter()
-            .filter(|(_, player_dimension, center, radius)| *player_dimension == dimension.0 && (chunk.0 - center.0).pow(2) + (chunk.1 - center.1).pow(2) <= radius * radius)
+            .filter(|(player, player_dimension, center, radius)| {
+                *player != actor_entity && *player_dimension == dimension.0 && (chunk.0 - center.0).pow(2) + (chunk.1 - center.1).pow(2) <= radius * radius
+            })
             .map(|(entity, ..)| *entity)
             .collect();
         if wanted == viewers.0 {
@@ -89,9 +95,9 @@ pub fn broadcast_movement(moved: Query<(&ActorId, &Transform, &Viewers, Option<&
                     actor_runtime_id: ActorRuntimeID(actor.runtime_id),
                     header: physics.is_some_and(|physics| physics.on_ground) as i8,
                     position: (position.x, position.y + offset.map_or(0.0, |offset| offset.0), position.z),
-                    rotation_x: 0,
-                    rotation_y: 0,
-                    rotation_y_head: 0,
+                    rotation_x: angle(transform.rotation.x),
+                    rotation_y: angle(transform.rotation.y),
+                    rotation_y_head: angle(transform.rotation.y),
                 },
             }
             .into(),
