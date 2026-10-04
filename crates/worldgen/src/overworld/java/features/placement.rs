@@ -190,7 +190,7 @@ impl Placed {
             }
             Modifier::SurfaceRelativeThreshold { heightmap, min, max } => {
                 let surface = ctx.region.height(*heightmap, origin.x, origin.z);
-                if surface + min <= origin.y && origin.y <= surface + max {
+                if surface as i64 + *min as i64 <= origin.y as i64 && origin.y as i64 <= surface as i64 + *max as i64 {
                     out.push(origin);
                 }
             }
