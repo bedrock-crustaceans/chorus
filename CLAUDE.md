@@ -142,7 +142,7 @@ Worlds are saved in the vanilla Bedrock LevelDB layout under `worlds/<level_name
 
 - `[server]`: `name`, `description` (second line in the server list), `max_players`, `authentication` (require Xbox Live sign-in), `threads` (a number, or `"auto"` for one per CPU core; 0 runs everything on the main thread)
 - `[network]`: `ip`, `port`, `transport` (`RakNet` | `NetherNet`), with `[network.raknet]` `encryption` and `[network.nethernet]` `http_port`
-- `[level]`: `name`, `seed` (a number, or text parsed like vanilla's `WorldOptions.parseSeed`; `LevelSeed::parse_with` lets a generator use its own rule), `compression_level` (deflate 0-10 for the world database), `max_view_distance` (also caps how far chunks are generated)
+- `[level]`: `name`, `seed` (a number, or text parsed like vanilla's `WorldOptions.parseSeed`; `LevelSeed::parse_with` lets a generator use its own rule), `max_view_distance` (also caps how far chunks are generated), `autosave` (an `Interval`: `"30s"`, `"5m"`, seconds, or `false`), and `[level.database]` with `compression` (deflate 0-10), `auto_compaction` (an `Interval`) and `shutdown_compaction`
 - `[packs]`: `resource_directory`, `behavior_directory`, `force_accept`, `force_disable_vibrant_visuals`
 - `[log]`: `level` (a tracing `EnvFilter` string, e.g. `"info"` or `"info,chorus=debug"`), `to_file`, `directory`
 

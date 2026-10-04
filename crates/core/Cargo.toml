@@ -9,6 +9,7 @@ authors.workspace = true
 bedrock.workspace = true
 bevy_ecs.workspace = true
 glam.workspace = true
+humantime.workspace = true
 rand.workspace = true
 serde.workspace = true
 strum.workspace = true
