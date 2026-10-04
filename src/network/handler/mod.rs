@@ -5,7 +5,7 @@ use crate::network::handler::chat::{broadcast_chat, broadcast_message};
 use crate::network::handler::chunks::{handle_sub_chunk_request, send_pending_chunks, unload_distant_chunks, update_chunk_order};
 use crate::network::handler::handshake::handle_handshake;
 use crate::network::handler::inventory::{handle_inventory_packets, send_initial_inventory};
-use crate::network::handler::item::{broadcast_spawned_items, broadcast_taken_items, handle_item_pickup, spawn_block_drops, tick_item_entities};
+use crate::network::handler::item::{broadcast_spawned_items, broadcast_taken_items, handle_item_pickup, merge_item_entities, show_items_to_new_viewers, spawn_block_drops, tick_item_entities};
 use crate::network::handler::login::handle_login;
 use crate::network::handler::play::{announce_join_quit, broadcast_block_updates, handle_play, on_enter_play, on_quit};
 use crate::network::handler::request::handle_request;
@@ -54,7 +54,16 @@ impl Plugin for PacketHandlers {
                     CommandRegistry::broadcast_soft_enum_updates,
                 )
                     .chain(),
-                (spawn_block_drops, broadcast_spawned_items, tick_item_entities, handle_item_pickup, broadcast_taken_items).chain(),
+                (
+                    spawn_block_drops,
+                    broadcast_spawned_items,
+                    show_items_to_new_viewers,
+                    tick_item_entities,
+                    merge_item_entities,
+                    handle_item_pickup,
+                    broadcast_taken_items,
+                )
+                    .chain(),
                 (broadcast_chat, on_quit, announce_join_quit, broadcast_message).chain(),
                 (update_chunk_order, send_pending_chunks, unload_distant_chunks, handle_sub_chunk_request).chain(),
                 (broadcast_block_updates, broadcast_level_events, broadcast_level_sounds).chain(),
