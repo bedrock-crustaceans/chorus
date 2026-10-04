@@ -645,7 +645,9 @@ fn storage_round_trip() {
     let storage = std::sync::Arc::new(LevelStorage::open(&directory, &registry, 1).expect("storage opens"));
     let mut dimension = Dimension::new(DimensionType::Overworld, generator).with_storage(storage.clone());
     let positions = [(0, 0), (-1, 3), (5, -2)];
-    dimension.request_chunks(&positions);
+    for &(x, z) in &positions {
+        dimension.persist_chunk(x, z);
+    }
     let mut done = 0;
     while done < positions.len() {
         done += dimension.tick().len();
@@ -677,5 +679,47 @@ fn storage_round_trip() {
     }
     drop(dimension);
     drop(storage);
+    let _ = std::fs::remove_dir_all(directory);
+}
+
+#[test]
+fn chunk_saving_policy() {
+    use chorus_core::config::ChunkSaving;
+    use chorus_level::dimension_type::DimensionType;
+    use chorus_level::generator::dimension::Dimension;
+    use chorus_level::storage::LevelStorage;
+    bevy_tasks::AsyncComputeTaskPool::get_or_init(bevy_tasks::TaskPool::default);
+    let (generator, registry) = generator(0);
+    let directory = std::env::temp_dir().join(format!("chorus_chunk_saving_{}", std::process::id()));
+    let storage = std::sync::Arc::new(LevelStorage::open(&directory, &registry, 1).expect("storage opens"));
+    let mut dimension = Dimension::new(DimensionType::Overworld, generator).with_storage(storage);
+    let generate = |dimension: &mut Dimension, count: usize| {
+        let mut done = 0;
+        while done < count {
+            done += dimension.tick().len();
+            std::thread::yield_now();
+        }
+    };
+
+    dimension.request_chunks(&[(0, 0), (1, 0)]);
+    generate(&mut dimension, 2);
+    assert_eq!(dimension.unsaved_count(), 0, "untouched generated chunks are not saved by default");
+
+    let stone = registry.get_block_id("minecraft:stone").expect("stone");
+    assert!(dimension.set_block(0, 100, 0, 0, stone));
+    assert_eq!(dimension.unsaved_count(), 1, "a changed chunk is saved");
+
+    dimension.persist_chunk(1, 0);
+    assert_eq!(dimension.unsaved_count(), 2, "persisting a loaded chunk saves it");
+    dimension.persist_chunk(5, 5);
+    generate(&mut dimension, 1);
+    assert_eq!(dimension.unsaved_count(), 3, "a persisted chunk is saved once it generates");
+
+    dimension.set_chunk_saving(ChunkSaving::All);
+    dimension.request_chunks(&[(9, 9)]);
+    generate(&mut dimension, 1);
+    assert_eq!(dimension.unsaved_count(), 4, "every generated chunk is saved with chunk_saving = all");
+
+    drop(dimension);
     let _ = std::fs::remove_dir_all(directory);
 }

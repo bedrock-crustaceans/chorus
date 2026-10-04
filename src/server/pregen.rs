@@ -92,10 +92,11 @@ impl Pregen {
         while !writes_backed_up && pregen.in_flight.len() < MAX_IN_FLIGHT {
             let Some((x, z)) = pregen.queue.pop() else { break };
             if dimension.get_chunk(x, z).is_some() {
+                dimension.persist_chunk(x, z);
                 pregen.done += 1;
                 continue;
             }
-            dimension.request_chunk(x, z);
+            dimension.persist_chunk(x, z);
             pregen.in_flight.insert((x, z));
         }
 
@@ -104,7 +105,9 @@ impl Pregen {
             if pregen.stalled_ticks >= STALL_TICKS {
                 pregen.stalled_ticks = 0;
                 let positions: Vec<(i32, i32)> = pregen.in_flight.iter().copied().collect();
-                dimension.request_chunks(&positions);
+                for (x, z) in positions {
+                    dimension.persist_chunk(x, z);
+                }
             }
         } else {
             pregen.stalled_ticks = 0;

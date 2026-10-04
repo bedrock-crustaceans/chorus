@@ -7,6 +7,7 @@ pub struct Chunk {
     sub_chunks: Vec<SubChunk>,
     min_sub_chunk_y: i8,
     block_entities: Vec<BlockEntity>,
+    dirty: bool,
 }
 
 #[derive(Clone)]
@@ -23,6 +24,7 @@ impl Chunk {
             sub_chunks: (0..count).map(|_| SubChunk::new(air_id, biome)).collect(),
             min_sub_chunk_y,
             block_entities: Vec::new(),
+            dirty: false,
         }
     }
 
@@ -33,7 +35,20 @@ impl Chunk {
             sub_chunks,
             min_sub_chunk_y,
             block_entities,
+            dirty: false,
         }
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    pub fn mark_dirty(&mut self) {
+        self.dirty = true;
+    }
+
+    pub fn mark_saved(&mut self) {
+        self.dirty = false;
     }
 
     pub fn serialize_block_entities(&self, sub_y: Option<i8>) -> Vec<u8> {
@@ -64,7 +79,9 @@ impl Chunk {
 
     pub fn get_sub_chunk_mut(&mut self, sub_y: i8) -> Option<&mut SubChunk> {
         let offset = self.sub_chunk_offset(sub_y);
-        self.sub_chunks.get_mut(offset)
+        let sub_chunk = self.sub_chunks.get_mut(offset);
+        self.dirty |= sub_chunk.is_some();
+        sub_chunk
     }
 
     pub fn get_block(&self, x: u8, y: i32, z: u8, layer: usize) -> Option<i32> {
@@ -78,15 +95,10 @@ impl Chunk {
     }
 
     pub fn set_block(&mut self, x: u8, y: i32, z: u8, layer: usize, block_id: i32) -> bool {
-        let sub_y = (y >> 4) as i8;
-        let local_y = (y & 0xF) as u8;
-        match self.get_sub_chunk_mut(sub_y) {
-            Some(sc) => {
-                sc.set(x, local_y, z, layer, block_id);
-                true
-            }
-            None => false,
-        }
+        let offset = self.sub_chunk_offset((y >> 4) as i8);
+        let changed = self.sub_chunks.get_mut(offset).is_some_and(|sub_chunk| sub_chunk.set(x, (y & 0xF) as u8, z, layer, block_id));
+        self.dirty |= changed;
+        changed
     }
 
     pub fn highest_non_air_sub_chunk_y(&self) -> i8 {

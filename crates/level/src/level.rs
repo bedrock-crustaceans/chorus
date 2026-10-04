@@ -3,6 +3,7 @@ use crate::dimension_type::DimensionType;
 use crate::generator::dimension::{Dimension, Generator};
 use crate::storage::{LevelData, LevelStorage};
 use chorus_block::block_registry::BlockRegistry;
+use chorus_core::config::ChunkSaving;
 
 use bevy_ecs::message::MessageWriter;
 use bevy_ecs::prelude::Resource;
@@ -29,6 +30,7 @@ pub struct Level {
     pub spawn: IVec3,
     dimensions: HashMap<i32, Dimension>,
     storage: Option<Arc<LevelStorage>>,
+    chunk_saving: ChunkSaving,
     is_new: bool,
 }
 
@@ -70,12 +72,20 @@ impl Level {
             spawn: IVec3::ZERO,
             dimensions: HashMap::new(),
             storage: None,
+            chunk_saving: ChunkSaving::default(),
             is_new: true,
         }
     }
 
     pub fn is_new(&self) -> bool {
         self.is_new
+    }
+
+    pub fn set_chunk_saving(&mut self, chunk_saving: ChunkSaving) {
+        self.chunk_saving = chunk_saving;
+        for dimension in self.dimensions.values_mut() {
+            dimension.set_chunk_saving(chunk_saving);
+        }
     }
 
     pub fn storage(&self) -> Option<&Arc<LevelStorage>> {
@@ -87,6 +97,7 @@ impl Level {
         if let Some(storage) = &self.storage {
             dimension = dimension.with_storage(storage.clone());
         }
+        dimension.set_chunk_saving(self.chunk_saving);
         self.remove_dimension(dimension_type.id());
         self.dimensions.entry(dimension_type.id()).or_insert(dimension)
     }

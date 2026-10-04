@@ -54,13 +54,13 @@ impl SubChunk {
         self.blocks[layer].get(Self::index(x, y, z))
     }
 
-    pub fn set(&mut self, x: u8, y: u8, z: u8, layer: usize, block_id: i32) {
+    pub fn set(&mut self, x: u8, y: u8, z: u8, layer: usize, block_id: i32) -> bool {
         debug_assert!(x < 16 && y < 16 && z < 16 && layer < 2);
         let index = Self::index(x, y, z);
 
         let old = self.blocks[layer].get(index);
         if old == block_id {
-            return;
+            return false;
         }
 
         if old == self.air_id {
@@ -70,6 +70,7 @@ impl SubChunk {
         }
 
         self.blocks[layer].set(index, block_id);
+        true
     }
 
     pub(crate) fn layers(&self) -> &[Palette] {

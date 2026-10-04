@@ -85,7 +85,9 @@ fn autosave(level: Option<ResMut<Level>>, config: Res<Config>, mut last: Local<O
 
 pub fn open_level(mut commands: Commands, registry: Res<BlockRegistry>, config: Res<Config>) {
     let path = Path::new(WORLDS_DIRECTORY).join(&config.level.name);
-    commands.insert_resource(Level::open(path, &config.level.name, config.level.seed.value(), &registry, config.level.database.compression));
+    let mut level = Level::open(path, &config.level.name, config.level.seed.value(), &registry, config.level.database.compression);
+    level.set_chunk_saving(config.level.chunk_saving);
+    commands.insert_resource(level);
 }
 
 pub fn add_default_dimensions(mut level: ResMut<Level>, registry: Res<BlockRegistry>) {
