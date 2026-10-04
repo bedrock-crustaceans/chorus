@@ -9,6 +9,7 @@ use crate::generator::error::PhaseFailure;
 use crate::generator::phase::Phase;
 use crate::generator::phase_graph::PhaseGraph;
 use crate::storage::{LevelStorage, StorageResult, spawn_io};
+use chorus_core::config::ChunkSaving;
 use crossbeam_channel::{Receiver, Sender};
 
 pub trait Generator: Send + Sync + Sized + 'static {
@@ -27,9 +28,9 @@ pub struct Dimension {
     pub dimension_type: DimensionType,
     generator: Box<dyn WorldGenerator>,
     chunks: HashMap<(i32, i32), Chunk>,
-    modified: HashSet<(i32, i32)>,
     storage: Option<Arc<LevelStorage>>,
-    unsaved: HashSet<(i32, i32)>,
+    chunk_saving: ChunkSaving,
+    persist: HashSet<(i32, i32)>,
     loading: HashSet<(i32, i32)>,
     cancelled: HashSet<(i32, i32)>,
     loads: (Sender<LoadResult>, Receiver<LoadResult>),
@@ -43,9 +44,9 @@ impl Dimension {
             dimension_type,
             generator: Box::new(PhaseGraph::new(generator)),
             chunks: HashMap::new(),
-            modified: HashSet::new(),
             storage: None,
-            unsaved: HashSet::new(),
+            chunk_saving: ChunkSaving::default(),
+            persist: HashSet::new(),
             loading: HashSet::new(),
             cancelled: HashSet::new(),
             loads: crossbeam_channel::unbounded(),
@@ -57,17 +58,35 @@ impl Dimension {
         self
     }
 
+    pub fn set_chunk_saving(&mut self, chunk_saving: ChunkSaving) {
+        self.chunk_saving = chunk_saving;
+    }
+
+    pub fn persist_chunk(&mut self, x: i32, z: i32) {
+        if self.storage.is_some() {
+            if let Some(chunk) = self.chunks.get_mut(&(x, z)) {
+                chunk.mark_dirty();
+            } else {
+                self.persist.insert((x, z));
+            }
+        }
+        self.request_chunk(x, z);
+    }
+
     pub fn is_persistent(&self) -> bool {
         self.storage.is_some()
     }
 
     pub fn unsaved_count(&self) -> usize {
-        self.unsaved.len()
+        if self.storage.is_none() {
+            return 0;
+        }
+        self.chunks.values().filter(|chunk| chunk.is_dirty()).count()
     }
 
     pub fn save(&mut self) -> usize {
-        let unsaved: Vec<(i32, i32)> = self.unsaved.iter().copied().collect();
-        let saved = unsaved.into_iter().filter(|&position| self.save_chunk(position)).count();
+        let dirty: Vec<(i32, i32)> = self.chunks.iter().filter(|(_, chunk)| chunk.is_dirty()).map(|(&position, _)| position).collect();
+        let saved = dirty.into_iter().filter(|&position| self.save_chunk(position)).count();
         if let Some(storage) = &self.storage {
             storage.schedule_flush();
         }
@@ -75,13 +94,12 @@ impl Dimension {
     }
 
     fn save_chunk(&mut self, position: (i32, i32)) -> bool {
-        let (Some(storage), Some(chunk)) = (&self.storage, self.chunks.get(&position)) else {
-            self.unsaved.remove(&position);
+        let (Some(storage), Some(chunk)) = (&self.storage, self.chunks.get_mut(&position)) else {
             return false;
         };
         match storage.save_chunk(self.dimension_type, chunk) {
             Ok(()) => {
-                self.unsaved.remove(&position);
+                chunk.mark_saved();
                 true
             }
             Err(err) => {
@@ -149,6 +167,7 @@ impl Dimension {
             match result {
                 Ok(Some(chunk)) => {
                     self.chunks.entry((x, z)).or_insert(chunk);
+                    self.persist.remove(&(x, z));
                     generated.push((x, z));
                 }
                 Ok(None) if !cancelled => self.generator.request_chunk(x, z),
@@ -163,11 +182,12 @@ impl Dimension {
         }
         for (x, z, result) in self.generator.tick() {
             match result {
-                Ok(chunk) => {
-                    self.chunks.insert((x, z), chunk);
-                    if self.storage.is_some() {
-                        self.unsaved.insert((x, z));
+                Ok(mut chunk) => {
+                    chunk.mark_saved();
+                    if self.persist.remove(&(x, z)) || self.chunk_saving == ChunkSaving::All {
+                        chunk.mark_dirty();
                     }
+                    self.chunks.insert((x, z), chunk);
                     generated.push((x, z));
                 }
                 Err(failure) => error!("failed to generate chunk ({x}, {z}) in {}: {failure}", self.name()),
@@ -178,15 +198,22 @@ impl Dimension {
 
     pub fn unload_chunks(&mut self, keep: impl Fn(i32, i32) -> bool) -> usize {
         let persistent = self.storage.is_some();
-        let unloading: Vec<(i32, i32)> = self.chunks.keys().copied().filter(|&(x, z)| !keep(x, z) && (persistent || !self.modified.contains(&(x, z)))).collect();
+        let unloading: Vec<(i32, i32)> = self
+            .chunks
+            .iter()
+            .filter(|&(&(x, z), chunk)| !keep(x, z) && (persistent || !chunk.is_dirty()))
+            .map(|(&position, _)| position)
+            .collect();
         let mut unloaded = 0;
-        let staged = unloading.iter().any(|position| self.unsaved.contains(position));
+        let mut staged = false;
         for position in unloading {
-            if self.unsaved.contains(&position) && !self.save_chunk(position) {
-                continue;
+            if self.chunks[&position].is_dirty() {
+                if !self.save_chunk(position) {
+                    continue;
+                }
+                staged = true;
             }
             self.chunks.remove(&position);
-            self.modified.remove(&position);
             unloaded += 1;
         }
         if staged && let Some(storage) = &self.storage {
@@ -210,13 +237,6 @@ impl Dimension {
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, layer: usize, block_id: i32) -> bool {
         let position = (x >> 4, z >> 4);
         let Some(chunk) = self.chunks.get_mut(&position) else { return false };
-        let changed = chunk.set_block((x & 0xF) as u8, y, (z & 0xF) as u8, layer, block_id);
-        if changed {
-            self.modified.insert(position);
-            if self.storage.is_some() {
-                self.unsaved.insert(position);
-            }
-        }
-        changed
+        chunk.set_block((x & 0xF) as u8, y, (z & 0xF) as u8, layer, block_id)
     }
 }

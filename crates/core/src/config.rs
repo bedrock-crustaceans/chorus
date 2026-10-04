@@ -234,11 +234,20 @@ impl<'de> Deserialize<'de> for Interval {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ChunkSaving {
+    #[default]
+    Modified,
+    All,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct LevelConfig {
     pub name: String,
     pub seed: LevelSeed,
+    pub chunk_saving: ChunkSaving,
     pub max_view_distance: i32,
     /// How often unsaved chunks are written to disk.
     pub autosave: Interval,
@@ -250,6 +259,7 @@ impl Default for LevelConfig {
         Self {
             name: String::from("world"),
             seed: LevelSeed::default(),
+            chunk_saving: ChunkSaving::default(),
             max_view_distance: 32,
             autosave: Interval::every(Duration::from_secs(60)),
             database: DatabaseConfig::default(),
