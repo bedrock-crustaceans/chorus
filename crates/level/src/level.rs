@@ -60,6 +60,16 @@ impl Level {
         saved
     }
 
+    pub fn save_blocking(&mut self) -> usize {
+        let saved = self.save();
+        if let Some(storage) = &self.storage
+            && let Err(err) = storage.flush_blocking()
+        {
+            error!("failed to write level to disk: {err}");
+        }
+        saved
+    }
+
     pub fn unsaved_count(&self) -> usize {
         self.dimensions.values().map(Dimension::unsaved_count).sum()
     }
