@@ -49,6 +49,9 @@ const AUTOSAVE_INTERVAL_TICKS: u32 = 1200;
 const COMPACTION_INTERVAL_TICKS: u32 = 6000;
 
 fn compact_level(level: Option<Res<Level>>, mut ticks: Local<u32>) {
+    if let Some(storage) = level.as_ref().and_then(|level| level.storage.as_ref()) {
+        storage.step_compaction();
+    }
     *ticks += 1;
     if *ticks < COMPACTION_INTERVAL_TICKS {
         return;
