@@ -1,7 +1,7 @@
 use crate::chunk::{BlockEntity, Chunk};
 use crate::dimension_type::DimensionType;
 use crate::sub_chunk::SubChunk;
-use bedrock::level::db::Database;
+use bedrock::level::db::{CompactionMode, Database, WriteBatch};
 use chorus_block::block_registry::BlockRegistry;
 use chorus_block::hash_utils::HashUtils;
 use glam::IVec3;
@@ -91,6 +91,7 @@ pub struct LevelStorage {
     db: Mutex<Database>,
     pending: Mutex<PendingWrites>,
     flushing: AtomicBool,
+    compacting: AtomicBool,
     air_id: i32,
     block_nbt: HashMap<i32, Vec<u8>>,
     block_ids: Mutex<HashMap<Vec<u8>, i32>>,
@@ -101,7 +102,7 @@ impl LevelStorage {
         let path = path.as_ref().to_path_buf();
         let db_path = path.join("db");
         std::fs::create_dir_all(&db_path)?;
-        let db = Database::open(db_path.to_string_lossy()).map_err(database_error)?;
+        let db = Database::open_with(db_path.to_string_lossy(), CompactionMode::Manual).map_err(database_error)?;
 
         let block_nbt = registry
             .permutations()
@@ -113,6 +114,7 @@ impl LevelStorage {
             db: Mutex::new(db),
             pending: Mutex::new(HashMap::new()),
             flushing: AtomicBool::new(false),
+            compacting: AtomicBool::new(false),
             air_id: registry.get_block_id("minecraft:air").expect("air is registered"),
             block_nbt,
             block_ids: Mutex::new(HashMap::new()),
@@ -152,16 +154,14 @@ impl LevelStorage {
         if batch.is_empty() {
             return Ok(());
         }
-        {
-            let db = self.db.lock().expect("level database lock poisoned");
-            for (key, value) in &batch {
-                match value {
-                    Some(value) => db.insert(key, value),
-                    None => db.remove(key),
-                }
-                .map_err(database_error)?;
+        let mut write = WriteBatch::new();
+        for (key, value) in &batch {
+            match value {
+                Some(value) => write.insert(key, value),
+                None => write.remove(key),
             }
         }
+        self.db.lock().expect("level database lock poisoned").write(write).map_err(database_error)?;
         let mut pending = self.pending();
         for (key, written) in batch {
             let unchanged = match (pending.get(&key), &written) {
@@ -193,6 +193,19 @@ impl LevelStorage {
                     return;
                 }
             }
+        });
+    }
+
+    pub fn schedule_compaction(self: &Arc<Self>) {
+        if self.compacting.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let storage = self.clone();
+        spawn_io(move || {
+            if let Err(err) = storage.db.lock().expect("level database lock poisoned").compact() {
+                error!("failed to compact the level database: {err}");
+            }
+            storage.compacting.store(false, Ordering::Release);
         });
     }
 
