@@ -1,6 +1,8 @@
 use crate::BlockUpdatedMessage;
-use crate::generator::dimension::Dimension;
+use crate::dimension_type::DimensionType;
+use crate::generator::dimension::{Dimension, Generator};
 use crate::storage::{LevelData, LevelStorage};
+use chorus_block::block_registry::BlockRegistry;
 
 use bevy_ecs::message::MessageWriter;
 use bevy_ecs::prelude::Resource;
@@ -9,8 +11,9 @@ use bevy_ecs::system::{Res, ResMut, SystemId};
 use chorus_core::schedule::JobQueue;
 use glam::IVec3;
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
-use tracing::error;
+use tracing::{error, info, warn};
 
 #[derive(Resource)]
 pub struct PollGenerationJob(pub SystemId);
@@ -19,12 +22,101 @@ pub struct PollGenerationJob(pub SystemId);
 pub struct Level {
     pub name: String,
     pub seed: i64,
-    pub dimensions: HashMap<i32, Dimension>,
     pub spawn: IVec3,
-    pub storage: Option<Arc<LevelStorage>>,
+    dimensions: HashMap<i32, Dimension>,
+    storage: Option<Arc<LevelStorage>>,
+    is_new: bool,
 }
 
 impl Level {
+    pub fn open(path: impl AsRef<Path>, name: impl Into<String>, seed: i64, registry: &BlockRegistry, compression_level: u8) -> Self {
+        let (path, name) = (path.as_ref(), name.into());
+        let storage = match LevelStorage::open(path, registry, compression_level) {
+            Ok(storage) => Arc::new(storage),
+            Err(err) => {
+                error!("failed to open level \"{name}\" at {}, it will not be saved: {err}", path.display());
+                return Self::in_memory(name, seed);
+            }
+        };
+        let stored = storage.read_level_data().unwrap_or_else(|err| {
+            warn!("failed to read the level data of \"{name}\", starting it over: {err}");
+            None
+        });
+
+        let mut level = Self::in_memory(name, seed);
+        if let Some(data) = stored {
+            if data.seed != seed {
+                warn!("level \"{}\" was created with seed {}, ignoring seed {seed}", level.name, data.seed);
+            }
+            info!("loaded level \"{}\" from {}", level.name, path.display());
+            level.seed = data.seed;
+            level.spawn = data.spawn;
+            level.is_new = false;
+        } else {
+            info!("created level \"{}\" at {} with seed {seed}", level.name, path.display());
+        }
+        level.storage = Some(storage);
+        level
+    }
+
+    pub fn in_memory(name: impl Into<String>, seed: i64) -> Self {
+        Self {
+            name: name.into(),
+            seed,
+            spawn: IVec3::ZERO,
+            dimensions: HashMap::new(),
+            storage: None,
+            is_new: true,
+        }
+    }
+
+    pub fn is_new(&self) -> bool {
+        self.is_new
+    }
+
+    pub fn storage(&self) -> Option<&Arc<LevelStorage>> {
+        self.storage.as_ref()
+    }
+
+    pub fn insert_dimension<G: Generator>(&mut self, dimension_type: DimensionType, generator: G) -> &mut Dimension {
+        let mut dimension = Dimension::new(dimension_type, generator);
+        if let Some(storage) = &self.storage {
+            dimension = dimension.with_storage(storage.clone());
+        }
+        self.remove_dimension(dimension_type.id());
+        self.dimensions.entry(dimension_type.id()).or_insert(dimension)
+    }
+
+    pub fn remove_dimension(&mut self, id: i32) -> Option<Dimension> {
+        let mut dimension = self.dimensions.remove(&id)?;
+        dimension.save();
+        Some(dimension)
+    }
+
+    pub fn has_dimension(&self, id: i32) -> bool {
+        self.dimensions.contains_key(&id)
+    }
+
+    pub fn dimensions(&self) -> impl Iterator<Item = &Dimension> {
+        self.dimensions.values()
+    }
+
+    pub fn dimensions_mut(&mut self) -> impl Iterator<Item = &mut Dimension> {
+        self.dimensions.values_mut()
+    }
+
+    pub fn save_level_data(&self) {
+        let Some(storage) = &self.storage else { return };
+        let data = LevelData {
+            name: self.name.clone(),
+            seed: self.seed,
+            spawn: self.spawn,
+        };
+        if let Err(err) = storage.write_level_data(&data) {
+            error!("failed to write level data: {err}");
+        }
+    }
+
     pub fn queue_poll_generation(job: Res<PollGenerationJob>, mut jobs: ResMut<JobQueue>) {
         jobs.push(job.0);
     }
@@ -47,16 +139,7 @@ impl Level {
 
     pub fn save(&mut self) -> usize {
         let saved = self.dimensions.values_mut().map(Dimension::save).sum();
-        if let Some(storage) = &self.storage {
-            let data = LevelData {
-                name: self.name.clone(),
-                seed: self.seed,
-                spawn: self.spawn,
-            };
-            if let Err(err) = storage.write_level_data(&data) {
-                error!("failed to write level data: {err}");
-            }
-        }
+        self.save_level_data();
         saved
     }
 

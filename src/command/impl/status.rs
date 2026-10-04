@@ -55,7 +55,7 @@ fn report_worlds(context: &CommandContext) -> Vec<String> {
     let level = context.resource::<Level>();
     let mut lines = Vec::new();
 
-    let mut dimensions: Vec<&Dimension> = level.dimensions.values().collect();
+    let mut dimensions: Vec<&Dimension> = level.dimensions().collect();
     dimensions.sort_by_key(|dimension| dimension.id());
 
     for dimension in dimensions {

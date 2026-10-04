@@ -1,21 +1,17 @@
 use crate::config::Config;
 use crate::level::Level;
 use crate::level::dimension_type::DimensionType;
-use crate::level::generator::dimension::Dimension;
 use crate::level::generator::r#impl::overworld::{Java, OverworldGenerator};
 use crate::level::level::PollGenerationJob;
-use crate::level::storage::{LevelData, LevelStorage};
 use crate::registry::block_registry::BlockRegistry;
 use crate::resource::ResourcePacks;
 use bevy_app::{App, Plugin, Startup, Update};
-use bevy_ecs::prelude::{Commands, IntoScheduleConfigs, Local, Res, ResMut};
+use bevy_ecs::prelude::{Commands, IntoScheduleConfigs, Local, Res, ResMut, SystemSet};
 use chorus_core::schedule::{Tick, TickSet};
 use command_registry::CommandRegistry;
 use item_registry::ItemRegistry;
-use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::info;
 
 pub mod command_registry;
 
@@ -23,6 +19,13 @@ pub use chorus_block::block_registry;
 pub use chorus_item::item_registry;
 
 pub struct Registry;
+
+#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LevelStartup {
+    Open,
+    Dimensions,
+    Defaults,
+}
 
 impl Plugin for Registry {
     fn build(&self, app: &mut App) {
@@ -36,9 +39,11 @@ impl Plugin for Registry {
                 CommandRegistry::init,
                 ResourcePacks::load,
                 ItemRegistry::init,
-                init_level.after(BlockRegistry::init),
+                open_level.in_set(LevelStartup::Open),
+                add_default_dimensions.in_set(LevelStartup::Defaults),
             ),
         )
+        .configure_sets(Startup, (LevelStartup::Open, LevelStartup::Dimensions, LevelStartup::Defaults).chain().after(BlockRegistry::init))
         .add_systems(Update, Level::queue_poll_generation)
         .add_systems(Tick, (autosave, compact_level).in_set(TickSet::Last));
     }
@@ -49,7 +54,7 @@ const AUTOSAVE_INTERVAL_TICKS: u32 = 1200;
 const COMPACTION_INTERVAL_TICKS: u32 = 6000;
 
 fn compact_level(level: Option<Res<Level>>, mut ticks: Local<u32>) {
-    if let Some(storage) = level.as_ref().and_then(|level| level.storage.as_ref()) {
+    if let Some(storage) = level.as_ref().and_then(|level| level.storage()) {
         storage.step_compaction();
     }
     *ticks += 1;
@@ -57,7 +62,7 @@ fn compact_level(level: Option<Res<Level>>, mut ticks: Local<u32>) {
         return;
     }
     *ticks = 0;
-    if let Some(storage) = level.as_ref().and_then(|level| level.storage.as_ref()) {
+    if let Some(storage) = level.as_ref().and_then(|level| level.storage()) {
         storage.schedule_compaction();
     }
 }
@@ -76,55 +81,19 @@ fn autosave(level: Option<ResMut<Level>>, mut ticks: Local<u32>) {
     }
 }
 
-pub fn init_level(mut commands: Commands, registry: Res<BlockRegistry>, config: Res<Config>) {
-    let storage = match LevelStorage::open(Path::new(WORLDS_DIRECTORY).join(&config.level_name), &registry, config.level_compression_level) {
-        Ok(storage) => Some(Arc::new(storage)),
-        Err(err) => {
-            error!("failed to open level \"{}\", it will not be saved: {err}", config.level_name);
-            None
+pub fn open_level(mut commands: Commands, registry: Res<BlockRegistry>, config: Res<Config>) {
+    let path = Path::new(WORLDS_DIRECTORY).join(&config.level_name);
+    commands.insert_resource(Level::open(path, &config.level_name, config.level_seed.value(), &registry, config.level_compression_level));
+}
+
+pub fn add_default_dimensions(mut level: ResMut<Level>, registry: Res<BlockRegistry>) {
+    if !level.has_dimension(DimensionType::Overworld.id()) {
+        let generator = OverworldGenerator::<Java>::new(level.seed, &registry);
+        if level.is_new() {
+            level.spawn = generator.find_spawn();
         }
-    };
-    let stored = storage.as_ref().and_then(|storage| match storage.read_level_data() {
-        Ok(data) => data,
-        Err(err) => {
-            warn!("failed to read level data, starting from config: {err}");
-            None
-        }
-    });
-
-    let seed = stored.as_ref().map_or(config.level_seed as i64, |data| data.seed);
-    if stored.is_some() && seed != config.level_seed as i64 {
-        warn!(
-            "level \"{}\" was created with seed {seed}, ignoring level_seed {} from the config",
-            config.level_name, config.level_seed
-        );
+        level.insert_dimension(DimensionType::Overworld, generator);
     }
-    let generator = OverworldGenerator::<Java>::new(seed, &registry);
-    let spawn = stored.as_ref().map_or_else(|| generator.find_spawn(), |data| data.spawn);
-
-    match &storage {
-        Some(storage) if stored.is_some() => info!("loaded level \"{}\" from {}, spawn at {spawn}", config.level_name, storage.path().display()),
-        _ => info!("created level \"{}\" with seed {seed}, spawn at {spawn}", config.level_name),
-    }
-
-    let mut overworld = Dimension::new(DimensionType::Overworld, generator);
-    if let Some(storage) = &storage {
-        overworld = overworld.with_storage(storage.clone());
-        let data = LevelData {
-            name: config.level_name.clone(),
-            seed,
-            spawn,
-        };
-        if let Err(err) = storage.write_level_data(&data) {
-            error!("failed to write level data: {err}");
-        }
-    }
-
-    commands.insert_resource(Level {
-        name: config.level_name.clone(),
-        seed,
-        dimensions: HashMap::from_iter([(0, overworld)]),
-        spawn,
-        storage,
-    });
+    info!("level \"{}\" spawn at {}", level.name, level.spawn);
+    level.save_level_data();
 }

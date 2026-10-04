@@ -13,7 +13,7 @@ pub const SAVE_COMMAND: CommandDefinition = const_command! {
         let Some(mut level) = context.world_mut().get_resource_mut::<Level>() else {
             return Err("the level is not loaded yet".to_owned());
         };
-        if level.storage.is_none() {
+        if level.storage().is_none() {
             return Err("this level is not saved to disk".to_owned());
         }
         let saved = level.save();

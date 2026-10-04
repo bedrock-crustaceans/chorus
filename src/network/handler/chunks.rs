@@ -134,7 +134,8 @@ pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>,
     }
     *ticks = 0;
 
-    for (&id, dimension) in &mut level.dimensions {
+    for dimension in level.dimensions_mut() {
+        let id = dimension.id();
         let nearby: Vec<((i32, i32), i32)> = views
             .iter()
             .filter(|view| view.dimension == id)

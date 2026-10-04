@@ -14,6 +14,41 @@ pub enum NetworkTransport {
     NetherNet,
 }
 
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+#[serde(untagged)]
+pub enum LevelSeed {
+    Number(i64),
+    Text(String),
+}
+
+impl Default for LevelSeed {
+    fn default() -> Self {
+        Self::Number(0)
+    }
+}
+
+impl LevelSeed {
+    pub fn value(&self) -> i64 {
+        self.parse_with(Self::parse_text)
+    }
+
+    pub fn parse_with(&self, parse: impl FnOnce(&str) -> i64) -> i64 {
+        match self {
+            Self::Number(seed) => *seed,
+            Self::Text(text) => parse(text),
+        }
+    }
+
+    fn parse_text(text: &str) -> i64 {
+        let text = text.trim();
+        if text.is_empty() {
+            return rand::random();
+        }
+        text.parse()
+            .unwrap_or_else(|_| text.encode_utf16().fold(0i32, |hash, unit| hash.wrapping_mul(31).wrapping_add(unit as i32)) as i64)
+    }
+}
+
 #[derive(Resource, Serialize, Deserialize, Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
@@ -31,7 +66,7 @@ pub struct Config {
     pub resource_packs_directory: PathBuf,
     pub behavior_packs_directory: PathBuf,
     pub level_name: String,
-    pub level_seed: u64,
+    pub level_seed: LevelSeed,
     pub online_mode: bool,
     pub encryption: bool,
     pub log_level: String,
@@ -58,7 +93,7 @@ impl Default for Config {
             resource_packs_directory: PathBuf::from("resource_packs"),
             behavior_packs_directory: PathBuf::from("behavior_packs"),
             level_name: String::from("world"),
-            level_seed: 0,
+            level_seed: LevelSeed::default(),
             online_mode: true,
             encryption: false,
             log_level: String::from("info"),
