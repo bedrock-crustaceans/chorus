@@ -1,4 +1,4 @@
-use crate::console::{Console, strip_formatting};
+use crate::console::{self, Console};
 use crate::network::BedrockProtocol;
 use crate::network::session::Session;
 use crate::player::identity::PlayerIdentity;
@@ -67,7 +67,7 @@ impl<'w> CommandContext<'w> {
     pub fn reply(&mut self, message: impl Into<String>) {
         let Some(mut session) = self.get_mut::<Session>() else {
             if self.is_console() {
-                tracing::info!("{}", strip_formatting(&message.into()));
+                console::reply(&message.into());
             }
             return;
         };
