@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tracing::error;
+use tracing::{debug, error, info};
 
 const CHUNK_VERSION: u8 = 40;
 const SUB_CHUNK_VERSION: u8 = 9;
@@ -91,12 +91,19 @@ pub fn spawn_io(work: impl FnOnce() + Send + 'static) {
     }
 }
 
+#[derive(Default)]
+struct CompactionProgress {
+    started: Option<std::time::Instant>,
+    slices: u32,
+}
+
 pub struct LevelStorage {
     path: PathBuf,
     db: Mutex<Database>,
     pending: Mutex<PendingWrites>,
     flushing: AtomicBool,
     compacting: AtomicBool,
+    compaction: Mutex<CompactionProgress>,
     air_id: i32,
     block_nbt: HashMap<i32, Vec<u8>>,
     block_ids: Mutex<HashMap<Vec<u8>, i32>>,
@@ -124,6 +131,7 @@ impl LevelStorage {
             pending: Mutex::new(HashMap::new()),
             flushing: AtomicBool::new(false),
             compacting: AtomicBool::new(false),
+            compaction: Mutex::new(CompactionProgress::default()),
             air_id: registry.get_block_id("minecraft:air").expect("air is registered"),
             block_nbt,
             block_ids: Mutex::new(HashMap::new()),
@@ -210,7 +218,26 @@ impl LevelStorage {
             return;
         }
         let storage = self.clone();
-        spawn_io(move || while storage.compact_step(POOL_COMPACTION_SLICE) {});
+        spawn_io(move || {
+            loop {
+                storage.flush_if_idle();
+                if !storage.compact_step(POOL_COMPACTION_SLICE) {
+                    break;
+                }
+            }
+        });
+    }
+
+    /// Writes pending chunks between compaction slices, so a long compaction holding a pool
+    /// thread never leaves writes queued behind it.
+    fn flush_if_idle(&self) {
+        if self.pending().is_empty() || self.flushing.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        if let Err(err) = self.flush() {
+            error!("failed to write level data to disk: {err}");
+        }
+        self.flushing.store(false, Ordering::Release);
     }
 
     /// Runs one compaction round on this thread when a compaction was scheduled without any pool
@@ -222,6 +249,7 @@ impl LevelStorage {
     }
 
     fn compact_step(&self, budget: Duration) -> bool {
+        let started = std::time::Instant::now();
         let more = match self.db.lock().expect("level database lock poisoned").compact_step(budget) {
             Ok(more) => more,
             Err(err) => {
@@ -229,7 +257,22 @@ impl LevelStorage {
                 false
             }
         };
+
+        let mut progress = self.compaction.lock().expect("compaction progress lock poisoned");
+        progress.slices += 1;
+        let first = progress.started.is_none();
+        let since = *progress.started.get_or_insert(started);
+        if more && first {
+            info!("compacting the level database");
+        }
         if !more {
+            let elapsed = since.elapsed();
+            if first {
+                debug!("compacted the level database in {elapsed:.2?}");
+            } else {
+                info!("compacted the level database in {:.1}s over {} slices", elapsed.as_secs_f64(), progress.slices);
+            }
+            *progress = CompactionProgress::default();
             self.compacting.store(false, Ordering::Release);
         }
         more

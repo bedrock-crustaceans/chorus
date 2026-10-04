@@ -13,7 +13,11 @@ use glam::IVec3;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::{error, info, warn};
+
+/// How long the generation poll waits when nothing finished, instead of spinning on the job queue.
+const IDLE_POLL_WAIT: Duration = Duration::from_micros(500);
 
 #[derive(Resource)]
 pub struct PollGenerationJob(pub SystemId);
@@ -122,17 +126,17 @@ impl Level {
     }
 
     pub fn poll_generation(mut level: ResMut<Level>, job: Res<PollGenerationJob>, mut jobs: ResMut<JobQueue>) {
-        let mut keep_going = false;
+        let mut progressed = false;
+        let mut pending = false;
         for dimension in level.dimensions.values_mut() {
-            if !dimension.tick().is_empty() {
-                keep_going = true;
-            }
-            if dimension.has_pending_generation() {
-                keep_going = true;
-            }
+            progressed |= !dimension.tick().is_empty();
+            pending |= dimension.has_pending_generation();
         }
 
-        if keep_going {
+        if !progressed && pending {
+            std::thread::sleep(IDLE_POLL_WAIT);
+        }
+        if progressed || pending {
             jobs.push(job.0);
         }
     }
