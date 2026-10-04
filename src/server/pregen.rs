@@ -19,6 +19,9 @@ pub struct Pregen {
     done: usize,
     started: Instant,
     last_report: Instant,
+    reported_done: usize,
+    /// Chunks per second over the last report window, until the first report the whole run so far.
+    recent_rate: Option<f64>,
     stalled_ticks: u32,
 }
 
@@ -37,6 +40,8 @@ impl Pregen {
             done: 0,
             started: now,
             last_report: now,
+            reported_done: 0,
+            recent_rate: None,
             stalled_ticks: 0,
         }
     }
@@ -46,8 +51,10 @@ impl Pregen {
     }
 
     pub fn progress(&self) -> String {
-        let elapsed = self.started.elapsed().as_secs_f64();
-        let rate = if elapsed > 0.0 { self.done as f64 / elapsed } else { 0.0 };
+        let rate = self.recent_rate.unwrap_or_else(|| {
+            let elapsed = self.started.elapsed().as_secs_f64();
+            if elapsed > 0.0 { self.done as f64 / elapsed } else { 0.0 }
+        });
         let remaining = self.total - self.done;
         let eta = if rate > 0.0 {
             format!(", about {} left", format_duration(remaining as f64 / rate))
@@ -104,17 +111,16 @@ impl Pregen {
         }
 
         if pregen.done >= pregen.total {
-            let saved = level.save();
-            info!(
-                "pregeneration finished: {} chunks in {}, saved {saved}",
-                pregen.total,
-                format_duration(pregen.started.elapsed().as_secs_f64())
-            );
+            level.save();
+            info!("pregeneration finished: {} chunks in {}", pregen.total, format_duration(pregen.started.elapsed().as_secs_f64()));
             commands.remove_resource::<Pregen>();
             return;
         }
 
-        if pregen.last_report.elapsed() >= REPORT_INTERVAL {
+        let window = pregen.last_report.elapsed();
+        if window >= REPORT_INTERVAL {
+            pregen.recent_rate = Some((pregen.done - pregen.reported_done) as f64 / window.as_secs_f64());
+            pregen.reported_done = pregen.done;
             pregen.last_report = Instant::now();
             info!("pregenerating: {}", pregen.progress());
         }
