@@ -642,7 +642,7 @@ fn storage_round_trip() {
     bevy_tasks::AsyncComputeTaskPool::get_or_init(bevy_tasks::TaskPool::default);
     let (generator, registry) = generator(0);
     let directory = std::env::temp_dir().join(format!("chorus_storage_round_trip_{}", std::process::id()));
-    let storage = std::sync::Arc::new(LevelStorage::open(&directory, &registry).expect("storage opens"));
+    let storage = std::sync::Arc::new(LevelStorage::open(&directory, &registry, 1).expect("storage opens"));
     let mut dimension = Dimension::new(DimensionType::Overworld, generator).with_storage(storage.clone());
     let positions = [(0, 0), (-1, 3), (5, -2)];
     dimension.request_chunks(&positions);

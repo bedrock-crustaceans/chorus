@@ -1,7 +1,7 @@
 use crate::chunk::{BlockEntity, Chunk};
 use crate::dimension_type::DimensionType;
 use crate::sub_chunk::SubChunk;
-use bedrock::level::db::{CompactionMode, Database, WriteBatch};
+use bedrock::level::db::{CompactionMode, Database, OpenOptions, WriteBatch};
 use chorus_block::block_registry::BlockRegistry;
 use chorus_block::hash_utils::HashUtils;
 use glam::IVec3;
@@ -98,11 +98,15 @@ pub struct LevelStorage {
 }
 
 impl LevelStorage {
-    pub fn open(path: impl AsRef<Path>, registry: &BlockRegistry) -> StorageResult<Self> {
+    pub fn open(path: impl AsRef<Path>, registry: &BlockRegistry, compression_level: u8) -> StorageResult<Self> {
         let path = path.as_ref().to_path_buf();
         let db_path = path.join("db");
         std::fs::create_dir_all(&db_path)?;
-        let db = Database::open_with(db_path.to_string_lossy(), CompactionMode::Manual).map_err(database_error)?;
+        let options = OpenOptions {
+            compaction_mode: CompactionMode::Manual,
+            compression_level,
+        };
+        let db = Database::open_with(db_path.to_string_lossy(), options).map_err(database_error)?;
 
         let block_nbt = registry
             .permutations()

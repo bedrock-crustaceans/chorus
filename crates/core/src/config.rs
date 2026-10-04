@@ -39,6 +39,7 @@ pub struct Config {
     pub force_disable_vibrant_visuals: bool,
     pub max_view_distance: i32,
     pub max_generation_distance: i32,
+    pub level_compression_level: u8,
 }
 
 impl Default for Config {
@@ -65,6 +66,7 @@ impl Default for Config {
             force_disable_vibrant_visuals: false,
             max_view_distance: 8,
             max_generation_distance: 8,
+            level_compression_level: 1,
         }
     }
 }

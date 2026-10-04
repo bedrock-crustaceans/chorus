@@ -74,7 +74,7 @@ fn autosave(level: Option<ResMut<Level>>, mut ticks: Local<u32>) {
 }
 
 pub fn init_level(mut commands: Commands, registry: Res<BlockRegistry>, config: Res<Config>) {
-    let storage = match LevelStorage::open(Path::new(WORLDS_DIRECTORY).join(&config.level_name), &registry) {
+    let storage = match LevelStorage::open(Path::new(WORLDS_DIRECTORY).join(&config.level_name), &registry, config.level_compression_level) {
         Ok(storage) => Some(Arc::new(storage)),
         Err(err) => {
             error!("failed to open level \"{}\", it will not be saved: {err}", config.level_name);
