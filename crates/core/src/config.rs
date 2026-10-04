@@ -1,3 +1,4 @@
+use crate::permission::PermissionLevel;
 use bevy_ecs::prelude::Resource;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -58,6 +59,34 @@ pub struct Config {
     pub level: LevelConfig,
     pub packs: PackConfig,
     pub log: LogConfig,
+    pub permissions: PermissionConfig,
+}
+
+/// Command permission levels: `default` for everyone, and `players` for specific players by name
+/// or XUID, for example `players = { Steve = "admin" }`. The console is always `owner`.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct PermissionConfig {
+    pub default: PermissionLevel,
+    pub players: std::collections::BTreeMap<String, PermissionLevel>,
+}
+
+impl Default for PermissionConfig {
+    fn default() -> Self {
+        Self {
+            default: PermissionLevel::Operator,
+            players: Default::default(),
+        }
+    }
+}
+
+impl PermissionConfig {
+    pub fn level_of(&self, name: &str, xuid: &str) -> PermissionLevel {
+        self.players
+            .iter()
+            .find(|(player, _)| player.eq_ignore_ascii_case(name) || (!xuid.is_empty() && *player == xuid))
+            .map_or(self.default, |(_, level)| *level)
+    }
 }
 
 /// How many worker threads the task pools get: a number, or `"auto"` for one per CPU core.

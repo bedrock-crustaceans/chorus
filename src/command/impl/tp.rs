@@ -1,60 +1,51 @@
+use crate::command::args::Coordinate;
 use crate::command::command_definition::CommandDefinition;
-use crate::command::parameter::{CommandOverload, CommandParameter, CommandParameterType};
-use crate::const_command;
+use crate::command::parameter::{ArgumentType, CommandParameter};
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::network::session::Session;
+use crate::player::identity::PlayerIdentity;
 use crate::player::{PLAYER_EYE_HEIGHT, PendingTeleport, teleport};
-use atomicow::CowArc;
-use bedrock::protocol::v898::packets::CommandPermissionLevelString;
+use chorus_core::permission::PermissionLevel;
 use glam::Vec3;
 
-pub const TP_COMMAND: CommandDefinition = const_command! {
-    name: "tp",
-    description: "Teleports you to a position",
-    aliases: ["teleport"],
-    permission: CommandPermissionLevelString::GameDirectors,
-    overloads: [
-        CommandOverload {
-            parameters: CowArc::Static(&[
-                CommandParameter {
-                    name: CowArc::Static("destination"),
-                    kind: CommandParameterType::Position,
-                    optional: false
-                }
-            ])
+pub const TP_COMMAND: CommandDefinition = CommandDefinition::new("tp", "Teleports you to a position or a player", |context, args| {
+    let feet = context.get::<Transform>().ok_or("must be sent by player!")?.position - Vec3::new(0.0, PLAYER_EYE_HEIGHT, 0.0);
+    let rotation = context.get::<Transform>().map(|transform| transform.rotation).unwrap_or_default();
+
+    let destination = match args.position("destination") {
+        Some(position) => {
+            let centered = |coordinate: Coordinate| match coordinate {
+                Coordinate::Absolute(value) if value.fract() == 0.0 => Coordinate::Absolute(value + 0.5),
+                other => other,
+            };
+            let position = if position.is_local() { position } else { crate::command::args::CommandPosition { x: centered(position.x), z: centered(position.z), ..position } };
+            position.resolve(feet.as_dvec3(), rotation).as_vec3()
         }
-    ],
-    execute: |context, args| {
-        let usage = || "Usage: /tp <x> <y> <z>, each optionally relative with ~".to_owned();
-        let &[x, y, z] = args else {
-            return Err(usage());
-        };
+        None => {
+            let name = args.string("player").unwrap_or_default();
+            let target = context
+                .world()
+                .iter_entities()
+                .find(|entity| entity.get::<PlayerIdentity>().is_some_and(|identity| identity.name().eq_ignore_ascii_case(name)))
+                .and_then(|entity| entity.get::<Transform>())
+                .ok_or_else(|| format!("No player named \"{name}\" is online."))?;
+            target.position - Vec3::new(0.0, PLAYER_EYE_HEIGHT, 0.0)
+        }
+    };
 
-        let Some((mut session, actor, mut transform, mut pending)) = context.components_mut::<(&mut Session, &ActorId, &mut Transform, &mut PendingTeleport)>() else {
-            return Err("must be sent by player!".to_owned());
-        };
-        let feet = transform.position - Vec3::new(0.0, PLAYER_EYE_HEIGHT, 0.0);
+    let Some((mut session, actor, mut transform, mut pending)) = context.components_mut::<(&mut Session, &ActorId, &mut Transform, &mut PendingTeleport)>() else {
+        return Err("must be sent by player!".to_owned());
+    };
+    teleport(&mut session, actor, &mut transform, &mut pending, destination);
 
-        let (Some(x), Some(y), Some(z)) = (coordinate(x, feet.x, true), coordinate(y, feet.y, false), coordinate(z, feet.z, true)) else {
-            return Err(usage());
-        };
-        let destination = Vec3::new(x, y, z);
+    context.reply(format!("Teleported to {:.2}, {:.2}, {:.2}", destination.x, destination.y, destination.z));
+    Ok(())
+})
+.aliases(crate::values!["teleport"])
+.permission(PermissionLevel::Operator)
+.overloads(crate::overloads![
+    [CommandParameter::new("destination", ArgumentType::Position)],
+    [CommandParameter::new("player", ArgumentType::Target)],
+]);
 
-        teleport(&mut session, actor, &mut transform, &mut pending, destination);
-
-        context.reply(format!("Teleported to {:.2}, {:.2}, {:.2}", destination.x, destination.y, destination.z));
-        Ok(())
-    }
-};
-
-fn coordinate(argument: &str, current: f32, center_whole: bool) -> Option<f32> {
-    if let Some(offset) = argument.strip_prefix('~') {
-        let offset = if offset.is_empty() { 0.0 } else { offset.parse::<f64>().ok()? };
-        return Some((current as f64 + offset) as f32);
-    }
-
-    let value = argument.parse::<f64>().ok()?;
-    let centered = center_whole && !argument.contains('.');
-    Some((if centered { value + 0.5 } else { value }) as f32)
-}

@@ -1,46 +1,21 @@
 use crate::command::command_definition::CommandDefinition;
-use crate::command::parameter::{CommandOverload, CommandParameter, CommandParameterType};
-use crate::const_command;
+use crate::command::parameter::{ArgumentType, CommandParameter};
 use crate::level::DimensionId;
 use crate::level::level::Level;
-use atomicow::CowArc;
-use bedrock::protocol::v898::packets::CommandPermissionLevelString;
+use chorus_core::permission::PermissionLevel;
 
-pub const DIMENSION_COMMAND: CommandDefinition = const_command! {
-    name: "dimension",
-    description: "Debug: moves you to another dimension at the same position",
-    aliases: [],
-    permission: CommandPermissionLevelString::GameDirectors,
-    overloads: [
-        CommandOverload {
-            parameters: CowArc::Static(&[
-                CommandParameter {
-                    name: CowArc::Static("id"),
-                    kind: CommandParameterType::Int,
-                    optional: false
-                }
-            ])
-        }
-    ],
-    execute: |context, args| {
-        let Some(id) = args.first().and_then(|argument| argument.parse::<i32>().ok()) else {
-            return Err("Usage: /dimension <id: int>".to_owned());
-        };
+pub const DIMENSION_COMMAND: CommandDefinition = CommandDefinition::new("dimension", "Debug: moves you to another dimension at the same position", |context, args| {
+    let id = args.int("id").unwrap_or_default();
+    let name = context.world().resource::<Level>().dimension(id).ok_or_else(|| format!("Dimension {id} isn't registered."))?.name();
 
-        let Some(dimension) = context.world().resource::<Level>().dimension(id) else {
-            return Err(format!("Dimension {id} isn't registered."));
-        };
-        let name = dimension.name();
-
-        let Some(mut current) = context.get_mut::<DimensionId>() else {
-            return Err("must be sent by player!".to_owned());
-        };
-        if current.0 == id {
-            return Err(format!("Already in {name}."));
-        }
-        current.0 = id;
-
-        context.reply(format!("Moving to {name}"));
-        Ok(())
+    let mut current = context.get_mut::<DimensionId>().ok_or("must be sent by player!")?;
+    if current.0 == id {
+        return Err(format!("Already in {name}."));
     }
-};
+    current.0 = id;
+
+    context.reply(format!("Moving to {name}"));
+    Ok(())
+})
+.permission(PermissionLevel::Operator)
+.overloads(crate::overloads![[CommandParameter::new("id", ArgumentType::Int)]]);

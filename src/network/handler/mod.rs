@@ -11,6 +11,7 @@ use crate::network::handler::play::{announce_join_quit, broadcast_block_updates,
 use crate::network::handler::request::handle_request;
 use crate::network::handler::resource::handle_resource;
 use crate::network::handler::setup::{handle_setup, on_enter_setup};
+use crate::registry::command_registry::CommandRegistry;
 use crate::{Tick, TickSet};
 use bevy_app::{App, Plugin};
 use bevy_ecs::prelude::{Entity, Message};
@@ -45,7 +46,14 @@ impl Plugin for PacketHandlers {
                 (handle_request, handle_login, handle_handshake, handle_resource).chain(),
                 (on_enter_setup, handle_setup).chain(),
                 (on_enter_play, send_initial_inventory, handle_play).chain(),
-                (handle_block_actions, update_block_breaking, handle_inventory_packets, dispatch_commands).chain(),
+                (
+                    handle_block_actions,
+                    update_block_breaking,
+                    handle_inventory_packets,
+                    dispatch_commands,
+                    CommandRegistry::broadcast_soft_enum_updates,
+                )
+                    .chain(),
                 (spawn_block_drops, broadcast_spawned_items, tick_item_entities, handle_item_pickup, broadcast_taken_items).chain(),
                 (broadcast_chat, on_quit, announce_join_quit, broadcast_message).chain(),
                 (update_chunk_order, send_pending_chunks, unload_distant_chunks, handle_sub_chunk_request).chain(),

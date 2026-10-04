@@ -1,8 +1,8 @@
 use crate::command::command_definition::CommandDefinition;
 use crate::command::context::CommandContext;
-use crate::command::parameter::{CommandOverload, CommandParameter, CommandParameterType};
+use crate::command::parameter::{CommandEnum, CommandParameter};
 use crate::config::Config;
-use crate::const_command;
+use crate::values;
 use crate::level::DimensionId;
 use crate::level::generator::dimension::Dimension;
 use crate::level::level::Level;
@@ -11,53 +11,36 @@ use crate::player::Player;
 use crate::server::pregen::Pregen;
 use crate::server::{ServerMetrics, ServerState};
 use crate::utils::process::process_stats;
-use atomicow::CowArc;
-use bedrock::protocol::v898::packets::CommandPermissionLevelString;
+use chorus_core::permission::PermissionLevel;
 use bevy_tasks::{AsyncComputeTaskPool, ComputeTaskPool, IoTaskPool};
 
-const SECTIONS: &str = "performance|network|memory|worlds|storage|all";
+const SECTION: CommandEnum = CommandEnum::new("StatusSection", values!["performance", "network", "memory", "worlds", "storage", "all"]);
 
-pub const STATUS_COMMAND: CommandDefinition = const_command! {
-    name: "status",
-    description: "Shows how the server is doing",
-    aliases: [],
-    permission: CommandPermissionLevelString::GameDirectors,
-    overloads: [
-        CommandOverload {
-            parameters: CowArc::Static(&[
-                CommandParameter {
-                    name: CowArc::Static("section"),
-                    kind: CommandParameterType::String,
-                    optional: true
-                }
-            ])
-        }
-    ],
-    execute: |context, args| {
-        let sections: &[Section] = match args.first().map(|arg| arg.to_ascii_lowercase()).as_deref() {
-            None => &[Section::Summary],
-            Some("all") => &[Section::Performance, Section::Network, Section::Memory, Section::Worlds, Section::Storage],
-            Some("performance" | "perf" | "tps") => &[Section::Performance],
-            Some("network" | "net") => &[Section::Network],
-            Some("memory" | "mem") => &[Section::Memory],
-            Some("worlds" | "world") => &[Section::Worlds],
-            Some("storage" | "level") => &[Section::Storage],
-            Some(other) => return Err(format!("unknown section \"{other}\", use one of {SECTIONS}")),
-        };
+pub const STATUS_COMMAND: CommandDefinition = CommandDefinition::new("status", "Shows how the server is doing", |context, args| {
+    let sections: &[Section] = match args.string("section") {
+        None => &[Section::Summary],
+        Some("all") => &[Section::Performance, Section::Network, Section::Memory, Section::Worlds, Section::Storage],
+        Some("performance") => &[Section::Performance],
+        Some("network") => &[Section::Network],
+        Some("memory") => &[Section::Memory],
+        Some("worlds") => &[Section::Worlds],
+        Some(_) => &[Section::Storage],
+    };
 
-        let mut report = Report::default();
-        for section in sections {
-            section.write(context, &mut report);
-        }
-        if sections == [Section::Summary] {
-            report.hint(format!("/status <{SECTIONS}> for more"));
-        }
-        for line in report.lines {
-            context.reply(line);
-        }
-        Ok(())
+    let mut report = Report::default();
+    for section in sections {
+        section.write(context, &mut report);
     }
-};
+    if sections == [Section::Summary] {
+        report.hint(format!("/status <{}> for more", SECTION.values.join("|")));
+    }
+    for line in report.lines {
+        context.reply(line);
+    }
+    Ok(())
+})
+.permission(PermissionLevel::Operator)
+.overloads(crate::overloads![[CommandParameter::enumeration("section", SECTION).optional()]]);
 
 #[derive(PartialEq)]
 enum Section {

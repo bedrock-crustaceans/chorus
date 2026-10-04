@@ -1,14 +1,5 @@
 use crate::command::command_definition::CommandDefinition;
-use crate::const_command;
-use bedrock::protocol::v898::packets::CommandPermissionLevelString;
+use chorus_core::permission::PermissionLevel;
 
-pub const DAYLOCK_COMMAND: CommandDefinition = const_command! {
-    name: "daylock",
-    description: "Locks and unlocks the day-night cycle.",
-    aliases: ["alwaysday"],
-    permission: CommandPermissionLevelString::GameDirectors,
-    overloads: [
-        // TODO
-    ],
-    execute: |_, _| { Ok(()) },
-};
+pub const DAYLOCK_COMMAND: CommandDefinition =
+    CommandDefinition::new("daylock", "Locks and unlocks the day-night cycle", |_, _| Err("/daylock is not implemented yet".to_owned())).permission(PermissionLevel::Operator);

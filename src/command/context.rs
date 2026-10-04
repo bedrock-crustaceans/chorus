@@ -1,3 +1,4 @@
+use crate::command::permission::CommandPermission;
 use crate::console::{self, Console};
 use crate::network::BedrockProtocol;
 use crate::network::session::Session;
@@ -8,6 +9,7 @@ use bedrock::protocol::v924::enums::TextPacketType;
 use bevy_ecs::component::Mutable;
 use bevy_ecs::prelude::{Component, Entity, Mut, Resource, World};
 use bevy_ecs::query::{ReleaseStateQueryData, SingleEntityQueryData};
+use chorus_core::permission::PermissionLevel;
 
 type TextPacket = <BedrockProtocol as ProtoVersionPackets>::TextPacket;
 
@@ -62,6 +64,14 @@ impl<'w> CommandContext<'w> {
 
     pub fn is_console(&self) -> bool {
         self.get::<Console>().is_some()
+    }
+
+    /// The sender's permission level; the console is always `Owner`.
+    pub fn permission_level(&self) -> PermissionLevel {
+        if self.is_console() {
+            return PermissionLevel::Owner;
+        }
+        self.get::<CommandPermission>().map_or(PermissionLevel::Member, |permission| permission.0)
     }
 
     pub fn reply(&mut self, message: impl Into<String>) {
