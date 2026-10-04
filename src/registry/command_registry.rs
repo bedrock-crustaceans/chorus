@@ -2,8 +2,7 @@ use crate::command::args;
 use crate::command::command_definition::CommandDefinition;
 use crate::command::context::CommandContext;
 use crate::command::r#impl::DEFINITIONS;
-use crate::command::r#impl::help::COMMAND_NAMES;
-use crate::command::parameter::{ChainedSubcommand, CommandEnum, CommandParameter, ParameterKind};
+use crate::command::parameter::{COMMAND_NAME_ENUM, ChainedSubcommand, CommandEnum, CommandParameter, ParameterKind};
 use crate::network::BedrockProtocol;
 use crate::network::session::Session;
 use crate::network::session::state::SessionState;
@@ -40,12 +39,6 @@ impl CommandRegistry {
         let mut registry = Self::new();
 
         registry.register_all(DEFINITIONS.iter().copied());
-        let names: Vec<String> = registry
-            .commands()
-            .flat_map(|command| std::iter::once(&command.name).chain(command.aliases.iter()))
-            .map(|name| name.to_string())
-            .collect();
-        registry.soft_enums.insert(COMMAND_NAMES.to_owned(), names);
 
         commands.insert_resource(registry);
     }
@@ -158,7 +151,9 @@ impl CommandRegistry {
         }
 
         let registry = context.registry();
-        let (command, soft_enums) = (registry.get(name).cloned(), registry.soft_enums.clone().into_iter().collect::<HashMap<_, _>>());
+        let mut lookups: HashMap<String, Vec<String>> = registry.soft_enums.clone().into_iter().collect();
+        lookups.insert(COMMAND_NAME_ENUM.to_owned(), registry.index.keys().cloned().collect());
+        let command = registry.get(name).cloned();
         let Some(command) = command else {
             context.reply(format!("§cUnknown command: {name}. Type /help for a list of commands."));
             return;
@@ -168,7 +163,7 @@ impl CommandRegistry {
             return;
         }
 
-        let parsed = match args::parse(&command.name, &command.overloads, rest, &soft_enums, context.permission_level()) {
+        let parsed = match args::parse(&command.name, &command.overloads, rest, &lookups, context.permission_level()) {
             Ok(parsed) => parsed,
             Err(error) => {
                 context.reply(format!("§cSyntax error: {}", error.message));
@@ -185,7 +180,7 @@ impl CommandRegistry {
     }
 
     pub fn to_packet(&self) -> AvailableCommandsPacket {
-        let mut packet = PacketBuilder::new(&self.soft_enums);
+        let mut packet = PacketBuilder::new(&self.soft_enums, self.commands().map(|command| command.name.to_string()).collect());
         let commands = self.commands.iter().map(|command| packet.command(command)).collect();
         packet.finish(commands)
     }
@@ -202,11 +197,14 @@ struct PacketBuilder {
     constraints: Vec<ConstraintsEntry>,
     sub_command_values: Vec<String>,
     chained: Vec<ChainedSubCommandDataEntry>,
+    command_names: Vec<String>,
 }
 
 impl PacketBuilder {
-    fn new(soft_enums: &IndexMap<String, Vec<String>>) -> Self {
+    fn new(soft_enums: &IndexMap<String, Vec<String>>, mut command_names: Vec<String>) -> Self {
+        command_names.sort_unstable();
         Self {
+            command_names,
             enum_values: Vec::new(),
             value_index: HashMap::new(),
             enum_data: Vec::new(),
@@ -297,6 +295,12 @@ impl PacketBuilder {
             ParameterKind::Argument(kind) => ARG_FLAG_VALID | kind.id(),
             ParameterKind::Enum(values) => ARG_FLAG_VALID | ARG_FLAG_ENUM | self.command_enum(values),
             ParameterKind::Literal(word) => ARG_FLAG_VALID | ARG_FLAG_ENUM | self.enumeration(word, [word.as_ref()]),
+            ParameterKind::CommandName => {
+                let names = std::mem::take(&mut self.command_names);
+                let index = self.enumeration(COMMAND_NAME_ENUM, names.iter().map(String::as_str));
+                self.command_names = names;
+                ARG_FLAG_VALID | ARG_FLAG_ENUM | index
+            }
             ParameterKind::SoftEnum(name) => {
                 let index = match self.soft_enums.iter().position(|entry| entry.enum_name == name.as_ref()) {
                     Some(index) => index,

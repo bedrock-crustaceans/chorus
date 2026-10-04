@@ -1,4 +1,4 @@
-use crate::command::parameter::{ArgumentType, CommandOverload, CommandParameter, ParameterKind};
+use crate::command::parameter::{ArgumentType, COMMAND_NAME_ENUM, CommandOverload, CommandParameter, ParameterKind};
 use chorus_core::permission::PermissionLevel;
 use glam::{DVec3, IVec3, Vec2};
 use std::collections::HashMap;
@@ -256,8 +256,12 @@ fn parse_overload(parameters: &[CommandParameter], tokens: &[Token], soft_enums:
                 Some(value) => ArgValue::Text(value.to_owned()),
                 None => return Err(fail(format!("\"{text}\" is not one of {}", values.values.join(", ")))),
             },
-            ParameterKind::SoftEnum(name) => {
-                let known = soft_enums.get(name.as_ref());
+            ParameterKind::SoftEnum(_) | ParameterKind::CommandName => {
+                let key = match &parameter.kind {
+                    ParameterKind::SoftEnum(name) => name.as_ref(),
+                    _ => COMMAND_NAME_ENUM,
+                };
+                let known = soft_enums.get(key);
                 match known.and_then(|values| values.iter().find(|value| value.eq_ignore_ascii_case(text))) {
                     Some(value) => ArgValue::Text(value.clone()),
                     None => return Err(fail(format!("\"{text}\" is not a valid {}", parameter.name))),

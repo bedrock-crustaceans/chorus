@@ -256,7 +256,12 @@ pub enum ParameterKind {
     SoftEnum(CowArc<'static, str>),
     /// An int followed by a suffix, like `10L`.
     Postfix(CowArc<'static, str>),
+    /// The name of any registered command, sent as vanilla's `CommandName` enum.
+    CommandName,
 }
+
+/// Name of the enum listing every registered command, which vanilla uses for `/help`.
+pub const COMMAND_NAME_ENUM: &str = "CommandName";
 
 /// Extra hints for how the client presents a parameter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -304,6 +309,11 @@ impl CommandParameter {
         Self::of(name, ParameterKind::Postfix(CowArc::Static(postfix)))
     }
 
+    /// The name or alias of any registered command.
+    pub const fn command_name(name: &'static str) -> Self {
+        Self::of(name, ParameterKind::CommandName)
+    }
+
     const fn of(name: &'static str, kind: ParameterKind) -> Self {
         Self {
             name: CowArc::Static(name),
@@ -330,6 +340,7 @@ impl CommandParameter {
             ParameterKind::Literal(word) => return if self.optional { format!("[{word}]") } else { word.to_string() },
             ParameterKind::SoftEnum(name) => format!("{}: {name}", self.name),
             ParameterKind::Postfix(postfix) => format!("{}: int{postfix}", self.name),
+            ParameterKind::CommandName => format!("{}: {COMMAND_NAME_ENUM}", self.name),
         };
         if self.optional { format!("[{inner}]") } else { format!("<{inner}>") }
     }
