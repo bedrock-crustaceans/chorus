@@ -54,9 +54,16 @@ impl LoopRunner {
             app.update();
 
             if let Some(exit) = app.should_exit() {
+                let compact = app.world().get_resource::<Config>().is_some_and(|config| config.level.database.shutdown_compaction);
                 if let Some(mut level) = app.world_mut().get_resource_mut::<level::Level>() {
                     let saved = level.save_blocking();
                     info!("saved {saved} chunks before exiting");
+                    if compact && let Some(storage) = level.storage() {
+                        info!("compacting the level database before exiting");
+                        if let Err(err) = storage.compact_blocking() {
+                            warn!("failed to compact the level database: {err}");
+                        }
+                    }
                 }
                 console::shutdown();
                 return exit;

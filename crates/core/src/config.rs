@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::process::exit;
+use std::time::Duration;
 use tracing::debug;
 
 const CONFIG_PATH: &str = "chorus.toml";
@@ -160,14 +161,59 @@ impl Default for NetherNetConfig {
     }
 }
 
+/// How often something runs: a duration such as `"30s"`, `"5m"` or `"1h 30m"`, a whole number of
+/// seconds, or `false` to turn it off.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Interval(Option<Duration>);
+
+impl Interval {
+    pub const DISABLED: Self = Self(None);
+
+    pub const fn every(duration: Duration) -> Self {
+        Self(Some(duration))
+    }
+
+    pub fn get(self) -> Option<Duration> {
+        self.0.filter(|duration| !duration.is_zero())
+    }
+}
+
+impl Serialize for Interval {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self.get() {
+            Some(duration) => serializer.serialize_str(&humantime::format_duration(duration).to_string()),
+            None => serializer.serialize_bool(false),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Interval {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Toggle(bool),
+            Seconds(u64),
+            Text(String),
+        }
+        match Raw::deserialize(deserializer)? {
+            Raw::Toggle(false) => Ok(Self::DISABLED),
+            Raw::Toggle(true) => Err(serde::de::Error::custom("expected a duration such as \"5m\" or false, not true")),
+            Raw::Seconds(seconds) => Ok(Self::every(Duration::from_secs(seconds))),
+            Raw::Text(text) => humantime::parse_duration(&text).map(Self::every).map_err(serde::de::Error::custom),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct LevelConfig {
     pub name: String,
     pub seed: LevelSeed,
-    /// Deflate level from 0 to 10 for the world database.
-    pub compression_level: u8,
     pub max_view_distance: i32,
+    /// How often unsaved chunks are written to disk.
+    pub autosave: Interval,
+    pub database: DatabaseConfig,
 }
 
 impl Default for LevelConfig {
@@ -175,8 +221,30 @@ impl Default for LevelConfig {
         Self {
             name: String::from("world"),
             seed: LevelSeed::default(),
-            compression_level: 6,
             max_view_distance: 32,
+            autosave: Interval::every(Duration::from_secs(60)),
+            database: DatabaseConfig::default(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct DatabaseConfig {
+    /// Deflate level from 0 to 10.
+    pub compression: u8,
+    /// How often the database is compacted in the background.
+    pub auto_compaction: Interval,
+    /// Fully compact the database when the server stops, which can take a while after lots of new chunks.
+    pub shutdown_compaction: bool,
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            compression: 6,
+            auto_compaction: Interval::every(Duration::from_secs(300)),
+            shutdown_compaction: false,
         }
     }
 }
@@ -237,7 +305,8 @@ const MOVED_KEYS: &[(&str, &str)] = &[
     ("network.encryption", "network.raknet.encryption"),
     ("level_name", "level.name"),
     ("level_seed", "level.seed"),
-    ("level_compression_level", "level.compression_level"),
+    ("level_compression_level", "level.database.compression"),
+    ("level.compression_level", "level.database.compression"),
     ("max_view_distance", "level.max_view_distance"),
     ("resource_packs_directory", "packs.resource_directory"),
     ("behavior_packs_directory", "packs.behavior_directory"),

@@ -278,6 +278,15 @@ impl LevelStorage {
         more
     }
 
+    /// Writes everything pending and compacts the whole database on this thread.
+    pub fn compact_blocking(&self) -> StorageResult<()> {
+        self.flush_blocking()?;
+        let started = std::time::Instant::now();
+        self.db.lock().expect("level database lock poisoned").compact().map_err(database_error)?;
+        info!("compacted the level database in {:.1}s", started.elapsed().as_secs_f64());
+        Ok(())
+    }
+
     pub fn flush_blocking(&self) -> StorageResult<()> {
         while self.flushing.swap(true, Ordering::AcqRel) {
             std::thread::sleep(Duration::from_millis(5));
