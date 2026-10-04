@@ -88,7 +88,7 @@ pub fn handle_block_actions(
                     }
                 }
                 PlayerActionType::StartDestroyBlock | PlayerActionType::ContinueDestroyBlock => {
-                    attack_block(&action, transform, &mut breaking, dimension, &level, &registry, &mut event_writer);
+                    attack_block(action, transform, &mut breaking, dimension, &level, &registry, &mut event_writer);
                 }
                 PlayerActionType::AbortDestroyBlock | PlayerActionType::StopDestroyBlock => {
                     stop_break(&mut breaking, dimension, &mut event_writer);
@@ -97,12 +97,12 @@ pub fn handle_block_actions(
                 // read: the item use transaction it belongs to arrives in a packet bedrock-rs
                 // cannot decode yet
                 PlayerActionType::StartItemUseOn => {
-                    place_block(action.entity, &action, transform, inventory, dimension, &mut level, &registry, &mut block_writer, &mut place_writer);
+                    place_block(action.entity, action, transform, inventory, dimension, &mut level, &registry, &mut block_writer, &mut place_writer);
                 }
                 PlayerActionType::PredictDestroyBlock | PlayerActionType::CreativeDestroyBlock => {
                     break_block(
                         action.entity,
-                        &action,
+                        action,
                         transform,
                         &mut breaking,
                         dimension,
