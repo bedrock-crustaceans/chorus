@@ -1,4 +1,5 @@
 use crate::network::BedrockProtocol;
+use crate::network::handler::play::{PlayerJoinedMessage, PlayerQuitMessage};
 use crate::network::session::Session;
 use crate::network::session::state::SessionState;
 use crate::player::identity::PlayerIdentity;
@@ -98,5 +99,30 @@ pub fn broadcast_chat(mut reader: MessageReader<PlayerChatMessage>, mut sessions
                 .into(),
             ));
         }
+    }
+}
+
+pub fn announce_join_quit(mut join_reader: MessageReader<PlayerJoinedMessage>, mut quit_reader: MessageReader<PlayerQuitMessage>, mut broadcast_writer: MessageWriter<BroadcastMessage>) {
+    for ev in join_reader.read() {
+        broadcast_writer.write(BroadcastMessage::translate("§e%multiplayer.player.joined", vec![ev.name.clone()]));
+    }
+
+    for ev in quit_reader.read() {
+        broadcast_writer.write(BroadcastMessage::translate("§e%multiplayer.player.left", vec![ev.name.clone()]));
+    }
+}
+
+pub struct ChatPlugin;
+
+impl bevy_app::Plugin for ChatPlugin {
+    fn build(&self, app: &mut bevy_app::App) {
+        use bevy_ecs::schedule::IntoScheduleConfigs;
+        app.add_systems(
+            crate::Tick,
+            (broadcast_chat, announce_join_quit, broadcast_message)
+                .chain()
+                .in_set(crate::schedule::GameSet::Chat)
+                .in_set(crate::TickSet::Update),
+        );
     }
 }

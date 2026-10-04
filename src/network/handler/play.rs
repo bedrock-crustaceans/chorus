@@ -1,27 +1,24 @@
+use crate::chat::{PlayerChatMessage, handle_text};
 use crate::command::dispatch::{CommandPreprocessMessage, CommandRequestedMessage};
 use crate::command::permission::CommandPermission;
 use crate::config::Config;
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
-use crate::level::BlockUpdatedMessage;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
-use crate::network::handler::chat::{BroadcastMessage, PlayerChatMessage, handle_text};
 use crate::network::handler::form::{FormResponseMessage, handle_modal_form_response};
 use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::PendingTeleport;
-use crate::player::chunk_view::ChunkView;
 use crate::player::forms::PendingForms;
 use crate::player::identity::PlayerIdentity;
 use crate::registry::command_registry::CommandRegistry;
 use bedrock::protocol::v662::enums::ActorFlags;
-use bedrock::protocol::v662::packets::{SetActorDataPacket, UpdateAbilitiesPacket, UpdateBlockPacket};
+use bedrock::protocol::v662::packets::{SetActorDataPacket, UpdateAbilitiesPacket};
 use bedrock::protocol::v662::types::{ActorRuntimeID, DataItem, PropertySyncData};
 use bedrock::protocol::v729::packets::{AttributeData, UpdateAttributesPacket};
 use bedrock::protocol::v776::enums::AbilitiesIndex;
 use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitiesLayer, SerializedLayer};
-use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bedrock::protocol::v2168::enums::DataItemType;
 use bevy_ecs::message::{Message, MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Commands, Entity, Query, Res};
@@ -160,16 +157,6 @@ pub fn on_quit(sessions: Query<(Entity, &Session, &PlayerIdentity)>, mut quit_wr
     }
 }
 
-pub fn announce_join_quit(mut join_reader: MessageReader<PlayerJoinedMessage>, mut quit_reader: MessageReader<PlayerQuitMessage>, mut broadcast_writer: MessageWriter<BroadcastMessage>) {
-    for ev in join_reader.read() {
-        broadcast_writer.write(BroadcastMessage::translate("§e%multiplayer.player.joined", vec![ev.name.clone()]));
-    }
-
-    for ev in quit_reader.read() {
-        broadcast_writer.write(BroadcastMessage::translate("§e%multiplayer.player.left", vec![ev.name.clone()]));
-    }
-}
-
 #[derive(Message, Clone, Debug)]
 pub struct PlayerMoveMessage {
     pub entity: Entity,
@@ -238,25 +225,6 @@ pub fn handle_play(
                 let count = session.unhandled_packets.entry(packet.as_ref().meta().name).or_insert(0);
                 *count = count.saturating_add(1);
             }
-        }
-    }
-}
-
-pub fn broadcast_block_updates(mut reader: MessageReader<BlockUpdatedMessage>, mut query: Query<(&mut Session, &ChunkView)>) {
-    for msg in reader.read() {
-        for (mut session, view) in &mut query {
-            if view.dimension != msg.dimension_id {
-                continue;
-            }
-            session.send(BedrockProtocol::UpdateBlockPacket(
-                UpdateBlockPacket {
-                    block_position: NetworkBlockPosition { x: msg.x, y: msg.y, z: msg.z },
-                    block_runtime_id: msg.block_id as u32,
-                    flags: 0xB,
-                    layer: msg.layer as u32,
-                }
-                .into(),
-            ));
         }
     }
 }

@@ -7,6 +7,8 @@ use chorus_core::schedule::run_fixed_tick;
 use std::time::Instant;
 use tracing::{info, warn};
 
+pub mod actor;
+pub mod chat;
 pub mod command;
 pub mod console;
 pub mod form;
@@ -15,7 +17,9 @@ pub mod network;
 pub mod player;
 pub mod registry;
 pub mod resource;
+pub mod schedule;
 pub mod server;
+pub mod world;
 
 pub use chorus_block as block;
 pub use chorus_core::schedule::{JobQueue, Tick, TickClock, TickSet};
@@ -105,6 +109,20 @@ impl Plugin for ChorusPlugin {
 
         app.add_schedule(Schedule::new(Tick));
         app.configure_sets(Tick, (TickSet::First, TickSet::Update, TickSet::Last).chain());
+        app.configure_sets(
+            Tick,
+            (
+                schedule::GameSet::Connection,
+                schedule::GameSet::Input,
+                schedule::GameSet::World,
+                schedule::GameSet::Actors,
+                schedule::GameSet::Chat,
+                schedule::GameSet::Chunks,
+                schedule::GameSet::Broadcast,
+            )
+                .chain()
+                .in_set(TickSet::Update),
+        );
 
         app.init_resource::<TickClock>().init_resource::<JobQueue>().add_systems(RunFixedMainLoop, run_fixed_tick);
 

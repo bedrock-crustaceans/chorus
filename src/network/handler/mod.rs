@@ -1,29 +1,24 @@
 use crate::command::dispatch::dispatch_commands;
 use crate::network::BedrockProtocol;
-use crate::network::handler::block::{broadcast_level_events, broadcast_level_sounds, handle_block_actions, update_block_breaking};
-use crate::network::handler::chat::{broadcast_chat, broadcast_message};
-use crate::network::handler::chunks::{handle_sub_chunk_request, send_pending_chunks, unload_distant_chunks, update_chunk_order};
+use crate::network::handler::block::decode_block_actions;
 use crate::network::handler::handshake::handle_handshake;
 use crate::network::handler::inventory::{handle_inventory_packets, send_initial_inventory};
-use crate::network::handler::item::{broadcast_spawned_items, broadcast_taken_items, handle_item_pickup, merge_item_entities, show_items_to_new_viewers, spawn_block_drops, tick_item_entities};
 use crate::network::handler::login::handle_login;
-use crate::network::handler::play::{announce_join_quit, broadcast_block_updates, handle_play, on_enter_play, on_quit};
+use crate::network::handler::play::{handle_play, on_enter_play, on_quit};
 use crate::network::handler::request::handle_request;
 use crate::network::handler::resource::handle_resource;
 use crate::network::handler::setup::{handle_setup, on_enter_setup};
 use crate::registry::command_registry::CommandRegistry;
+use crate::schedule::GameSet;
 use crate::{Tick, TickSet};
 use bevy_app::{App, Plugin};
 use bevy_ecs::prelude::{Entity, Message};
 use bevy_ecs::schedule::IntoScheduleConfigs;
 
 pub mod block;
-pub mod chat;
-pub mod chunks;
 pub mod form;
 pub mod handshake;
 pub mod inventory;
-pub mod item;
 pub mod login;
 pub mod play;
 pub mod request;
@@ -43,32 +38,17 @@ impl Plugin for PacketHandlers {
         app.add_systems(
             Tick,
             (
-                (handle_request, handle_login, handle_handshake, handle_resource).chain(),
-                (on_enter_setup, handle_setup).chain(),
-                (on_enter_play, send_initial_inventory, handle_play).chain(),
                 (
-                    handle_block_actions,
-                    update_block_breaking,
-                    handle_inventory_packets,
-                    dispatch_commands,
-                    CommandRegistry::broadcast_soft_enum_updates,
+                    (handle_request, handle_login, handle_handshake, handle_resource).chain(),
+                    (on_enter_setup, handle_setup).chain(),
+                    (on_enter_play, send_initial_inventory, handle_play, on_quit).chain(),
                 )
-                    .chain(),
-                (
-                    spawn_block_drops,
-                    broadcast_spawned_items,
-                    show_items_to_new_viewers,
-                    tick_item_entities,
-                    merge_item_entities,
-                    handle_item_pickup,
-                    broadcast_taken_items,
-                )
-                    .chain(),
-                (broadcast_chat, on_quit, announce_join_quit, broadcast_message).chain(),
-                (update_chunk_order, send_pending_chunks, unload_distant_chunks, handle_sub_chunk_request).chain(),
-                (broadcast_block_updates, broadcast_level_events, broadcast_level_sounds).chain(),
+                    .chain()
+                    .in_set(GameSet::Connection),
+                (decode_block_actions, handle_inventory_packets, dispatch_commands, CommandRegistry::broadcast_soft_enum_updates)
+                    .chain()
+                    .in_set(GameSet::Input),
             )
-                .chain()
                 .in_set(TickSet::Update),
         );
     }
