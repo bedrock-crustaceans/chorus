@@ -5,9 +5,6 @@ use chorus_core::permission::PermissionLevel;
 
 const PAGE_SIZE: usize = 7;
 
-/// Soft enum of every registered command name, kept up to date by the registry.
-pub const COMMAND_NAMES: &str = "CommandName";
-
 pub const HELP_COMMAND: CommandDefinition = CommandDefinition::new("help", "Lists commands or shows how to use one", |context, args| {
     let level = context.permission_level();
     let registry = context.registry();
@@ -33,7 +30,7 @@ pub const HELP_COMMAND: CommandDefinition = CommandDefinition::new("help", "List
 .permission(PermissionLevel::Member)
 .overloads(crate::overloads![
     [CommandParameter::new("page", ArgumentType::Int).optional()],
-    [CommandParameter::soft_enum("command", COMMAND_NAMES)],
+    [CommandParameter::command_name("command").optional()],
 ]);
 
 fn list(commands: &[&CommandDefinition], page: usize) -> Vec<String> {
