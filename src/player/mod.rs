@@ -21,6 +21,7 @@ pub mod forms;
 pub mod gamemode;
 pub mod identity;
 pub mod inventory;
+pub mod skin;
 
 pub const PLAYER_EYE_HEIGHT: f32 = 1.62;
 

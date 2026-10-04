@@ -117,12 +117,6 @@ pub struct ChatPlugin;
 impl bevy_app::Plugin for ChatPlugin {
     fn build(&self, app: &mut bevy_app::App) {
         use bevy_ecs::schedule::IntoScheduleConfigs;
-        app.add_systems(
-            crate::Tick,
-            (broadcast_chat, announce_join_quit, broadcast_message)
-                .chain()
-                .in_set(crate::schedule::GameSet::Chat)
-                .in_set(crate::TickSet::Update),
-        );
+        app.add_systems(crate::Tick, (broadcast_chat, announce_join_quit, broadcast_message).chain().in_set(crate::schedule::GameSet::Chat));
     }
 }

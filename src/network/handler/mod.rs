@@ -1,3 +1,4 @@
+use crate::Tick;
 use crate::command::dispatch::dispatch_commands;
 use crate::network::BedrockProtocol;
 use crate::network::handler::block::decode_block_actions;
@@ -10,7 +11,6 @@ use crate::network::handler::resource::handle_resource;
 use crate::network::handler::setup::{handle_setup, on_enter_setup};
 use crate::registry::command_registry::CommandRegistry;
 use crate::schedule::GameSet;
-use crate::{Tick, TickSet};
 use bevy_app::{App, Plugin};
 use bevy_ecs::prelude::{Entity, Message};
 use bevy_ecs::schedule::IntoScheduleConfigs;
@@ -48,8 +48,7 @@ impl Plugin for PacketHandlers {
                 (decode_block_actions, handle_inventory_packets, dispatch_commands, CommandRegistry::broadcast_soft_enum_updates)
                     .chain()
                     .in_set(GameSet::Input),
-            )
-                .in_set(TickSet::Update),
+            ),
         );
     }
 }
