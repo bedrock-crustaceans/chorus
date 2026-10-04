@@ -102,3 +102,9 @@ semver.workspace = true
 spin_sleep.workspace = true
 uuid.workspace = true
 zip.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_Pipes", "Win32_System_IO"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

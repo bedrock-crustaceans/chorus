@@ -14,6 +14,8 @@ commands! {
     debug::DEBUG_COMMAND,
     status::STATUS_COMMAND,
     list::LIST_COMMAND,
+    save::SAVE_COMMAND,
+    stop::STOP_COMMAND,
 
     gamemode::GAMEMODE_COMMAND,
     dimension::DIMENSION_COMMAND,
