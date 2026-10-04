@@ -40,12 +40,24 @@ impl Plugin for Registry {
             ),
         )
         .add_systems(Update, Level::queue_poll_generation)
-        .add_systems(Tick, autosave.in_set(TickSet::Last));
+        .add_systems(Tick, (autosave, compact_level).in_set(TickSet::Last));
     }
 }
 
 pub const WORLDS_DIRECTORY: &str = "worlds";
 const AUTOSAVE_INTERVAL_TICKS: u32 = 1200;
+const COMPACTION_INTERVAL_TICKS: u32 = 6000;
+
+fn compact_level(level: Option<Res<Level>>, mut ticks: Local<u32>) {
+    *ticks += 1;
+    if *ticks < COMPACTION_INTERVAL_TICKS {
+        return;
+    }
+    *ticks = 0;
+    if let Some(storage) = level.as_ref().and_then(|level| level.storage.as_ref()) {
+        storage.schedule_compaction();
+    }
+}
 
 fn autosave(level: Option<ResMut<Level>>, mut ticks: Local<u32>) {
     *ticks += 1;
