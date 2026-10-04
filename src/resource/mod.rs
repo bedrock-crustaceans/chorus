@@ -30,7 +30,7 @@ impl ResourcePacks {
     pub fn load(config: Res<Config>, mut commands: Commands) {
         let mut res = ResourcePacks::default();
 
-        let entries = match std::fs::read_dir(&config.resource_packs_directory) {
+        let entries = match std::fs::read_dir(&config.packs.resource_directory) {
             Ok(e) => e,
             Err(err) => {
                 warn!("Could not read resource packs directory: {err}");

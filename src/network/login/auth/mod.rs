@@ -17,8 +17,8 @@ impl Plugin for LoginAuthOIDC {
 
 impl LoginAuthOIDC {
     pub fn fetch_oidc(config: Res<Config>, mut commands: Commands) {
-        if !config.online_mode {
-            debug!("Skipping Auth OIDC fetch, online_mode is disabled");
+        if !config.server.authentication {
+            debug!("Skipping Auth OIDC fetch, authentication is disabled");
             return;
         }
 

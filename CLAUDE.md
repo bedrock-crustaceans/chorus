@@ -138,7 +138,15 @@ Worlds are saved in the vanilla Bedrock LevelDB layout under `worlds/<level_name
 
 ### Configuration
 
-`chorus.toml` is read (or created with defaults) at startup by `Config::setup()` (`crates/core/src/config.rs`). Fields: `ip`, `port`, `name`, `sub_name`, `max_players`, `threads`, `transport` (`RakNet` | `NetherNet`), `nethernet_http_port`, `log_to_file`, `logs_directory`, `resource_packs_directory`, `behavior_packs_directory`, `level_name`, `level_seed` (a number, or text hashed like Java's `String.hashCode`; empty text picks a random seed), `online_mode`, `encryption`, `log_level`, `force_accept_resource_packs`, `force_disable_vibrant_visuals`, `max_view_distance`, `max_generation_distance`, `level_compression_level` (deflate level 0-10 for the world database, default 1).
+`chorus.toml` is read (or created with defaults) at startup by `Config::setup()` (`crates/core/src/config.rs`). It is split into sections:
+
+- `[server]`: `name`, `description` (second line in the server list), `max_players`, `authentication` (require Xbox Live sign-in), `threads` (a number, or `"auto"` for one per CPU core; 0 runs everything on the main thread)
+- `[network]`: `ip`, `port`, `transport` (`RakNet` | `NetherNet`), with `[network.raknet]` `encryption` and `[network.nethernet]` `http_port`
+- `[level]`: `name`, `seed` (a number, or text parsed like vanilla's `WorldOptions.parseSeed`; `LevelSeed::parse_with` lets a generator use its own rule), `compression_level` (deflate 0-10 for the world database), `max_view_distance` (also caps how far chunks are generated)
+- `[packs]`: `resource_directory`, `behavior_directory`, `force_accept`, `force_disable_vibrant_visuals`
+- `[log]`: `level` (a tracing `EnvFilter` string, e.g. `"info"` or `"info,chorus=debug"`), `to_file`, `directory`
+
+A config in an older layout is migrated on startup (`MOVED_KEYS` and `REMOVED_KEYS` list the changes as dotted paths) and the original kept as `chorus.toml.old`.
 
 ### Protocol version
 

@@ -56,7 +56,7 @@ pub fn handle_login(
             continue;
         };
 
-        if !request.online && config.online_mode {
+        if !request.online && config.server.authentication {
             session.close(Some("disconnectionScreen.notAuthenticated"));
             continue;
         }
@@ -69,7 +69,7 @@ pub fn handle_login(
             xuid: request.auth_data.xid.clone(),
         });
 
-        if config.encryption && session.id.supports_encryption() {
+        if config.network.raknet.encryption && session.id.supports_encryption() {
             let mut token = [0u8; 16];
             rand::rng().fill(&mut token);
 

@@ -103,7 +103,7 @@ impl Plugin for Server {
 
 impl Server {
     pub fn start(config: Res<Config>) {
-        info!("Started on {}:{}.", config.ip, config.port);
+        info!("Started on {}:{}.", config.network.ip, config.network.port);
     }
 
     pub fn start_tick(mut server_state: ResMut<ServerState>) {

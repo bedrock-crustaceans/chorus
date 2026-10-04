@@ -49,61 +49,248 @@ impl LevelSeed {
     }
 }
 
-#[derive(Resource, Serialize, Deserialize, Clone, Debug)]
+#[derive(Resource, Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
-    pub ip: String,
-    pub port: u16,
-    pub name: String,
-    pub sub_name: String,
-    pub max_players: i32,
-    pub threads: usize,
-    pub transport: NetworkTransport,
-    /// TCP port the NetherNet HTTP signaling endpoint binds to, unused for RakNet.
-    pub nethernet_http_port: u16,
-    pub log_to_file: bool,
-    pub logs_directory: PathBuf,
-    pub resource_packs_directory: PathBuf,
-    pub behavior_packs_directory: PathBuf,
-    pub level_name: String,
-    pub level_seed: LevelSeed,
-    pub online_mode: bool,
-    pub encryption: bool,
-    pub log_level: String,
-    pub force_accept_resource_packs: bool,
-    pub force_disable_vibrant_visuals: bool,
-    pub max_view_distance: i32,
-    pub max_generation_distance: i32,
-    pub level_compression_level: u8,
+    pub server: ServerConfig,
+    pub network: NetworkConfig,
+    pub level: LevelConfig,
+    pub packs: PackConfig,
+    pub log: LogConfig,
 }
 
-impl Default for Config {
+/// How many worker threads the task pools get: a number, or `"auto"` for one per CPU core.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(untagged)]
+pub enum Threads {
+    Count(usize),
+    Mode(ThreadMode),
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum ThreadMode {
+    Auto,
+}
+
+impl Default for Threads {
+    fn default() -> Self {
+        Self::Mode(ThreadMode::Auto)
+    }
+}
+
+impl Threads {
+    pub fn count(self) -> usize {
+        match self {
+            Self::Count(count) => count,
+            Self::Mode(ThreadMode::Auto) => std::thread::available_parallelism().map_or(1, |count| count.get()),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct ServerConfig {
+    pub name: String,
+    /// Second line of the server list entry.
+    pub description: String,
+    pub max_players: i32,
+    /// Whether players must be signed in to Xbox Live.
+    pub authentication: bool,
+    /// Worker threads for the task pools; 0 runs everything on the main thread.
+    pub threads: Threads,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            name: String::from("Chorus"),
+            description: String::from("bedrock-crustaceans.org"),
+            max_players: 20,
+            authentication: true,
+            threads: Threads::default(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct NetworkConfig {
+    pub ip: String,
+    pub port: u16,
+    pub transport: NetworkTransport,
+    pub raknet: RakNetConfig,
+    pub nethernet: NetherNetConfig,
+}
+
+impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
             ip: String::from("0.0.0.0"),
             port: 19132,
-            name: String::from("Chorus"),
-            sub_name: String::from("bedrock-crustaceans.org"),
-            max_players: 20,
-            threads: 4,
             transport: NetworkTransport::RakNet,
-            nethernet_http_port: 19133,
-            log_to_file: true,
-            logs_directory: PathBuf::from("logs"),
-            resource_packs_directory: PathBuf::from("resource_packs"),
-            behavior_packs_directory: PathBuf::from("behavior_packs"),
-            level_name: String::from("world"),
-            level_seed: LevelSeed::default(),
-            online_mode: true,
-            encryption: false,
-            log_level: String::from("info"),
-            force_accept_resource_packs: false,
-            force_disable_vibrant_visuals: false,
-            max_view_distance: 8,
-            max_generation_distance: 8,
-            level_compression_level: 1,
+            raknet: RakNetConfig::default(),
+            nethernet: NetherNetConfig::default(),
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct RakNetConfig {
+    pub encryption: bool,
+}
+
+impl Default for RakNetConfig {
+    fn default() -> Self {
+        Self { encryption: true }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct NetherNetConfig {
+    /// TCP port the HTTP signaling endpoint binds to.
+    pub http_port: u16,
+}
+
+impl Default for NetherNetConfig {
+    fn default() -> Self {
+        Self { http_port: 19133 }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct LevelConfig {
+    pub name: String,
+    pub seed: LevelSeed,
+    /// Deflate level from 0 to 10 for the world database.
+    pub compression_level: u8,
+    pub max_view_distance: i32,
+}
+
+impl Default for LevelConfig {
+    fn default() -> Self {
+        Self {
+            name: String::from("world"),
+            seed: LevelSeed::default(),
+            compression_level: 6,
+            max_view_distance: 32,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct PackConfig {
+    pub resource_directory: PathBuf,
+    pub behavior_directory: PathBuf,
+    pub force_accept: bool,
+    pub force_disable_vibrant_visuals: bool,
+}
+
+impl Default for PackConfig {
+    fn default() -> Self {
+        Self {
+            resource_directory: PathBuf::from("resource_packs"),
+            behavior_directory: PathBuf::from("behavior_packs"),
+            force_accept: false,
+            force_disable_vibrant_visuals: false,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct LogConfig {
+    pub level: String,
+    pub to_file: bool,
+    pub directory: PathBuf,
+}
+
+impl Default for LogConfig {
+    fn default() -> Self {
+        Self {
+            level: String::from("info"),
+            to_file: true,
+            directory: PathBuf::from("logs"),
+        }
+    }
+}
+
+/// Where keys of older config layouts moved, as dotted (old path, new path).
+const MOVED_KEYS: &[(&str, &str)] = &[
+    ("name", "server.name"),
+    ("sub_name", "server.description"),
+    ("server.sub_name", "server.description"),
+    ("max_players", "server.max_players"),
+    ("online_mode", "server.authentication"),
+    ("server.online_mode", "server.authentication"),
+    ("threads", "server.threads"),
+    ("ip", "network.ip"),
+    ("port", "network.port"),
+    ("transport", "network.transport"),
+    ("nethernet_http_port", "network.nethernet.http_port"),
+    ("network.nethernet_http_port", "network.nethernet.http_port"),
+    ("encryption", "network.raknet.encryption"),
+    ("network.encryption", "network.raknet.encryption"),
+    ("level_name", "level.name"),
+    ("level_seed", "level.seed"),
+    ("level_compression_level", "level.compression_level"),
+    ("max_view_distance", "level.max_view_distance"),
+    ("resource_packs_directory", "packs.resource_directory"),
+    ("behavior_packs_directory", "packs.behavior_directory"),
+    ("force_accept_resource_packs", "packs.force_accept"),
+    ("force_disable_vibrant_visuals", "packs.force_disable_vibrant_visuals"),
+    ("log_level", "log.level"),
+    ("log_to_file", "log.to_file"),
+    ("logs_directory", "log.directory"),
+];
+
+/// Keys that no longer exist, as dotted paths.
+const REMOVED_KEYS: &[&str] = &["max_generation_distance", "level.max_generation_distance"];
+
+/// Removes the value at a dotted path, unless it is a section.
+fn take_key(table: &mut toml::Table, path: &str) -> Option<toml::Value> {
+    let (parents, key) = path.rsplit_once('.').map_or(("", path), |(parents, key)| (parents, key));
+    let mut table = table;
+    for part in parents.split('.').filter(|part| !part.is_empty()) {
+        table = table.get_mut(part)?.as_table_mut()?;
+    }
+    if table.get(key)?.is_table() {
+        return None;
+    }
+    table.remove(key)
+}
+
+/// Sets the value at a dotted path unless one is already there, creating sections on the way.
+fn put_key(table: &mut toml::Table, path: &str, value: toml::Value) {
+    let (parents, key) = path.rsplit_once('.').map_or(("", path), |(parents, key)| (parents, key));
+    let mut table = table;
+    for part in parents.split('.').filter(|part| !part.is_empty()) {
+        let Some(section) = table.entry(part).or_insert_with(|| toml::Value::Table(toml::Table::new())).as_table_mut() else {
+            return;
+        };
+        table = section;
+    }
+    table.entry(key).or_insert(value);
+}
+
+/// Moves keys of older config layouts to where they live now, drops removed keys and returns
+/// whether anything changed.
+fn migrate_layout(table: &mut toml::Table) -> bool {
+    let mut migrated = false;
+    for &path in REMOVED_KEYS {
+        migrated |= take_key(table, path).is_some();
+    }
+    for &(old, new) in MOVED_KEYS {
+        if let Some(value) = take_key(table, old) {
+            put_key(table, new, value);
+            migrated = true;
+        }
+    }
+    migrated
 }
 
 impl Config {
@@ -114,10 +301,26 @@ impl Config {
                 exit(1);
             });
 
-            toml::from_str(&text).unwrap_or_else(|err| {
+            let mut table: toml::Table = toml::from_str(&text).unwrap_or_else(|err| {
+                eprintln!("An unexpected Error occurred while trying to parse {CONFIG_PATH:?}, Err: {err}");
+                exit(1);
+            });
+            let migrated = migrate_layout(&mut table);
+            let config: Config = table.try_into().unwrap_or_else(|err| {
                 eprintln!("An unexpected Error occurred while trying to deserialize {CONFIG_PATH:?}, Err: {err}");
                 exit(1);
-            })
+            });
+            if migrated {
+                let backup = format!("{CONFIG_PATH}.old");
+                match toml::to_string(&config) {
+                    Ok(text) if fs::copy(CONFIG_PATH, &backup).is_ok() => match fs::write(CONFIG_PATH, text) {
+                        Ok(()) => eprintln!("Moved {CONFIG_PATH:?} to the sectioned layout, the old file is kept as {backup:?}"),
+                        Err(err) => eprintln!("Failed to write the migrated config to {CONFIG_PATH:?}, Err: {err}"),
+                    },
+                    _ => eprintln!("Failed to back up {CONFIG_PATH:?} before migrating it, using the migrated values without saving them"),
+                }
+            }
+            config
         } else {
             let config = Config::default();
 
@@ -133,28 +336,28 @@ impl Config {
             config
         };
 
-        if !&config.logs_directory.exists() {
-            fs::create_dir(&config.logs_directory).unwrap_or_else(|err| {
-                eprintln!("An unexpected Error occurred while trying to create the logs directory at {:?}, Err: {err}", config.logs_directory);
+        if !&config.log.directory.exists() {
+            fs::create_dir(&config.log.directory).unwrap_or_else(|err| {
+                eprintln!("An unexpected Error occurred while trying to create the logs directory at {:?}, Err: {err}", config.log.directory);
                 exit(1)
             });
         };
 
-        if !&config.resource_packs_directory.exists() {
-            fs::create_dir(&config.resource_packs_directory).unwrap_or_else(|err| {
+        if !&config.packs.resource_directory.exists() {
+            fs::create_dir(&config.packs.resource_directory).unwrap_or_else(|err| {
                 eprintln!(
                     "An unexpected Error occurred while trying to create the resource packs directory at {:?}, Err: {err}",
-                    config.resource_packs_directory
+                    config.packs.resource_directory
                 );
                 exit(1)
             });
         };
 
-        if !&config.behavior_packs_directory.exists() {
-            fs::create_dir(&config.behavior_packs_directory).unwrap_or_else(|err| {
+        if !&config.packs.behavior_directory.exists() {
+            fs::create_dir(&config.packs.behavior_directory).unwrap_or_else(|err| {
                 eprintln!(
                     "An unexpected Error occurred while trying to create the behavior packs directory at {:?}, Err: {err:?}",
-                    config.behavior_packs_directory
+                    config.packs.behavior_directory
                 );
                 exit(1)
             });
