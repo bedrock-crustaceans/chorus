@@ -110,7 +110,7 @@ State transitions emit a `SessionStateChangedMessage`, which handler systems obs
 | `handler/chunks.rs` | chunk ordering, sending, unloading, sub-chunk requests |
 | `handler/form.rs` | form responses |
 
-Commands are dispatched by `dispatch_commands` (`src/command/dispatch.rs`), an exclusive `&mut World` system in the same chain. The server console is a `Console` entity (`src/console/`): stdin is polled without blocking on the main thread each update (console input records on Windows, `poll` on unix) and each line becomes a `CommandRequestedMessage`, so commands run the same way from the console and replies are logged. Ctrl+C requests a normal `AppExit`, which saves the level; a second Ctrl+C exits immediately.
+Commands are dispatched by `dispatch_commands` (`src/command/dispatch.rs`), an exclusive `&mut World` system in the same chain. The server console is a `Console` entity (`src/console/`). On a terminal it runs a crossterm raw-mode prompt (`console/prompt.rs`) polled without blocking on the main thread, with history and line editing; log lines go through `ConsoleWriter`, which prints them above the prompt. When stdin is a pipe it is read without blocking instead (`PeekNamedPipe` on Windows, `poll` on unix). Each line becomes a `CommandRequestedMessage`, so commands run the same way from the console and replies are logged. Ctrl+C requests a normal `AppExit`, which saves the level; a second Ctrl+C exits immediately.
 
 ### Block system
 

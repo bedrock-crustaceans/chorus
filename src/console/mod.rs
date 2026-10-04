@@ -4,8 +4,13 @@ use bevy_ecs::entity::Entity;
 use bevy_ecs::message::MessageWriter;
 use bevy_ecs::prelude::{Commands, Component, Res, ResMut, Resource};
 use bevy_ecs::system::Local;
+use std::io::IsTerminal;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing::{info, warn};
+
+mod prompt;
+
+pub use prompt::ConsoleWriter;
 
 #[cfg(unix)]
 mod unix;
@@ -26,6 +31,7 @@ pub struct ConsoleSender(pub Entity);
 
 #[derive(Resource, Default)]
 struct ConsoleInput {
+    terminal: bool,
     pending: Vec<u8>,
     closed: bool,
 }
@@ -42,13 +48,31 @@ impl Plugin for ConsolePlugin {
 
 fn interrupt() {
     if INTERRUPTED.swap(true, Ordering::SeqCst) {
+        prompt::stop();
         std::process::exit(130);
     }
 }
 
-fn setup_console(mut commands: Commands) {
+pub fn shutdown() {
+    prompt::stop();
+}
+
+fn setup_console(mut commands: Commands, mut input: ResMut<ConsoleInput>) {
     let console = commands.spawn(Console).id();
     commands.insert_resource(ConsoleSender(console));
+    if std::io::stdin().is_terminal() && std::io::stdout().is_terminal() {
+        match prompt::start() {
+            Ok(()) => {
+                input.terminal = true;
+                let hook = std::panic::take_hook();
+                std::panic::set_hook(Box::new(move |info| {
+                    prompt::stop();
+                    hook(info);
+                }));
+            }
+            Err(err) => warn!("failed to set up the console prompt, falling back to plain input: {err}"),
+        }
+    }
     if !platform::install_interrupt_handler(interrupt) {
         warn!("failed to install the interrupt handler, ctrl+c will exit without saving");
     }
@@ -56,6 +80,17 @@ fn setup_console(mut commands: Commands) {
 
 fn read_console(mut input: ResMut<ConsoleInput>, sender: Option<Res<ConsoleSender>>, mut writer: MessageWriter<CommandRequestedMessage>) {
     let Some(sender) = sender else { return };
+    if input.terminal {
+        for line in prompt::read() {
+            match line {
+                prompt::Input::Line(line) => {
+                    writer.write(CommandRequestedMessage { entity: sender.0, line });
+                }
+                prompt::Input::Interrupt => interrupt(),
+            }
+        }
+        return;
+    }
     if input.closed {
         return;
     }

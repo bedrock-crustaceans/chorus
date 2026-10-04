@@ -66,7 +66,7 @@ pub fn setup_logger(config: Res<Config>) {
         .add_directive("hyper=warn".parse().unwrap())
         .add_directive("h2=warn".parse().unwrap());
 
-    let console_layer = fmt::layer().event_format(PrettyFormatter).with_ansi(true);
+    let console_layer = fmt::layer().event_format(PrettyFormatter).with_ansi(true).with_writer(crate::console::ConsoleWriter::default);
 
     let file_layer = if config.log_to_file {
         let file_path = format!("{}.log", Local::now().format("%Y-%m-%d_%H-%M-%S"));

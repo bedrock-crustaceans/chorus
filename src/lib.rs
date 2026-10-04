@@ -58,6 +58,7 @@ impl LoopRunner {
                     let saved = level.save_blocking();
                     info!("saved {saved} chunks before exiting");
                 }
+                console::shutdown();
                 return exit;
             }
 

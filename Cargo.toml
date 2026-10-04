@@ -53,6 +53,7 @@ sha2 = "0.10.9"
 rand = "0.10.3"
 semver = "1.0.28"
 spin_sleep = "1.3.3"
+crossterm = "0.29"
 strum = "0.28.0"
 strum_macros = "0.28.0"
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
@@ -100,6 +101,7 @@ glam.workspace = true
 rand.workspace = true
 semver.workspace = true
 spin_sleep.workspace = true
+crossterm.workspace = true
 uuid.workspace = true
 zip.workspace = true
 
