@@ -79,7 +79,6 @@ impl CommandRegistry {
         info!("registered {} commands", self.commands.len() - before);
     }
 
-    /// Looks a command up by name or alias, ignoring case.
     pub fn get(&self, name: &str) -> Option<&CommandDefinition> {
         self.index.get(&name.to_ascii_lowercase()).and_then(|&position| self.commands.get(position).map(|c| c.as_ref()))
     }
@@ -92,14 +91,12 @@ impl CommandRegistry {
         self.soft_enums.get(name).map(Vec::as_slice)
     }
 
-    /// Replaces a soft enum's values and tells every client.
     pub fn set_soft_enum(&mut self, name: impl Into<String>, values: impl IntoIterator<Item = impl Into<String>>) {
         let (name, values): (String, Vec<String>) = (name.into(), values.into_iter().map(Into::into).collect());
         self.soft_enums.insert(name.clone(), values.clone());
         self.soft_enum_updates.push((name, values, SoftEnumUpdateType::Replace));
     }
 
-    /// Adds values to a soft enum and tells every client.
     pub fn add_soft_enum_values(&mut self, name: impl Into<String>, values: impl IntoIterator<Item = impl Into<String>>) {
         let name = name.into();
         let existing = self.soft_enums.entry(name.clone()).or_default();
@@ -111,7 +108,6 @@ impl CommandRegistry {
         self.soft_enum_updates.push((name, added, SoftEnumUpdateType::Add));
     }
 
-    /// Removes values from a soft enum and tells every client.
     pub fn remove_soft_enum_values(&mut self, name: impl Into<String>, values: impl IntoIterator<Item = impl Into<String>>) {
         let name = name.into();
         let Some(existing) = self.soft_enums.get_mut(&name) else { return };
@@ -123,7 +119,6 @@ impl CommandRegistry {
         self.soft_enum_updates.push((name, removed, SoftEnumUpdateType::Remove));
     }
 
-    /// Sends queued soft enum changes to every player.
     pub fn broadcast_soft_enum_updates(mut registry: ResMut<CommandRegistry>, mut sessions: Query<&mut Session>) {
         if registry.soft_enum_updates.is_empty() {
             return;
@@ -142,7 +137,6 @@ impl CommandRegistry {
         }
     }
 
-    /// Runs a command line from a player or the console, checking permission and parsing its arguments.
     pub fn dispatch(context: &mut CommandContext, line: &str) {
         let line = line.trim().trim_start_matches('/');
         let (name, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
@@ -186,7 +180,6 @@ impl CommandRegistry {
     }
 }
 
-/// Collects the shared enum, postfix and soft enum tables while commands are added.
 struct PacketBuilder {
     enum_values: Vec<String>,
     value_index: HashMap<String, u32>,
@@ -242,7 +235,6 @@ impl PacketBuilder {
         index
     }
 
-    /// Adds an enum along with the constraints on its values.
     fn command_enum(&mut self, values: &CommandEnum) -> u32 {
         let known = self.enum_index.contains_key(values.name.as_ref());
         let index = self.enumeration(&values.name, values.values.iter().map(|value| value.as_ref()));

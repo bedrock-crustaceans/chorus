@@ -66,7 +66,6 @@ impl<'w> CommandContext<'w> {
         self.get::<Console>().is_some()
     }
 
-    /// The sender's permission level; the console is always `Owner`.
     pub fn permission_level(&self) -> PermissionLevel {
         if self.is_console() {
             return PermissionLevel::Owner;

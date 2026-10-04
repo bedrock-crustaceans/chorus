@@ -62,7 +62,6 @@ pub const GENERATE_COMMAND: CommandDefinition = CommandDefinition::new("generate
     [CommandParameter::literal("status")],
 ]);
 
-/// The sender's block x and z, or the spawn for the console, and their dimension.
 fn origin(context: &CommandContext) -> ((i32, i32), i32) {
     let dimension = context.get::<DimensionId>().map_or(0, |dimension| dimension.0);
     if let Some(transform) = context.get::<Transform>() {

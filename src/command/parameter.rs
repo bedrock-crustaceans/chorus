@@ -2,42 +2,26 @@ use atomicow::CowArc;
 use bedrock::protocol::v898::packets::{OverloadsEntry, ParameterDataEntry};
 use chorus_core::permission::PermissionLevel;
 
-/// Built-in argument types the client knows how to suggest and validate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ArgumentType {
     Int,
     Float,
-    /// A number that may be relative, like `~5`.
     Value,
-    /// An int or `*`.
     WildcardInt,
-    /// An assignment operator: `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `<`, `>` or `><`.
     Operator,
-    /// A comparison: `<`, `<=`, `=`, `>=` or `>`.
     CompareOperator,
-    /// A player name or selector.
     Target,
-    /// A player name, selector or `*`.
     WildcardTarget,
     FilePath,
-    /// A range like `1..5`, `..5` or `3..`.
     IntegerRange,
     EquipmentSlot,
-    /// A single word, or a quoted string.
     String,
-    /// Three ints, each optionally relative (`~`) or local (`^`).
     BlockPosition,
-    /// Three numbers, each optionally relative (`~`) or local (`^`).
     Position,
-    /// The rest of the line, with selectors.
     Message,
-    /// The rest of the line.
     RawText,
-    /// The rest of the line, as JSON.
     Json,
-    /// Block states like `["facing"="north"]`.
     BlockStates,
-    /// The rest of the line, as a command.
     Command,
 }
 
@@ -87,18 +71,15 @@ impl ArgumentType {
         }
     }
 
-    /// Whether the argument takes the rest of the line.
     pub const fn is_greedy(self) -> bool {
         matches!(self, Self::Message | Self::RawText | Self::Json | Self::Command)
     }
 }
 
-/// A fixed list of values, sent once with the command list.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CommandEnum {
     pub name: CowArc<'static, str>,
     pub values: CowArc<'static, [CowArc<'static, str>]>,
-    /// Requirements on individual values, such as needing operator permissions.
     pub constraints: CowArc<'static, [ConstrainedValue]>,
 }
 
@@ -119,13 +100,11 @@ impl CommandEnum {
         }
     }
 
-    /// Adds requirements to some of the values: `.constrained(constraints![("spectator", EnumConstraints::OPERATOR_PERMISSIONS)])`.
     pub const fn constrained(mut self, constraints: &'static [ConstrainedValue]) -> Self {
         std::mem::forget(std::mem::replace(&mut self.constraints, CowArc::Static(constraints)));
         self
     }
 
-    /// The value matching `input`, ignoring case.
     pub fn find(&self, input: &str) -> Option<&str> {
         self.values.iter().map(|value| value.as_ref()).find(|value| value.eq_ignore_ascii_case(input))
     }
@@ -138,7 +117,6 @@ impl CommandEnum {
     }
 }
 
-/// Requirements the client and server apply before an enum value may be used.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct EnumConstraints(u8);
 
@@ -156,12 +134,10 @@ impl EnumConstraints {
         self.0 == 0
     }
 
-    /// The constraint ids sent to the client.
     pub(crate) fn ids(self) -> Vec<i8> {
         (0..3).filter(|bit| self.0 & (1 << bit) != 0).map(|bit| bit as i8).collect()
     }
 
-    /// The permission level a sender needs for a value with these constraints. Cheats are always on.
     pub fn required_level(self) -> PermissionLevel {
         if self.0 & Self::HOST_PERMISSIONS.0 != 0 {
             PermissionLevel::Host
@@ -188,8 +164,6 @@ impl ConstrainedValue {
     }
 }
 
-/// Builds the constrained values of a [`CommandEnum`] in a const:
-/// `constraints![("spectator", EnumConstraints::OPERATOR_PERMISSIONS)]`.
 #[macro_export]
 macro_rules! constraints {
     ($(($value:expr, $constraints:expr)),* $(,)?) => {{
@@ -198,8 +172,6 @@ macro_rules! constraints {
     }};
 }
 
-/// A named set of chained subcommand values, as used by commands like `/execute` whose overloads
-/// chain into further subcommands. Each value is a pair of words from the shared subcommand table.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChainedSubcommand {
     pub name: CowArc<'static, str>,
@@ -215,7 +187,6 @@ impl ChainedSubcommand {
     }
 }
 
-/// Builds the value pairs of a [`ChainedSubcommand`] in a const: `chained![("as", "origin"), ("at", "origin")]`.
 #[macro_export]
 macro_rules! chained {
     ($(($first:expr, $second:expr)),* $(,)?) => {{
@@ -224,7 +195,6 @@ macro_rules! chained {
     }};
 }
 
-/// Builds a `'static` list of strings in a const, for enum values and aliases: `values!["survival", "creative"]`.
 #[macro_export]
 macro_rules! values {
     ($($value:expr),* $(,)?) => {{
@@ -233,8 +203,6 @@ macro_rules! values {
     }};
 }
 
-/// Builds a command's overloads in a const, one bracketed parameter list per overload:
-/// `overloads![[CommandParameter::new("radius", ArgumentType::Int)], [CommandParameter::literal("stop")]]`.
 #[macro_export]
 macro_rules! overloads {
     ($([$($parameter:expr),* $(,)?]),* $(,)?) => {{
@@ -250,26 +218,19 @@ macro_rules! overloads {
 pub enum ParameterKind {
     Argument(ArgumentType),
     Enum(CommandEnum),
-    /// A literal word, sent as an enum with a single value, used for subcommands like `stop`.
     Literal(CowArc<'static, str>),
-    /// An enum whose values can change while the server runs, see `CommandRegistry::set_soft_enum`.
     SoftEnum(CowArc<'static, str>),
-    /// An int followed by a suffix, like `10L`.
     Postfix(CowArc<'static, str>),
-    /// The name of any registered command, sent as vanilla's `CommandName` enum.
     CommandName,
 }
 
-/// Name of the enum listing every registered command, which vanilla uses for `/help`.
 pub const COMMAND_NAME_ENUM: &str = "CommandName";
 
-/// Extra hints for how the client presents a parameter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ParameterOptions(pub(crate) u8);
 
 impl ParameterOptions {
     pub const NONE: Self = Self(0);
-    /// Show the enum's values inline instead of its name.
     pub const COLLAPSE_ENUM: Self = Self(1);
     pub const HAS_SEMANTIC_CONSTRAINT: Self = Self(2);
     pub const AS_CHAINED_COMMAND: Self = Self(4);
@@ -296,7 +257,6 @@ impl CommandParameter {
         Self::of(name, ParameterKind::Enum(values))
     }
 
-    /// A literal word such as a subcommand name; its parameter name is the word itself.
     pub const fn literal(word: &'static str) -> Self {
         Self::of(word, ParameterKind::Literal(CowArc::Static(word)))
     }
@@ -309,7 +269,6 @@ impl CommandParameter {
         Self::of(name, ParameterKind::Postfix(CowArc::Static(postfix)))
     }
 
-    /// The name or alias of any registered command.
     pub const fn command_name(name: &'static str) -> Self {
         Self::of(name, ParameterKind::CommandName)
     }
@@ -349,7 +308,6 @@ impl CommandParameter {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CommandOverload {
     pub parameters: CowArc<'static, [CommandParameter]>,
-    /// Whether this overload is a chained subcommand, like the parts of `/execute`.
     pub chaining: bool,
 }
 

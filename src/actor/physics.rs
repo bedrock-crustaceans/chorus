@@ -9,8 +9,6 @@ use glam::{IVec3, Vec3};
 
 const DEFAULT_FRICTION: f32 = 0.6;
 
-/// Simple vanilla style motion for an entity: gravity, drag and collision with blocks. The entity's
-/// `Transform::position` is the bottom centre of its box and `Transform::velocity` its motion per tick.
 #[derive(Component, Clone, Copy, Debug)]
 pub struct Physics {
     pub width: f32,
@@ -31,13 +29,11 @@ impl Physics {
         }
     }
 
-    /// Dropped items, like vanilla.
     pub const fn item() -> Self {
         Self::new(0.25, 0.25, 0.04, 0.98)
     }
 }
 
-/// Collision boxes of the blocks an entity can't pass through.
 pub struct BlockCollision<'a> {
     pub level: &'a Level,
     pub blocks: &'a BlockRegistry,
@@ -46,7 +42,6 @@ pub struct BlockCollision<'a> {
 }
 
 impl BlockCollision<'_> {
-    /// The block's collision box in world space; unloaded chunks count as solid so items never fall out of the world.
     pub fn collision_box(&self, block: IVec3) -> Option<(Vec3, Vec3)> {
         let origin = block.as_vec3();
         let Some(id) = self.level.get_block(self.dimension, block.x, block.y, block.z, 0) else {
@@ -70,7 +65,6 @@ impl BlockCollision<'_> {
             .map_or(DEFAULT_FRICTION, |friction| friction.friction)
     }
 
-    /// Moves a box along one axis as far as it can go and returns the distance travelled.
     fn sweep(&self, min: Vec3, max: Vec3, axis: usize, delta: f32) -> f32 {
         if delta == 0.0 {
             return 0.0;
@@ -102,7 +96,6 @@ impl BlockCollision<'_> {
         }
         allowed
     }
-    /// Advances an entity by one tick of gravity, movement and drag, and returns whether it is on the ground.
     pub fn step(&self, physics: &Physics, position: &mut Vec3, velocity: &mut Vec3) -> bool {
         velocity.y -= physics.gravity;
 

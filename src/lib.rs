@@ -59,6 +59,7 @@ impl LoopRunner {
 
             if let Some(exit) = app.should_exit() {
                 let compact = app.world().get_resource::<Config>().is_some_and(|config| config.level.database.shutdown_compaction);
+                actor::storage::save_all_actors(app.world_mut());
                 if let Some(mut level) = app.world_mut().get_resource_mut::<level::Level>() {
                     let saved = level.save_blocking();
                     info!("saved {saved} chunks before exiting");

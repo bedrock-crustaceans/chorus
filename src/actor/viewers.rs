@@ -11,28 +11,21 @@ use bevy_ecs::message::{Message, MessageWriter};
 use bevy_ecs::prelude::{Changed, Commands, Component, Entity, Query, With, Without};
 use std::collections::HashSet;
 
-/// The players that currently have this entity spawned on their client. Entities with this component
-/// are shown to players whose view reaches their chunk and hidden again when it stops reaching.
 #[derive(Component, Default, Debug)]
 pub struct Viewers(pub HashSet<Entity>);
 
-/// How far above an entity's position the client expects it, for entities whose position is their
-/// bottom but whose network position is their centre.
 #[derive(Component, Clone, Copy, Debug, Default)]
 pub struct NetworkOffset(pub f32);
 
-/// An entity was just shown to a player; the system for that entity kind sends its spawn packet.
 #[derive(Message, Clone, Copy, Debug)]
 pub struct ActorShown {
     pub actor: Entity,
     pub viewer: Entity,
 }
 
-/// Marks an entity to be removed from its viewers' clients and despawned at the end of the tick.
 #[derive(Component, Debug)]
 pub struct Despawn;
 
-/// Sends a packet to every player viewing an entity.
 pub fn send_to_viewers(viewers: &Viewers, sessions: &mut Query<&mut Session>, packet: &BedrockProtocol) {
     for &viewer in &viewers.0 {
         if let Ok(mut session) = sessions.get_mut(viewer) {
@@ -50,8 +43,6 @@ fn remove_packet(actor: &ActorId) -> BedrockProtocol {
     )
 }
 
-/// Works out which players should see each entity, showing and hiding it as players move, join,
-/// leave or change dimension.
 pub fn update_viewers(
     mut actors: Query<(Entity, &Transform, &DimensionId, &ActorId, &mut Viewers), Without<Despawn>>,
     mut sessions: Query<&mut Session>,
@@ -86,7 +77,6 @@ pub fn update_viewers(
     }
 }
 
-/// Sends the position of every entity that moved this tick to its viewers.
 pub fn broadcast_movement(moved: Query<(&ActorId, &Transform, &Viewers, Option<&NetworkOffset>, Option<&crate::actor::physics::Physics>), Changed<Transform>>, mut sessions: Query<&mut Session>) {
     for (actor, transform, viewers, offset, physics) in &moved {
         if viewers.0.is_empty() {
@@ -110,7 +100,6 @@ pub fn broadcast_movement(moved: Query<(&ActorId, &Transform, &Viewers, Option<&
     }
 }
 
-/// Removes entities marked with [`Despawn`] from their viewers' clients and despawns them.
 pub fn despawn_actors(despawning: Query<(Entity, &ActorId, Option<&Viewers>), With<Despawn>>, mut sessions: Query<&mut Session>, mut commands: Commands) {
     for (entity, actor, viewers) in &despawning {
         if let Some(viewers) = viewers {

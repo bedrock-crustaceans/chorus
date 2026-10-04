@@ -31,7 +31,6 @@ const SOUND_HIT: &str = "hit";
 
 const MAX_REACH_DISTANCE: f32 = 13.0;
 
-/// A block interaction a player sent, decoded from `PlayerActionPacket` or `PlayerAuthInputPacket`.
 #[derive(Message, Clone, Debug)]
 pub struct BlockActionMessage {
     pub entity: Entity,
@@ -119,7 +118,6 @@ pub fn handle_block_actions(
     }
 }
 
-/// Puts the held block against the face the player clicked.
 #[allow(clippy::too_many_arguments)]
 fn place_block(
     player_entity: Entity,

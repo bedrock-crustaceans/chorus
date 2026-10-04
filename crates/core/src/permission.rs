@@ -2,15 +2,12 @@ use bedrock::protocol::v662::enums::CommandPermissionLevel;
 use bedrock::protocol::v898::packets::CommandPermissionLevelString;
 use serde::{Deserialize, Serialize};
 
-/// How much a command sender is trusted, from players with no extra rights up to the server itself.
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PermissionLevel {
     #[default]
-    /// Called any in the protocol.
     #[serde(alias = "any")]
     Member,
-    /// Called game directors in the protocol.
     #[serde(alias = "game_directors", alias = "gamedirectors", alias = "op")]
     Operator,
     Admin,

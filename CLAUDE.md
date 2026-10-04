@@ -99,7 +99,7 @@ State transitions emit a `SessionStateChangedMessage`, which handler systems obs
 | Module | Plugin | Contents |
 |---|---|---|
 | `src/world/` | `WorldPlugin` | block breaking and placing (`block.rs`), level event, sound and block update broadcasts, chunk streaming and unloading (`chunks.rs`) |
-| `src/actor/` | `ActorPlugin` | non-player entities, currently dropped items (`item.rs`) |
+| `src/actor/` | `ActorPlugin` | non-player entities: `viewers.rs` (each entity's `Viewers` follow players' view radius; kinds send their spawn packet on `ActorShown`, `Despawn` removes from clients), `physics.rs` (`Physics` with block collision), `storage.rs` (actors saved with their chunk in vanilla's `digp` + `actorprefix` keys through per-kind codecs in `ActorRegistry`, loaded when the chunk becomes available, saved on unload, autosave, `/save` and exit), `item.rs` (dropped items) |
 | `src/chat.rs` | `ChatPlugin` | chat, broadcast messages, join and quit announcements |
 
 Commands are dispatched by `dispatch_commands` (`src/command/dispatch.rs`), an exclusive `&mut World` system in the same chain. The server console is a `Console` entity (`src/console/`). On a terminal it runs a crossterm raw-mode prompt (`console/prompt.rs`) polled without blocking on the main thread, with history and line editing; log lines go through `ConsoleWriter`, which prints them above the prompt. When stdin is a pipe it is read without blocking instead (`PeekNamedPipe` on Windows, `poll` on unix). Each line becomes a `CommandRequestedMessage`, so commands run the same way from the console, and console replies are printed with their colour codes as terminal colours. Ctrl+C requests a normal `AppExit`, which saves the level; a second Ctrl+C exits immediately.

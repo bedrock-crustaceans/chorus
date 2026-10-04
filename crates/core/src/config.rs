@@ -62,8 +62,6 @@ pub struct Config {
     pub permissions: PermissionConfig,
 }
 
-/// Command permission levels: `default` for everyone, and `players` for specific players by name
-/// or XUID, for example `players = { Steve = "admin" }`. The console is always `owner`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct PermissionConfig {
@@ -89,7 +87,6 @@ impl PermissionConfig {
     }
 }
 
-/// How many worker threads the task pools get: a number, or `"auto"` for one per CPU core.
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(untagged)]
 pub enum Threads {
@@ -122,12 +119,9 @@ impl Threads {
 #[serde(default, deny_unknown_fields)]
 pub struct ServerConfig {
     pub name: String,
-    /// Second line of the server list entry.
     pub description: String,
     pub max_players: i32,
-    /// Whether players must be signed in to Xbox Live.
     pub authentication: bool,
-    /// Worker threads for the task pools; 0 runs everything on the main thread.
     pub threads: Threads,
 }
 
@@ -180,7 +174,6 @@ impl Default for RakNetConfig {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct NetherNetConfig {
-    /// TCP port the HTTP signaling endpoint binds to.
     pub http_port: u16,
 }
 
@@ -190,8 +183,6 @@ impl Default for NetherNetConfig {
     }
 }
 
-/// How often something runs: a duration such as `"30s"`, `"5m"` or `"1h 30m"`, a whole number of
-/// seconds, or `false` to turn it off.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Interval(Option<Duration>);
 
@@ -249,7 +240,6 @@ pub struct LevelConfig {
     pub seed: LevelSeed,
     pub chunk_saving: ChunkSaving,
     pub max_view_distance: i32,
-    /// How often unsaved chunks are written to disk.
     pub autosave: Interval,
     pub database: DatabaseConfig,
 }
@@ -270,11 +260,8 @@ impl Default for LevelConfig {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct DatabaseConfig {
-    /// Deflate level from 0 to 10.
     pub compression: u8,
-    /// How often the database is compacted in the background.
     pub auto_compaction: Interval,
-    /// Fully compact the database when the server stops, which can take a while after lots of new chunks.
     pub shutdown_compaction: bool,
 }
 
@@ -326,7 +313,6 @@ impl Default for LogConfig {
     }
 }
 
-/// Where keys of older config layouts moved, as dotted (old path, new path).
 const MOVED_KEYS: &[(&str, &str)] = &[
     ("name", "server.name"),
     ("sub_name", "server.description"),
@@ -356,10 +342,8 @@ const MOVED_KEYS: &[(&str, &str)] = &[
     ("logs_directory", "log.directory"),
 ];
 
-/// Keys that no longer exist, as dotted paths.
 const REMOVED_KEYS: &[&str] = &["max_generation_distance", "level.max_generation_distance"];
 
-/// Removes the value at a dotted path, unless it is a section.
 fn take_key(table: &mut toml::Table, path: &str) -> Option<toml::Value> {
     let (parents, key) = path.rsplit_once('.').map_or(("", path), |(parents, key)| (parents, key));
     let mut table = table;
@@ -372,7 +356,6 @@ fn take_key(table: &mut toml::Table, path: &str) -> Option<toml::Value> {
     table.remove(key)
 }
 
-/// Sets the value at a dotted path unless one is already there, creating sections on the way.
 fn put_key(table: &mut toml::Table, path: &str, value: toml::Value) {
     let (parents, key) = path.rsplit_once('.').map_or(("", path), |(parents, key)| (parents, key));
     let mut table = table;
@@ -385,8 +368,6 @@ fn put_key(table: &mut toml::Table, path: &str, value: toml::Value) {
     table.entry(key).or_insert(value);
 }
 
-/// Moves keys of older config layouts to where they live now, drops removed keys and returns
-/// whether anything changed.
 fn migrate_layout(table: &mut toml::Table) -> bool {
     let mut migrated = false;
     for &path in REMOVED_KEYS {

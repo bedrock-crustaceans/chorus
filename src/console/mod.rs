@@ -127,14 +127,11 @@ fn handle_interrupt(mut exit: MessageWriter<AppExit>, mut handled: Local<bool>) 
     }
 }
 
-/// Prints a command reply to the console, with its formatting codes as terminal colours when the
-/// console is a terminal and stripped otherwise.
 pub fn reply(message: &str) {
     let text = if std::io::stdout().is_terminal() { to_ansi(message) } else { strip_formatting(message) };
     prompt::print(format!("{text}\n").as_bytes());
 }
 
-/// Terminal colour for a formatting code, including Bedrock's material colours.
 fn ansi_code(code: char) -> Option<&'static str> {
     Some(match code {
         '0' => "\x1b[30m",

@@ -3,8 +3,6 @@ use chorus_core::permission::PermissionLevel;
 use glam::{DVec3, IVec3, Vec2};
 use std::collections::HashMap;
 
-/// One component of a position: a plain number, relative to the sender (`~`), or along the sender's
-/// facing (`^`, left/up/forward).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Coordinate {
     Absolute(f64),
@@ -24,8 +22,6 @@ impl Coordinate {
         }
     }
 
-    /// Resolves an absolute or relative coordinate against `origin`; local coordinates need a whole
-    /// [`CommandPosition`].
     pub fn resolve(self, origin: f64) -> f64 {
         match self {
             Self::Absolute(value) => value,
@@ -34,7 +30,6 @@ impl Coordinate {
     }
 }
 
-/// A position argument. Use [`resolve`](Self::resolve) to turn it into world coordinates.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CommandPosition {
     pub x: Coordinate,
@@ -47,8 +42,6 @@ impl CommandPosition {
         matches!(self.x, Coordinate::Local(_))
     }
 
-    /// World coordinates relative to `origin`, facing `rotation` (pitch, yaw in degrees, as in
-    /// `Transform::rotation`) for `^`.
     pub fn resolve(&self, origin: DVec3, rotation: Vec2) -> DVec3 {
         if let (Coordinate::Local(left), Coordinate::Local(up), Coordinate::Local(forward)) = (self.x, self.y, self.z) {
             let (pitch, yaw) = ((rotation.x as f64).to_radians(), (rotation.y as f64).to_radians());
@@ -60,26 +53,22 @@ impl CommandPosition {
         DVec3::new(self.x.resolve(origin.x), self.y.resolve(origin.y), self.z.resolve(origin.z))
     }
 
-    /// The block containing [`resolve`](Self::resolve)'s result.
     pub fn resolve_block(&self, origin: DVec3, rotation: Vec2) -> IVec3 {
         self.resolve(origin, rotation).floor().as_ivec3()
     }
 }
 
-/// A parsed argument value.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgValue {
     Int(i32),
     Float(f32),
     Value(Coordinate),
-    /// `None` for `*`.
     WildcardInt(Option<i32>),
     Range(Option<i32>, Option<i32>),
     Position(CommandPosition),
     Text(String),
 }
 
-/// The arguments of a command, parsed against the overload that matched.
 #[derive(Debug, Clone, Default)]
 pub struct CommandArgs {
     overload: usize,
@@ -88,12 +77,10 @@ pub struct CommandArgs {
 }
 
 impl CommandArgs {
-    /// Index of the overload that matched, in the order the command declares them.
     pub fn overload(&self) -> usize {
         self.overload
     }
 
-    /// Everything after the command name, as typed.
     pub fn raw(&self) -> &str {
         &self.raw
     }
@@ -128,7 +115,6 @@ impl CommandArgs {
         }
     }
 
-    /// `Some(None)` when the argument was `*`.
     pub fn wildcard_int(&self, name: &str) -> Option<Option<i32>> {
         match self.get(name)? {
             ArgValue::WildcardInt(value) => Some(*value),
@@ -150,7 +136,6 @@ impl CommandArgs {
         }
     }
 
-    /// Text arguments: strings, targets, enum and soft enum values, literals, and rest-of-line text.
     pub fn string(&self, name: &str) -> Option<&str> {
         match self.get(name)? {
             ArgValue::Text(text) => Some(text),
@@ -159,11 +144,9 @@ impl CommandArgs {
     }
 }
 
-/// Why no overload matched.
 #[derive(Debug)]
 pub struct ParseError {
     pub message: String,
-    /// Usage of every overload that got as far as the one the message is about.
     pub usages: Vec<String>,
 }
 
@@ -174,7 +157,6 @@ struct Token<'a> {
     source: &'a str,
 }
 
-/// Splits on whitespace, keeping `"quoted strings"` (with `\"` escapes) together.
 fn tokenize(line: &str) -> Vec<Token<'_>> {
     let mut tokens = Vec::new();
     let mut chars = line.char_indices().peekable();
@@ -208,7 +190,6 @@ fn tokenize(line: &str) -> Vec<Token<'_>> {
     tokens
 }
 
-/// Splits a token like `~~1~` into the coordinates it holds.
 fn coordinate_parts(text: &str) -> Vec<&str> {
     let mut parts = Vec::new();
     let mut start = 0;
@@ -363,8 +344,6 @@ fn parse_argument(kind: ArgumentType, text: &str) -> Option<ArgValue> {
     })
 }
 
-/// Parses `line` (everything after the command name) against each overload in order and returns the
-/// first that fits, or the error from the overload that got furthest.
 pub fn parse(name: &str, overloads: &[CommandOverload], line: &str, soft_enums: &HashMap<String, Vec<String>>, level: PermissionLevel) -> Result<CommandArgs, ParseError> {
     let tokens = tokenize(line);
     let empty = [CommandOverload::new(&[])];

@@ -23,15 +23,35 @@ pub struct ServerState {
     started: Instant,
 
     runtime_id: u64,
+    unique_id: i64,
 }
 
 impl ServerState {
+    pub fn new() -> Self {
+        Self {
+            tick: 0,
+            tick_instant: Instant::now(),
+            started: Instant::now(),
+            runtime_id: 1,
+            unique_id: 0,
+        }
+    }
+
     pub fn tick(&self) -> i64 {
         self.tick
     }
 
     pub fn uptime(&self) -> Duration {
         self.started.elapsed()
+    }
+
+    pub fn get_unique_id(&mut self) -> i64 {
+        self.unique_id += 1;
+        self.unique_id
+    }
+
+    pub fn set_unique_id_base(&mut self, start_count: i64) {
+        self.unique_id = start_count << 32;
     }
 
     pub fn get_runtime_id(&mut self) -> u64 {
@@ -92,28 +112,22 @@ impl ServerMetrics {
 
 impl Plugin for Server {
     fn build(&self, app: &mut App) {
-        app.insert_resource(ServerState {
-            tick: 0,
-            tick_instant: Instant::now(),
-            started: Instant::now(),
-
-            runtime_id: 1,
-        })
-        .insert_resource(ServerMetrics {
-            tps: TICK_RATE,
-            tps_min: TICK_RATE,
-            tps_avg: RollingAvg::new(20),
-            mspt: 0.0,
-            mspt_max: 0.0,
-            mspt_avg: RollingAvg::new(20),
-        })
-        .add_systems(Startup, Server::start)
-        .add_systems(Tick, Server::start_tick.in_set(TickSet::First))
-        .add_systems(Tick, pregen::Pregen::run.in_set(TickSet::First).after(Server::start_tick))
-        .add_systems(Tick, Server::end_tick.in_set(TickSet::Last))
-        .add_plugins(Registry)
-        .add_plugins(ConsolePlugin)
-        .add_plugins(Network);
+        app.insert_resource(ServerState::new())
+            .insert_resource(ServerMetrics {
+                tps: TICK_RATE,
+                tps_min: TICK_RATE,
+                tps_avg: RollingAvg::new(20),
+                mspt: 0.0,
+                mspt_max: 0.0,
+                mspt_avg: RollingAvg::new(20),
+            })
+            .add_systems(Startup, Server::start)
+            .add_systems(Tick, Server::start_tick.in_set(TickSet::First))
+            .add_systems(Tick, pregen::Pregen::run.in_set(TickSet::First).after(Server::start_tick))
+            .add_systems(Tick, Server::end_tick.in_set(TickSet::Last))
+            .add_plugins(Registry)
+            .add_plugins(ConsolePlugin)
+            .add_plugins(Network);
     }
 }
 

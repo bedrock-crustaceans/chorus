@@ -20,7 +20,6 @@ pub struct Pregen {
     started: Instant,
     last_report: Instant,
     reported_done: usize,
-    /// Chunks per second over the last report window, until the first report the whole run so far.
     recent_rate: Option<f64>,
     stalled_ticks: u32,
 }

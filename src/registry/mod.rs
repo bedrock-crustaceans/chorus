@@ -7,7 +7,7 @@ use crate::level::level::PollGenerationJob;
 use crate::registry::block_registry::BlockRegistry;
 use crate::resource::ResourcePacks;
 use bevy_app::{App, Plugin, Startup, Update};
-use bevy_ecs::prelude::{Commands, IntoScheduleConfigs, Local, Res, ResMut, SystemSet};
+use bevy_ecs::prelude::{Commands, IntoScheduleConfigs, Local, Res, ResMut, SystemSet, World};
 use chorus_core::schedule::{Tick, TickSet};
 use command_registry::CommandRegistry;
 use item_registry::ItemRegistry;
@@ -52,7 +52,6 @@ impl Plugin for Registry {
 }
 
 pub const WORLDS_DIRECTORY: &str = "worlds";
-/// Whether `interval` has passed since `last`, restarting the wait when it has.
 fn interval_elapsed(last: &mut Option<Instant>, interval: Interval) -> bool {
     let Some(interval) = interval.get() else { return false };
     let last = last.get_or_insert_with(Instant::now);
@@ -71,11 +70,12 @@ fn compact_level(level: Option<Res<Level>>, config: Res<Config>, mut last: Local
     }
 }
 
-fn autosave(level: Option<ResMut<Level>>, config: Res<Config>, mut last: Local<Option<Instant>>) {
-    if !interval_elapsed(&mut last, config.level.autosave) {
+fn autosave(world: &mut World, mut last: Local<Option<Instant>>) {
+    if !interval_elapsed(&mut last, world.resource::<Config>().level.autosave) {
         return;
     }
-    if let Some(mut level) = level
+    crate::actor::storage::save_all_actors(world);
+    if let Some(mut level) = world.get_resource_mut::<Level>()
         && level.unsaved_count() > 0
     {
         let saved = level.save();
@@ -90,7 +90,8 @@ pub fn open_level(mut commands: Commands, registry: Res<BlockRegistry>, config: 
     commands.insert_resource(level);
 }
 
-pub fn add_default_dimensions(mut level: ResMut<Level>, registry: Res<BlockRegistry>) {
+pub fn add_default_dimensions(mut level: ResMut<Level>, registry: Res<BlockRegistry>, mut server_state: ResMut<crate::server::ServerState>) {
+    server_state.set_unique_id_base(level.start_count);
     if !level.has_dimension(DimensionType::Overworld.id()) {
         let generator = OverworldGenerator::<Java>::new(level.seed, &registry);
         if level.is_new() {
