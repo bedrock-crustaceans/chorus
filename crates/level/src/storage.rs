@@ -19,6 +19,8 @@ const SUB_CHUNK_VERSION: u8 = 9;
 const STORAGE_VERSION: i32 = 10;
 const FINALIZED: i32 = 2;
 const PLAINS: i32 = 1;
+const POOL_COMPACTION_SLICE: Duration = Duration::from_millis(50);
+const TICK_COMPACTION_BUDGET: Duration = Duration::from_millis(10);
 
 const TAG_DATA_3D: u8 = 0x2b;
 const TAG_VERSION: u8 = 0x2c;
@@ -75,12 +77,15 @@ pub struct LevelData {
 type PendingWrite = (Vec<u8>, Option<Arc<[u8]>>);
 type PendingWrites = HashMap<Vec<u8>, Option<Arc<[u8]>>>;
 
-pub fn spawn_io(work: impl FnOnce() + Send + 'static) {
-    let pool = bevy_tasks::IoTaskPool::try_get()
+fn io_pool() -> Option<&'static bevy_tasks::TaskPool> {
+    bevy_tasks::IoTaskPool::try_get()
         .map(|pool| &**pool)
         .filter(|pool| pool.thread_num() > 0)
-        .or_else(|| bevy_tasks::AsyncComputeTaskPool::try_get().map(|pool| &**pool).filter(|pool| pool.thread_num() > 0));
-    match pool {
+        .or_else(|| bevy_tasks::AsyncComputeTaskPool::try_get().map(|pool| &**pool).filter(|pool| pool.thread_num() > 0))
+}
+
+pub fn spawn_io(work: impl FnOnce() + Send + 'static) {
+    match io_pool() {
         Some(pool) => pool.spawn(async move { work() }).detach(),
         None => work(),
     }
@@ -201,16 +206,33 @@ impl LevelStorage {
     }
 
     pub fn schedule_compaction(self: &Arc<Self>) {
-        if self.compacting.swap(true, Ordering::AcqRel) {
+        if self.compacting.swap(true, Ordering::AcqRel) || io_pool().is_none() {
             return;
         }
         let storage = self.clone();
-        spawn_io(move || {
-            if let Err(err) = storage.db.lock().expect("level database lock poisoned").compact() {
+        spawn_io(move || while storage.compact_step(POOL_COMPACTION_SLICE) {});
+    }
+
+    /// Runs one compaction round on this thread when a compaction was scheduled without any pool
+    /// threads to hand it to. Called every tick so a single-threaded server never stalls on a full compaction.
+    pub fn step_compaction(&self) {
+        if io_pool().is_none() && self.compacting.load(Ordering::Acquire) {
+            self.compact_step(TICK_COMPACTION_BUDGET);
+        }
+    }
+
+    fn compact_step(&self, budget: Duration) -> bool {
+        let more = match self.db.lock().expect("level database lock poisoned").compact_step(budget) {
+            Ok(more) => more,
+            Err(err) => {
                 error!("failed to compact the level database: {err}");
+                false
             }
-            storage.compacting.store(false, Ordering::Release);
-        });
+        };
+        if !more {
+            self.compacting.store(false, Ordering::Release);
+        }
+        more
     }
 
     pub fn flush_blocking(&self) -> StorageResult<()> {
