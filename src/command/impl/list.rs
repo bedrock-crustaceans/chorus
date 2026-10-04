@@ -21,7 +21,7 @@ pub const LIST_COMMAND: CommandDefinition = const_command! {
 
         names.sort_unstable();
 
-        let max_players = context.resource::<Config>().max_players;
+        let max_players = context.resource::<Config>().server.max_players;
 
         context.reply(format!("There are {}/{max_players} players online:", names.len()));
 

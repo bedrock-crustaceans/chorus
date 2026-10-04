@@ -60,18 +60,17 @@ where
 pub fn setup_logger(config: Res<Config>) {
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
-        .parse_lossy(config.log_level.clone())
-        .add_directive("chorus=debug".parse().unwrap())
+        .parse_lossy(config.log.level.clone())
         .add_directive("reqwest=warn".parse().unwrap())
         .add_directive("hyper=warn".parse().unwrap())
         .add_directive("h2=warn".parse().unwrap());
 
     let console_layer = fmt::layer().event_format(PrettyFormatter).with_ansi(true).with_writer(crate::console::ConsoleWriter::default);
 
-    let file_layer = if config.log_to_file {
+    let file_layer = if config.log.to_file {
         let file_path = format!("{}.log", Local::now().format("%Y-%m-%d_%H-%M-%S"));
 
-        let appender = rolling::never(config.logs_directory.display().to_string(), file_path);
+        let appender = rolling::never(config.log.directory.display().to_string(), file_path);
 
         Some(fmt::layer().with_writer(appender).with_ansi(false).event_format(PrettyFormatter))
     } else {

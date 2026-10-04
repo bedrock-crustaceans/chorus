@@ -104,8 +104,8 @@ impl Plugin for ChorusPlugin {
         if !app.is_plugin_added::<TaskPoolPlugin>() {
             app.add_plugins(TaskPoolPlugin {
                 task_pool_options: TaskPoolOptions {
-                    min_total_threads: config.threads,
-                    max_total_threads: config.threads,
+                    min_total_threads: config.server.threads.count(),
+                    max_total_threads: config.server.threads.count(),
                     io: thread_policy(2, 0.1),
                     async_compute: thread_policy(usize::MAX, 0.75),
                     compute: thread_policy(usize::MAX, 1.0),

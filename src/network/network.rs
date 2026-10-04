@@ -90,29 +90,29 @@ impl Plugin for Network {
 
 impl Network {
     pub fn init(config: Res<Config>, mut commands: Commands) {
-        let ip = IpAddr::V4(Ipv4Addr::from_str(config.ip.as_str()).unwrap_or_else(|err| {
-            error!("{}: {}", err, config.ip);
+        let ip = IpAddr::V4(Ipv4Addr::from_str(config.network.ip.as_str()).unwrap_or_else(|err| {
+            error!("{}: {}", err, config.network.ip);
 
             Ipv4Addr::UNSPECIFIED
         }));
-        let bind_addr = SocketAddr::new(ip, config.port);
+        let bind_addr = SocketAddr::new(ip, config.network.port);
 
-        match config.transport {
+        match config.network.transport {
             NetworkTransport::RakNet => {
                 let guid = rand::random::<u64>();
 
                 let server = RakServer::new(bind_addr, |conf: &mut RakServerConfig| {
                     conf.guid = guid;
                     conf.protocols = Box::new([BedrockProtocol::RAKNET_VERSION]);
-                    conf.max_connections = config.max_players.max(0) as usize;
+                    conf.max_connections = config.server.max_players.max(0) as usize;
                     conf.message = BedrockMOTD {
                         edition: MINECRAFT_EDITION_MOTD.to_owned(),
-                        name: config.name.clone(),
-                        sub_name: config.sub_name.clone(),
+                        name: config.server.name.clone(),
+                        sub_name: config.server.description.clone(),
                         protocol: BedrockProtocol::PROTOCOL_VERSION,
                         version: BedrockProtocol::GAME_VERSION.to_string(),
                         player_count: 0,
-                        player_max: config.max_players,
+                        player_max: config.server.max_players,
                         guid,
                         game_mode: "Survival".to_string(),
                         nintendo_limited: Some(false),
@@ -129,15 +129,15 @@ impl Network {
             NetworkTransport::NetherNet => {
                 let network_id = rand::random::<u64>();
 
-                let mut data = ServerData::new(config.name.clone(), config.level_name.clone());
-                data.max_player_count = config.max_players;
+                let mut data = ServerData::new(config.server.name.clone(), config.level.name.clone());
+                data.max_player_count = config.server.max_players;
                 data.protocol_version = BedrockProtocol::PROTOCOL_VERSION;
                 data.game_version = BedrockProtocol::GAME_VERSION.to_string();
 
                 let mut lan = NetherServer::new(network_id, bind_addr, |_| {}).expect("failed to bind nethernet lan signaler");
                 lan.set_server_data(data.clone());
 
-                let http_addr = SocketAddr::new(ip, config.nethernet_http_port);
+                let http_addr = SocketAddr::new(ip, config.network.nethernet.http_port);
                 let mut http = NetherHttpServer::bind(http_addr, |_| {}).expect("failed to bind nethernet http signaler");
                 http.set_server_data(data);
 

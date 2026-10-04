@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::level::DimensionId;
@@ -148,12 +147,11 @@ pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>,
     }
 }
 
-pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut ChunkView)>, mut level: ResMut<Level>, config: Res<Config>) {
+pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut ChunkView)>, mut level: ResMut<Level>) {
     let mut focus: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
     let mut to_request: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
     for (_, _, mut view) in query.iter_mut() {
         let Some(center) = view.center else { continue };
-        let generation_radius = view.radius.min(config.max_generation_distance);
         focus.entry(view.dimension).or_default().push(center);
 
         let mut new_requests = Vec::new();
@@ -161,7 +159,7 @@ pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut Chun
             if new_requests.len() >= MAX_NEW_REQUESTS_PER_TICK {
                 break;
             }
-            if (x - center.0).pow(2) + (z - center.1).pow(2) <= generation_radius.pow(2) && !view.requested.contains(&(x, z)) {
+            if (x - center.0).pow(2) + (z - center.1).pow(2) <= view.radius.pow(2) && !view.requested.contains(&(x, z)) {
                 new_requests.push((x, z));
             }
         }

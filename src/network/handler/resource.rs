@@ -63,10 +63,10 @@ pub fn handle_resource(
 
         session.send(BedrockProtocol::ResourcePacksInfoPacket(
             ResourcePacksInfoPacket {
-                resource_pack_required: config.force_accept_resource_packs,
+                resource_pack_required: config.packs.force_accept,
                 has_addon_packs: false,
                 has_scripts: entries.iter().any(|e| e.has_scripts),
-                force_disable_vibrant_visuals: config.force_disable_vibrant_visuals,
+                force_disable_vibrant_visuals: config.packs.force_disable_vibrant_visuals,
                 world_template_uuid: Default::default(),
                 world_template_version: String::new(),
                 resource_packs: entries,
@@ -161,7 +161,7 @@ fn handle_client_response(
 
             session.send(BedrockProtocol::ResourcePackStackPacket(
                 ResourcePackStackPacket {
-                    texture_pack_required: config.force_accept_resource_packs,
+                    texture_pack_required: config.packs.force_accept,
                     addon_list,
                     base_game_version: BaseGameVersion("*".to_string()),
                     experiments: Experiments {
