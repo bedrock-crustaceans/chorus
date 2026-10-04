@@ -8,6 +8,7 @@ use std::time::Instant;
 use tracing::{info, warn};
 
 pub mod command;
+pub mod console;
 pub mod form;
 pub mod logger;
 pub mod network;

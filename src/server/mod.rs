@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::console::ConsolePlugin;
 use crate::network::network::Network;
 use crate::registry::Registry;
 use crate::utils::rolling_avg::RollingAvg;
@@ -92,6 +93,7 @@ impl Plugin for Server {
         .add_systems(Tick, Server::start_tick.in_set(TickSet::First))
         .add_systems(Tick, Server::end_tick.in_set(TickSet::Last))
         .add_plugins(Registry)
+        .add_plugins(ConsolePlugin)
         .add_plugins(Network);
     }
 }

@@ -1,4 +1,5 @@
 use crate::command::context::CommandContext;
+use crate::console::Console;
 use crate::network::session::Session;
 use crate::registry::command_registry::CommandRegistry;
 use bevy_ecs::message::Messages;
@@ -20,7 +21,7 @@ pub fn dispatch_commands(world: &mut World) {
     let requests: Vec<CommandRequestedMessage> = world.resource_mut::<Messages<CommandRequestedMessage>>().drain().collect();
 
     for request in requests {
-        if world.get::<Session>(request.entity).is_none() {
+        if world.get::<Session>(request.entity).is_none() && world.get::<Console>(request.entity).is_none() {
             continue;
         }
 

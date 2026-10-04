@@ -1,3 +1,4 @@
+use crate::console::{Console, strip_formatting};
 use crate::network::BedrockProtocol;
 use crate::network::session::Session;
 use crate::player::identity::PlayerIdentity;
@@ -41,6 +42,9 @@ impl<'w> CommandContext<'w> {
     }
 
     pub fn sender_name(&self) -> &str {
+        if self.is_console() {
+            return "Server";
+        }
         self.get::<PlayerIdentity>().map_or("", |identity| identity.name())
     }
 
@@ -56,8 +60,15 @@ impl<'w> CommandContext<'w> {
         self.world.get_entity_mut(self.sender).ok()?.into_components_mut::<Q>().ok()
     }
 
+    pub fn is_console(&self) -> bool {
+        self.get::<Console>().is_some()
+    }
+
     pub fn reply(&mut self, message: impl Into<String>) {
         let Some(mut session) = self.get_mut::<Session>() else {
+            if self.is_console() {
+                tracing::info!("{}", strip_formatting(&message.into()));
+            }
             return;
         };
 
