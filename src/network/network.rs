@@ -1,11 +1,10 @@
+use crate::chat::{BroadcastMessage, PlayerChatMessage};
 use crate::command::dispatch::{CommandPreprocessMessage, CommandRequestedMessage};
 use crate::config::{Config, NetworkTransport};
 use crate::item::ItemTakenMessage;
 use crate::level::{BlockUpdatedMessage, LevelEventMessage, LevelSoundMessage};
 use crate::network::BedrockProtocol;
 use crate::network::bandwidth::BandwidthTracker;
-use crate::network::handler::block::{BlockBreakMessage, BlockPlaceMessage};
-use crate::network::handler::chat::{BroadcastMessage, PlayerChatMessage};
 use crate::network::handler::form::FormResponseMessage;
 use crate::network::handler::inventory::{InventoryCloseMessage, InventoryOpenMessage, PlayerItemHeldMessage};
 use crate::network::handler::login::PlayerLoginMessage;
@@ -17,6 +16,7 @@ use crate::network::login::auth::LoginAuthOIDC;
 use crate::network::session::Session;
 use crate::network::session::state::SessionStateChangedMessage;
 use crate::network::transport::{ActiveTransport, SessionId};
+use crate::world::block::{BlockBreakMessage, BlockPlaceMessage};
 use crate::{JobQueue, Tick, TickSet};
 use bedrock::network::info::MINECRAFT_EDITION_MOTD;
 use bedrock::network::motd::BedrockMOTD;
@@ -46,7 +46,7 @@ impl Plugin for Network {
         let receive_job = app.world_mut().register_system(Network::receive);
         app.insert_resource(ReceiveJob(receive_job));
 
-        app.add_plugins(PacketHandlers)
+        app.add_plugins((PacketHandlers, crate::world::WorldPlugin, crate::actor::ActorPlugin, crate::chat::ChatPlugin))
             .add_plugins(LoginAuthOIDC)
             .add_plugins(RakServerPlugin)
             .add_plugins(NetherServerPlugin)

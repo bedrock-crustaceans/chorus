@@ -92,23 +92,15 @@ Request → Login → Handshake (if encryption) → Resource → Setup → Play
 
 State transitions emit a `SessionStateChangedMessage`, which handler systems observe to run entry logic (`on_enter_setup`, `on_enter_play`).
 
-### Packet routing
+### Packet routing and game systems
 
-`PacketHandlers` (`src/network/handler/mod.rs`) registers all handler systems in the `Tick` schedule inside `TickSet::Update`, as one long `.chain()` of grouped systems. Each state handler reads `PacketReceivedMessage`, filters by `SessionState`, and dispatches:
+`TickSet::Update` is split into chained `GameSet` stages (`src/schedule.rs`): `Connection`, `Input`, `World`, `Actors`, `Chat`, `Chunks`, `Broadcast`. `network/handler/` only holds per-session-state packet handlers (`PacketHandlers`, in `Connection` and `Input`): request, login, handshake, resource, setup, play, inventory, forms, and `block.rs`, which decodes block interactions into `BlockActionMessage`s. Game logic lives in domain modules, each with its own plugin:
 
-| Handler file | Responsibility |
-|---|---|
-| `handler/request.rs` | `Request` state |
-| `handler/login.rs` | `Login` state |
-| `handler/handshake.rs` | `Handshake` state |
-| `handler/resource.rs` | `Resource` state: pack info, chunk serving, pack stack |
-| `handler/setup.rs` | `Setup` state: StartGame, item/creative/biome packets |
-| `handler/play.rs` | `Play` state: movement, join/quit, block update broadcasts |
-| `handler/block.rs` | block break/place actions and level event broadcasts |
-| `handler/inventory.rs` | inventory transactions and held item |
-| `handler/chat.rs` | chat and broadcast messages |
-| `handler/chunks.rs` | chunk ordering, sending, unloading, sub-chunk requests |
-| `handler/form.rs` | form responses |
+| Module | Plugin | Contents |
+|---|---|---|
+| `src/world/` | `WorldPlugin` | block breaking and placing (`block.rs`), level event, sound and block update broadcasts, chunk streaming and unloading (`chunks.rs`) |
+| `src/actor/` | `ActorPlugin` | non-player entities, currently dropped items (`item.rs`) |
+| `src/chat.rs` | `ChatPlugin` | chat, broadcast messages, join and quit announcements |
 
 Commands are dispatched by `dispatch_commands` (`src/command/dispatch.rs`), an exclusive `&mut World` system in the same chain. The server console is a `Console` entity (`src/console/`). On a terminal it runs a crossterm raw-mode prompt (`console/prompt.rs`) polled without blocking on the main thread, with history and line editing; log lines go through `ConsoleWriter`, which prints them above the prompt. When stdin is a pipe it is read without blocking instead (`PeekNamedPipe` on Windows, `poll` on unix). Each line becomes a `CommandRequestedMessage`, so commands run the same way from the console, and console replies are printed with their colour codes as terminal colours. Ctrl+C requests a normal `AppExit`, which saves the level; a second Ctrl+C exits immediately.
 
