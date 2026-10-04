@@ -5,29 +5,28 @@ pub mod HashUtils {
     use std::collections::HashMap;
 
     pub fn hash_block_permutation(identifier: &str, states: &HashMap<CowArc<'static, str>, BlockState>) -> i32 {
+        let states = nbtx::Compound::from_iter(states.iter().map(|(id, val)| {
+            (
+                id.as_ref().into(),
+                match val {
+                    BlockState::Bool(val) => nbtx::Value::Byte(if *val { 1 } else { 0 }),
+                    BlockState::Int(val) => nbtx::Value::Int(*val),
+                    BlockState::Enum(val) => nbtx::Value::String(val.as_ref().into()),
+                },
+            )
+        }));
+        hash_block_nbt(identifier, states)
+    }
+
+    pub fn hash_block_nbt(identifier: &str, mut states: nbtx::Compound) -> i32 {
         if identifier == "minecraft:unknown" {
             return -2;
         }
 
+        states.sort_unstable_keys();
         let mut tag = nbtx::Compound::new();
         tag.insert("name".into(), nbtx::Value::String(identifier.into()));
-        tag.insert(
-            "states".into(),
-            nbtx::Value::Compound({
-                let mut map = nbtx::Compound::from_iter(states.iter().map(|(id, val)| {
-                    (
-                        id.as_ref().into(),
-                        match val {
-                            BlockState::Bool(val) => nbtx::Value::Byte(if *val { 1 } else { 0 }),
-                            BlockState::Int(val) => nbtx::Value::Int(*val),
-                            BlockState::Enum(val) => nbtx::Value::String(val.as_ref().into()),
-                        },
-                    )
-                }));
-                map.sort_unstable_keys();
-                map
-            }),
-        );
+        tag.insert("states".into(), nbtx::Value::Compound(states));
         tag.sort_unstable_keys();
 
         // TODO: return error here instead of unwrap

@@ -72,6 +72,14 @@ impl SubChunk {
         self.blocks[layer].set(index, block_id);
     }
 
+    pub(crate) fn layers(&self) -> &[Palette] {
+        &self.blocks
+    }
+
+    pub(crate) fn biomes(&self) -> &Palette {
+        &self.biomes
+    }
+
     pub fn is_all_air(&self) -> bool {
         self.non_air_count == 0
     }

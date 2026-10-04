@@ -126,7 +126,9 @@ Use the `const_block!` / `const_permutation!` macros for compile-time static def
 
 ### Level
 
-`Level` (`crates/level/src/level.rs`) is a single global resource, created by `init_level` (`src/registry/mod.rs`), which picks the overworld generator. There is no world persistence; `init_level` builds an in-memory generated world after `BlockRegistry::init`. Chunk generation is polled through the `JobQueue`.
+`Level` (`crates/level/src/level.rs`) is a single global resource, created by `init_level` (`src/registry/mod.rs`), which picks the overworld generator. Chunk generation is polled through the `JobQueue`.
+
+Worlds are saved in the vanilla Bedrock LevelDB layout under `worlds/<level_name>/` (`db/`, `level.dat`, `levelname.txt`) by `LevelStorage` (`crates/level/src/storage.rs`). A `Dimension` built `with_storage` loads chunks from disk before asking its generator, marks generated and edited chunks unsaved, and saves them when they unload, on the one-minute autosave, on `/save` and on exit. An existing `level.dat` wins over `level_seed` in the config. Palette entries are written as `{name, states, version}` NBT and read back through `HashUtils::hash_block_nbt`.
 
 ### Resource packs
 

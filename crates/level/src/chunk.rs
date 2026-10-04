@@ -98,6 +98,18 @@ impl Chunk {
         self.min_sub_chunk_y
     }
 
+    pub fn sub_chunks(&self) -> &[SubChunk] {
+        &self.sub_chunks
+    }
+
+    pub fn min_sub_chunk_y(&self) -> i8 {
+        self.min_sub_chunk_y
+    }
+
+    pub fn block_entities(&self) -> &[BlockEntity] {
+        &self.block_entities
+    }
+
     pub fn sub_chunk_count(&self) -> usize {
         self.sub_chunks.len()
     }

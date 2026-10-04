@@ -633,3 +633,49 @@ fn request_main_thread_cost() {
         durations.last().unwrap()
     );
 }
+
+#[test]
+fn storage_round_trip() {
+    use chorus_level::dimension_type::DimensionType;
+    use chorus_level::generator::dimension::Dimension;
+    use chorus_level::storage::LevelStorage;
+    bevy_tasks::AsyncComputeTaskPool::get_or_init(bevy_tasks::TaskPool::default);
+    let (generator, registry) = generator(0);
+    let directory = std::env::temp_dir().join(format!("chorus_storage_round_trip_{}", std::process::id()));
+    let storage = std::sync::Arc::new(LevelStorage::open(&directory, &registry).expect("storage opens"));
+    let mut dimension = Dimension::new(DimensionType::Overworld, generator).with_storage(storage.clone());
+    let positions = [(0, 0), (-1, 3), (5, -2)];
+    dimension.request_chunks(&positions);
+    let mut done = 0;
+    while done < positions.len() {
+        done += dimension.tick().len();
+        std::thread::yield_now();
+    }
+    assert_eq!(dimension.save(), positions.len());
+
+    let kind = DimensionType::Overworld;
+    let min_y = kind.min_sub_chunk_y() as i32 * 16;
+    let max_y = (kind.max_sub_chunk_y() as i32 + 1) * 16;
+    for &(x, z) in &positions {
+        let original = dimension.get_chunk(x, z).expect("generated");
+        let loaded = storage.load_chunk(kind, x, z).expect("loads").expect("stored");
+        for y in min_y..max_y {
+            for bx in 0..16u8 {
+                for bz in 0..16u8 {
+                    for layer in 0..2 {
+                        assert_eq!(
+                            original.get_block(bx, y, bz, layer),
+                            loaded.get_block(bx, y, bz, layer),
+                            "block at {bx} {y} {bz} layer {layer} in ({x}, {z})"
+                        );
+                    }
+                    assert_eq!(original.get_biome(bx, y, bz), loaded.get_biome(bx, y, bz), "biome at {bx} {y} {bz} in ({x}, {z})");
+                }
+            }
+        }
+        assert_eq!(original.serialize_block_entities(None), loaded.serialize_block_entities(None));
+    }
+    drop(dimension);
+    drop(storage);
+    let _ = std::fs::remove_dir_all(directory);
+}
