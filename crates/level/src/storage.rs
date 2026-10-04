@@ -213,9 +213,14 @@ impl LevelStorage {
         });
     }
 
-    pub fn schedule_compaction(self: &Arc<Self>) {
-        if self.compacting.swap(true, Ordering::AcqRel) || io_pool().is_none() {
-            return;
+    /// Starts compacting the database in the background, or one slice per tick when there are no
+    /// pool threads. Returns `false` when a compaction is already running.
+    pub fn schedule_compaction(self: &Arc<Self>) -> bool {
+        if self.compacting.swap(true, Ordering::AcqRel) {
+            return false;
+        }
+        if io_pool().is_none() {
+            return true;
         }
         let storage = self.clone();
         spawn_io(move || {
@@ -226,6 +231,24 @@ impl LevelStorage {
                 }
             }
         });
+        true
+    }
+
+    pub fn is_compacting(&self) -> bool {
+        self.compacting.load(Ordering::Acquire)
+    }
+
+    /// Total size of the database files on disk.
+    pub fn disk_size(&self) -> u64 {
+        std::fs::read_dir(self.path.join("db"))
+            .map(|entries| {
+                entries
+                    .filter_map(|entry| entry.ok()?.metadata().ok())
+                    .filter(|metadata| metadata.is_file())
+                    .map(|metadata| metadata.len())
+                    .sum()
+            })
+            .unwrap_or(0)
     }
 
     /// Writes pending chunks between compaction slices, so a long compaction holding a pool

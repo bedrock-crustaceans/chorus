@@ -127,6 +127,68 @@ fn handle_interrupt(mut exit: MessageWriter<AppExit>, mut handled: Local<bool>) 
     }
 }
 
+/// Prints a command reply to the console, with its formatting codes as terminal colours when the
+/// console is a terminal and stripped otherwise.
+pub fn reply(message: &str) {
+    let text = if std::io::stdout().is_terminal() { to_ansi(message) } else { strip_formatting(message) };
+    prompt::print(format!("{text}\n").as_bytes());
+}
+
+/// Terminal colour for a formatting code, including Bedrock's material colours.
+fn ansi_code(code: char) -> Option<&'static str> {
+    Some(match code {
+        '0' => "\x1b[30m",
+        '1' => "\x1b[34m",
+        '2' => "\x1b[32m",
+        '3' => "\x1b[36m",
+        '4' => "\x1b[31m",
+        '5' => "\x1b[35m",
+        '6' => "\x1b[33m",
+        '7' => "\x1b[37m",
+        '8' => "\x1b[90m",
+        '9' => "\x1b[94m",
+        'a' => "\x1b[92m",
+        'b' => "\x1b[96m",
+        'c' => "\x1b[91m",
+        'd' => "\x1b[95m",
+        'e' => "\x1b[93m",
+        'f' => "\x1b[97m",
+        'g' => "\x1b[38;2;221;214;5m",
+        'h' => "\x1b[38;2;227;212;209m",
+        'i' => "\x1b[38;2;206;202;202m",
+        'j' => "\x1b[38;2;68;58;59m",
+        'm' => "\x1b[38;2;151;22;7m",
+        'n' => "\x1b[38;2;180;104;77m",
+        'p' => "\x1b[38;2;222;177;45m",
+        'q' => "\x1b[38;2;71;160;54m",
+        's' => "\x1b[38;2;44;186;168m",
+        't' => "\x1b[38;2;33;73;123m",
+        'u' => "\x1b[38;2;154;92;198m",
+        'v' => "\x1b[38;2;235;113;20m",
+        'l' => "\x1b[1m",
+        'o' => "\x1b[3m",
+        'r' => "\x1b[0m",
+        _ => return None,
+    })
+}
+
+fn to_ansi(message: &str) -> String {
+    let mut out = String::with_capacity(message.len() + 16);
+    let mut chars = message.chars();
+    while let Some(char) = chars.next() {
+        if char != '§' {
+            out.push(char);
+            continue;
+        }
+        let Some(code) = chars.next() else { break };
+        if let Some(ansi) = ansi_code(code.to_ascii_lowercase()) {
+            out.push_str(ansi);
+        }
+    }
+    out.push_str("\x1b[0m");
+    out
+}
+
 pub fn strip_formatting(message: &str) -> String {
     let mut stripped = String::with_capacity(message.len());
     let mut chars = message.chars();

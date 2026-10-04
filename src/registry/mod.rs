@@ -67,7 +67,7 @@ fn compact_level(level: Option<Res<Level>>, config: Res<Config>, mut last: Local
     let Some(storage) = level.as_ref().and_then(|level| level.storage()) else { return };
     storage.step_compaction();
     if interval_elapsed(&mut last, config.level.database.auto_compaction) {
-        storage.schedule_compaction();
+        let _ = storage.schedule_compaction();
     }
 }
 

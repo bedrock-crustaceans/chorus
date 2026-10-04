@@ -65,6 +65,22 @@ impl ServerMetrics {
         self.usage(self.mspt)
     }
 
+    pub fn tps_min(&self) -> f64 {
+        self.tps_min
+    }
+
+    pub fn mspt(&self) -> f64 {
+        self.mspt
+    }
+
+    pub fn mspt_average(&self) -> f64 {
+        self.mspt_avg.get_avg()
+    }
+
+    pub fn mspt_max(&self) -> f64 {
+        self.mspt_max
+    }
+
     pub fn tick_usage_average(&self) -> f64 {
         self.usage(self.mspt_avg.get_avg())
     }
