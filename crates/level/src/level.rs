@@ -1,5 +1,6 @@
 use crate::BlockUpdatedMessage;
 use crate::generator::dimension::Dimension;
+use crate::storage::{LevelData, LevelStorage};
 
 use bevy_ecs::message::MessageWriter;
 use bevy_ecs::prelude::Resource;
@@ -8,14 +9,19 @@ use bevy_ecs::system::{Res, ResMut, SystemId};
 use chorus_core::schedule::JobQueue;
 use glam::IVec3;
 use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::error;
 
 #[derive(Resource)]
 pub struct PollGenerationJob(pub SystemId);
 
 #[derive(Resource)]
 pub struct Level {
+    pub name: String,
+    pub seed: i64,
     pub dimensions: HashMap<i32, Dimension>,
     pub spawn: IVec3,
+    pub storage: Option<Arc<LevelStorage>>,
 }
 
 impl Level {
@@ -37,6 +43,25 @@ impl Level {
         if keep_going {
             jobs.push(job.0);
         }
+    }
+
+    pub fn save(&mut self) -> usize {
+        let saved = self.dimensions.values_mut().map(Dimension::save).sum();
+        if let Some(storage) = &self.storage {
+            let data = LevelData {
+                name: self.name.clone(),
+                seed: self.seed,
+                spawn: self.spawn,
+            };
+            if let Err(err) = storage.write_level_data(&data) {
+                error!("failed to write level data: {err}");
+            }
+        }
+        saved
+    }
+
+    pub fn unsaved_count(&self) -> usize {
+        self.dimensions.values().map(Dimension::unsaved_count).sum()
     }
 
     pub fn dimension(&self, id: i32) -> Option<&Dimension> {

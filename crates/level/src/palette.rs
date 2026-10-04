@@ -175,6 +175,48 @@ impl Palette {
     }
 }
 
+impl Palette {
+    pub fn write_blocks_disk(&self, buf: &mut Vec<u8>, mut entry: impl FnMut(i32, &mut Vec<u8>)) {
+        match self {
+            Self::Uniform { value } => {
+                buf.push(0);
+                buf.extend(1u32.to_le_bytes());
+                entry(*value, buf);
+            }
+            Self::Indexed { values, indices } => {
+                write_indices(buf, indices);
+                buf.extend((values.len() as u32).to_le_bytes());
+                for &value in values.keys() {
+                    entry(value, buf);
+                }
+            }
+        }
+    }
+
+    pub fn write_biomes_disk(&self, buf: &mut Vec<u8>) {
+        match self {
+            Self::Uniform { value } => {
+                buf.push(0);
+                buf.extend(value.to_le_bytes());
+            }
+            Self::Indexed { values, indices } => {
+                write_indices(buf, indices);
+                buf.extend((values.len() as u32).to_le_bytes());
+                for value in values.keys() {
+                    buf.extend(value.to_le_bytes());
+                }
+            }
+        }
+    }
+}
+
+fn write_indices(buf: &mut Vec<u8>, indices: &BitArray<4096>) {
+    buf.push(indices.get_bits() << 1);
+    for word in indices.get_blocks() {
+        buf.extend(word.to_le_bytes());
+    }
+}
+
 impl ProtoCodec for Palette {
     fn serialize<W: Write>(&self, stream: &mut W) -> Result<(), ProtoCodecError> {
         match &self {

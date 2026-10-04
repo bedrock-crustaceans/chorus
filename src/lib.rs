@@ -5,7 +5,7 @@ use bevy_app::{App, AppExit, Plugin, PluginsState, PreStartup, RunFixedMainLoop,
 use bevy_ecs::schedule::{IntoScheduleConfigs, Schedule};
 use chorus_core::schedule::run_fixed_tick;
 use std::time::Instant;
-use tracing::warn;
+use tracing::{info, warn};
 
 pub mod command;
 pub mod form;
@@ -53,6 +53,10 @@ impl LoopRunner {
             app.update();
 
             if let Some(exit) = app.should_exit() {
+                if let Some(mut level) = app.world_mut().get_resource_mut::<level::Level>() {
+                    let saved = level.save();
+                    info!("saved {saved} chunks before exiting");
+                }
                 return exit;
             }
 

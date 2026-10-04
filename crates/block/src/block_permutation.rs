@@ -44,6 +44,23 @@ impl BlockPermutation {
         &self.states
     }
 
+    pub fn to_nbt(&self) -> nbtx::Value {
+        let mut states = nbtx::Compound::from_iter(self.states.iter().map(|(id, value)| {
+            let value = match value {
+                BlockState::Bool(value) => nbtx::Value::Byte(*value as i8),
+                BlockState::Int(value) => nbtx::Value::Int(*value),
+                BlockState::Enum(value) => nbtx::Value::String(value.as_ref().into()),
+            };
+            (id.as_ref().into(), value)
+        }));
+        states.sort_unstable_keys();
+        let mut tag = nbtx::Compound::new();
+        tag.insert("name".into(), nbtx::Value::String(self.identifier.as_ref().into()));
+        tag.insert("states".into(), nbtx::Value::Compound(states));
+        tag.insert("version".into(), nbtx::Value::Int(BLOCK_STATE_VERSION));
+        nbtx::Value::Compound(tag)
+    }
+
     pub fn get_state_value(&self, id: &str) -> Option<&BlockState> {
         self.states.get(id)
     }

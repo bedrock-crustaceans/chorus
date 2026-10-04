@@ -113,6 +113,10 @@ impl BlockRegistry {
         self.permutations.get(&hash)
     }
 
+    pub fn permutations(&self) -> impl Iterator<Item = &BlockPermutation> {
+        self.permutations.values()
+    }
+
     pub fn get_random(&self) -> i32 {
         *self.default_hash.values().choose(&mut rand::rng()).expect("no hash found")
     }
