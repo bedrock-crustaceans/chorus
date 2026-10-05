@@ -28,8 +28,8 @@ use bevy_nethernet::prelude::*;
 use bevy_raknet::prelude::*;
 use std::collections::HashMap;
 use std::fs;
-use std::time::{Duration, Instant, SystemTime};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::time::{Duration, Instant, SystemTime};
 
 const LAN_DISCOVERY_PORT: u16 = 7551;
 const NETHERNET_IDENTITY_PATH: &str = "nethernet.pem";
@@ -283,13 +283,7 @@ impl Network {
     }
 
     /// Pushes everything the handlers queued this tick out, and reaps closed sessions.
-    pub fn flush(
-        mut transport: Transports,
-        mut state: ResMut<NetworkState>,
-        bandwidth: Res<BandwidthTracker>,
-        mut query: Query<(Entity, &mut Session)>,
-        mut commands: Commands,
-    ) {
+    pub fn flush(mut transport: Transports, mut state: ResMut<NetworkState>, bandwidth: Res<BandwidthTracker>, mut query: Query<(Entity, &mut Session)>, mut commands: Commands) {
         for (entity, mut session) in query.iter_mut() {
             for batch in session.take_outgoing() {
                 bandwidth.counters().add_sent(batch.data.len() as u64);
