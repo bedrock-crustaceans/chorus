@@ -5,6 +5,7 @@ use crate::network::BedrockProtocol;
 use crate::network::session::Session;
 use crate::network::session::state::SessionState;
 use crate::player::chunk_view::ChunkView;
+use crate::player::gamemode::Gamemode;
 use bedrock::protocol::v662::packets::{MoveActorAbsolutePacket, RemoveActorPacket};
 use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID, MoveActorAbsoluteData};
 use bevy_ecs::message::{Message, MessageWriter};
@@ -47,26 +48,47 @@ fn angle(degrees: f32) -> i8 {
     (degrees.rem_euclid(360.0) / 360.0 * 256.0) as i32 as i8
 }
 
+struct Watcher {
+    entity: Entity,
+    dimension: i32,
+    center: (i32, i32),
+    radius: i32,
+    // only spectators get to see other spectators
+    sees_hidden: bool,
+}
+
 pub fn update_viewers(
     mut actors: Query<(Entity, &Transform, &DimensionId, &ActorId, &mut Viewers), Without<Despawn>>,
     mut sessions: Query<&mut Session>,
-    views: Query<(Entity, &ChunkView)>,
+    views: Query<(Entity, &ChunkView, &Gamemode)>,
     mut shown: MessageWriter<ActorShown>,
 ) {
-    let players: Vec<(Entity, i32, (i32, i32), i32)> = views
+    let watchers: Vec<Watcher> = views
         .iter()
-        .filter(|(entity, _)| sessions.get(*entity).is_ok_and(|session| session.get_state() == SessionState::Play))
-        .filter_map(|(entity, view)| Some((entity, view.dimension, view.center?, view.radius)))
+        .filter(|(entity, ..)| sessions.get(*entity).is_ok_and(|session| session.get_state() == SessionState::Play))
+        .filter_map(|(entity, view, gamemode)| {
+            Some(Watcher {
+                entity,
+                dimension: view.dimension,
+                center: view.center?,
+                radius: view.radius,
+                sees_hidden: !gamemode.visible(),
+            })
+        })
         .collect();
 
     for (actor_entity, transform, dimension, actor, mut viewers) in &mut actors {
         let chunk = ((transform.position.x.floor() as i32) >> 4, (transform.position.z.floor() as i32) >> 4);
-        let wanted: HashSet<Entity> = players
+        let visible = views.get(actor_entity).map_or(true, |(.., gamemode)| gamemode.visible());
+        let wanted: HashSet<Entity> = watchers
             .iter()
-            .filter(|(player, player_dimension, center, radius)| {
-                *player != actor_entity && *player_dimension == dimension.0 && (chunk.0 - center.0).pow(2) + (chunk.1 - center.1).pow(2) <= radius * radius
+            .filter(|watcher| {
+                watcher.entity != actor_entity
+                    && (visible || watcher.sees_hidden)
+                    && watcher.dimension == dimension.0
+                    && (chunk.0 - watcher.center.0).pow(2) + (chunk.1 - watcher.center.1).pow(2) <= watcher.radius * watcher.radius
             })
-            .map(|(entity, ..)| *entity)
+            .map(|watcher| watcher.entity)
             .collect();
         if wanted == viewers.0 {
             continue;

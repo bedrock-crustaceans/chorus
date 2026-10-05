@@ -310,7 +310,7 @@ fn stack_size_packet(actor: &ActorId, count: u16) -> BedrockProtocol {
 }
 
 pub fn handle_item_pickup(
-    mut players: Query<(Entity, &mut PlayerInventory, &ActorId, &Transform, &ChunkView)>,
+    mut players: Query<(Entity, &mut PlayerInventory, &ActorId, &Transform, &ChunkView, &Gamemode)>,
     items: Query<(Entity, &ItemEntity, &ActorId, &Transform, &DimensionId, &Viewers), Without<Despawn>>,
     mut sessions: Query<&mut Session>,
     mut writer: MessageWriter<ItemTakenMessage>,
@@ -318,8 +318,8 @@ pub fn handle_item_pickup(
 ) {
     let mut claimed = HashSet::new();
 
-    for (player, mut inventory, player_actor, player_transform, view) in &mut players {
-        if sessions.get(player).is_ok_and(|session| session.get_state() != SessionState::Play) {
+    for (player, mut inventory, player_actor, player_transform, view, gamemode) in &mut players {
+        if !gamemode.allows_interaction() || sessions.get(player).is_ok_and(|session| session.get_state() != SessionState::Play) {
             continue;
         }
 

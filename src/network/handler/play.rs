@@ -11,15 +11,11 @@ use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::PendingTeleport;
 use crate::player::forms::PendingForms;
+use crate::player::gamemode::Gamemode;
 use crate::player::identity::PlayerIdentity;
 use crate::registry::command_registry::CommandRegistry;
-use bedrock::protocol::v662::enums::ActorFlags;
-use bedrock::protocol::v662::packets::{SetActorDataPacket, UpdateAbilitiesPacket};
-use bedrock::protocol::v662::types::{ActorRuntimeID, DataItem, PropertySyncData};
+use bedrock::protocol::v662::types::ActorRuntimeID;
 use bedrock::protocol::v729::packets::{AttributeData, UpdateAttributesPacket};
-use bedrock::protocol::v776::enums::AbilitiesIndex;
-use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitiesLayer, SerializedLayer};
-use bedrock::protocol::v2168::enums::DataItemType;
 use bevy_ecs::message::{Message, MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Commands, Entity, Query, Res};
 use glam::{Vec2, Vec3};
@@ -38,7 +34,7 @@ pub struct PlayerQuitMessage {
 }
 
 pub fn on_enter_play(
-    mut sessions: Query<(&mut Session, &ActorId, &PlayerIdentity)>,
+    mut sessions: Query<(&mut Session, &ActorId, &PlayerIdentity, &Gamemode)>,
     commands: Res<CommandRegistry>,
     config: Res<Config>,
     mut entities: Commands,
@@ -49,7 +45,7 @@ pub fn on_enter_play(
         if ev.to != SessionState::Play {
             continue;
         }
-        let Ok((mut session, actor, identity)) = sessions.get_mut(ev.entity) else {
+        let Ok((mut session, actor, identity, gamemode)) = sessions.get_mut(ev.entity) else {
             continue;
         };
 
@@ -67,49 +63,9 @@ pub fn on_enter_play(
 
         session.send(BedrockProtocol::AvailableCommandsPacket(commands.to_packet().into()));
 
-        let flags = (1i64 << ActorFlags::HasGravity as i64) | (1i64 << ActorFlags::HasCollision as i64) | (1i64 << ActorFlags::Breathing as i64);
-
-        session.send(BedrockProtocol::SetActorDataPacket(
-            SetActorDataPacket {
-                target_runtime_id: ActorRuntimeID(actor.runtime_id),
-                actor_data: vec![DataItem {
-                    data_item_id: 0,
-                    data_item_type: DataItemType::Int64(flags),
-                }],
-                synced_properties: PropertySyncData {
-                    int_entries_list: vec![],
-                    float_entries_list: vec![],
-                },
-                tick: 0,
-            }
-            .into(),
-        ));
-
-        let ability_values = (1u32 << AbilitiesIndex::Build as u32)
-            | (1u32 << AbilitiesIndex::Mine as u32)
-            | (1u32 << AbilitiesIndex::DoorsAndSwitches as u32)
-            | (1u32 << AbilitiesIndex::OpenContainers as u32)
-            | (1u32 << AbilitiesIndex::AttackPlayers as u32)
-            | (1u32 << AbilitiesIndex::AttackMobs as u32);
-
-        session.send(BedrockProtocol::UpdateAbilitiesPacket(
-            UpdateAbilitiesPacket {
-                data: SerializedAbilitiesData {
-                    target_player_raw_id: actor.unique_id,
-                    player_permissions: 1,
-                    command_permissions: permission.into(),
-                    layers: vec![SerializedLayer {
-                        serialized_layer: SerializedAbilitiesLayer::Base,
-                        abilities_set: 0xFFFFF,
-                        ability_values,
-                        fly_speed: 0.05,
-                        vertical_fly_speed: 1.0,
-                        walk_speed: 0.1,
-                    }],
-                },
-            }
-            .into(),
-        ));
+        // spectators never touch the ground, so one joining starts out flying
+        session.send(gamemode.actor_data_packet(actor));
+        session.send(gamemode.abilities_packet(actor, permission, !gamemode.has_collision()));
 
         let attribute = |name: &str, min: f32, max: f32, value: f32| AttributeData {
             min_value: min,
