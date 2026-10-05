@@ -8,6 +8,7 @@ use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
 use crate::player::block_break::BlockBreaking;
 use crate::player::chunk_view::ChunkView;
+use crate::world::blob_cache::{ClientBlobCache, blob_id};
 use bedrock::protocol::v662::enums::{PlayStatus, PlayerActionType};
 use bedrock::protocol::v662::packets::{NetworkChunkPublisherUpdatePacket, PlayerActionPacket};
 use bedrock::protocol::v662::types::{ActorRuntimeID, BlockPos, ChunkPos};
@@ -21,13 +22,33 @@ use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::{Local, Query};
 use bevy_ecs::system::Res;
 use bevy_tasks::ComputeTaskPool;
+use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
 use tracing::debug;
 
 struct ChunkPayload {
     sub_chunk_count: u32,
     sub_chunk_limit: u16,
-    data: Vec<u8>,
+    // every sub chunk, then all biomes, each with its id; this is what a caching client gets by id
+    blobs: Vec<(u64, Arc<[u8]>)>,
+    // border blocks and block entities, never cached
+    tail: Vec<u8>,
+    // the whole thing glued back together, only built once some client without the cache needs it
+    full: OnceCell<Vec<u8>>,
+}
+
+impl ChunkPayload {
+    fn full(&self) -> &[u8] {
+        self.full.get_or_init(|| {
+            let mut data = Vec::with_capacity(self.blobs.iter().map(|(_, blob)| blob.len()).sum::<usize>() + self.tail.len());
+            for (_, blob) in &self.blobs {
+                data.extend_from_slice(blob);
+            }
+            data.extend_from_slice(&self.tail);
+            data
+        })
+    }
 }
 
 pub fn update_chunk_order(mut query: Query<(&mut Session, &Transform, &mut ChunkView, &mut BlockBreaking, &ActorId, &DimensionId)>, mut level: ResMut<Level>) {
@@ -147,10 +168,10 @@ pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>,
     }
 }
 
-pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut ChunkView)>, mut level: ResMut<Level>) {
+pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut ChunkView, Option<&mut ClientBlobCache>)>, mut level: ResMut<Level>) {
     let mut focus: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
     let mut to_request: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
-    for (_, _, mut view) in query.iter_mut() {
+    for (_, _, mut view, _) in query.iter_mut() {
         let Some(center) = view.center else { continue };
         focus.entry(view.dimension).or_default().push(center);
 
@@ -179,7 +200,7 @@ pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut Chun
     }
 
     let mut ready: HashMap<i32, HashSet<(i32, i32)>> = HashMap::new();
-    for (_, _, view) in query.iter() {
+    for (_, _, view, _) in query.iter() {
         let Some(dimension) = level.dimension(view.dimension) else { continue };
         let ready = ready.entry(view.dimension).or_default();
         ready.extend(view.pending.iter().copied().filter(|&(x, z)| dimension.get_chunk(x, z).is_some()));
@@ -197,12 +218,21 @@ pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut Chun
         return;
     }
 
-    for (mut session, transform, mut view) in query.iter_mut() {
+    for (mut session, transform, mut view, mut cache) in query.iter_mut() {
         let Some(payloads) = payloads.get(&view.dimension) else { continue };
         let mut sent: Vec<(i32, i32)> = Vec::new();
 
         for &(x, z) in &view.pending {
             let Some(payload) = payloads.get(&(x, z)) else { continue };
+
+            let cached = cache.as_mut().filter(|cache| cache.has_room(payload.blobs.len()));
+            let (cache_blobs, serialized_chunk_data) = match cached {
+                Some(cache) => {
+                    cache.track(&payload.blobs);
+                    (payload.blobs.iter().map(|(id, _)| *id).collect(), payload.tail.clone())
+                }
+                None => (vec![], payload.full().to_vec()),
+            };
 
             session.send(BedrockProtocol::LevelChunkPacket(
                 LevelChunkPacket {
@@ -210,9 +240,9 @@ pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut Chun
                     dimension_id: view.dimension,
                     sub_chunk_count: payload.sub_chunk_count,
                     client_request_sub_chunk_limit: None,
-                    cache_enabled: false,
-                    cache_blobs: vec![],
-                    serialized_chunk_data: payload.data.clone(),
+                    cache_enabled: !cache_blobs.is_empty(),
+                    cache_blobs,
+                    serialized_chunk_data,
                 }
                 .into(),
             ));
@@ -258,12 +288,26 @@ fn serialize_chunks(dimension: &Dimension, positions: &[(i32, i32)]) -> HashMap<
             let Some(chunk) = dimension.get_chunk(x, z) else { continue };
 
             scope.spawn(async move {
+                // same bytes as Chunk::serialize, just cut where the client cache wants them
+                let mut blobs: Vec<Vec<u8>> = chunk
+                    .sub_chunks()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, sub_chunk)| sub_chunk.serialize_network(chunk.min_sub_chunk_y().wrapping_add(i as i8)))
+                    .collect();
+                blobs.push(chunk.sub_chunks().iter().flat_map(|sub_chunk| sub_chunk.serialize_biomes()).collect());
+
+                let mut tail = vec![0u8]; // border blocks
+                tail.extend(chunk.serialize_block_entities(None));
+
                 (
                     (x, z),
                     ChunkPayload {
                         sub_chunk_count: chunk.sub_chunk_count() as u32,
                         sub_chunk_limit: (chunk.highest_non_air_sub_chunk_y() - min_y) as u16,
-                        data: chunk.serialize(),
+                        blobs: blobs.into_iter().map(|blob| (blob_id(&blob), Arc::from(blob))).collect(),
+                        tail,
+                        full: OnceCell::new(),
                     },
                 )
             });

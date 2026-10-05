@@ -98,7 +98,7 @@ State transitions emit a `SessionStateChangedMessage`, which handler systems obs
 
 | Module | Plugin | Contents |
 |---|---|---|
-| `src/world/` | `WorldPlugin` | block breaking and placing (`block.rs`), level event, sound and block update broadcasts, chunk streaming and unloading (`chunks.rs`) |
+| `src/world/` | `WorldPlugin` | block breaking and placing (`block.rs`), level event, sound and block update broadcasts, chunk streaming and unloading (`chunks.rs`), the client blob cache (`blob_cache.rs`: clients that send `ClientCacheStatusPacket` get chunks as xxh64 blob ids, and missing blobs are answered from the session's `ClientBlobCache`, with plain chunks as the fallback once too many are unanswered) |
 | `src/actor/` | `ActorPlugin` | non-player entities: `viewers.rs` (each entity's `Viewers` follow players' view radius; kinds send their spawn packet on `ActorShown`, `Despawn` removes from clients), `physics.rs` (`Physics` with block collision), `storage.rs` (actors saved with their chunk in vanilla's `digp` + `actorprefix` keys through per-kind codecs in `ActorRegistry`, loaded when the chunk becomes available, saved on unload, autosave, `/save` and exit), `item.rs` (dropped items) |
 | `src/chat.rs` | `ChatPlugin` | chat, broadcast messages, join and quit announcements |
 
