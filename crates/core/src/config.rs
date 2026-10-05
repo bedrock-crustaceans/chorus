@@ -171,15 +171,28 @@ impl Default for RakNetConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct NetherNetConfig {
-    pub http_port: u16,
+    pub signaler: NetherNetSignaler,
 }
 
-impl Default for NetherNetConfig {
-    fn default() -> Self {
-        Self { http_port: 19133 }
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum NetherNetSignaler {
+    Http,
+    Lan,
+    #[default]
+    Both,
+}
+
+impl NetherNetSignaler {
+    pub fn lan(self) -> bool {
+        matches!(self, Self::Lan | Self::Both)
+    }
+
+    pub fn http(self) -> bool {
+        matches!(self, Self::Http | Self::Both)
     }
 }
 
@@ -324,8 +337,6 @@ const MOVED_KEYS: &[(&str, &str)] = &[
     ("ip", "network.ip"),
     ("port", "network.port"),
     ("transport", "network.transport"),
-    ("nethernet_http_port", "network.nethernet.http_port"),
-    ("network.nethernet_http_port", "network.nethernet.http_port"),
     ("encryption", "network.raknet.encryption"),
     ("network.encryption", "network.raknet.encryption"),
     ("level_name", "level.name"),
@@ -342,7 +353,13 @@ const MOVED_KEYS: &[(&str, &str)] = &[
     ("logs_directory", "log.directory"),
 ];
 
-const REMOVED_KEYS: &[&str] = &["max_generation_distance", "level.max_generation_distance"];
+const REMOVED_KEYS: &[&str] = &[
+    "max_generation_distance",
+    "level.max_generation_distance",
+    "nethernet_http_port",
+    "network.nethernet_http_port",
+    "network.nethernet.http_port",
+];
 
 fn take_key(table: &mut toml::Table, path: &str) -> Option<toml::Value> {
     let (parents, key) = path.rsplit_once('.').map_or(("", path), |(parents, key)| (parents, key));

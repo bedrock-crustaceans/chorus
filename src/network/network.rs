@@ -15,7 +15,7 @@ use crate::network::handler::{PacketHandlers, PacketReceivedMessage};
 use crate::network::login::auth::LoginAuthOIDC;
 use crate::network::session::Session;
 use crate::network::session::state::SessionStateChangedMessage;
-use crate::network::transport::{ActiveTransport, SessionId};
+use crate::network::transport::{SessionId, Transports};
 use crate::world::block::{BlockBreakMessage, BlockPlaceMessage};
 use crate::{JobQueue, Tick, TickSet};
 use bedrock::network::info::MINECRAFT_EDITION_MOTD;
@@ -27,9 +27,21 @@ use bevy_ecs::system::SystemId;
 use bevy_nethernet::prelude::*;
 use bevy_raknet::prelude::*;
 use std::collections::HashMap;
+use std::fs;
+use std::time::{Duration, Instant, SystemTime};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+const LAN_DISCOVERY_PORT: u16 = 7551;
+const NETHERNET_IDENTITY_PATH: &str = "nethernet.pem";
+const NETHERNET_IDENTITY_RENEWAL: Duration = Duration::from_secs(12 * 60 * 60);
+
+#[derive(Resource)]
+struct NetherIdentity {
+    pem: String,
+    issued: Instant,
+}
 use std::str::FromStr;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(Resource, Default)]
 pub struct NetworkState {
@@ -60,7 +72,7 @@ impl Plugin for Network {
                 (Network::accept, Network::queue_receive).chain().after(RakServerSet).after(NetherServerSet).after(NetherHttpServerSet),
             )
             .add_systems(PostUpdate, Network::flush)
-            .add_systems(Tick, BandwidthTracker::sample.in_set(TickSet::Last))
+            .add_systems(Tick, (BandwidthTracker::sample, Network::renew_identity).in_set(TickSet::Last))
             .init_resource::<BandwidthTracker>()
             .init_resource::<NetworkState>()
             .add_message::<PacketReceivedMessage>()
@@ -134,16 +146,23 @@ impl Network {
                 data.protocol_version = BedrockProtocol::PROTOCOL_VERSION;
                 data.game_version = BedrockProtocol::GAME_VERSION.to_string();
 
-                let mut lan = NetherServer::new(network_id, bind_addr, |_| {}).expect("failed to bind nethernet lan signaler");
-                lan.set_server_data(data.clone());
-
-                let http_addr = SocketAddr::new(ip, config.network.nethernet.http_port);
-                let mut http = NetherHttpServer::bind(http_addr, |_| {}).expect("failed to bind nethernet http signaler");
-                http.set_server_data(data);
-
-                info!("Listening for NetherNet connections on {bind_addr} (LAN) and {http_addr} (HTTP signaling)");
-                commands.insert_resource(lan);
-                commands.insert_resource(http);
+                let signaler = config.network.nethernet.signaler;
+                if signaler.lan() {
+                    let lan_addr = SocketAddr::new(ip, LAN_DISCOVERY_PORT);
+                    let mut lan = NetherServer::new(network_id, lan_addr, |_| {}).expect("failed to bind nethernet lan signaler");
+                    lan.set_server_data(data.clone());
+                    info!("Listening for NetherNet LAN connections on {lan_addr}");
+                    commands.insert_resource(lan);
+                }
+                if signaler.http() {
+                    let mut http = NetherHttpServer::bind(bind_addr, |_| {}).expect("failed to bind nethernet http signaler");
+                    http.set_server_data(data);
+                    let pem = Network::nethernet_identity_pem();
+                    http.set_identity(ServerIdentity::from_pem(&pem, "", SystemTime::now()).expect("nethernet identity was just validated"));
+                    commands.insert_resource(NetherIdentity { pem, issued: Instant::now() });
+                    info!("Listening for NetherNet HTTP signaling on {bind_addr}");
+                    commands.insert_resource(http);
+                }
             }
         }
     }
@@ -188,9 +207,7 @@ impl Network {
     }
 
     fn receive(
-        mut rak_server: Option<ResMut<RakServer>>,
-        mut nether_lan: Option<ResMut<NetherServer>>,
-        mut nether_http: Option<ResMut<NetherHttpServer>>,
+        mut transport: Transports,
         state: Res<NetworkState>,
         bandwidth: Res<BandwidthTracker>,
         mut query: Query<&mut Session>,
@@ -198,10 +215,6 @@ impl Network {
         job: Res<ReceiveJob>,
         mut jobs: ResMut<JobQueue>,
     ) {
-        let Some(mut transport) = ActiveTransport::from_resources(&mut rak_server, &mut nether_lan, &mut nether_http) else {
-            return;
-        };
-
         let mut any = false;
         while let Some((id, data)) = transport.recv() {
             any = true;
@@ -224,6 +237,36 @@ impl Network {
         }
     }
 
+    fn nethernet_identity_pem() -> String {
+        if let Ok(pem) = fs::read_to_string(NETHERNET_IDENTITY_PATH) {
+            match ServerIdentity::from_pem(&pem, "", SystemTime::now()) {
+                Ok(_) => return pem,
+                Err(error) => warn!("ignoring unreadable {NETHERNET_IDENTITY_PATH}: {error}"),
+            }
+        }
+        let pem = ServerIdentity::generate("", SystemTime::now())
+            .and_then(|identity| identity.to_pem())
+            .expect("failed to generate nethernet identity");
+        if let Err(error) = fs::write(NETHERNET_IDENTITY_PATH, &pem) {
+            warn!("failed to save {NETHERNET_IDENTITY_PATH}, clients will be asked to trust a new key next start: {error}");
+        }
+        pem
+    }
+
+    fn renew_identity(identity: Option<ResMut<NetherIdentity>>, http: Option<ResMut<NetherHttpServer>>) {
+        let (Some(mut identity), Some(mut http)) = (identity, http) else { return };
+        if identity.issued.elapsed() < NETHERNET_IDENTITY_RENEWAL {
+            return;
+        }
+        match ServerIdentity::from_pem(&identity.pem, "", SystemTime::now()) {
+            Ok(renewed) => {
+                http.set_identity(renewed);
+                identity.issued = Instant::now();
+            }
+            Err(error) => error!("failed to renew nethernet identity: {error}"),
+        }
+    }
+
     fn connect(state: &mut NetworkState, commands: &mut Commands, id: SessionId) {
         let entity = commands.spawn_empty().id();
         commands.entity(entity).insert(Session::new(entity, id.clone()));
@@ -241,18 +284,12 @@ impl Network {
 
     /// Pushes everything the handlers queued this tick out, and reaps closed sessions.
     pub fn flush(
-        mut rak_server: Option<ResMut<RakServer>>,
-        mut nether_lan: Option<ResMut<NetherServer>>,
-        mut nether_http: Option<ResMut<NetherHttpServer>>,
+        mut transport: Transports,
         mut state: ResMut<NetworkState>,
         bandwidth: Res<BandwidthTracker>,
         mut query: Query<(Entity, &mut Session)>,
         mut commands: Commands,
     ) {
-        let Some(mut transport) = ActiveTransport::from_resources(&mut rak_server, &mut nether_lan, &mut nether_http) else {
-            return;
-        };
-
         for (entity, mut session) in query.iter_mut() {
             for batch in session.take_outgoing() {
                 bandwidth.counters().add_sent(batch.data.len() as u64);
