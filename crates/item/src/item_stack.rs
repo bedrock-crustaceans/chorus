@@ -2,6 +2,10 @@ use bedrock::protocol::ProtoVersionTypes;
 use bedrock::protocol::v2168::types::{NetworkItemStackDescriptor, NetworkItemStackDescriptorV2};
 use chorus_core::protocol::BedrockProtocol;
 
+/// Item user data with nothing in it: no NBT (an i16 of 0), then empty can place on and can
+/// destroy lists (two i32 counts). An empty buffer is not valid, clients run off its end.
+const EMPTY_USER_DATA: [u8; 10] = [0; 10];
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ItemStack {
     pub id: i16,
@@ -49,7 +53,7 @@ impl ItemStack {
             aux_value: self.meta,
             net_id,
             block_runtime_id: self.block_runtime_id as u32,
-            user_data_buffer: vec![],
+            user_data_buffer: EMPTY_USER_DATA.to_vec(),
         }
     }
 
@@ -60,7 +64,7 @@ impl ItemStack {
             aux_value: self.meta,
             net_id: None,
             block_runtime_id: self.block_runtime_id as u32,
-            user_data_buffer: vec![],
+            user_data_buffer: EMPTY_USER_DATA.to_vec(),
         }
     }
 }
