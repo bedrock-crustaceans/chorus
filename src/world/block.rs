@@ -8,6 +8,7 @@ use crate::network::session::Session;
 use crate::network::session::state::SessionState;
 use crate::player::block_break::{BlockBreakHandler, BlockBreaking, BreakTick, break_speed};
 use crate::player::chunk_view::ChunkView;
+use crate::player::gamemode::Gamemode;
 use crate::player::inventory::PlayerInventory;
 use crate::registry::block_registry::BlockRegistry;
 use bedrock::protocol::v662::enums::PlayerActionType;
@@ -56,7 +57,7 @@ pub struct BlockPlaceMessage {
 
 pub fn handle_block_actions(
     mut action_reader: MessageReader<BlockActionMessage>,
-    mut query: Query<(&Session, &Transform, &mut BlockBreaking, &PlayerInventory, &ChunkView)>,
+    mut query: Query<(&Session, &Transform, &mut BlockBreaking, &PlayerInventory, &ChunkView, &Gamemode)>,
     mut level: ResMut<Level>,
     registry: Res<BlockRegistry>,
     mut event_writer: MessageWriter<LevelEventMessage>,
@@ -65,11 +66,16 @@ pub fn handle_block_actions(
     mut place_writer: MessageWriter<BlockPlaceMessage>,
 ) {
     for action in action_reader.read() {
-        let Ok((session, transform, mut breaking, inventory, view)) = query.get_mut(action.entity) else {
+        let Ok((session, transform, mut breaking, inventory, view, gamemode)) = query.get_mut(action.entity) else {
             continue;
         };
         let dimension = view.dimension;
         if session.get_state() != SessionState::Play {
+            continue;
+        }
+        // the abilities already stop the client from trying, this catches the ones that don't listen
+        if !gamemode.allows_editing() {
+            stop_break(&mut breaking, dimension, &mut event_writer);
             continue;
         }
 

@@ -169,6 +169,9 @@ pub fn handle_inventory_packets(
             }
             // middle click - the client asks the server to hand it the block it is looking at
             BedrockProtocol::BlockPickRequestPacket(packet) => {
+                if !gamemode.allows_interaction() {
+                    continue;
+                }
                 let position = &packet.position;
                 let Some(block_id) = level.get_block(view.dimension, position.x, position.y, position.z, 0) else {
                     continue;
@@ -203,7 +206,8 @@ pub fn handle_inventory_packets(
                         continue;
                     }
 
-                    let response = match drop_items(&mut inventory, request) {
+                    let dropped = if gamemode.allows_interaction() { drop_items(&mut inventory, request) } else { None };
+                    let response = match dropped {
                         Some(dropped) => {
                             for (stack, randomly) in dropped {
                                 drop_writer.write(ItemDropMessage { entity: ev.entity, stack, randomly });

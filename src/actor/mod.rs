@@ -31,6 +31,7 @@ impl Plugin for ActorPlugin {
                 viewers::update_viewers,
                 item::send_item_spawns,
                 player::send_player_spawns,
+                player::broadcast_gamemode_changes,
                 viewers::broadcast_movement,
                 viewers::despawn_actors,
             )

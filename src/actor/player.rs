@@ -14,11 +14,12 @@ use bedrock::protocol::ProtoCodec;
 use bedrock::protocol::v662::enums::BuildPlatform;
 use bedrock::protocol::v662::packets::{AddPlayerPacket, RemoveActorPacket};
 use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID, PropertySyncData};
+use bedrock::protocol::v671::packets::UpdatePlayerGameTypePacket;
 use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitiesLayer, SerializedLayer};
 use bedrock::protocol::v800::types::Color;
 use bedrock::protocol::v2168::packets::{AddPlayerListEntry, PlayerListEntry, PlayerListPacket};
 use bevy_ecs::message::MessageReader;
-use bevy_ecs::prelude::{Commands, Entity, Query, With};
+use bevy_ecs::prelude::{Changed, Commands, Entity, Query, With};
 
 fn list_entry(identity: &PlayerIdentity, actor: &ActorId, appearance: &PlayerAppearance) -> PlayerListEntry<BedrockProtocol> {
     PlayerListEntry::Add(AddPlayerListEntry {
@@ -115,6 +116,22 @@ pub fn send_player_spawns(
             }
             .into(),
         ));
+    }
+}
+
+/// Tells everyone still watching a player that its game mode changed. Viewers who should no longer
+/// see it are already gone by now, `update_viewers` takes care of that.
+pub fn broadcast_gamemode_changes(changed: Query<(&ActorId, &Gamemode, &Viewers), Changed<Gamemode>>, mut sessions: Query<&mut Session>) {
+    for (actor, gamemode, viewers) in &changed {
+        let packet = BedrockProtocol::UpdatePlayerGameTypePacket(
+            UpdatePlayerGameTypePacket {
+                player_game_type: gamemode.game_type(),
+                target_player: ActorUniqueID(actor.unique_id),
+                tick: 0,
+            }
+            .into(),
+        );
+        send_to_viewers(viewers, &mut sessions, &packet);
     }
 }
 
