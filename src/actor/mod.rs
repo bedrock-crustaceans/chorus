@@ -23,6 +23,7 @@ impl Plugin for ActorPlugin {
                 player::handle_player_joins,
                 player::handle_player_quits,
                 item::spawn_block_drops,
+                item::spawn_player_drops,
                 item::tick_item_entities,
                 physics::apply_physics,
                 item::merge_item_entities,

@@ -9,7 +9,7 @@ use crate::item::item_entity::{ItemEntity, within_pickup_reach};
 use crate::item::item_stack::ItemStack;
 use crate::level::DimensionId;
 use crate::network::BedrockProtocol;
-use crate::network::handler::inventory::{picked_item, send_content};
+use crate::network::handler::inventory::{ItemDropMessage, picked_item, send_content};
 use crate::network::session::Session;
 use crate::network::session::state::SessionState;
 use crate::player::PLAYER_EYE_HEIGHT;
@@ -28,13 +28,16 @@ use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID};
 use bedrock::protocol::v975::enums::ActorEvent;
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Bundle, Commands, Entity, Local, Query, Res, ResMut, Without, World};
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 use std::collections::HashSet;
+use std::f32::consts::TAU;
 
 type ActorEventPacket = <BedrockProtocol as ProtoVersionPackets>::ActorEventPacket;
 
 const MERGE_INTERVAL_TICKS: u32 = 10;
 const MERGE_REACH: f32 = 0.5;
+const THROW_BELOW_EYES: f32 = 0.3;
+const THROW_SPEED: f32 = 0.3;
 
 pub const ITEM_IDENTIFIER: &str = "minecraft:item";
 
@@ -60,6 +63,11 @@ pub fn spawn_item(commands: &mut Commands, server_state: &mut ServerState, item:
     let jitter = || rand::random::<f32>() * 0.5 - 0.25;
     let position = center + Vec3::new(jitter(), jitter() - Physics::item().height / 2.0, jitter());
     let velocity = Vec3::new(rand::random::<f32>() * 0.2 - 0.1, 0.2, rand::random::<f32>() * 0.2 - 0.1);
+    spawn_item_at(commands, server_state, item, position, velocity, dimension)
+}
+
+/// Like `spawn_item`, but the item starts exactly where and how fast you say.
+pub fn spawn_item_at(commands: &mut Commands, server_state: &mut ServerState, item: ItemEntity, position: Vec3, velocity: Vec3, dimension: i32) -> Entity {
     let actor = ActorId {
         unique_id: server_state.get_unique_id(),
         runtime_id: server_state.get_runtime_id(),
@@ -171,6 +179,33 @@ pub fn spawn_block_drops(
             spawn_item(&mut commands, &mut server_state, ItemEntity::new(stack), msg.position.as_vec3() + Vec3::splat(0.5), view.dimension);
         }
     }
+}
+
+pub fn spawn_player_drops(mut reader: MessageReader<ItemDropMessage>, players: Query<(&Transform, &ChunkView)>, mut server_state: ResMut<ServerState>, mut commands: Commands) {
+    for msg in reader.read() {
+        let Ok((transform, view)) = players.get(msg.entity) else { continue };
+        let position = transform.position - Vec3::new(0.0, THROW_BELOW_EYES, 0.0);
+        let velocity = if msg.randomly { scatter_velocity() } else { throw_velocity(transform.rotation) };
+        spawn_item_at(&mut commands, &mut server_state, ItemEntity::thrown(msg.stack), position, velocity, view.dimension);
+    }
+}
+
+/// Sends the item off where the player is looking, a bit upwards and with a little wobble so a
+/// pile of drops doesn't stack up on one spot.
+fn throw_velocity(rotation: Vec2) -> Vec3 {
+    let (pitch, yaw) = (rotation.x.to_radians(), rotation.y.to_radians());
+    let (angle, wobble) = (rand::random::<f32>() * TAU, rand::random::<f32>() * 0.02);
+
+    Vec3::new(
+        -yaw.sin() * pitch.cos() * THROW_SPEED + angle.cos() * wobble,
+        -pitch.sin() * THROW_SPEED + 0.1 + (rand::random::<f32>() - rand::random::<f32>()) * 0.1,
+        yaw.cos() * pitch.cos() * THROW_SPEED + angle.sin() * wobble,
+    )
+}
+
+fn scatter_velocity() -> Vec3 {
+    let (angle, speed) = (rand::random::<f32>() * TAU, rand::random::<f32>() * 0.5);
+    Vec3::new(-angle.sin() * speed, 0.2, angle.cos() * speed)
 }
 
 /// The stack a broken block leaves behind, following its `LootComponent` when it has one.
