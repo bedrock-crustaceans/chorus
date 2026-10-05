@@ -5,7 +5,6 @@ use bedrock::protocol::v662::packets::{ClientCacheMissResponsePacket, MissingBlo
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::{Commands, Component, Query};
 use std::collections::HashMap;
-use std::collections::hash_map::Entry;
 use std::sync::Arc;
 use tracing::debug;
 use xxhash_rust::xxh64::xxh64;
@@ -24,8 +23,7 @@ pub fn blob_id(data: &[u8]) -> u64 {
 /// said it supports the cache have this component.
 #[derive(Component, Default)]
 pub struct ClientBlobCache {
-    // the count is how many chunks still wait on the blob, two chunks can easily share one
-    pending: HashMap<u64, (Arc<[u8]>, u32)>,
+    pending: HashMap<u64, Arc<[u8]>>,
 }
 
 impl ClientBlobCache {
@@ -34,24 +32,21 @@ impl ClientBlobCache {
         self.pending.len() + blobs <= MAX_PENDING_BLOBS
     }
 
-    /// Remembers the blobs of one chunk until the client says it has or misses them.
-    /// The ids must be unique within the call.
+    /// Remembers the blobs of one chunk until the client says it has them.
     pub fn track(&mut self, blobs: &[(u64, Arc<[u8]>)]) {
         for (id, data) in blobs {
-            self.pending.entry(*id).or_insert_with(|| (data.clone(), 0)).1 += 1;
+            self.pending.entry(*id).or_insert_with(|| data.clone());
         }
     }
 
-    fn resolve(&mut self, id: u64) -> Option<Arc<[u8]>> {
-        let Entry::Occupied(mut entry) = self.pending.entry(id) else {
-            return None;
-        };
-        let data = entry.get().0.clone();
-        entry.get_mut().1 -= 1;
-        if entry.get().1 == 0 {
-            entry.remove();
-        }
-        Some(data)
+    // a miss doesn't free the blob, the client can ask for the same one again before it
+    // has it, and only its obtained list says it's really done with it
+    fn get(&self, id: u64) -> Option<Arc<[u8]>> {
+        self.pending.get(&id).cloned()
+    }
+
+    fn obtained(&mut self, id: u64) {
+        self.pending.remove(&id);
     }
 }
 
@@ -83,17 +78,17 @@ pub fn handle_blob_status(mut reader: MessageReader<PacketReceivedMessage>, mut 
         };
 
         for id in &packet.obtained_blobs {
-            cache.resolve(*id);
+            cache.obtained(*id);
         }
 
-        // ids we never sent or already answered are skipped, the client gets nothing for those
+        // ids we never sent or the client already confirmed are skipped
         let missing_blobs: Vec<MissingBlobEntry> = packet
             .missing_blobs
             .iter()
             .filter_map(|&blob_id| {
                 Some(MissingBlobEntry {
                     blob_id,
-                    blob_data: cache.resolve(blob_id)?.to_vec(),
+                    blob_data: cache.get(blob_id)?.to_vec(),
                 })
             })
             .collect();
@@ -114,15 +109,16 @@ mod tests {
     }
 
     #[test]
-    fn shared_blob_stays_until_every_chunk_resolves_it() {
+    fn missed_blob_stays_until_obtained() {
         let mut cache = ClientBlobCache::default();
         let shared = blob(1);
         cache.track(&[shared.clone(), blob(2)]);
         cache.track(&[shared.clone()]);
 
-        assert!(cache.resolve(shared.0).is_some());
-        assert!(cache.resolve(shared.0).is_some());
-        assert!(cache.resolve(shared.0).is_none());
+        assert!(cache.get(shared.0).is_some());
+        assert!(cache.get(shared.0).is_some());
+        cache.obtained(shared.0);
+        assert!(cache.get(shared.0).is_none());
         assert_eq!(cache.pending.len(), 1);
     }
 
