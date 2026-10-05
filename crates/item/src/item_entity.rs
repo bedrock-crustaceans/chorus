@@ -3,6 +3,7 @@ use bevy_ecs::prelude::Component;
 use glam::Vec3;
 
 pub const PICKUP_DELAY_TICKS: u32 = 10;
+pub const THROWN_PICKUP_DELAY_TICKS: u32 = 40;
 pub const PICKUP_RADIUS: f32 = 1.75;
 pub const DESPAWN_TICKS: u32 = 6000;
 
@@ -21,6 +22,15 @@ impl ItemEntity {
             pickup_delay: PICKUP_DELAY_TICKS,
             age: 0,
             on_ground: false,
+        }
+    }
+
+    /// An item a player threw. It waits longer before anyone can grab it, otherwise it would land
+    /// straight back in the thrower's inventory.
+    pub fn thrown(stack: ItemStack) -> Self {
+        Self {
+            pickup_delay: THROWN_PICKUP_DELAY_TICKS,
+            ..Self::new(stack)
         }
     }
 
