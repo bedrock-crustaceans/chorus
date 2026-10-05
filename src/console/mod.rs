@@ -2,15 +2,25 @@ use crate::command::dispatch::CommandRequestedMessage;
 use bevy_app::{App, AppExit, Plugin, PreUpdate, Startup};
 use bevy_ecs::entity::Entity;
 use bevy_ecs::message::MessageWriter;
-use bevy_ecs::prelude::{Commands, Component, Res, ResMut, Resource};
+use bevy_ecs::prelude::{Commands, Component, DetectChanges, Res, ResMut, Resource};
 use bevy_ecs::system::Local;
 use std::io::IsTerminal;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, LazyLock};
 use tracing::{info, warn};
 
+mod complete;
 mod prompt;
 
 pub use prompt::ConsoleWriter;
+
+pub fn progress_bar(len: u64, template: &str) -> indicatif::ProgressBar {
+    let bar = indicatif::ProgressBar::with_draw_target(Some(len), prompt::draw_target());
+    if let Ok(style) = indicatif::ProgressStyle::with_template(template) {
+        bar.set_style(style.progress_chars("━╸─"));
+    }
+    bar
+}
 
 #[cfg(unix)]
 mod unix;
@@ -21,7 +31,7 @@ mod windows;
 #[cfg(windows)]
 use windows as platform;
 
-static INTERRUPTED: AtomicBool = AtomicBool::new(false);
+static INTERRUPTED: LazyLock<Arc<AtomicBool>> = LazyLock::new(Arc::default);
 
 #[derive(Component)]
 pub struct Console;
@@ -42,7 +52,7 @@ impl Plugin for ConsolePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ConsoleInput>()
             .add_systems(Startup, setup_console)
-            .add_systems(PreUpdate, (read_console, handle_interrupt));
+            .add_systems(PreUpdate, (read_console, handle_interrupt, sync_completions));
     }
 }
 
@@ -53,6 +63,14 @@ fn interrupt() {
     }
 }
 
+fn install_interrupt_handler() -> bool {
+    use signal_hook::consts::{SIGINT, SIGTERM};
+    use signal_hook::flag;
+    [SIGINT, SIGTERM]
+        .into_iter()
+        .all(|signal| flag::register_conditional_shutdown(signal, 130, INTERRUPTED.clone()).is_ok() && flag::register(signal, INTERRUPTED.clone()).is_ok())
+}
+
 pub fn shutdown() {
     prompt::stop();
 }
@@ -60,8 +78,8 @@ pub fn shutdown() {
 fn setup_console(mut commands: Commands, mut input: ResMut<ConsoleInput>) {
     let console = commands.spawn(Console).id();
     commands.insert_resource(ConsoleSender(console));
-    if std::io::stdin().is_terminal() && std::io::stdout().is_terminal() {
-        match prompt::start() {
+    if std::io::stdin().is_terminal() {
+        match prompt::start(std::io::stdout().is_terminal()) {
             Ok(()) => {
                 input.terminal = true;
                 let hook = std::panic::take_hook();
@@ -73,7 +91,7 @@ fn setup_console(mut commands: Commands, mut input: ResMut<ConsoleInput>) {
             Err(err) => warn!("failed to set up the console prompt, falling back to plain input: {err}"),
         }
     }
-    if !platform::install_interrupt_handler(interrupt) {
+    if !install_interrupt_handler() {
         warn!("failed to install the interrupt handler, ctrl+c will exit without saving");
     }
 }
@@ -119,6 +137,12 @@ fn read_console(mut input: ResMut<ConsoleInput>, sender: Option<Res<ConsoleSende
     }
 }
 
+fn sync_completions(registry: Option<Res<crate::registry::command_registry::CommandRegistry>>, input: Res<ConsoleInput>) {
+    if let Some(registry) = registry.filter(|registry| input.terminal && registry.is_changed()) {
+        prompt::set_completions(complete::Completions::build(&registry));
+    }
+}
+
 fn handle_interrupt(mut exit: MessageWriter<AppExit>, mut handled: Local<bool>) {
     if !*handled && INTERRUPTED.load(Ordering::SeqCst) {
         *handled = true;
@@ -127,9 +151,18 @@ fn handle_interrupt(mut exit: MessageWriter<AppExit>, mut handled: Local<bool>) 
     }
 }
 
+pub fn banner(name: &str, details: &str) {
+    let text = if std::io::stdout().is_terminal() {
+        format!("\x1b[1;36m{name}\x1b[0m \x1b[90m{details}\x1b[0m\n")
+    } else {
+        format!("{name} {details}\n")
+    };
+    prompt::print(text.as_bytes());
+}
+
 pub fn reply(message: &str) {
     let text = if std::io::stdout().is_terminal() { to_ansi(message) } else { strip_formatting(message) };
-    prompt::print(format!("{text}\n").as_bytes());
+    prompt::reply(&text);
 }
 
 fn ansi_code(code: char) -> Option<&'static str> {

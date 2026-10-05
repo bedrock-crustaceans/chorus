@@ -102,6 +102,7 @@ impl Plugin for Network {
 }
 
 impl Network {
+    #[tracing::instrument(name = "network", skip_all)]
     pub fn init(config: Res<Config>, mut commands: Commands) {
         let ip = IpAddr::V4(Ipv4Addr::from_str(config.network.ip.as_str()).unwrap_or_else(|err| {
             error!("{}: {}", err, config.network.ip);
@@ -264,10 +265,14 @@ impl Network {
                 http.set_identity(renewed);
                 identity.issued = Instant::now();
             }
-            Err(error) => error!("failed to renew nethernet identity: {error}"),
+            Err(error) => {
+                let _tag = tracing::info_span!("network").entered();
+                error!("failed to renew nethernet identity: {error}");
+            }
         }
     }
 
+    #[tracing::instrument(name = "network", skip_all)]
     fn connect(state: &mut NetworkState, commands: &mut Commands, id: SessionId) {
         let entity = commands.spawn_empty().id();
         commands.entity(entity).insert(Session::new(entity, id.clone()));

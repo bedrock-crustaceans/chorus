@@ -1,9 +1,11 @@
 use crate::level::Level;
 use bevy_ecs::prelude::{Commands, ResMut, Resource};
+use indicatif::ProgressBar;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 use tracing::{info, warn};
 
+const BAR_TEMPLATE: &str = "{prefix:.dim} {bar:40.green/black} {percent:>3}% {human_pos}/{human_len} chunks {per_sec:.dim} {eta:.dim}";
 const MAX_IN_FLIGHT: usize = 512;
 const REPORT_INTERVAL: Duration = Duration::from_secs(5);
 const STALL_TICKS: u32 = 100;
@@ -22,6 +24,7 @@ pub struct Pregen {
     reported_done: usize,
     recent_rate: Option<f64>,
     stalled_ticks: u32,
+    bar: ProgressBar,
 }
 
 impl Pregen {
@@ -31,6 +34,8 @@ impl Pregen {
         let distance = |&(x, z): &(i32, i32)| (x as f64 - center.0).powi(2) + (z as f64 - center.1).powi(2);
         queue.sort_by(|a, b| distance(b).total_cmp(&distance(a)));
         let now = Instant::now();
+        let bar = crate::console::progress_bar(queue.len() as u64, BAR_TEMPLATE);
+        bar.set_prefix("pregenerating");
         Self {
             dimension,
             total: queue.len(),
@@ -42,6 +47,7 @@ impl Pregen {
             reported_done: 0,
             recent_rate: None,
             stalled_ticks: 0,
+            bar,
         }
     }
 
@@ -71,12 +77,13 @@ impl Pregen {
 
     pub fn run(mut commands: Commands, pregen: Option<ResMut<Pregen>>, mut level: ResMut<Level>) {
         let Some(mut pregen) = pregen else { return };
+        let _tag = tracing::info_span!("pregen").entered();
         let writes_backed_up = level.storage().is_some_and(|storage| storage.pending_writes() > MAX_PENDING_WRITES);
         if writes_backed_up && let Some(storage) = level.storage() {
             storage.schedule_flush();
         }
         let Some(dimension) = level.dimension_mut(pregen.dimension) else {
-            warn!("stopping pregeneration, dimension {} is gone", pregen.dimension);
+            warn!("stopping, dimension {} is gone", pregen.dimension);
             commands.remove_resource::<Pregen>();
             return;
         };
@@ -112,9 +119,13 @@ impl Pregen {
             pregen.stalled_ticks = 0;
         }
 
+        let done = pregen.done as u64;
+        pregen.bar.set_position(done);
+
         if pregen.done >= pregen.total {
+            pregen.bar.finish_and_clear();
             level.save();
-            info!("pregeneration finished: {} chunks in {}", pregen.total, format_duration(pregen.started.elapsed().as_secs_f64()));
+            info!("finished: {} chunks in {}", pregen.total, format_duration(pregen.started.elapsed().as_secs_f64()));
             commands.remove_resource::<Pregen>();
             return;
         }
@@ -124,7 +135,9 @@ impl Pregen {
             pregen.recent_rate = Some((pregen.done - pregen.reported_done) as f64 / window.as_secs_f64());
             pregen.reported_done = pregen.done;
             pregen.last_report = Instant::now();
-            info!("pregenerating: {}", pregen.progress());
+            if pregen.bar.is_hidden() {
+                info!("{}", pregen.progress());
+            }
         }
     }
 }

@@ -27,6 +27,7 @@ impl ResourcePacks {
         self.packs.iter().find(|p| p.uuid.to_string() == uuid_part)
     }
 
+    #[tracing::instrument(name = "resources", skip_all)]
     pub fn load(config: Res<Config>, mut commands: Commands) {
         let mut res = ResourcePacks::default();
 
@@ -59,7 +60,7 @@ impl ResourcePacks {
             }
         }
 
-        info!("Loaded {} resource pack(s).", res.packs.len());
+        info!("loaded {} pack(s)", res.packs.len());
         commands.insert_resource(res);
     }
 }

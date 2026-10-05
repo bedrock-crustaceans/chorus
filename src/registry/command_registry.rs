@@ -35,6 +35,7 @@ impl CommandRegistry {
         Self::default()
     }
 
+    #[tracing::instrument(name = "registry", skip_all)]
     pub fn init(mut commands: Commands) {
         let mut registry = Self::new();
 
