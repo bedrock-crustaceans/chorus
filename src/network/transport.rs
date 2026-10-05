@@ -1,6 +1,7 @@
 use crate::network::session::Batch;
 use bedrock::network::info::RAKNET_GAMEPACKET_ID;
 use bevy_ecs::prelude::ResMut;
+use bevy_ecs::system::SystemParam;
 use bevy_nethernet::prelude::{NetherHttpServer, NetherServer, NetherSessionId};
 use bevy_raknet::prelude::{RakPriority, RakReliability, RakServer, RakSessionId};
 use tracing::warn;
@@ -21,81 +22,58 @@ impl SessionId {
     }
 }
 
-/// Whichever transport server resource(s) are active this tick, so [`Network`](super::network::Network)'s
-/// systems get one call site instead of a RakNet/NetherNet match at every send/recv/disconnect.
-/// NetherNet runs its LAN and HTTP signalers side by side, since one discovers local peers and
-/// the other accepts remote ones. Connect/disconnect events aren't handled here: the *ServerPlugin
-/// systems already drain them into `MessageWriter<*ServerEvent>` each tick, so by the time this runs
-/// the servers' own event queues are empty - read the message types directly instead.
-pub enum ActiveTransport<'a> {
-    RakNet(&'a mut RakServer),
-    NetherNet { lan: &'a mut NetherServer, http: &'a mut NetherHttpServer },
+#[derive(SystemParam)]
+pub struct Transports<'w> {
+    rak: Option<ResMut<'w, RakServer>>,
+    nether_lan: Option<ResMut<'w, NetherServer>>,
+    nether_http: Option<ResMut<'w, NetherHttpServer>>,
 }
 
-impl<'a> ActiveTransport<'a> {
-    pub fn from_resources(rak: &'a mut Option<ResMut<RakServer>>, nether_lan: &'a mut Option<ResMut<NetherServer>>, nether_http: &'a mut Option<ResMut<NetherHttpServer>>) -> Option<Self> {
-        if let Some(server) = rak.as_deref_mut() {
-            return Some(Self::RakNet(server));
-        }
-
-        if let (Some(lan), Some(http)) = (nether_lan.as_deref_mut(), nether_http.as_deref_mut()) {
-            return Some(Self::NetherNet { lan, http });
-        }
-
-        None
-    }
-
+impl Transports<'_> {
     pub fn recv(&mut self) -> Option<(SessionId, Box<[u8]>)> {
-        match self {
-            // Bedrock prefixes every RakNet-carried batch with RAKNET_GAMEPACKET_ID (0xFE) to tell
-            // it apart from RakNet's own internal packet IDs - NetherNet has no such ambiguity to
-            // resolve, so it carries the batch as-is.
-            Self::RakNet(server) => {
-                while let Some((id, buf)) = server.recv() {
-                    match buf.split_first() {
-                        Some((&RAKNET_GAMEPACKET_ID, rest)) => return Some((SessionId::RakNet(id), rest.into())),
-                        _ => warn!("dropping RakNet datagram with missing/invalid game packet header"),
-                    }
+        if let Some(server) = self.rak.as_mut() {
+            while let Some((id, buf)) = server.recv() {
+                match buf.split_first() {
+                    Some((&RAKNET_GAMEPACKET_ID, rest)) => return Some((SessionId::RakNet(id), rest.into())),
+                    _ => warn!("dropping RakNet datagram with missing/invalid game packet header"),
                 }
-
-                None
-            }
-            Self::NetherNet { lan, http } => {
-                if let Some((id, buf)) = lan.recv() {
-                    return Some((SessionId::NetherNetLan(id), buf));
-                }
-
-                http.recv().map(|(id, buf)| (SessionId::NetherNetHttp(id), buf))
             }
         }
+        if let Some((id, buf)) = self.nether_lan.as_mut().and_then(|server| server.recv()) {
+            return Some((SessionId::NetherNetLan(id), buf));
+        }
+        self.nether_http.as_mut().and_then(|server| server.recv()).map(|(id, buf)| (SessionId::NetherNetHttp(id), buf))
     }
 
     pub fn send(&mut self, id: &SessionId, batch: Batch) {
-        match (self, id) {
-            (Self::RakNet(server), SessionId::RakNet(id)) => {
-                let mut buf = Vec::with_capacity(batch.data.len() + 1);
-                buf.push(RAKNET_GAMEPACKET_ID);
-                buf.extend_from_slice(&batch.data);
-
-                let priority = if batch.immediate { RakPriority::Immediate } else { RakPriority::Normal };
-                let _ = server.send(*id, buf, RakReliability::ReliableOrdered, priority);
+        match id {
+            SessionId::RakNet(id) => {
+                if let Some(server) = self.rak.as_mut() {
+                    let mut buf = Vec::with_capacity(batch.data.len() + 1);
+                    buf.push(RAKNET_GAMEPACKET_ID);
+                    buf.extend_from_slice(&batch.data);
+                    let priority = if batch.immediate { RakPriority::Immediate } else { RakPriority::Normal };
+                    let _ = server.send(*id, buf, RakReliability::ReliableOrdered, priority);
+                }
             }
-            (Self::NetherNet { lan, .. }, SessionId::NetherNetLan(id)) => {
-                let _ = lan.send(id, &batch.data);
+            SessionId::NetherNetLan(id) => {
+                if let Some(server) = self.nether_lan.as_mut() {
+                    let _ = server.send(id, &batch.data);
+                }
             }
-            (Self::NetherNet { http, .. }, SessionId::NetherNetHttp(id)) => {
-                let _ = http.send(id, &batch.data);
+            SessionId::NetherNetHttp(id) => {
+                if let Some(server) = self.nether_http.as_mut() {
+                    let _ = server.send(id, &batch.data);
+                }
             }
-            _ => {}
         }
     }
 
     pub fn disconnect(&mut self, id: &SessionId) {
-        match (self, id) {
-            (Self::RakNet(server), SessionId::RakNet(id)) => server.disconnect(*id),
-            (Self::NetherNet { lan, .. }, SessionId::NetherNetLan(id)) => lan.disconnect(id),
-            (Self::NetherNet { http, .. }, SessionId::NetherNetHttp(id)) => http.disconnect(id),
-            _ => {}
-        }
+        match id {
+            SessionId::RakNet(id) => self.rak.as_mut().map(|server| server.disconnect(*id)),
+            SessionId::NetherNetLan(id) => self.nether_lan.as_mut().map(|server| server.disconnect(id)),
+            SessionId::NetherNetHttp(id) => self.nether_http.as_mut().map(|server| server.disconnect(id)),
+        };
     }
 }
