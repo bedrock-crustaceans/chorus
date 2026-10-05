@@ -1,6 +1,7 @@
 use crate::actor::physics::Physics;
 use crate::actor::storage::ActorKind;
 use crate::actor::viewers::{ActorShown, Despawn, NetworkOffset, Viewers, send_to_viewers};
+use crate::block::component::loot_component::LootComponent;
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::item::ItemTakenMessage;
@@ -166,10 +167,25 @@ pub fn spawn_block_drops(
         if *gamemode == Gamemode::Creative {
             continue;
         }
-        if let Some(stack) = picked_item(&blocks, &items, msg.block_id) {
+        if let Some(stack) = block_drop(&blocks, &items, msg.block_id) {
             spawn_item(&mut commands, &mut server_state, ItemEntity::new(stack), msg.position.as_vec3() + Vec3::splat(0.5), view.dimension);
         }
     }
+}
+
+/// The stack a broken block leaves behind, following its `LootComponent` when it has one.
+fn block_drop(blocks: &BlockRegistry, items: &ItemRegistry, block_id: i32) -> Option<ItemStack> {
+    let Some(loot) = blocks.get_components(block_id).and_then(|components| components.get::<LootComponent>()) else {
+        return picked_item(blocks, items, block_id);
+    };
+    let identifier = loot.item?;
+
+    Some(ItemStack {
+        id: items.get(identifier)?,
+        count: 1,
+        meta: 0,
+        block_runtime_id: blocks.get_block_id(identifier).unwrap_or(0),
+    })
 }
 
 pub fn send_item_spawns(mut reader: MessageReader<ActorShown>, items: Query<(&ItemEntity, &ActorId, &Transform, &NetworkOffset)>, mut sessions: Query<&mut Session>) {
