@@ -204,7 +204,8 @@ impl LevelStorage {
                 let result = storage.flush();
                 storage.flushing.store(false, Ordering::Release);
                 if let Err(err) = result {
-                    error!("failed to write level data to disk: {err}");
+                    let _tag = tracing::info_span!("level").entered();
+                    error!("failed to write to disk: {err}");
                     return;
                 }
                 if storage.pending().is_empty() || storage.flushing.swap(true, Ordering::AcqRel) {
@@ -249,12 +250,13 @@ impl LevelStorage {
             .unwrap_or(0)
     }
 
+    #[tracing::instrument(name = "level", skip_all)]
     fn flush_if_idle(&self) {
         if self.pending().is_empty() || self.flushing.swap(true, Ordering::AcqRel) {
             return;
         }
         if let Err(err) = self.flush() {
-            error!("failed to write level data to disk: {err}");
+            error!("failed to write to disk: {err}");
         }
         self.flushing.store(false, Ordering::Release);
     }
@@ -265,12 +267,13 @@ impl LevelStorage {
         }
     }
 
+    #[tracing::instrument(name = "level", skip_all)]
     fn compact_step(&self, budget: Duration) -> bool {
         let started = std::time::Instant::now();
         let more = match self.db.lock().expect("level database lock poisoned").compact_step(budget) {
             Ok(more) => more,
             Err(err) => {
-                error!("failed to compact the level database: {err}");
+                error!("failed to compact the database: {err}");
                 false
             }
         };
@@ -280,14 +283,14 @@ impl LevelStorage {
         let first = progress.started.is_none();
         let since = *progress.started.get_or_insert(started);
         if more && first {
-            info!("compacting the level database");
+            info!("compacting the database");
         }
         if !more {
             let elapsed = since.elapsed();
             if first {
-                debug!("compacted the level database in {elapsed:.2?}");
+                debug!("compacted the database in {elapsed:.2?}");
             } else {
-                info!("compacted the level database in {:.1}s over {} slices", elapsed.as_secs_f64(), progress.slices);
+                info!("compacted the database in {:.1}s over {} slices", elapsed.as_secs_f64(), progress.slices);
             }
             *progress = CompactionProgress::default();
             self.compacting.store(false, Ordering::Release);
@@ -295,11 +298,12 @@ impl LevelStorage {
         more
     }
 
+    #[tracing::instrument(name = "level", skip_all)]
     pub fn compact_blocking(&self) -> StorageResult<()> {
         self.flush_blocking()?;
         let started = std::time::Instant::now();
         self.db.lock().expect("level database lock poisoned").compact().map_err(database_error)?;
-        info!("compacted the level database in {:.1}s", started.elapsed().as_secs_f64());
+        info!("compacted the database in {:.1}s", started.elapsed().as_secs_f64());
         Ok(())
     }
 

@@ -35,6 +35,7 @@ pub struct Level {
 }
 
 impl Level {
+    #[tracing::instrument(name = "level", skip_all)]
     pub fn open(path: impl AsRef<Path>, name: impl Into<String>, seed: i64, registry: &BlockRegistry, compression_level: u8) -> Self {
         let (path, name) = (path.as_ref(), name.into());
         let storage = match LevelStorage::open(path, registry, compression_level) {
@@ -52,15 +53,15 @@ impl Level {
         let mut level = Self::in_memory(name, seed);
         if let Some(data) = stored {
             if data.seed != seed {
-                warn!("level \"{}\" was created with seed {}, ignoring seed {seed}", level.name, data.seed);
+                warn!("\"{}\" was created with seed {}, ignoring seed {seed}", level.name, data.seed);
             }
-            info!("loaded level \"{}\" from {}", level.name, path.display());
+            info!("loaded \"{}\" from {}", level.name, path.display());
             level.seed = data.seed;
             level.spawn = data.spawn;
             level.start_count = data.start_count;
             level.is_new = false;
         } else {
-            info!("created level \"{}\" at {} with seed {seed}", level.name, path.display());
+            info!("created \"{}\" at {} with seed {seed}", level.name, path.display());
         }
         level.start_count += 1;
         level.storage = Some(storage);
@@ -123,6 +124,7 @@ impl Level {
         self.dimensions.values_mut()
     }
 
+    #[tracing::instrument(name = "level", skip_all)]
     pub fn save_level_data(&self) {
         let Some(storage) = &self.storage else { return };
         let data = LevelData {
@@ -162,6 +164,7 @@ impl Level {
         saved
     }
 
+    #[tracing::instrument(name = "level", skip_all)]
     pub fn save_blocking(&mut self) -> usize {
         let saved = self.save();
         if let Some(storage) = &self.storage

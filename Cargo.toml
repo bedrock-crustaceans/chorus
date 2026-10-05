@@ -54,6 +54,8 @@ rand = "0.10.3"
 semver = "1.0.28"
 spin_sleep = "1.3.3"
 crossterm = "0.29"
+signal-hook = "0.3"
+indicatif = "0.18"
 humantime = "2"
 strum = "0.28.0"
 strum_macros = "0.28.0"
@@ -104,12 +106,14 @@ rand.workspace = true
 semver.workspace = true
 spin_sleep.workspace = true
 crossterm.workspace = true
+signal-hook.workspace = true
+indicatif.workspace = true
 uuid.workspace = true
 xxhash-rust.workspace = true
 zip.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_Pipes", "Win32_System_IO"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Pipes", "Win32_System_IO"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

@@ -4,7 +4,7 @@ use crate::network::network::Network;
 use crate::registry::Registry;
 use crate::utils::rolling_avg::RollingAvg;
 use crate::{Tick, TickSet};
-use bevy_app::{App, Plugin, Startup};
+use bevy_app::{App, Plugin, PostStartup};
 use bevy_ecs::prelude::{IntoScheduleConfigs, Res, Resource};
 use bevy_ecs::system::ResMut;
 use std::time::{Duration, Instant};
@@ -121,7 +121,7 @@ impl Plugin for Server {
                 mspt_max: 0.0,
                 mspt_avg: RollingAvg::new(20),
             })
-            .add_systems(Startup, Server::start)
+            .add_systems(PostStartup, Server::start)
             .add_systems(Tick, Server::start_tick.in_set(TickSet::First))
             .add_systems(Tick, pregen::Pregen::run.in_set(TickSet::First).after(Server::start_tick))
             .add_systems(Tick, Server::end_tick.in_set(TickSet::Last))

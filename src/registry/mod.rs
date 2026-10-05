@@ -79,6 +79,7 @@ fn autosave(world: &mut World, mut last: Local<Option<Instant>>) {
         && level.unsaved_count() > 0
     {
         let saved = level.save();
+        let _tag = tracing::info_span!("level").entered();
         info!("autosaved {saved} chunks");
     }
 }
@@ -99,6 +100,7 @@ pub fn add_default_dimensions(mut level: ResMut<Level>, registry: Res<BlockRegis
         }
         level.insert_dimension(DimensionType::Overworld, generator);
     }
-    info!("level \"{}\" spawn at {}", level.name, level.spawn);
+    let _tag = tracing::info_span!("level").entered();
+    info!("\"{}\" spawn at {}", level.name, level.spawn);
     level.save_level_data();
 }
