@@ -22,6 +22,7 @@ commands! {
     gamemode::GAMEMODE_COMMAND,
     dimension::DIMENSION_COMMAND,
     tp::TP_COMMAND,
+    transfer::TRANSFER_COMMAND,
 
     aimassist::AIMASSIST_COMMAND,
     camera::CAMERA_COMMAND,
