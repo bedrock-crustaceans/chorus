@@ -59,8 +59,8 @@ impl Session {
     }
 
     /// Decodes a raw batch the transport handed us, dropping it if it fails to decrypt/decompress.
-    pub fn decode(&mut self, stream: Vec<u8>) -> Vec<BedrockProtocol> {
-        decode_packets(stream, self.compression.as_ref(), self.encryption.as_mut()).unwrap_or_else(|err| {
+    pub fn decode(&mut self, stream: Vec<u8>, max_batch_size: usize) -> Vec<BedrockProtocol> {
+        decode_packets(stream, self.compression.as_ref(), self.encryption.as_mut(), max_batch_size).unwrap_or_else(|err| {
             error!("error decoding packets, dropping batch {:?}", err);
             vec![]
         })
@@ -173,5 +173,37 @@ impl Session {
         } else {
             self.send(packet);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bedrock::protocol::v662::packets::ClientToServerHandshakePacket;
+    use bevy_raknet::prelude::RakSessionId;
+
+    fn session_with_zlib() -> Session {
+        let mut session = Session::new(Entity::PLACEHOLDER, SessionId::RakNet(RakSessionId(0)));
+        session.compression = Some(Compression::Zlib { threshold: 0, compression_level: 6 });
+        session
+    }
+
+    fn compressed_batch(packets: usize) -> Vec<u8> {
+        let packets = vec![BedrockProtocol::ClientToServerHandshakePacket(ClientToServerHandshakePacket {}.into()); packets];
+        encode_packets(&packets, Some(&Compression::Zlib { threshold: 0, compression_level: 6 }), None).unwrap()
+    }
+
+    #[test]
+    fn decode_returns_the_packets_of_a_batch_within_the_limit() {
+        let batch = compressed_batch(100);
+
+        assert_eq!(session_with_zlib().decode(batch, usize::MAX).len(), 100);
+    }
+
+    #[test]
+    fn decode_drops_a_batch_that_inflates_past_the_limit() {
+        let batch = compressed_batch(100);
+
+        assert!(session_with_zlib().decode(batch, 100).is_empty());
     }
 }

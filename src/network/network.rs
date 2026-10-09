@@ -209,6 +209,7 @@ impl Network {
     }
 
     fn receive(
+        config: Res<Config>,
         mut transport: Transports,
         state: Res<NetworkState>,
         bandwidth: Res<BandwidthTracker>,
@@ -229,7 +230,7 @@ impl Network {
                 continue;
             };
 
-            for packet in session.decode(data.into_vec()) {
+            for packet in session.decode(data.into_vec(), config.network.max_batch_size) {
                 events.write(PacketReceivedMessage { entity, packet });
             }
         }

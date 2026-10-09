@@ -1,5 +1,6 @@
 use crate::config::Config;
-use bedrock::auth::auth_oidc::AuthOIDC;
+use bedrock::auth::AuthOIDC;
+use bedrock::auth::http::ureq_agent;
 use bevy_app::{App, Plugin, Startup};
 use bevy_ecs::prelude::{Commands, Res, Resource};
 use tracing::debug;
@@ -22,7 +23,7 @@ impl LoginAuthOIDC {
             return;
         }
 
-        if let Ok(oidc) = AuthOIDC::fetch() {
+        if let Ok(oidc) = AuthOIDC::fetch(&ureq_agent()) {
             debug!("Auth OIDC fetch succeeded");
             commands.insert_resource(Auth(oidc))
         } else {

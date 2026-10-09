@@ -355,7 +355,7 @@ pub fn handle_item_pickup(
         }
 
         if changed && let Ok(mut session) = sessions.get_mut(player) {
-            send_content(&mut session, &mut inventory, ContainerID::Inventory);
+            send_content(&mut session, &mut inventory, ContainerID::INVENTORY);
         }
     }
 }

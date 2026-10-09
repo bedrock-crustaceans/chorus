@@ -143,6 +143,7 @@ pub struct NetworkConfig {
     pub ip: String,
     pub port: u16,
     pub transport: NetworkTransport,
+    pub max_batch_size: usize,
     pub raknet: RakNetConfig,
     pub nethernet: NetherNetConfig,
 }
@@ -153,6 +154,7 @@ impl Default for NetworkConfig {
             ip: String::from("0.0.0.0"),
             port: 19132,
             transport: NetworkTransport::RakNet,
+            max_batch_size: 16 * 1024 * 1024,
             raknet: RakNetConfig::default(),
             nethernet: NetherNetConfig::default(),
         }
@@ -472,5 +474,24 @@ impl Config {
         debug!("Config read!");
 
         config
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn max_batch_size_defaults_when_the_config_omits_it() {
+        let config: NetworkConfig = toml::from_str("port = 25565").unwrap();
+
+        assert_eq!(config.max_batch_size, NetworkConfig::default().max_batch_size);
+    }
+
+    #[test]
+    fn max_batch_size_is_read_from_the_config() {
+        let config: NetworkConfig = toml::from_str("max_batch_size = 1048576").unwrap();
+
+        assert_eq!(config.max_batch_size, 1048576);
     }
 }

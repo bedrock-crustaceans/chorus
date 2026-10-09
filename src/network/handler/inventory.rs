@@ -28,7 +28,7 @@ use bevy_ecs::message::{Message, MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Entity, Query, Res};
 use tracing::debug;
 
-const PLAYER_WINDOW: ContainerID = ContainerID::First;
+const PLAYER_WINDOW: ContainerID = ContainerID::FIRST;
 
 #[derive(Message, Clone, Debug)]
 pub struct InventoryOpenMessage {
@@ -68,7 +68,7 @@ pub fn send_initial_inventory(mut sessions: Query<(&mut Session, &mut PlayerInve
             continue;
         };
 
-        for container in [ContainerID::Inventory, ContainerID::Offhand, ContainerID::Armor] {
+        for container in [ContainerID::INVENTORY, ContainerID::OFFHAND, ContainerID::ARMOR] {
             send_content(&mut session, &mut inventory, container);
         }
 
@@ -115,7 +115,7 @@ pub fn handle_inventory_packets(
 
                 open_writer.write(InventoryOpenMessage {
                     entity: ev.entity,
-                    container_id: PLAYER_WINDOW as u32,
+                    container_id: PLAYER_WINDOW.0 as u32,
                 });
             }
             // the client expects an ACK for every close, otherwise it refuses to open
@@ -132,12 +132,12 @@ pub fn handle_inventory_packets(
 
                 close_writer.write(InventoryCloseMessage {
                     entity: ev.entity,
-                    container_id: packet.container_id.clone() as u32,
+                    container_id: packet.container_id.clone().0 as u32,
                 });
             }
             BedrockProtocol::MobEquipmentPacket(packet) => {
                 // the offhand uses the same packet, only the main inventory changes the held slot
-                if !matches!(packet.container_id, ContainerID::Inventory) {
+                if !matches!(packet.container_id, ContainerID::INVENTORY) {
                     continue;
                 }
 
@@ -192,7 +192,7 @@ pub fn handle_inventory_packets(
                     continue;
                 }
 
-                send_content(&mut session, &mut inventory, ContainerID::Inventory);
+                send_content(&mut session, &mut inventory, ContainerID::INVENTORY);
                 send_held_item(&mut session, &inventory, actor);
             }
             BedrockProtocol::ItemStackRequestPacket(packet) => {
@@ -338,7 +338,7 @@ pub(crate) fn send_content(session: &mut Session, inventory: &mut PlayerInventor
 
     session.send(BedrockProtocol::InventoryContentPacket(
         InventoryContentPacket {
-            inventory_id: container as u32,
+            inventory_id: container.0 as u32,
             slots,
             container_name_data: FullContainerName {
                 container: ContainerEnumName::AnvilInputContainer,
@@ -359,7 +359,7 @@ fn send_held_item(session: &mut Session, inventory: &PlayerInventory, actor: &Ac
             item: inventory.held_item().to_descriptor(None),
             slot: held_slot,
             selected_slot: held_slot,
-            container_id: ContainerID::Inventory,
+            container_id: ContainerID::INVENTORY,
         }
         .into(),
     ));
@@ -367,8 +367,8 @@ fn send_held_item(session: &mut Session, inventory: &PlayerInventory, actor: &Ac
 
 fn container_of<'a>(inventory: &'a PlayerInventory, container: &ContainerID) -> &'a Inventory {
     match container {
-        ContainerID::Offhand => inventory.offhand(),
-        ContainerID::Armor => inventory.armor(),
+        &ContainerID::OFFHAND => inventory.offhand(),
+        &ContainerID::ARMOR => inventory.armor(),
         _ => inventory.main(),
     }
 }
