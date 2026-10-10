@@ -1,5 +1,5 @@
 use crate::network::session::Batch;
-use bedrock::network::info::RAKNET_GAMEPACKET_ID;
+use bedrock::network::raknet::RakNetGamePacket;
 use bevy_ecs::prelude::ResMut;
 use bevy_ecs::system::SystemParam;
 use bevy_nethernet::prelude::{NetherHttpServer, NetherServer, NetherSessionId};
@@ -33,9 +33,9 @@ impl Transports<'_> {
     pub fn recv(&mut self) -> Option<(SessionId, Box<[u8]>)> {
         if let Some(server) = self.rak.as_mut() {
             while let Some((id, buf)) = server.recv() {
-                match buf.split_first() {
-                    Some((&RAKNET_GAMEPACKET_ID, rest)) => return Some((SessionId::RakNet(id), rest.into())),
-                    _ => warn!("dropping RakNet datagram with missing/invalid game packet header"),
+                match RakNetGamePacket::unwrap(&buf) {
+                    Ok(batch) => return Some((SessionId::RakNet(id), batch.into())),
+                    Err(_) => warn!("dropping RakNet datagram with missing/invalid game packet header"),
                 }
             }
         }
@@ -49,9 +49,7 @@ impl Transports<'_> {
         match id {
             SessionId::RakNet(id) => {
                 if let Some(server) = self.rak.as_mut() {
-                    let mut buf = Vec::with_capacity(batch.data.len() + 1);
-                    buf.push(RAKNET_GAMEPACKET_ID);
-                    buf.extend_from_slice(&batch.data);
+                    let buf = RakNetGamePacket::wrap(&batch.data);
                     let priority = if batch.immediate { RakPriority::Immediate } else { RakPriority::Normal };
                     let _ = server.send(*id, buf, RakReliability::ReliableOrdered, priority);
                 }

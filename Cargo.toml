@@ -20,7 +20,7 @@ bevy_app = "0.20.0"
 bevy_ecs = { version = "0.20.0", features = ["debug", "multi_threaded"] }
 bevy_tasks = { version = "0.20.0", features = ["multi_threaded"] }
 
-bedrock = { git = "https://github.com/bedrock-crustaceans/bedrock-rs", branch = "main", features = ["level", "network", "protocol", "auth", "form", "protocol-packet-meta", "protocol-packet-dyn", "protocol-unknown", "protocol-v2193", "auth-ureq"] }
+bedrock = { git = "https://github.com/bedrock-crustaceans/bedrock-rs", branch = "main", features = ["level", "network", "network-nethernet", "protocol", "auth", "form", "protocol-packet-meta", "protocol-packet-dyn", "protocol-unknown", "protocol-v2193", "auth-ureq"] }
 bevy-nethernet = { git = "https://github.com/bedrock-crustaceans/nethernet", branch = "main" }
 bevy-raknet = { git = "https://github.com/bedrock-crustaceans/raknet", branch = "main" }
 # TODO: use crates.io after 4.0.0 release

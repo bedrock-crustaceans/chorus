@@ -20,6 +20,7 @@ use crate::{JobQueue, Tick, TickSet};
 use bedrock::network::info::MINECRAFT_EDITION_MOTD;
 use bedrock::network::login::server::ServerLoginOptions;
 use bedrock::network::motd::BedrockMOTD;
+use bedrock::network::nethernet::IdentityStore;
 use bedrock::protocol::ProtoVersion;
 use bevy_app::{App, Plugin, PostUpdate, PreUpdate, Startup};
 use bevy_ecs::prelude::*;
@@ -27,19 +28,15 @@ use bevy_ecs::system::SystemId;
 use bevy_nethernet::prelude::*;
 use bevy_raknet::prelude::*;
 use std::collections::HashMap;
-use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::Duration;
 
 const LAN_DISCOVERY_PORT: u16 = 7551;
 const NETHERNET_IDENTITY_PATH: &str = "nethernet.pem";
 const NETHERNET_IDENTITY_RENEWAL: Duration = Duration::from_secs(12 * 60 * 60);
 
 #[derive(Resource)]
-struct NetherIdentity {
-    pem: String,
-    issued: Instant,
-}
+struct NetherIdentity(IdentityStore);
 use std::str::FromStr;
 use tracing::{error, info, warn};
 
@@ -102,6 +99,23 @@ impl Plugin for Network {
 }
 
 impl Network {
+    fn motd(config: &Config, guid: u64, port: u16) -> BedrockMOTD {
+        BedrockMOTD {
+            edition: MINECRAFT_EDITION_MOTD.to_owned(),
+            name: config.server.name.clone(),
+            sub_name: config.server.description.clone(),
+            protocol: BedrockProtocol::PROTOCOL_VERSION,
+            version: BedrockProtocol::GAME_VERSION.to_string(),
+            player_count: 0,
+            player_max: config.server.max_players,
+            guid,
+            game_mode: "Survival".to_string(),
+            nintendo_limited: Some(false),
+            port_v4: Some(port),
+            port_v6: Some(port),
+        }
+    }
+
     #[tracing::instrument(name = "network", skip_all)]
     pub fn init(config: Res<Config>, mut commands: Commands) {
         let ip = IpAddr::V4(Ipv4Addr::from_str(config.network.ip.as_str()).unwrap_or_else(|err| {
@@ -119,21 +133,7 @@ impl Network {
                     conf.guid = guid;
                     conf.protocols = Box::new([BedrockProtocol::RAKNET_VERSION]);
                     conf.max_connections = config.server.max_players.max(0) as usize;
-                    conf.message = BedrockMOTD {
-                        edition: MINECRAFT_EDITION_MOTD.to_owned(),
-                        name: config.server.name.clone(),
-                        sub_name: config.server.description.clone(),
-                        protocol: BedrockProtocol::PROTOCOL_VERSION,
-                        version: BedrockProtocol::GAME_VERSION.to_string(),
-                        player_count: 0,
-                        player_max: config.server.max_players,
-                        guid,
-                        game_mode: "Survival".to_string(),
-                        nintendo_limited: Some(false),
-                        port_v4: Some(bind_addr.port()),
-                        port_v6: Some(bind_addr.port()),
-                    }
-                    .into();
+                    conf.message = Network::motd(&config, guid, bind_addr.port()).into();
                 })
                 .expect("failed to bind raknet server");
 
@@ -143,10 +143,8 @@ impl Network {
             NetworkTransport::NetherNet => {
                 let network_id = rand::random::<u64>();
 
-                let mut data = ServerData::new(config.server.name.clone(), config.level.name.clone());
-                data.max_player_count = config.server.max_players;
-                data.protocol_version = BedrockProtocol::PROTOCOL_VERSION;
-                data.game_version = BedrockProtocol::GAME_VERSION.to_string();
+                let mut data = ServerData::from(&Network::motd(&config, network_id, bind_addr.port()));
+                data.level_name = config.level.name.clone();
 
                 let signaler = config.network.nethernet.signaler;
                 if signaler.lan() {
@@ -159,9 +157,9 @@ impl Network {
                 if signaler.http() {
                     let mut http = NetherHttpServer::bind(bind_addr, |_| {}).expect("failed to bind nethernet http signaler");
                     http.set_server_data(data);
-                    let pem = Network::nethernet_identity_pem();
-                    http.set_identity(ServerIdentity::from_pem(&pem, "", SystemTime::now()).expect("nethernet identity was just validated"));
-                    commands.insert_resource(NetherIdentity { pem, issued: Instant::now() });
+                    let store = IdentityStore::load_or_generate(NETHERNET_IDENTITY_PATH).expect("failed to prepare nethernet identity");
+                    http.set_identity(store.identity().expect("nethernet identity was just validated"));
+                    commands.insert_resource(NetherIdentity(store));
                     info!("Listening for NetherNet HTTP signaling on {bind_addr}");
                     commands.insert_resource(http);
                 }
@@ -244,36 +242,15 @@ impl Network {
         }
     }
 
-    fn nethernet_identity_pem() -> String {
-        if let Ok(pem) = fs::read_to_string(NETHERNET_IDENTITY_PATH) {
-            match ServerIdentity::from_pem(&pem, "", SystemTime::now()) {
-                Ok(_) => return pem,
-                Err(error) => warn!("ignoring unreadable {NETHERNET_IDENTITY_PATH}: {error}"),
-            }
-        }
-        let pem = ServerIdentity::generate("", SystemTime::now())
-            .and_then(|identity| identity.to_pem())
-            .expect("failed to generate nethernet identity");
-        if let Err(error) = fs::write(NETHERNET_IDENTITY_PATH, &pem) {
-            warn!("failed to save {NETHERNET_IDENTITY_PATH}, clients will be asked to trust a new key next start: {error}");
-        }
-        pem
-    }
-
     fn renew_identity(identity: Option<ResMut<NetherIdentity>>, http: Option<ResMut<NetherHttpServer>>) {
         let (Some(mut identity), Some(mut http)) = (identity, http) else { return };
-        if identity.issued.elapsed() < NETHERNET_IDENTITY_RENEWAL {
-            return;
-        }
-        match ServerIdentity::from_pem(&identity.pem, "", SystemTime::now()) {
-            Ok(renewed) => {
-                http.set_identity(renewed);
-                identity.issued = Instant::now();
-            }
-            Err(error) => {
+        match identity.0.renew(NETHERNET_IDENTITY_RENEWAL) {
+            Some(Ok(renewed)) => http.set_identity(renewed),
+            Some(Err(error)) => {
                 let _tag = tracing::info_span!("network").entered();
                 error!("failed to renew nethernet identity: {error}");
             }
+            None => {}
         }
     }
 
