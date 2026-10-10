@@ -2,11 +2,9 @@ use crate::Tick;
 use crate::command::dispatch::dispatch_commands;
 use crate::network::BedrockProtocol;
 use crate::network::handler::block::decode_block_actions;
-use crate::network::handler::handshake::handle_handshake;
 use crate::network::handler::inventory::{handle_inventory_packets, send_initial_inventory};
 use crate::network::handler::login::handle_login;
 use crate::network::handler::play::{handle_play, on_enter_play, on_quit};
-use crate::network::handler::request::handle_request;
 use crate::network::handler::resource::handle_resource;
 use crate::network::handler::setup::{handle_setup, on_enter_setup};
 use crate::registry::command_registry::CommandRegistry;
@@ -17,11 +15,9 @@ use bevy_ecs::schedule::IntoScheduleConfigs;
 
 pub mod block;
 pub mod form;
-pub mod handshake;
 pub mod inventory;
 pub mod login;
 pub mod play;
-pub mod request;
 pub mod resource;
 pub mod setup;
 
@@ -39,7 +35,7 @@ impl Plugin for PacketHandlers {
             Tick,
             (
                 (
-                    (handle_request, handle_login, handle_handshake, handle_resource).chain(),
+                    (handle_login, handle_resource).chain(),
                     (on_enter_setup, handle_setup).chain(),
                     (on_enter_play, send_initial_inventory, handle_play, on_quit).chain(),
                 )

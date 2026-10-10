@@ -3,10 +3,11 @@ use bedrock::auth::AuthOIDC;
 use bedrock::auth::http::ureq_agent;
 use bevy_app::{App, Plugin, Startup};
 use bevy_ecs::prelude::{Commands, Res, Resource};
+use std::sync::Arc;
 use tracing::debug;
 
 #[derive(Resource)]
-pub struct Auth(pub AuthOIDC);
+pub struct Auth(pub Arc<AuthOIDC>);
 
 pub struct LoginAuthOIDC;
 
@@ -25,7 +26,7 @@ impl LoginAuthOIDC {
 
         if let Ok(oidc) = AuthOIDC::fetch(&ureq_agent()) {
             debug!("Auth OIDC fetch succeeded");
-            commands.insert_resource(Auth(oidc))
+            commands.insert_resource(Auth(Arc::new(oidc)))
         } else {
             debug!("Auth OIDC fetch failed")
         }

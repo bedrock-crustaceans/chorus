@@ -7,6 +7,7 @@ use bedrock::protocol::v662::packets::{SetActorDataPacket, SetPlayerGameTypePack
 use bedrock::protocol::v662::types::{ActorRuntimeID, DataItem, PropertySyncData};
 use bedrock::protocol::v776::enums::AbilitiesIndex;
 use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitiesLayer, SerializedLayer};
+use bedrock::protocol::v924::enums::ActorDataIDs;
 use bedrock::protocol::v2168::enums::{DataItemType, PlayerPositionMode};
 use bedrock::protocol::v2168::packets::MovePlayerPacket;
 use bedrock::protocol::v2168::types::MovePlayerTeleportData;
@@ -144,7 +145,7 @@ impl Gamemode {
             SetActorDataPacket {
                 target_runtime_id: ActorRuntimeID(actor.runtime_id),
                 actor_data: vec![DataItem {
-                    data_item_id: 0,
+                    data_item_id: ActorDataIDs::Reserved0,
                     data_item_type: DataItemType::Int64(self.actor_flags()),
                 }],
                 synced_properties: PropertySyncData {

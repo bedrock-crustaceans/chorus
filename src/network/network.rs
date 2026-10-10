@@ -7,18 +7,18 @@ use crate::network::BedrockProtocol;
 use crate::network::bandwidth::BandwidthTracker;
 use crate::network::handler::form::FormResponseMessage;
 use crate::network::handler::inventory::{InventoryCloseMessage, InventoryOpenMessage, ItemDropMessage, PlayerItemHeldMessage};
-use crate::network::handler::login::PlayerLoginMessage;
+use crate::network::handler::login::{PlayerLoginMessage, PlayerPreLoginMessage, login_options};
 use crate::network::handler::play::{PlayerJoinedMessage, PlayerMoveMessage, PlayerQuitMessage};
-use crate::network::handler::request::PlayerPreLoginMessage;
 use crate::network::handler::resource::ResourcePackResponseMessage;
 use crate::network::handler::{PacketHandlers, PacketReceivedMessage};
-use crate::network::login::auth::LoginAuthOIDC;
+use crate::network::login::auth::{Auth, LoginAuthOIDC};
 use crate::network::session::Session;
 use crate::network::session::state::SessionStateChangedMessage;
 use crate::network::transport::{SessionId, Transports};
 use crate::world::block::{BlockBreakMessage, BlockPlaceMessage};
 use crate::{JobQueue, Tick, TickSet};
 use bedrock::network::info::MINECRAFT_EDITION_MOTD;
+use bedrock::network::login::server::ServerLoginOptions;
 use bedrock::network::motd::BedrockMOTD;
 use bedrock::protocol::ProtoVersion;
 use bevy_app::{App, Plugin, PostUpdate, PreUpdate, Startup};
@@ -179,26 +179,30 @@ impl Network {
         mut rak_events: MessageReader<RakServerEvent>,
         mut nether_lan_events: MessageReader<NetherServerEvent>,
         mut nether_http_events: MessageReader<NetherHttpServerEvent>,
+        config: Res<Config>,
+        oidc: Option<Res<Auth>>,
         mut state: ResMut<NetworkState>,
         mut commands: Commands,
     ) {
+        let options = |id: &SessionId| login_options(&config, oidc.as_deref(), id);
+
         for event in rak_events.read() {
             match event {
-                RakServerEvent::SessionConnected { id, .. } => Network::connect(&mut state, &mut commands, SessionId::RakNet(*id)),
+                RakServerEvent::SessionConnected { id, .. } => Network::connect(&mut state, &mut commands, SessionId::RakNet(*id), &options),
                 RakServerEvent::SessionDisconnected { id, .. } => Network::disconnect(&mut state, &mut commands, &SessionId::RakNet(*id)),
             }
         }
 
         for event in nether_lan_events.read() {
             match event {
-                NetherServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetLan(id.clone())),
+                NetherServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetLan(id.clone()), &options),
                 NetherServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &SessionId::NetherNetLan(id.clone())),
             }
         }
 
         for event in nether_http_events.read() {
             match event {
-                NetherHttpServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetHttp(id.clone())),
+                NetherHttpServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetHttp(id.clone()), &options),
                 NetherHttpServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &SessionId::NetherNetHttp(id.clone())),
             }
         }
@@ -274,9 +278,9 @@ impl Network {
     }
 
     #[tracing::instrument(name = "network", skip_all)]
-    fn connect(state: &mut NetworkState, commands: &mut Commands, id: SessionId) {
+    fn connect(state: &mut NetworkState, commands: &mut Commands, id: SessionId, options: &dyn Fn(&SessionId) -> ServerLoginOptions) {
         let entity = commands.spawn_empty().id();
-        commands.entity(entity).insert(Session::new(entity, id.clone()));
+        commands.entity(entity).insert(Session::new(entity, id.clone(), options(&id)));
 
         info!("Connected: {:?}", id);
 

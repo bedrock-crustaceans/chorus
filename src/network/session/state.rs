@@ -2,9 +2,7 @@ use bevy_ecs::prelude::{Entity, Message};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum SessionState {
-    Request,
-    Login,
-    Handshake,
+    Negotiating,
     Resource,
     Setup,
     Play,

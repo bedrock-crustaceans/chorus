@@ -20,7 +20,7 @@ bevy_app = "0.20.0"
 bevy_ecs = { version = "0.20.0", features = ["debug", "multi_threaded"] }
 bevy_tasks = { version = "0.20.0", features = ["multi_threaded"] }
 
-bedrock = { git = "https://github.com/bedrock-crustaceans/bedrock-rs", branch = "main", features = ["full", "form", "protocol-packet-meta", "protocol-packet-dyn", "protocol-unknown", "protocol-v2193", "auth-ureq"] }
+bedrock = { git = "https://github.com/bedrock-crustaceans/bedrock-rs", branch = "main", features = ["level", "network", "protocol", "auth", "form", "protocol-packet-meta", "protocol-packet-dyn", "protocol-unknown", "protocol-v2193", "auth-ureq"] }
 bevy-nethernet = { git = "https://github.com/bedrock-crustaceans/nethernet", branch = "main" }
 bevy-raknet = { git = "https://github.com/bedrock-crustaceans/raknet", branch = "main" }
 # TODO: use crates.io after 4.0.0 release
@@ -39,7 +39,6 @@ serde_json = "1.0.151"
 toml = "1.1.6"
 
 base64 = "0.23.1"
-jsonwebtoken = { version = "11.1.0", features = ["rust_crypto"] }
 p384 = { version = "0.14.0", features = ["ecdh", "ecdsa"] }
 
 tracing = "0.1.44"
@@ -95,8 +94,6 @@ facet.workspace = true
 facet-json.workspace = true
 serde_json.workspace = true
 base64.workspace = true
-jsonwebtoken.workspace = true
-p384.workspace = true
 tracing.workspace = true
 tracing-appender.workspace = true
 tracing-subscriber.workspace = true
@@ -111,6 +108,9 @@ indicatif.workspace = true
 uuid.workspace = true
 xxhash-rust.workspace = true
 zip.workspace = true
+
+[dev-dependencies]
+p384.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Pipes", "Win32_System_IO"] }

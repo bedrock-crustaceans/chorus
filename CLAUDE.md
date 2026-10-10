@@ -84,7 +84,7 @@ ChorusPlugin (src/lib.rs)        — Config::setup(), Tick schedule, TaskPoolPlu
 
 Each connection becomes a `Session` Bevy component (`src/network/session/mod.rs`) on its own entity. `Session` owns the connection's `SessionState`, compression and encryption settings, and an outgoing packet queue that `flush` encodes and sends.
 
-`SessionState` (`src/network/session/state.rs`) is a state machine:
+Each `Session` starts `Negotiating` and owns a bedrock-rs `ServerLogin` sans-io state machine (network settings, login verification, optional encryption handshake). `handle_login` (`src/network/handler/login.rs`) feeds it the received packets and `Session::advance_login` applies the returned actions in order (sends, compression, encryption); on completion the player gets a `PlayerIdentity` and `PlayerAppearance` and the session moves on. `SessionState` (`src/network/session/state.rs`) is a state machine:
 
 ```
 Request → Login → Handshake (if encryption) → Resource → Setup → Play
@@ -94,7 +94,7 @@ State transitions emit a `SessionStateChangedMessage`, which handler systems obs
 
 ### Packet routing and game systems
 
-`TickSet::Update` is split into chained `GameSet` stages (`src/schedule.rs`): `Connection`, `Input`, `World`, `Actors`, `Chat`, `Chunks`, `Broadcast`. `network/handler/` only holds per-session-state packet handlers (`PacketHandlers`, in `Connection` and `Input`): request, login, handshake, resource, setup, play, inventory, forms, and `block.rs`, which decodes block interactions into `BlockActionMessage`s. Game logic lives in domain modules, each with its own plugin:
+`TickSet::Update` is split into chained `GameSet` stages (`src/schedule.rs`): `Connection`, `Input`, `World`, `Actors`, `Chat`, `Chunks`, `Broadcast`. `network/handler/` only holds per-session-state packet handlers (`PacketHandlers`, in `Connection` and `Input`): login, resource, setup, play, inventory, forms, and `block.rs`, which decodes block interactions into `BlockActionMessage`s. Game logic lives in domain modules, each with its own plugin:
 
 | Module | Plugin | Contents |
 |---|---|---|

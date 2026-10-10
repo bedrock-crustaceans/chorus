@@ -28,7 +28,7 @@ fn list_entry(identity: &PlayerIdentity, actor: &ActorId, appearance: &PlayerApp
         player_name: identity.name().to_owned(),
         xbl_xuid: identity.xuid().to_owned(),
         platform_chat_id: String::new(),
-        build_platform: BuildPlatform::Unknown,
+        build_platform: BuildPlatform::Unknown(-1),
         serialized_skin: appearance.skin.clone(),
         is_teacher: false,
         is_host: false,
@@ -112,7 +112,7 @@ pub fn send_player_spawns(
                 },
                 actor_links: vec![],
                 device_id: appearance.device_id.clone(),
-                build_platform: BuildPlatform::Unknown,
+                build_platform: BuildPlatform::Unknown(-1),
             }
             .into(),
         ));
