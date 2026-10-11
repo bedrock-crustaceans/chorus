@@ -108,8 +108,6 @@ indicatif.workspace = true
 uuid.workspace = true
 xxhash-rust.workspace = true
 zip.workspace = true
-
-[dev-dependencies]
 p384.workspace = true
 
 [target.'cfg(windows)'.dependencies]

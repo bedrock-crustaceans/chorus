@@ -7,26 +7,26 @@ use crate::network::BedrockProtocol;
 use crate::network::bandwidth::BandwidthTracker;
 use crate::network::handler::form::FormResponseMessage;
 use crate::network::handler::inventory::{InventoryCloseMessage, InventoryOpenMessage, ItemDropMessage, PlayerItemHeldMessage};
-use crate::network::handler::login::{PlayerLoginMessage, PlayerPreLoginMessage, login_options};
+use crate::network::handler::login::{PlayerLoginMessage, PlayerPreLoginMessage, login_config};
 use crate::network::handler::play::{PlayerJoinedMessage, PlayerMoveMessage, PlayerQuitMessage};
 use crate::network::handler::resource::ResourcePackResponseMessage;
 use crate::network::handler::{PacketHandlers, PacketReceivedMessage};
 use crate::network::login::auth::{Auth, LoginAuthOIDC};
-use crate::network::session::Session;
 use crate::network::session::state::SessionStateChangedMessage;
+use crate::network::session::{LoginConfig, Session};
 use crate::network::transport::{SessionId, Transports};
 use crate::world::block::{BlockBreakMessage, BlockPlaceMessage};
 use crate::{JobQueue, Tick, TickSet};
 use bedrock::network::info::MINECRAFT_EDITION_MOTD;
-use bedrock::network::login::server::ServerLoginOptions;
 use bedrock::network::motd::BedrockMOTD;
 use bedrock::network::nethernet::IdentityStore;
 use bedrock::protocol::ProtoVersion;
 use bevy_app::{App, Plugin, PostUpdate, PreUpdate, Startup};
 use bevy_ecs::prelude::*;
-use bevy_ecs::system::SystemId;
+use bevy_ecs::system::{SystemId, SystemParam};
 use bevy_nethernet::prelude::*;
 use bevy_raknet::prelude::*;
+use p384::PublicKey;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
@@ -47,6 +47,31 @@ pub struct NetworkState {
 
 #[derive(Resource)]
 struct ReceiveJob(SystemId);
+
+#[derive(SystemParam)]
+pub struct ConnectionEvents<'w, 's> {
+    rak: MessageReader<'w, 's, RakServerEvent>,
+    nether_lan: MessageReader<'w, 's, NetherServerEvent>,
+    nether_http: MessageReader<'w, 's, NetherHttpServerEvent>,
+}
+
+#[derive(SystemParam)]
+pub struct TransportIdentities<'w> {
+    lan: Option<Res<'w, NetherServer>>,
+    http: Option<Res<'w, NetherHttpServer>>,
+}
+
+impl TransportIdentities<'_> {
+    fn lan(&self, id: &NetherSessionId) -> Option<PublicKey> {
+        let player = self.lan.as_ref()?.player(id)?;
+        player.client_public_key().ok().map(|key| PublicKey::from(&key))
+    }
+
+    fn http(&self, id: &NetherSessionId) -> Option<PublicKey> {
+        let player = self.http.as_ref()?.player(id)?;
+        player.client_public_key().ok().map(|key| PublicKey::from(&key))
+    }
+}
 
 pub struct Network;
 
@@ -173,34 +198,32 @@ impl Network {
     /// already drain their server's connect/disconnect events into `MessageWriter<*ServerEvent>`
     /// each tick, so this reads those messages directly rather than polling the servers again -
     /// by this point their own event queues are already empty.
-    pub fn accept(
-        mut rak_events: MessageReader<RakServerEvent>,
-        mut nether_lan_events: MessageReader<NetherServerEvent>,
-        mut nether_http_events: MessageReader<NetherHttpServerEvent>,
-        config: Res<Config>,
-        oidc: Option<Res<Auth>>,
-        mut state: ResMut<NetworkState>,
-        mut commands: Commands,
-    ) {
-        let options = |id: &SessionId| login_options(&config, oidc.as_deref(), id);
+    pub fn accept(mut events: ConnectionEvents, identities: TransportIdentities, config: Res<Config>, oidc: Option<Res<Auth>>, mut state: ResMut<NetworkState>, mut commands: Commands) {
+        let options = |id: &SessionId| login_config(&config, oidc.as_deref(), id);
 
-        for event in rak_events.read() {
+        for event in events.rak.read() {
             match event {
-                RakServerEvent::SessionConnected { id, .. } => Network::connect(&mut state, &mut commands, SessionId::RakNet(*id), &options),
+                RakServerEvent::SessionConnected { id, .. } => Network::connect(&mut state, &mut commands, SessionId::RakNet(*id), &options, None),
                 RakServerEvent::SessionDisconnected { id, .. } => Network::disconnect(&mut state, &mut commands, &SessionId::RakNet(*id)),
             }
         }
 
-        for event in nether_lan_events.read() {
+        for event in events.nether_lan.read() {
             match event {
-                NetherServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetLan(id.clone()), &options),
+                NetherServerEvent::SessionConnected(id) => {
+                    let key = identities.lan(id);
+                    Network::connect(&mut state, &mut commands, SessionId::NetherNetLan(id.clone()), &options, key)
+                }
                 NetherServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &SessionId::NetherNetLan(id.clone())),
             }
         }
 
-        for event in nether_http_events.read() {
+        for event in events.nether_http.read() {
             match event {
-                NetherHttpServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetHttp(id.clone()), &options),
+                NetherHttpServerEvent::SessionConnected(id) => {
+                    let key = identities.http(id);
+                    Network::connect(&mut state, &mut commands, SessionId::NetherNetHttp(id.clone()), &options, key)
+                }
                 NetherHttpServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &SessionId::NetherNetHttp(id.clone())),
             }
         }
@@ -255,9 +278,13 @@ impl Network {
     }
 
     #[tracing::instrument(name = "network", skip_all)]
-    fn connect(state: &mut NetworkState, commands: &mut Commands, id: SessionId, options: &dyn Fn(&SessionId) -> ServerLoginOptions) {
+    fn connect(state: &mut NetworkState, commands: &mut Commands, id: SessionId, options: &dyn Fn(&SessionId) -> LoginConfig, transport_key: Option<PublicKey>) {
         let entity = commands.spawn_empty().id();
-        commands.entity(entity).insert(Session::new(entity, id.clone(), options(&id)));
+        let mut session = Session::new(entity, id.clone(), options(&id));
+        if let Some(key) = transport_key {
+            session.bind_transport_key(key);
+        }
+        commands.entity(entity).insert(session);
 
         info!("Connected: {:?}", id);
 

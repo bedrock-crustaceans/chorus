@@ -1,13 +1,13 @@
 use crate::config::Config;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::login::auth::Auth;
-use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
+use crate::network::session::{LoginConfig, Session};
 use crate::network::transport::SessionId;
 use crate::player::identity::PlayerIdentity;
 use crate::player::skin::PlayerAppearance;
 use bedrock::network::compression::Compression;
-use bedrock::network::login::server::ServerLoginOptions;
+use bedrock::network::login::{LoginOptions, NetworkSettings};
 use bevy_ecs::message::{Message, MessageReader};
 use bevy_ecs::prelude::{Commands, Entity, MessageWriter, Query};
 use tracing::error;
@@ -24,15 +24,17 @@ pub struct PlayerLoginMessage {
     pub xuid: String,
 }
 
-pub fn login_options(config: &Config, oidc: Option<&Auth>, id: &SessionId) -> ServerLoginOptions {
-    let options = ServerLoginOptions::default()
-        .compression(Compression::Zlib { compression_level: 6, threshold: 1 })
-        .encryption(config.network.raknet.encryption && id.supports_encryption())
-        .require_authentication(config.server.authentication);
-
-    match oidc {
+pub fn login_config(config: &Config, oidc: Option<&Auth>, id: &SessionId) -> LoginConfig {
+    let options = LoginOptions::default().require_authentication(config.server.authentication);
+    let options = match oidc {
         Some(auth) => options.oidc(auth.0.clone()),
         None => options,
+    };
+
+    LoginConfig {
+        options,
+        settings: NetworkSettings::new(Compression::Zlib { compression_level: 6, threshold: 1 }),
+        encryption: config.network.raknet.encryption && id.supports_encryption(),
     }
 }
 
