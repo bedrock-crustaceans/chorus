@@ -16,6 +16,15 @@ pub enum NetworkTransport {
     NetherNet,
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum NetworkCompression {
+    #[default]
+    Zlib,
+    Snappy,
+    None,
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(untagged)]
 pub enum LevelSeed {
@@ -146,6 +155,9 @@ pub struct NetworkConfig {
     pub max_batch_size: usize,
     pub raknet: RakNetConfig,
     pub nethernet: NetherNetConfig,
+    pub compression: NetworkCompression,
+    pub zlib: ZLibConfig,
+    pub snappy: SnappyConfig,
 }
 
 impl Default for NetworkConfig {
@@ -157,6 +169,9 @@ impl Default for NetworkConfig {
             max_batch_size: 16 * 1024 * 1024,
             raknet: RakNetConfig::default(),
             nethernet: NetherNetConfig::default(),
+            compression: NetworkCompression::Zlib,
+            zlib: ZLibConfig::default(),
+            snappy: SnappyConfig::default(),
         }
     }
 }
@@ -177,6 +192,31 @@ impl Default for RakNetConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct NetherNetConfig {
     pub signaler: NetherNetSignaler,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct ZLibConfig {
+    pub threshold: u16,
+    pub level: u8,
+}
+
+impl Default for ZLibConfig {
+    fn default() -> Self {
+        Self { threshold: 1, level: 6 }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct SnappyConfig {
+    pub threshold: u16,
+}
+
+impl Default for SnappyConfig {
+    fn default() -> Self {
+        Self { threshold: 1 }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]

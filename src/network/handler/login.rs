@@ -10,6 +10,7 @@ use bedrock::network::compression::Compression;
 use bedrock::network::login::{LoginOptions, NetworkSettings};
 use bevy_ecs::message::{Message, MessageReader};
 use bevy_ecs::prelude::{Commands, Entity, MessageWriter, Query};
+use chorus_core::config::NetworkCompression;
 use tracing::error;
 
 #[derive(Message, Clone, Debug)]
@@ -33,7 +34,16 @@ pub fn login_config(config: &Config, oidc: Option<&Auth>, id: &SessionId) -> Log
 
     LoginConfig {
         options,
-        settings: NetworkSettings::new(Compression::Zlib { compression_level: 6, threshold: 1 }),
+        settings: NetworkSettings::new(match config.network.compression {
+            NetworkCompression::Zlib => Compression::Zlib {
+                threshold: config.network.zlib.threshold,
+                compression_level: config.network.zlib.level,
+            },
+            NetworkCompression::Snappy => Compression::Snappy {
+                threshold: config.network.snappy.threshold,
+            },
+            NetworkCompression::None => Compression::None,
+        }),
         encryption: config.network.raknet.encryption && id.supports_encryption(),
     }
 }

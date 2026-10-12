@@ -72,7 +72,7 @@ impl Prompt {
         let _ = write!(out, "{PROMPT}{line}\x1b[90m{ghost}\x1b[0m");
         let width = terminal::size().map_or(80, |(width, _)| width as usize).max(1);
         let length = PROMPT_WIDTH + self.line.len() + ghost.chars().count();
-        if length % width == 0 {
+        if length.is_multiple_of(width) {
             let _ = write!(out, "\r\n");
         }
         let target = PROMPT_WIDTH + self.cursor;

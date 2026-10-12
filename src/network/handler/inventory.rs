@@ -123,7 +123,7 @@ pub fn handle_inventory_packets(
             BedrockProtocol::ContainerClosePacket(packet) => {
                 session.send(BedrockProtocol::ContainerClosePacket(
                     ContainerClosePacket {
-                        container_id: packet.container_id.clone(),
+                        container_id: packet.container_id,
                         container_type: packet.container_type.clone(),
                         server_initiated_close: false,
                     }
@@ -132,7 +132,7 @@ pub fn handle_inventory_packets(
 
                 close_writer.write(InventoryCloseMessage {
                     entity: ev.entity,
-                    container_id: packet.container_id.clone().0 as u32,
+                    container_id: packet.container_id.0 as u32,
                 });
             }
             BedrockProtocol::MobEquipmentPacket(packet) => {
@@ -366,9 +366,9 @@ fn send_held_item(session: &mut Session, inventory: &PlayerInventory, actor: &Ac
 }
 
 fn container_of<'a>(inventory: &'a PlayerInventory, container: &ContainerID) -> &'a Inventory {
-    match container {
-        &ContainerID::OFFHAND => inventory.offhand(),
-        &ContainerID::ARMOR => inventory.armor(),
+    match *container {
+        ContainerID::OFFHAND => inventory.offhand(),
+        ContainerID::ARMOR => inventory.armor(),
         _ => inventory.main(),
     }
 }
