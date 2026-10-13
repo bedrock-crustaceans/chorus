@@ -6,7 +6,6 @@ pub struct SubChunk {
     blocks: Vec<Palette>,
     biomes: Palette,
     air_id: i32,
-    non_air_count: u32,
 }
 
 impl SubChunk {
@@ -15,29 +14,22 @@ impl SubChunk {
             blocks: vec![Palette::new(air_id), Palette::new(air_id)],
             biomes: Palette::new(biome),
             air_id,
-            non_air_count: 0,
         }
     }
 
     pub fn from_blocks(blocks: &[i32; 4096], air_id: i32, biome: i32) -> Self {
-        let palette = Palette::from_blocks(blocks);
-        let non_air_count = 4096 - palette.count(air_id);
         Self {
-            blocks: vec![palette, Palette::new(air_id)],
+            blocks: vec![Palette::from_blocks(blocks), Palette::new(air_id)],
             biomes: Palette::new(biome),
             air_id,
-            non_air_count,
         }
     }
 
     pub fn from_layers(blocks: &[i32; 4096], extra: Option<&[i32; 4096]>, biomes: &[i32; 4096], air_id: i32) -> Self {
-        let palette = Palette::from_blocks(blocks);
-        let non_air_count = 4096 - palette.count(air_id);
         Self {
-            blocks: vec![palette, extra.map_or_else(|| Palette::new(air_id), Palette::from_blocks)],
+            blocks: vec![Palette::from_blocks(blocks), extra.map_or_else(|| Palette::new(air_id), Palette::from_blocks)],
             biomes: Palette::from_blocks(biomes),
             air_id,
-            non_air_count,
         }
     }
 
@@ -63,12 +55,6 @@ impl SubChunk {
             return false;
         }
 
-        if old == self.air_id {
-            self.non_air_count += 1;
-        } else if block_id == self.air_id {
-            self.non_air_count -= 1;
-        }
-
         self.blocks[layer].set(index, block_id);
         true
     }
@@ -82,7 +68,7 @@ impl SubChunk {
     }
 
     pub fn is_all_air(&self) -> bool {
-        self.non_air_count == 0
+        self.blocks.iter().all(|p| p.is_all(self.air_id))
     }
 
     pub fn serialize_network(&self, sub_chunk_y: i8) -> Vec<u8> {

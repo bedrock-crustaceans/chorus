@@ -426,7 +426,7 @@ impl LevelStorage {
 
     fn heightmap(&self, chunk: &Chunk) -> [i16; 256] {
         let min_y = chunk.min_sub_chunk_y() as i32 * 16;
-        let top = (chunk.highest_non_air_sub_chunk_y() as i32 + 1) * 16 - 1;
+        let top = (chunk.highest_non_air_sub_chunk_y_relative() as i32 + 1) * 16 - 1;
         let mut heights = [0i16; 256];
         for z in 0..16u8 {
             for x in 0..16u8 {

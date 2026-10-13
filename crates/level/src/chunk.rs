@@ -101,13 +101,23 @@ impl Chunk {
         changed
     }
 
-    pub fn highest_non_air_sub_chunk_y(&self) -> i8 {
+    // TODO: remove this later it's stupid
+    pub fn highest_non_air_sub_chunk_y_relative(&self) -> i8 {
         for i in (0..self.sub_chunks.len()).rev() {
             if !self.sub_chunks[i].is_all_air() {
                 return self.min_sub_chunk_y.wrapping_add(i as i8);
             }
         }
         self.min_sub_chunk_y
+    }
+
+    pub fn highest_non_air_sub_chunk_y(&self) -> i8 {
+        for (i, sub_chunk) in self.sub_chunks.iter().enumerate().rev() {
+            if !sub_chunk.is_all_air() {
+                return (i + 1) as i8;
+            }
+        }
+        0
     }
 
     pub fn sub_chunks(&self) -> &[SubChunk] {

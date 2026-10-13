@@ -19,6 +19,10 @@ impl Palette {
         Self::Uniform { value }
     }
 
+    pub fn is_all(&self, value: i32) -> bool {
+        self.count(value) == 4096
+    }
+
     pub fn from_blocks(blocks: &[i32; 4096]) -> Self {
         if blocks.iter().all(|&value| value == blocks[0]) {
             return Self::Uniform { value: blocks[0] };

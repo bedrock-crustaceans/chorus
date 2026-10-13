@@ -158,6 +158,7 @@ pub struct NetworkConfig {
     pub compression: NetworkCompression,
     pub zlib: ZLibConfig,
     pub snappy: SnappyConfig,
+    pub chunks: NetworkChunksConfig,
 }
 
 impl Default for NetworkConfig {
@@ -172,6 +173,7 @@ impl Default for NetworkConfig {
             compression: NetworkCompression::Zlib,
             zlib: ZLibConfig::default(),
             snappy: SnappyConfig::default(),
+            chunks: NetworkChunksConfig::default(),
         }
     }
 }
@@ -216,6 +218,23 @@ pub struct SnappyConfig {
 impl Default for SnappyConfig {
     fn default() -> Self {
         Self { threshold: 1 }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct NetworkChunksConfig {
+    pub subchunks: bool,
+    pub cache: bool,
+}
+
+impl Default for NetworkChunksConfig {
+    fn default() -> Self {
+        Self {
+            // TODO: subchunks disabled by default, since we don't have their heightmaps implemented yet
+            subchunks: false,
+            cache: false,
+        }
     }
 }
 

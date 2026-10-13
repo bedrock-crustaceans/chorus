@@ -22,6 +22,7 @@ use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::{Local, Query};
 use bevy_ecs::system::Res;
 use bevy_tasks::ComputeTaskPool;
+use chorus_core::config::Config;
 use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
@@ -168,11 +169,13 @@ pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>,
     }
 }
 
-pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut ChunkView, Option<&mut ClientBlobCache>)>, mut level: ResMut<Level>) {
+pub fn send_pending_chunks(config: Res<Config>, mut query: Query<(&mut Session, &Transform, &mut ChunkView, Option<&mut ClientBlobCache>)>, mut level: ResMut<Level>) {
     let mut focus: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
     let mut to_request: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
+
     for (_, _, mut view, _) in query.iter_mut() {
         let Some(center) = view.center else { continue };
+
         focus.entry(view.dimension).or_default().push(center);
 
         let mut new_requests = Vec::new();
@@ -180,6 +183,7 @@ pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut Chun
             if new_requests.len() >= MAX_NEW_REQUESTS_PER_TICK {
                 break;
             }
+
             if (x - center.0).pow(2) + (z - center.1).pow(2) <= view.radius.pow(2) && !view.requested.contains(&(x, z)) {
                 new_requests.push((x, z));
             }
@@ -193,6 +197,7 @@ pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut Chun
             dimension.set_focus(&centers);
         }
     }
+
     for (id, positions) in to_request {
         if let Some(dimension) = level.dimension_mut(id) {
             dimension.request_chunks(&positions);
@@ -202,6 +207,7 @@ pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut Chun
     let mut ready: HashMap<i32, HashSet<(i32, i32)>> = HashMap::new();
     for (_, _, view, _) in query.iter() {
         let Some(dimension) = level.dimension(view.dimension) else { continue };
+
         let ready = ready.entry(view.dimension).or_default();
         ready.extend(view.pending.iter().copied().filter(|&(x, z)| dimension.get_chunk(x, z).is_some()));
     }
@@ -214,32 +220,39 @@ pub fn send_pending_chunks(mut query: Query<(&mut Session, &Transform, &mut Chun
             Some((id, serialize_chunks(level.dimension(id)?, &positions)))
         })
         .collect();
+
     if payloads.is_empty() {
         return;
     }
 
     for (mut session, transform, mut view, mut cache) in query.iter_mut() {
         let Some(payloads) = payloads.get(&view.dimension) else { continue };
+
         let mut sent: Vec<(i32, i32)> = Vec::new();
 
         for &(x, z) in &view.pending {
             let Some(payload) = payloads.get(&(x, z)) else { continue };
 
-            let cached = cache.as_mut().filter(|cache| cache.has_room(payload.blobs.len()));
+            let cached = if config.network.chunks.cache {
+                cache.as_mut().filter(|cache| cache.has_room(payload.blobs.len()))
+            } else {
+                None
+            };
+
             let (cache_blobs, serialized_chunk_data) = match cached {
                 Some(cache) => {
                     cache.track(&payload.blobs);
                     (payload.blobs.iter().map(|(id, _)| *id).collect(), payload.tail.clone())
                 }
-                None => (vec![], payload.full().to_vec()),
+                None => (vec![], if config.network.chunks.subchunks { payload.tail.clone() } else { payload.full().to_vec() }),
             };
 
             session.send(BedrockProtocol::LevelChunkPacket(
                 LevelChunkPacket {
                     chunk_position: ChunkPos { x, z },
                     dimension_id: view.dimension,
-                    sub_chunk_count: payload.sub_chunk_count,
-                    client_request_sub_chunk_limit: None,
+                    sub_chunk_count: if config.network.chunks.subchunks { 0 } else { payload.sub_chunk_count },
+                    client_request_sub_chunk_limit: config.network.chunks.subchunks.then_some(payload.sub_chunk_limit as i32),
                     cache_enabled: !cache_blobs.is_empty(),
                     cache_blobs,
                     serialized_chunk_data,
@@ -281,8 +294,6 @@ fn send_publisher_update(session: &mut Session, transform: &Transform, view: &Ch
 }
 
 fn serialize_chunks(dimension: &Dimension, positions: &[(i32, i32)]) -> HashMap<(i32, i32), ChunkPayload> {
-    let min_y = dimension.dimension_type.min_sub_chunk_y();
-
     let serialized = ComputeTaskPool::get().scope(|scope| {
         for &(x, z) in positions {
             let Some(chunk) = dimension.get_chunk(x, z) else { continue };
@@ -304,7 +315,7 @@ fn serialize_chunks(dimension: &Dimension, positions: &[(i32, i32)]) -> HashMap<
                     (x, z),
                     ChunkPayload {
                         sub_chunk_count: chunk.sub_chunk_count() as u32,
-                        sub_chunk_limit: (chunk.highest_non_air_sub_chunk_y() - min_y) as u16,
+                        sub_chunk_limit: chunk.highest_non_air_sub_chunk_y() as u16,
                         blobs: blobs.into_iter().map(|blob| (blob_id(&blob), Arc::from(blob))).collect(),
                         tail,
                         full: OnceCell::new(),
@@ -317,23 +328,21 @@ fn serialize_chunks(dimension: &Dimension, positions: &[(i32, i32)]) -> HashMap<
     serialized.into_iter().collect()
 }
 
-pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>, mut query: Query<&mut Session>, level: Res<Level>) {
+pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>, mut query: Query<(&mut Session, Option<&mut ClientBlobCache>)>, level: Res<Level>, config: Res<Config>) {
+    let blobs_enabled = config.network.chunks.cache;
+
     for ev in reader.read() {
         let BedrockProtocol::SubChunkRequestPacket(packet) = &ev.packet else {
             continue;
         };
-        let Ok(mut session) = query.get_mut(ev.entity) else {
+
+        let Ok((mut session, mut cache)) = query.get_mut(ev.entity) else {
             continue;
         };
 
-        debug!(
-            "SubChunkRequestPacket: dim={} center=({},{},{}) offsets={}",
-            packet.dimension_type,
-            packet.center_pos.0,
-            packet.center_pos.1,
-            packet.center_pos.2,
-            packet.sub_chunk_pos_offsets.len()
-        );
+        let Some(dim) = level.dimension(packet.dimension_type) else {
+            continue;
+        };
 
         let mut entries = Vec::with_capacity(packet.sub_chunk_pos_offsets.len());
 
@@ -342,12 +351,12 @@ pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>
             let cy = packet.center_pos.1 + offset.offset_y as i32;
             let cz = packet.center_pos.2 + offset.offset_z as i32;
 
-            let dim = level.dimension(packet.dimension_type);
-            let chunk = dim.and_then(|d| d.get_chunk(cx, cz));
+            let chunk = dim.get_chunk(cx, cz);
 
-            let (result, data) = match (chunk, dim) {
-                (Some(chunk), Some(_)) => match chunk.get_sub_chunk(cy as i8) {
-                    None => (SubChunkRequestResult::SuccessAllAir, None),
+            let (result, raw_data) = match chunk {
+                None => (SubChunkRequestResult::LevelChunkDoesntExist, None),
+                Some(chunk) => match chunk.get_sub_chunk(cy as i8) {
+                    None => (SubChunkRequestResult::IndexOutOfBounds, None),
                     Some(sc) if sc.is_all_air() => (SubChunkRequestResult::SuccessAllAir, None),
                     Some(sc) => {
                         let mut data = sc.serialize_network(cy as i8);
@@ -355,24 +364,36 @@ pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>
                         (SubChunkRequestResult::Success, Some(data))
                     }
                 },
-                _ => (SubChunkRequestResult::LevelChunkDoesntExist, None),
+            };
+
+            let use_blobs = blobs_enabled && cache.is_some() && raw_data.is_some();
+            let (blob_id, serialized_sub_chunk) = if use_blobs {
+                let data = raw_data.as_ref().unwrap();
+                let id = blob_id(data);
+
+                if let Some(cache) = cache.as_deref_mut() {
+                    cache.track(&[(id, Arc::from(data.clone()))]);
+                }
+                (Some(id), None)
+            } else {
+                (None, raw_data)
             };
 
             entries.push(SubChunkDataEntry {
                 sub_chunk_pos_offset: offset.clone(),
                 sub_chunk_request_result: result,
-                serialized_sub_chunk: Some(data.unwrap_or_default()),
+                serialized_sub_chunk,
                 height_map_data_type: HeightMapDataType::NoData,
                 height_map_data: None,
                 render_height_map_data_type: HeightMapDataType::NoData,
                 render_height_map_data: None,
-                blob_id: None,
+                blob_id,
             });
         }
 
         session.send(BedrockProtocol::SubChunkPacket(
             SubChunkPacket {
-                cache_enabled: false,
+                cache_enabled: blobs_enabled,
                 dimension_type: packet.dimension_type,
                 center_pos: SubChunkPos {
                     x: packet.center_pos.0,
