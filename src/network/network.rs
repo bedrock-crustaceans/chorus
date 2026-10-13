@@ -26,7 +26,6 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::system::{SystemId, SystemParam};
 use bevy_nethernet::prelude::*;
 use bevy_raknet::prelude::*;
-use p384::PublicKey;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
@@ -53,24 +52,6 @@ pub struct ConnectionEvents<'w, 's> {
     rak: MessageReader<'w, 's, RakServerEvent>,
     nether_lan: MessageReader<'w, 's, NetherServerEvent>,
     nether_http: MessageReader<'w, 's, NetherHttpServerEvent>,
-}
-
-#[derive(SystemParam)]
-pub struct TransportIdentities<'w> {
-    lan: Option<Res<'w, NetherServer>>,
-    http: Option<Res<'w, NetherHttpServer>>,
-}
-
-impl TransportIdentities<'_> {
-    fn lan(&self, id: &NetherSessionId) -> Option<PublicKey> {
-        let player = self.lan.as_ref()?.player(id)?;
-        player.client_public_key().ok().map(|key| PublicKey::from(&key))
-    }
-
-    fn http(&self, id: &NetherSessionId) -> Option<PublicKey> {
-        let player = self.http.as_ref()?.player(id)?;
-        player.client_public_key().ok().map(|key| PublicKey::from(&key))
-    }
 }
 
 pub struct Network;
@@ -198,32 +179,26 @@ impl Network {
     /// already drain their server's connect/disconnect events into `MessageWriter<*ServerEvent>`
     /// each tick, so this reads those messages directly rather than polling the servers again -
     /// by this point their own event queues are already empty.
-    pub fn accept(mut events: ConnectionEvents, identities: TransportIdentities, config: Res<Config>, oidc: Option<Res<Auth>>, mut state: ResMut<NetworkState>, mut commands: Commands) {
+    pub fn accept(mut events: ConnectionEvents, config: Res<Config>, oidc: Option<Res<Auth>>, mut state: ResMut<NetworkState>, mut commands: Commands) {
         let options = |id: &SessionId| login_config(&config, oidc.as_deref(), id);
 
         for event in events.rak.read() {
             match event {
-                RakServerEvent::SessionConnected { id, .. } => Network::connect(&mut state, &mut commands, SessionId::RakNet(*id), &options, None),
+                RakServerEvent::SessionConnected { id, .. } => Network::connect(&mut state, &mut commands, SessionId::RakNet(*id), &options),
                 RakServerEvent::SessionDisconnected { id, .. } => Network::disconnect(&mut state, &mut commands, &SessionId::RakNet(*id)),
             }
         }
 
         for event in events.nether_lan.read() {
             match event {
-                NetherServerEvent::SessionConnected(id) => {
-                    let key = identities.lan(id);
-                    Network::connect(&mut state, &mut commands, SessionId::NetherNetLan(id.clone()), &options, key)
-                }
+                NetherServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetLan(id.clone()), &options),
                 NetherServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &SessionId::NetherNetLan(id.clone())),
             }
         }
 
         for event in events.nether_http.read() {
             match event {
-                NetherHttpServerEvent::SessionConnected(id) => {
-                    let key = identities.http(id);
-                    Network::connect(&mut state, &mut commands, SessionId::NetherNetHttp(id.clone()), &options, key)
-                }
+                NetherHttpServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetHttp(id.clone()), &options),
                 NetherHttpServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &SessionId::NetherNetHttp(id.clone())),
             }
         }
@@ -278,12 +253,10 @@ impl Network {
     }
 
     #[tracing::instrument(name = "network", skip_all)]
-    fn connect(state: &mut NetworkState, commands: &mut Commands, id: SessionId, options: &dyn Fn(&SessionId) -> LoginConfig, transport_key: Option<PublicKey>) {
+    fn connect(state: &mut NetworkState, commands: &mut Commands, id: SessionId, options: &dyn Fn(&SessionId) -> LoginConfig) {
         let entity = commands.spawn_empty().id();
-        let mut session = Session::new(entity, id.clone(), options(&id));
-        if let Some(key) = transport_key {
-            session.bind_transport_key(key);
-        }
+        let session = Session::new(entity, id.clone(), options(&id));
+
         commands.entity(entity).insert(session);
 
         info!("Connected: {:?}", id);

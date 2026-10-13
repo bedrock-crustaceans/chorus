@@ -39,7 +39,6 @@ serde_json = "1.0.151"
 toml = "1.1.6"
 
 base64 = "0.23.1"
-p384 = { version = "0.14.0", features = ["ecdh", "ecdsa"] }
 
 tracing = "0.1.44"
 tracing-appender = "0.2.5"
@@ -108,7 +107,6 @@ indicatif.workspace = true
 uuid.workspace = true
 xxhash-rust.workspace = true
 zip.workspace = true
-p384.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Pipes", "Win32_System_IO"] }

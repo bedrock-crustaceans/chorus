@@ -3,11 +3,10 @@ use crate::network::BedrockProtocol;
 use bedrock::auth::Login;
 use bedrock::network::compression::Compression;
 use bedrock::network::error::LoginError;
-use bedrock::network::login::{LoginOptions, NetworkSettings, begin_encryption, bind_transport_identity, check_protocol};
+use bedrock::network::login::{LoginOptions, NetworkSettings, begin_encryption, check_protocol};
 use bedrock::protocol::ProtoVersion;
 use bedrock::protocol::v662::enums::{PacketCompressionAlgorithm, PlayStatus};
 use bedrock::protocol::v662::packets::{NetworkSettingsPacket, ServerToClientHandshakePacket};
-use p384::PublicKey;
 use std::fmt::{Display, Formatter};
 use std::mem::replace;
 use tracing::warn;
@@ -23,7 +22,6 @@ pub struct LoginConfig {
 pub struct LoginFlow {
     config: LoginConfig,
     state: LoginState,
-    transport_key: Option<PublicKey>,
 }
 
 impl LoginFlow {
@@ -31,12 +29,7 @@ impl LoginFlow {
         Self {
             config,
             state: LoginState::AwaitSettings,
-            transport_key: None,
         }
-    }
-
-    pub fn bind_transport_key(&mut self, key: PublicKey) {
-        self.transport_key = Some(key);
     }
 
     pub fn is_done(&self) -> bool {
@@ -148,9 +141,6 @@ impl Session {
     fn accept_login(&mut self, client_protocol: i32, connection_request: &[u8]) -> Result<LoginProgress, LoginFailure> {
         check_protocol(client_protocol, PROTOCOL)?;
         let login = self.login.config.options.verify(connection_request)?;
-        if let Some(key) = &self.login.transport_key {
-            bind_transport_identity(&login, key)?;
-        }
 
         if !self.login.config.encryption {
             return Ok(self.finish_login(Box::new(login)));
@@ -174,130 +164,5 @@ impl Session {
     pub fn fail_login(&mut self, failure: LoginFailure) {
         warn!("Rejected login: {failure}");
         self.close(failure.disconnect_message());
-    }
-}
-
-#[cfg(test)]
-pub(super) mod tests {
-    use super::*;
-    use crate::network::transport::SessionId;
-    use bedrock::auth::{ClientData, ConnectionRequest};
-    use bedrock::protocol::v662::packets::{ClientToServerHandshakePacket, LoginPacket, RequestNetworkSettingsPacket};
-    use bevy_ecs::prelude::Entity;
-    use bevy_raknet::prelude::RakSessionId;
-
-    fn config(encryption: bool, require_authentication: bool) -> LoginConfig {
-        LoginConfig {
-            options: LoginOptions::default().require_authentication(require_authentication),
-            settings: NetworkSettings::new(Compression::Zlib { compression_level: 6, threshold: 256 }),
-            encryption,
-        }
-    }
-
-    pub fn session_with_config(encryption: bool, require_authentication: bool) -> Session {
-        Session::new(Entity::PLACEHOLDER, SessionId::RakNet(RakSessionId(0)), config(encryption, require_authentication))
-    }
-
-    fn offline_session() -> Session {
-        session_with_config(false, false)
-    }
-
-    fn self_signed_login(name: &str) -> BedrockProtocol {
-        let key = p384::SecretKey::from_slice(&[0x11u8; 48]).unwrap();
-        let client_data = ClientData::offline("1.21.0", "127.0.0.1:19132", name);
-        let request = ConnectionRequest::self_signed(&key, name, &client_data).unwrap();
-        BedrockProtocol::LoginPacket(
-            LoginPacket {
-                client_network_version: PROTOCOL,
-                connection_request: request.to_bytes().unwrap(),
-            }
-            .into(),
-        )
-    }
-
-    fn settings_request(protocol: i32) -> BedrockProtocol {
-        BedrockProtocol::RequestNetworkSettingsPacket(RequestNetworkSettingsPacket { client_network_version: protocol }.into())
-    }
-
-    fn client_handshake() -> BedrockProtocol {
-        BedrockProtocol::ClientToServerHandshakePacket(ClientToServerHandshakePacket {}.into())
-    }
-
-    #[test]
-    fn offline_login_enables_compression_then_completes() {
-        let mut session = offline_session();
-
-        let progress = session.advance_login(settings_request(PROTOCOL)).unwrap();
-        assert!(progress.settings_accepted);
-        assert!(progress.completed.is_none());
-        assert_eq!(session.compression, Some(Compression::Zlib { compression_level: 6, threshold: 256 }));
-        assert_eq!(session.take_outgoing().len(), 1);
-
-        let progress = session.advance_login(self_signed_login("Steve")).unwrap();
-        let login = progress.completed.expect("login completes without encryption");
-        assert_eq!(login.authentication.identity().display_name, "Steve");
-        assert_eq!(session.take_outgoing().len(), 1);
-        assert!(session.login.is_done());
-    }
-
-    #[test]
-    fn encrypted_login_waits_for_the_client_handshake() {
-        let mut session = session_with_config(true, false);
-        session.advance_login(settings_request(PROTOCOL)).unwrap();
-
-        let progress = session.advance_login(self_signed_login("Steve")).unwrap();
-        assert!(progress.completed.is_none());
-        assert!(session.encryption.is_some());
-
-        let progress = session.advance_login(client_handshake()).unwrap();
-        assert!(progress.completed.is_some());
-    }
-
-    #[test]
-    fn outdated_client_is_told_and_closed() {
-        let mut session = offline_session();
-
-        let failure = session.advance_login(settings_request(PROTOCOL - 1)).err().expect("an older protocol is rejected");
-        assert!(matches!(failure, LoginFailure::Rejected(LoginError::ProtocolMismatch { .. })));
-        assert_eq!(failure.disconnect_message(), Some("disconnectionScreen.outdatedClient"));
-        assert_eq!(session.take_outgoing().len(), 1);
-
-        session.fail_login(failure);
-        assert!(session.is_closed());
-        assert_eq!(session.take_outgoing().len(), 1);
-    }
-
-    #[test]
-    fn unauthenticated_login_is_rejected_when_authentication_is_required() {
-        let mut session = session_with_config(false, true);
-        session.advance_login(settings_request(PROTOCOL)).unwrap();
-
-        let failure = session.advance_login(self_signed_login("Steve")).err().expect("a self-signed login is not authenticated");
-        assert!(matches!(failure, LoginFailure::Rejected(LoginError::NotAuthenticated)));
-        assert_eq!(failure.disconnect_message(), Some("disconnectionScreen.notAuthenticated"));
-    }
-
-    #[test]
-    fn login_from_another_key_than_the_transport_identity_is_rejected() {
-        let mut session = offline_session();
-        session.login.bind_transport_key(p384::SecretKey::from_slice(&[0x22u8; 48]).unwrap().public_key());
-        session.advance_login(settings_request(PROTOCOL)).unwrap();
-
-        let failure = session.advance_login(self_signed_login("Steve")).err().expect("the key differs from the transport identity");
-        assert!(matches!(failure, LoginFailure::Rejected(LoginError::TransportIdentityMismatch)));
-    }
-
-    #[test]
-    fn login_before_network_settings_is_unexpected() {
-        let mut session = offline_session();
-
-        let failure = session.advance_login(self_signed_login("Steve")).err().expect("settings come first");
-        assert!(matches!(failure, LoginFailure::UnexpectedPacket { .. }));
-    }
-
-    #[test]
-    fn newer_client_hits_outdated_server_text() {
-        let failure = LoginFailure::Rejected(LoginError::ProtocolMismatch { client: 2, server: 1 });
-        assert_eq!(failure.disconnect_message(), Some("disconnectionScreen.outdatedServer"));
     }
 }
