@@ -6,7 +6,6 @@ use bedrock::auth::client_data::SkinAnimation;
 use bedrock::protocol::v2168::enums::{AnimatedTextureType, AnimationExpression, ArmSizeType};
 use bedrock::protocol::v2168::types::{SerializedSkin, SerializedSkinAnimationFrame};
 use bevy_ecs::prelude::Component;
-use serde_json::Value;
 use uuid::Uuid;
 
 #[derive(Component, Clone, Debug)]
@@ -16,31 +15,19 @@ pub struct PlayerAppearance {
     pub device_id: String,
 }
 
-fn text(claims: &Value, key: &str) -> String {
-    claims.get(key).and_then(Value::as_str).unwrap_or_default().to_owned()
+fn bytes(base64: &String) -> Vec<u8> {
+    BASE64_STANDARD.decode(base64).unwrap_or_default()
 }
 
-fn number(claims: &Value, key: &str) -> u32 {
-    claims.get(key).and_then(Value::as_u64).unwrap_or_default() as u32
-}
-
-fn flag(claims: &Value, key: &str) -> bool {
-    claims.get(key).and_then(Value::as_bool).unwrap_or_default()
-}
-
-fn bytes(claims: &Value, key: &str) -> Vec<u8> {
-    BASE64_STANDARD.decode(text(claims, key)).unwrap_or_default()
-}
-
-fn decoded_text(claims: &Value, key: &str) -> String {
-    String::from_utf8(bytes(claims, key)).unwrap_or_default()
+fn decoded_text(base64: &String) -> String {
+    String::from_utf8(bytes(base64)).unwrap_or_default()
 }
 
 fn animation(frame: &SkinAnimation) -> SerializedSkinAnimationFrame<BedrockProtocol> {
     SerializedSkinAnimationFrame {
         image_width: frame.image_width as u32,
         image_height: frame.image_height as u32,
-        image_bytes: frame.image.as_bytes().to_vec(),
+        image_bytes: bytes(&frame.image),
         animation_type: match frame.animation_type {
             1 => AnimatedTextureType::Face,
             2 => AnimatedTextureType::Body32x32,
@@ -67,14 +54,14 @@ impl PlayerAppearance {
             skin_resource_patch: claims.skin_resource_patch.clone(),
             skin_image_width: claims.skin_image_width as u32,
             skin_image_height: claims.skin_image_height as u32,
-            skin_image_bytes: claims.skin_data.as_bytes().to_vec(),
+            skin_image_bytes: bytes(&claims.skin_data),
             animations: claims.animated_image_data.iter().map(animation).collect(),
             cape_image_width: claims.cape_image_width as u32,
             cape_image_height: claims.cape_image_height as u32,
-            cape_image_bytes: claims.cape_data.as_bytes().to_vec(),
-            geometry_data: claims.skin_geometry.clone(),
-            geometry_data_engine_version: claims.skin_geometry_version.clone(),
-            animation_data: claims.skin_animation_data.clone(),
+            cape_image_bytes: bytes(&claims.cape_data),
+            geometry_data: decoded_text(&claims.skin_geometry),
+            geometry_data_engine_version: decoded_text(&claims.skin_geometry_version),
+            animation_data: decoded_text(&claims.skin_animation_data),
             cape_id,
             arm_size: if claims.arm_size == "slim" { ArmSizeType::Slim } else { ArmSizeType::Wide },
             skin_color: i32::from_str_radix(claims.skin_colour.trim_start_matches('#'), 16).unwrap_or_default(),
