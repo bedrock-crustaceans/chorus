@@ -76,7 +76,7 @@ impl ResourcePack {
 
         let manifest_str = {
             let manifest_name = (0..archive.len())
-                .find(|&i| archive.by_index(i).map(|f| f.name().ends_with("manifest.json")).unwrap_or(false))
+                .find(|&i| archive.by_index(i).and_then(|f| Ok(f.name()?.ends_with("manifest.json"))).unwrap_or(false))
                 .ok_or(ResourcePackError::MissingManifest)?;
 
             let mut file = archive.by_index(manifest_name).map_err(ResourcePackError::Zip)?;
