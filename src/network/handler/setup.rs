@@ -214,14 +214,22 @@ pub fn handle_setup(
     }
 }
 
+fn clamp_chunk_radius(requested: i32, max_view_distance: i32) -> i32 {
+    requested.clamp(1, max_view_distance.max(1))
+}
+
 fn handle_request_chunk_radius(config: &Config, packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, view: &mut ChunkView, session: &mut Session, items: &ItemRegistry) {
-    let radius = packet.chunk_radius.min(config.level.max_view_distance);
+    let radius = clamp_chunk_radius(packet.chunk_radius, config.level.max_view_distance);
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
 
     // the queue itself is filled by update_chunk_order, which also keeps it following the player
     view.radius = radius;
 
     session.send(BedrockProtocol::ChunkRadiusUpdatedPacket(ChunkRadiusUpdatedPacket { chunk_radius: radius }.into()));
+
+    if !session.take_first_setup_response() {
+        return;
+    }
 
     session.send(BedrockProtocol::BiomeDefinitionListPacket(crate::level::biome::definitions::definition_list().into()));
 
@@ -242,4 +250,20 @@ fn handle_set_local_player_as_initialized(
     };
 
     session.set_state(SessionState::Play, state_writer);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clamp_chunk_radius;
+
+    #[test]
+    fn clamps_to_valid_range() {
+        assert_eq!(clamp_chunk_radius(-5, 16), 1);
+        assert_eq!(clamp_chunk_radius(i32::MIN, 16), 1);
+        assert_eq!(clamp_chunk_radius(0, 16), 1);
+        assert_eq!(clamp_chunk_radius(8, 16), 8);
+        assert_eq!(clamp_chunk_radius(100, 16), 16);
+        assert_eq!(clamp_chunk_radius(8, 0), 1);
+        assert_eq!(clamp_chunk_radius(8, -3), 1);
+    }
 }

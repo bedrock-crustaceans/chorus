@@ -328,13 +328,27 @@ fn serialize_chunks(dimension: &Dimension, positions: &[(i32, i32)]) -> HashMap<
     serialized.into_iter().collect()
 }
 
+const MAX_SUB_CHUNKS_PER_REQUEST: usize = 256;
+
+fn resolve_sub_chunk_position(center: (i32, i32, i32), offset: (i32, i32, i32)) -> Option<(i32, i8, i32)> {
+    let x = center.0.checked_add(offset.0)?;
+    let y = i8::try_from(center.1.checked_add(offset.1)?).ok()?;
+    let z = center.2.checked_add(offset.2)?;
+    Some((x, y, z))
+}
+
 pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>, mut query: Query<(&mut Session, Option<&mut ClientBlobCache>)>, level: Res<Level>, config: Res<Config>) {
     let blobs_enabled = config.network.chunks.cache;
+    let subchunks_enabled = config.network.chunks.subchunks;
 
     for ev in reader.read() {
         let BedrockProtocol::SubChunkRequestPacket(packet) = &ev.packet else {
             continue;
         };
+
+        if !subchunks_enabled {
+            continue;
+        }
 
         let Ok((mut session, mut cache)) = query.get_mut(ev.entity) else {
             continue;
@@ -344,25 +358,22 @@ pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>
             continue;
         };
 
-        let mut entries = Vec::with_capacity(packet.sub_chunk_pos_offsets.len());
+        let mut entries = Vec::with_capacity(packet.sub_chunk_pos_offsets.len().min(MAX_SUB_CHUNKS_PER_REQUEST));
 
-        for offset in &packet.sub_chunk_pos_offsets {
-            let cx = packet.center_pos.0 + offset.offset_x as i32;
-            let cy = packet.center_pos.1 + offset.offset_y as i32;
-            let cz = packet.center_pos.2 + offset.offset_z as i32;
-
-            let chunk = dim.get_chunk(cx, cz);
-
-            let (result, raw_data) = match chunk {
-                None => (SubChunkRequestResult::LevelChunkDoesntExist, None),
-                Some(chunk) => match chunk.get_sub_chunk(cy as i8) {
-                    None => (SubChunkRequestResult::IndexOutOfBounds, None),
-                    Some(sc) if sc.is_all_air() => (SubChunkRequestResult::SuccessAllAir, None),
-                    Some(sc) => {
-                        let mut data = sc.serialize_network(cy as i8);
-                        data.extend(chunk.serialize_block_entities(Some(cy as i8)));
-                        (SubChunkRequestResult::Success, Some(data))
-                    }
+        for offset in packet.sub_chunk_pos_offsets.iter().take(MAX_SUB_CHUNKS_PER_REQUEST) {
+            let (result, raw_data) = match resolve_sub_chunk_position(packet.center_pos, (offset.offset_x as i32, offset.offset_y as i32, offset.offset_z as i32)) {
+                None => (SubChunkRequestResult::IndexOutOfBounds, None),
+                Some((cx, cy, cz)) => match dim.get_chunk(cx, cz) {
+                    None => (SubChunkRequestResult::LevelChunkDoesntExist, None),
+                    Some(chunk) => match chunk.get_sub_chunk(cy) {
+                        None => (SubChunkRequestResult::IndexOutOfBounds, None),
+                        Some(sc) if sc.is_all_air() => (SubChunkRequestResult::SuccessAllAir, None),
+                        Some(sc) => {
+                            let mut data = sc.serialize_network(cy);
+                            data.extend(chunk.serialize_block_entities(Some(cy)));
+                            (SubChunkRequestResult::Success, Some(data))
+                        }
+                    },
                 },
             };
 
@@ -404,5 +415,23 @@ pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>
             }
             .into(),
         ));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolves_in_range_positions() {
+        assert_eq!(resolve_sub_chunk_position((10, 0, -3), (1, -4, 2)), Some((11, -4, -1)));
+    }
+
+    #[test]
+    fn rejects_overflow_and_out_of_range_y() {
+        assert_eq!(resolve_sub_chunk_position((i32::MAX, 0, 0), (1, 0, 0)), None);
+        assert_eq!(resolve_sub_chunk_position((0, 0, i32::MIN), (0, 0, -1)), None);
+        assert_eq!(resolve_sub_chunk_position((0, 256, 0), (0, 0, 0)), None);
+        assert_eq!(resolve_sub_chunk_position((0, 100, 0), (0, 100, 0)), None);
     }
 }

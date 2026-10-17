@@ -53,14 +53,14 @@ impl Chunk {
 
     pub fn serialize_block_entities(&self, sub_y: Option<i8>) -> Vec<u8> {
         let mut buf = Vec::new();
-        for entity in self.block_entities.iter().filter(|entity| sub_y.is_none_or(|sub_y| (entity.y >> 4) as i8 == sub_y)) {
+        for entity in self.block_entities.iter().filter(|entity| sub_y.is_none_or(|sub_y| (entity.y >> 4) == sub_y as i32)) {
             buf.extend(nbtx::to_varint_bytes(&entity.data).expect("block entity nbt serializes"));
         }
         buf
     }
 
     pub fn set_biome(&mut self, x: u8, y: i32, z: u8, biome: i32) -> bool {
-        match self.get_sub_chunk_mut((y >> 4) as i8) {
+        match self.sub_chunk_for_y_mut(y) {
             Some(sub_chunk) => {
                 sub_chunk.set_biome(x, (y & 0xF) as u8, z, biome);
                 true
@@ -71,6 +71,17 @@ impl Chunk {
 
     fn sub_chunk_offset(&self, sub_y: i8) -> usize {
         sub_y.wrapping_sub(self.min_sub_chunk_y) as usize
+    }
+
+    fn sub_chunk_index_for_y(&self, y: i32) -> Option<usize> {
+        usize::try_from((y >> 4) - self.min_sub_chunk_y as i32).ok()
+    }
+
+    fn sub_chunk_for_y_mut(&mut self, y: i32) -> Option<&mut SubChunk> {
+        let index = self.sub_chunk_index_for_y(y)?;
+        let sub_chunk = self.sub_chunks.get_mut(index);
+        self.dirty |= sub_chunk.is_some();
+        sub_chunk
     }
 
     pub fn get_sub_chunk(&self, sub_y: i8) -> Option<&SubChunk> {
@@ -85,18 +96,19 @@ impl Chunk {
     }
 
     pub fn get_block(&self, x: u8, y: i32, z: u8, layer: usize) -> Option<i32> {
-        let sub_y = (y >> 4) as i8;
         let local_y = (y & 0xF) as u8;
-        Some(self.get_sub_chunk(sub_y)?.get(x, local_y, z, layer))
+        Some(self.sub_chunks.get(self.sub_chunk_index_for_y(y)?)?.get(x, local_y, z, layer))
     }
 
     pub fn get_biome(&self, x: u8, y: i32, z: u8) -> Option<i32> {
-        Some(self.get_sub_chunk((y >> 4) as i8)?.get_biome(x, (y & 0xF) as u8, z))
+        Some(self.sub_chunks.get(self.sub_chunk_index_for_y(y)?)?.get_biome(x, (y & 0xF) as u8, z))
     }
 
     pub fn set_block(&mut self, x: u8, y: i32, z: u8, layer: usize, block_id: i32) -> bool {
-        let offset = self.sub_chunk_offset((y >> 4) as i8);
-        let changed = self.sub_chunks.get_mut(offset).is_some_and(|sub_chunk| sub_chunk.set(x, (y & 0xF) as u8, z, layer, block_id));
+        let Some(index) = self.sub_chunk_index_for_y(y) else {
+            return false;
+        };
+        let changed = self.sub_chunks.get_mut(index).is_some_and(|sub_chunk| sub_chunk.set(x, (y & 0xF) as u8, z, layer, block_id));
         self.dirty |= changed;
         changed
     }
@@ -301,5 +313,31 @@ mod tests {
         expected.extend(sub_chunk.serialize_biomes());
         expected.push(0);
         assert_eq!(bytes, expected);
+    }
+
+    fn chunk() -> Chunk {
+        Chunk::new(0, 0, -4, 24, 0, 0)
+    }
+
+    #[test]
+    fn in_range_blocks_round_trip() {
+        let mut chunk = chunk();
+        assert!(chunk.set_block(1, -64, 2, 0, 7));
+        assert_eq!(chunk.get_block(1, -64, 2, 0), Some(7));
+        assert!(chunk.set_block(1, 319, 2, 0, 9));
+        assert_eq!(chunk.get_block(1, 319, 2, 0), Some(9));
+    }
+
+    #[test]
+    fn out_of_range_y_does_not_alias() {
+        let mut chunk = chunk();
+        assert_eq!(chunk.get_block(0, 4096, 0, 0), None);
+        assert_eq!(chunk.get_block(0, -65, 0, 0), None);
+        assert_eq!(chunk.get_block(0, 320, 0, 0), None);
+        assert!(!chunk.set_block(0, 4096, 0, 0, 5));
+        assert!(!chunk.set_block(0, -4096, 0, 0, 5));
+        assert_eq!(chunk.get_block(0, 0, 0, 0), Some(0));
+        assert_eq!(chunk.get_biome(0, 4096, 0), None);
+        assert!(!chunk.set_biome(0, 4096, 0, 3));
     }
 }

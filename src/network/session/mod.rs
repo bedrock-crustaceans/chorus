@@ -37,6 +37,7 @@ pub struct Session {
     pub id: SessionId,
 
     closed: bool,
+    setup_responded: bool,
     state: SessionState,
     login: LoginFlow,
 
@@ -58,6 +59,7 @@ impl Session {
             id,
 
             closed: false,
+            setup_responded: false,
             state: SessionState::Negotiating,
             login: LoginFlow::new(login),
 
@@ -170,6 +172,10 @@ impl Session {
         }
 
         self.closed = true;
+    }
+
+    pub fn take_first_setup_response(&mut self) -> bool {
+        !std::mem::replace(&mut self.setup_responded, true)
     }
 
     pub fn is_closed(&self) -> bool {

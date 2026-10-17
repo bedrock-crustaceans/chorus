@@ -21,6 +21,9 @@ use bevy_ecs::prelude::{Commands, Entity, Query, Res};
 use glam::{Vec2, Vec3};
 use tracing::{debug, info};
 
+const MAX_HORIZONTAL_POSITION: f32 = 3.0e7;
+const MAX_VERTICAL_POSITION: f32 = 2048.;
+
 #[derive(Message, Clone, Debug)]
 pub struct PlayerJoinedMessage {
     pub entity: Entity,
@@ -147,6 +150,11 @@ pub fn handle_play(
                 let (pitch, yaw) = packet.player_rotation;
                 let new_rotation = Vec2::new(pitch, yaw);
 
+                if !is_valid_movement(new_position, new_rotation) {
+                    debug!("ignoring invalid movement from {}: {} {}", identity.name(), new_position, new_rotation);
+                    continue;
+                }
+
                 if !pending_teleport.accepts(new_position) {
                     continue;
                 }
@@ -182,5 +190,33 @@ pub fn handle_play(
                 *count = count.saturating_add(1);
             }
         }
+    }
+}
+
+fn is_valid_movement(position: Vec3, rotation: Vec2) -> bool {
+    position.is_finite() && rotation.is_finite() && position.x.abs() < MAX_HORIZONTAL_POSITION && position.z.abs() < MAX_HORIZONTAL_POSITION && position.y.abs() < MAX_VERTICAL_POSITION
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_normal_movement() {
+        assert!(is_valid_movement(Vec3::new(10., 64., -300.), Vec2::new(12., 270.)));
+    }
+
+    #[test]
+    fn rejects_non_finite_values() {
+        assert!(!is_valid_movement(Vec3::new(f32::NAN, 64., 0.), Vec2::ZERO));
+        assert!(!is_valid_movement(Vec3::new(0., f32::INFINITY, 0.), Vec2::ZERO));
+        assert!(!is_valid_movement(Vec3::ZERO, Vec2::new(0., f32::NAN)));
+    }
+
+    #[test]
+    fn rejects_out_of_range_positions() {
+        assert!(!is_valid_movement(Vec3::new(3.0e7, 64., 0.), Vec2::ZERO));
+        assert!(!is_valid_movement(Vec3::new(0., 64., -3.5e7), Vec2::ZERO));
+        assert!(!is_valid_movement(Vec3::new(0., 5000., 0.), Vec2::ZERO));
     }
 }
