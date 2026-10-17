@@ -5,6 +5,9 @@ on:
     branches:
       - main
   pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,6 +16,7 @@ permissions:
 jobs:
   test:
     name: Test
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -25,35 +29,24 @@ jobs:
           cache-on-failure: false
           cache-all-crates: true
 
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --all
 
   fmt:
     name: Formatting
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+          components: rustfmt
+      - run: cargo fmt --all -- --check
 
   clippy:
     name: Clippy
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -66,13 +59,41 @@ jobs:
           cache-on-failure: false
           cache-all-crates: true
 
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: rustup component add clippy
-      - uses: actions-rs/cargo@v1
+          components: clippy
+      - run: cargo clippy --all-targets --all-features
+
+  windows:
+    name: Windows
+    if: github.event_name != 'schedule'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: Swatinem/rust-cache@v2
         with:
-          command: clippy
-          args: --all-targets --all-features
+          add-job-id-key: false
+          shared-key: "chorus-cache-windows"
+          cache-on-failure: false
+          cache-all-crates: true
+
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo check --workspace
+
+  worldgen-checksum:
+    name: Worldgen checksum
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          add-job-id-key: false
+          shared-key: "chorus-cache-release"
+          cache-on-failure: false
+          cache-all-crates: true
+
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --release -p chorus_worldgen -- --ignored output_checksum --nocapture

@@ -81,7 +81,7 @@ pub struct PermissionConfig {
 impl Default for PermissionConfig {
     fn default() -> Self {
         Self {
-            default: PermissionLevel::Operator,
+            default: PermissionLevel::Member,
             players: Default::default(),
         }
     }
