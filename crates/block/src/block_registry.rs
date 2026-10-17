@@ -126,3 +126,104 @@ impl BlockRegistry {
         self.default_hash.values().copied().collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::block_id;
+
+    fn registry() -> BlockRegistry {
+        let mut registry = BlockRegistry::new();
+        registry.register_all(DEFINITIONS.iter().copied());
+        registry
+    }
+
+    #[test]
+    fn every_bundled_definition_registers() {
+        let registry = registry();
+        assert_eq!(registry.definitions.len(), DEFINITIONS.len());
+        assert_eq!(registry.get_all_block_ids().len(), DEFINITIONS.len());
+    }
+
+    #[test]
+    fn known_blocks_resolve_by_identifier() {
+        let registry = registry();
+        for identifier in [block_id::AIR, block_id::STONE, block_id::GRASS_BLOCK, block_id::DIRT] {
+            assert!(registry.get_block_id(identifier).is_some(), "{identifier}");
+        }
+        assert_eq!(registry.get_block_id("minecraft:not_a_block"), None);
+    }
+
+    #[test]
+    fn known_blocks_have_distinct_ids() {
+        let registry = registry();
+        let ids: Vec<i32> = [block_id::AIR, block_id::STONE, block_id::GRASS_BLOCK].iter().map(|id| registry.get_block_id(id).unwrap()).collect();
+        assert_ne!(ids[0], ids[1]);
+        assert_ne!(ids[1], ids[2]);
+        assert_ne!(ids[0], ids[2]);
+        assert_eq!(ids[0], -604749536);
+    }
+
+    #[test]
+    fn ids_map_back_to_their_permutation_and_components() {
+        let registry = registry();
+        for identifier in [block_id::AIR, block_id::STONE, block_id::GRASS_BLOCK] {
+            let id = registry.get_block_id(identifier).unwrap();
+            assert_eq!(registry.get_permutation(id).unwrap().get_identifier(), identifier);
+            assert_eq!(registry.get_permutation(id).unwrap().get_hash(), id);
+            assert!(registry.get_components(id).is_some());
+        }
+        assert!(registry.get_permutation(12345).is_none());
+        assert!(registry.get_components(12345).is_none());
+    }
+
+    #[test]
+    fn registering_twice_produces_the_same_ids() {
+        let a = registry();
+        let b = registry();
+        for identifier in [block_id::AIR, block_id::STONE, block_id::GRASS_BLOCK, block_id::ACACIA_LOG] {
+            assert_eq!(a.get_block_id(identifier), b.get_block_id(identifier));
+        }
+    }
+
+    #[test]
+    fn state_values_select_the_permutation() {
+        let registry = registry();
+        let default = registry.get_block_id(block_id::ACACIA_LOG).unwrap();
+        let y = registry.get_block_id_with_states(block_id::ACACIA_LOG, &[("pillar_axis", "y".into())]).unwrap();
+        let x = registry.get_block_id_with_states(block_id::ACACIA_LOG, &[("pillar_axis", "x".into())]).unwrap();
+        let z = registry.get_block_id_with_states(block_id::ACACIA_LOG, &[("pillar_axis", "z".into())]).unwrap();
+
+        assert_eq!(default, y);
+        assert_eq!(registry.get_permutation(x).unwrap().get_state_value("pillar_axis"), Some(&BlockState::from("x")));
+        assert_ne!(x, z);
+        assert_ne!(x, y);
+    }
+
+    #[test]
+    fn unknown_states_and_values_are_rejected() {
+        let registry = registry();
+        assert_eq!(registry.get_block_id_with_states(block_id::ACACIA_LOG, &[("nope", "y".into())]), None);
+        assert_eq!(registry.get_block_id_with_states(block_id::ACACIA_LOG, &[("pillar_axis", "w".into())]), None);
+        assert_eq!(registry.get_block_id_with_states("minecraft:not_a_block", &[]), None);
+    }
+
+    #[test]
+    fn no_states_means_the_default_permutation() {
+        let registry = registry();
+        assert_eq!(registry.get_block_id_with_states(block_id::STONE, &[]), registry.get_block_id(block_id::STONE));
+    }
+
+    #[test]
+    fn an_invalid_definition_is_skipped() {
+        let mut registry = BlockRegistry::new();
+        registry.register(BlockDefinition::new("not an identifier", [], [], []));
+        assert!(registry.get_all_block_ids().is_empty());
+    }
+
+    #[test]
+    fn get_random_returns_a_registered_id() {
+        let registry = registry();
+        assert!(registry.get_permutation(registry.get_random()).is_some());
+    }
+}

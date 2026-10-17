@@ -9,6 +9,9 @@ mod palette;
 pub mod storage;
 pub mod sub_chunk;
 
+#[cfg(test)]
+mod test_util;
+
 pub use level::Level;
 
 use bevy_ecs::prelude::{Component, Message};

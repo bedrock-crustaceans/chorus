@@ -234,3 +234,81 @@ fn air_instance() -> NetworkItemInstanceDescriptor {
         user_data_buffer: vec![],
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    fn registry() -> ItemRegistry {
+        let mut registry = ItemRegistry::new();
+        registry.load_items();
+        registry.load_creative();
+        registry
+    }
+
+    #[test]
+    fn known_items_resolve_by_identifier() {
+        let registry = registry();
+        for identifier in ["minecraft:stone", "minecraft:apple", "minecraft:diamond"] {
+            assert!(registry.get(identifier).is_some(), "{identifier}");
+        }
+        assert_eq!(registry.get("minecraft:not_an_item"), None);
+    }
+
+    #[test]
+    fn lookups_agree_with_the_item_list() {
+        let registry = registry();
+        assert!(!registry.items().is_empty());
+        for item in registry.items() {
+            assert_eq!(registry.get(&item.identifier), Some(item.runtime_id), "{}", item.identifier);
+        }
+    }
+
+    #[test]
+    fn identifiers_and_runtime_ids_are_unique() {
+        let registry = registry();
+        let identifiers: HashSet<&str> = registry.items().iter().map(|item| item.identifier.as_str()).collect();
+        let ids: HashSet<i16> = registry.items().iter().map(|item| item.runtime_id).collect();
+        assert_eq!(identifiers.len(), registry.items().len());
+        assert_eq!(ids.len(), registry.items().len());
+    }
+
+    #[test]
+    fn the_item_packet_lists_every_item() {
+        let registry = registry();
+        let packet = registry.to_packet();
+        assert_eq!(packet.items.len(), registry.items().len());
+        let apple = packet.items.iter().find(|item| item.component_item_name == "minecraft:apple").unwrap();
+        assert_eq!(Some(apple.runtime_id), registry.get("minecraft:apple"));
+    }
+
+    #[test]
+    fn the_creative_list_is_not_empty_and_has_sequential_net_ids() {
+        let registry = registry();
+        let packet = registry.to_creative_packet();
+        assert!(!packet.contents.is_empty());
+        assert!(!packet.groups.is_empty());
+        for (index, entry) in packet.contents.iter().enumerate() {
+            assert_eq!(entry.creative_net_id, index as u32 + 1);
+            assert!((entry.group_id as usize) < packet.groups.len());
+        }
+    }
+
+    #[test]
+    fn creative_entries_point_at_registered_items() {
+        let registry = registry();
+        let ids: HashSet<i32> = registry.items().iter().map(|item| item.runtime_id as i32).collect();
+        for entry in registry.to_creative_packet().contents {
+            assert!(ids.contains(&entry.item_instance.id), "creative entry {}", entry.creative_net_id);
+        }
+    }
+
+    #[test]
+    fn an_empty_registry_has_no_items_and_no_creative_entries() {
+        let registry = ItemRegistry::new();
+        assert!(registry.items().is_empty());
+        assert_eq!(registry.get("minecraft:stone"), None);
+        assert!(registry.to_creative_packet().contents.is_empty());
+    }
+}

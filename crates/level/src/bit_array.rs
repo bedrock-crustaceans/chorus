@@ -95,3 +95,126 @@ impl<const N: usize> BitArray<N> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::Lcg;
+
+    const WIDTHS: [u8; 8] = [1, 2, 3, 4, 5, 6, 8, 16];
+
+    #[test]
+    fn bits_for_picks_the_smallest_valid_width() {
+        let cases = [
+            (0, 1),
+            (1, 1),
+            (2, 2),
+            (3, 2),
+            (4, 3),
+            (7, 3),
+            (8, 4),
+            (15, 4),
+            (16, 5),
+            (31, 5),
+            (32, 6),
+            (63, 6),
+            (64, 8),
+            (255, 8),
+            (256, 16),
+            (u16::MAX, 16),
+        ];
+        for (value, bits) in cases {
+            assert_eq!(BitArray::<4096>::bits_for(value), bits, "value {value}");
+        }
+    }
+
+    #[test]
+    fn word_count_matches_the_packing_of_each_width() {
+        for bits in WIDTHS {
+            let array = BitArray::<4096>::with_bits(bits);
+            assert_eq!(array.get_blocks().len(), 4096usize.div_ceil(32 / bits as usize), "bits {bits}");
+        }
+    }
+
+    #[test]
+    fn every_width_stores_and_returns_random_values() {
+        for bits in WIDTHS {
+            let mut rng = Lcg::new(bits as u64);
+            let max = (1u32 << bits) - 1;
+            let expected: Vec<u16> = (0..4096).map(|_| rng.below(max + 1) as u16).collect();
+
+            let mut array = BitArray::<4096>::with_bits(bits);
+            for (i, &value) in expected.iter().enumerate() {
+                array.set(i, value);
+            }
+
+            assert_eq!(array.get_bits(), bits);
+            for (i, &value) in expected.iter().enumerate() {
+                assert_eq!(array.get(i), value, "bits {bits} index {i}");
+            }
+        }
+    }
+
+    #[test]
+    fn every_width_holds_its_maximum_value_without_resizing() {
+        for bits in WIDTHS {
+            let mut array = BitArray::<4096>::with_bits(bits);
+            let max = ((1u32 << bits) - 1) as u16;
+            array.set(4095, max);
+            array.set(0, max);
+            assert_eq!(array.get_bits(), bits);
+            assert_eq!((array.get(0), array.get(1), array.get(4095)), (max, 0, max));
+        }
+    }
+
+    #[test]
+    fn set_returns_the_previous_value() {
+        let mut array = BitArray::<4096>::new();
+        assert_eq!(array.set(10, 1), 0);
+        assert_eq!(array.set(10, 0), 1);
+    }
+
+    #[test]
+    fn set_neighbours_do_not_bleed_into_each_other() {
+        for bits in WIDTHS {
+            let mut array = BitArray::<4096>::with_bits(bits);
+            let max = ((1u32 << bits) - 1) as u16;
+            array.set(5, max);
+            assert_eq!((array.get(4), array.get(5), array.get(6)), (0, max, 0), "bits {bits}");
+            array.set(5, 0);
+            assert_eq!(array.get(5), 0);
+        }
+    }
+
+    #[test]
+    fn a_value_that_does_not_fit_grows_the_array_and_keeps_old_entries() {
+        let mut rng = Lcg::new(7);
+        let expected: Vec<u16> = (0..4096).map(|_| rng.below(2) as u16).collect();
+        let mut array = BitArray::<4096>::new();
+        for (i, &value) in expected.iter().enumerate() {
+            array.set(i, value);
+        }
+
+        for (step, value) in [(2u8, 3u16), (3, 6), (4, 12), (5, 20), (6, 40), (8, 200), (16, 1000)] {
+            array.set(100, value);
+            assert_eq!(array.get_bits(), step);
+            assert_eq!(array.get(100), value);
+            for (i, &old) in expected.iter().enumerate().filter(|(i, _)| *i != 100) {
+                assert_eq!(array.get(i), old, "after growing to {step} bits, index {i}");
+            }
+        }
+    }
+
+    #[test]
+    fn resizing_down_keeps_values_that_fit() {
+        let mut array = BitArray::<4096>::with_bits(8);
+        for i in 0..4096 {
+            array.set(i, (i % 4) as u16);
+        }
+        array.resize(2);
+        assert_eq!(array.get_bits(), 2);
+        for i in 0..4096 {
+            assert_eq!(array.get(i), (i % 4) as u16);
+        }
+    }
+}

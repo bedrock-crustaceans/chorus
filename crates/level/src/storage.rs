@@ -675,3 +675,237 @@ fn decode_biomes(data: &[u8], count: usize) -> StorageResult<Vec<[i32; 4096]>> {
     }
     Ok(sections)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::Lcg;
+    use chorus_block::r#impl::DEFINITIONS;
+
+    struct TempWorld(PathBuf);
+
+    impl TempWorld {
+        fn new(name: &str) -> Self {
+            let path = std::env::temp_dir().join(format!("chorus-level-test-{}-{name}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&path);
+            Self(path)
+        }
+    }
+
+    impl Drop for TempWorld {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn registry() -> BlockRegistry {
+        let mut registry = BlockRegistry::new();
+        registry.register_all(DEFINITIONS.iter().copied());
+        registry
+    }
+
+    fn pool(registry: &BlockRegistry, size: usize) -> Vec<i32> {
+        let mut ids = registry.get_all_block_ids();
+        ids.sort_unstable();
+        ids.truncate(size);
+        ids
+    }
+
+    fn filled_chunk(rng: &mut Lcg, air: i32, blocks: &[i32], biomes: &[i32], x: i32, z: i32) -> Chunk {
+        let mut chunk = Chunk::new(x, z, -4, 24, air, 1);
+        for _ in 0..3000 {
+            let (bx, bz) = (rng.below(16) as u8, rng.below(16) as u8);
+            let y = rng.below(384) as i32 - 64;
+            let block = blocks[rng.below(blocks.len() as u32) as usize];
+            chunk.set_block(bx, y, bz, (rng.below(8) == 0) as usize, block);
+        }
+        for _ in 0..1500 {
+            let y = rng.below(384) as i32 - 64;
+            chunk.set_biome(rng.below(16) as u8, y, rng.below(16) as u8, biomes[rng.below(biomes.len() as u32) as usize]);
+        }
+        chunk
+    }
+
+    fn assert_same(loaded: &Chunk, original: &Chunk) {
+        assert_eq!((loaded.x, loaded.z), (original.x, original.z));
+        assert_eq!(loaded.sub_chunk_count(), original.sub_chunk_count());
+        for y in -64..320 {
+            for x in 0..16u8 {
+                for z in 0..16u8 {
+                    for layer in 0..2 {
+                        assert_eq!(loaded.get_block(x, y, z, layer), original.get_block(x, y, z, layer), "block {x} {y} {z} layer {layer}");
+                    }
+                    assert_eq!(loaded.get_biome(x, y, z), original.get_biome(x, y, z), "biome {x} {y} {z}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn chunks_survive_a_save_and_load_through_the_database() {
+        let world = TempWorld::new("round-trip");
+        let registry = registry();
+        let air = registry.get_block_id("minecraft:air").unwrap();
+        let blocks = pool(&registry, 40);
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+        let mut rng = Lcg::new(99);
+
+        let originals: Vec<Chunk> = (0..3).map(|i| filled_chunk(&mut rng, air, &blocks, &[1, 2, 7, 39], i, -i)).collect();
+        for chunk in &originals {
+            storage.save_chunk(DimensionType::Overworld, chunk).unwrap();
+        }
+        storage.flush_blocking().unwrap();
+
+        for original in &originals {
+            let loaded = storage.load_chunk(DimensionType::Overworld, original.x, original.z).unwrap().expect("chunk was saved");
+            assert_same(&loaded, original);
+            assert!(!loaded.is_dirty());
+        }
+    }
+
+    #[test]
+    fn saved_chunks_are_still_there_after_reopening_the_database() {
+        let world = TempWorld::new("reopen");
+        let registry = registry();
+        let air = registry.get_block_id("minecraft:air").unwrap();
+        let blocks = pool(&registry, 12);
+        let mut rng = Lcg::new(5);
+        let original = filled_chunk(&mut rng, air, &blocks, &[1, 4], 7, 8);
+
+        {
+            let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+            storage.save_chunk(DimensionType::Overworld, &original).unwrap();
+            storage.flush_blocking().unwrap();
+        }
+
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+        let loaded = storage.load_chunk(DimensionType::Overworld, 7, 8).unwrap().expect("chunk was saved");
+        assert_same(&loaded, &original);
+    }
+
+    #[test]
+    fn an_empty_chunk_round_trips_as_air() {
+        let world = TempWorld::new("empty");
+        let registry = registry();
+        let air = registry.get_block_id("minecraft:air").unwrap();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+
+        let original = Chunk::new(0, 0, -4, 24, air, 1);
+        storage.save_chunk(DimensionType::Overworld, &original).unwrap();
+        storage.flush_blocking().unwrap();
+
+        let loaded = storage.load_chunk(DimensionType::Overworld, 0, 0).unwrap().unwrap();
+        assert_same(&loaded, &original);
+        assert_eq!(loaded.highest_non_air_sub_chunk_y_relative(), -4);
+    }
+
+    #[test]
+    fn a_chunk_that_was_never_saved_loads_as_none() {
+        let world = TempWorld::new("missing");
+        let storage = LevelStorage::open(&world.0, &registry(), 4).unwrap();
+        assert!(storage.load_chunk(DimensionType::Overworld, 12, 12).unwrap().is_none());
+    }
+
+    #[test]
+    fn dimensions_keep_their_chunks_apart() {
+        let world = TempWorld::new("dimensions");
+        let registry = registry();
+        let air = registry.get_block_id("minecraft:air").unwrap();
+        let stone = registry.get_block_id("minecraft:stone").unwrap();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+
+        let mut blocks = [air; 4096];
+        blocks[SubChunk::index(1, 2, 3)] = stone;
+        let mut sub_chunks: Vec<SubChunk> = (0..8).map(|_| SubChunk::new(air, 8)).collect();
+        sub_chunks[0] = SubChunk::from_layers(&blocks, None, &[8; 4096], air);
+        let nether = Chunk::from_sub_chunks(0, 0, 0, sub_chunks, Vec::new());
+        storage.save_chunk(DimensionType::Nether, &nether).unwrap();
+        storage.flush_blocking().unwrap();
+
+        assert!(storage.load_chunk(DimensionType::Overworld, 0, 0).unwrap().is_none());
+        let loaded = storage.load_chunk(DimensionType::Nether, 0, 0).unwrap().unwrap();
+        assert_eq!(loaded.sub_chunk_count(), 8);
+        assert_eq!(loaded.get_block(1, 2, 3, 0), Some(stone));
+        assert_eq!(loaded.get_biome(0, 0, 0), Some(8));
+    }
+
+    #[test]
+    fn a_single_block_placed_in_an_empty_chunk_is_saved() {
+        let world = TempWorld::new("single-block");
+        let registry = registry();
+        let air = registry.get_block_id("minecraft:air").unwrap();
+        let stone = registry.get_block_id("minecraft:stone").unwrap();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+
+        let mut chunk = Chunk::new(0, 0, -4, 24, air, 1);
+        chunk.set_block(1, 100, 3, 0, stone);
+        storage.save_chunk(DimensionType::Overworld, &chunk).unwrap();
+        storage.flush_blocking().unwrap();
+
+        let loaded = storage.load_chunk(DimensionType::Overworld, 0, 0).unwrap().unwrap();
+        assert_eq!(loaded.get_block(1, 100, 3, 0), Some(stone));
+    }
+
+    #[test]
+    fn a_sub_chunk_emptied_after_a_save_is_removed_on_the_next_save() {
+        let world = TempWorld::new("emptied");
+        let registry = registry();
+        let air = registry.get_block_id("minecraft:air").unwrap();
+        let stone = registry.get_block_id("minecraft:stone").unwrap();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+
+        let mut chunk = Chunk::new(0, 0, -4, 24, air, 1);
+        chunk.set_block(0, 100, 0, 0, stone);
+        storage.save_chunk(DimensionType::Overworld, &chunk).unwrap();
+        storage.flush_blocking().unwrap();
+
+        chunk.set_block(0, 100, 0, 0, air);
+        storage.save_chunk(DimensionType::Overworld, &chunk).unwrap();
+        storage.flush_blocking().unwrap();
+
+        let loaded = storage.load_chunk(DimensionType::Overworld, 0, 0).unwrap().unwrap();
+        assert_eq!(loaded.get_block(0, 100, 0, 0), Some(air));
+        assert_eq!(loaded.highest_non_air_sub_chunk_y_relative(), -4);
+    }
+
+    #[test]
+    fn read_indices_unpacks_each_width() {
+        for bits in [1usize, 2, 3, 4, 5, 6, 8, 16] {
+            let per_word = 32 / bits;
+            let mut rng = Lcg::new(bits as u64);
+            let expected: Vec<u16> = (0..4096).map(|_| rng.below(1 << bits) as u16).collect();
+            let mut bytes = Vec::new();
+            for chunk in expected.chunks(per_word) {
+                let mut word = 0u32;
+                for (slot, &value) in chunk.iter().enumerate() {
+                    word |= (value as u32) << (slot * bits);
+                }
+                bytes.extend(word.to_le_bytes());
+            }
+
+            let mut reader = bytes.as_slice();
+            let indices = read_indices(&mut reader, bits).unwrap();
+            assert_eq!(indices.as_slice(), expected.as_slice(), "bits {bits}");
+            assert!(reader.is_empty());
+        }
+    }
+
+    #[test]
+    fn read_indices_rejects_impossible_widths_and_short_data() {
+        assert!(read_indices(&mut [].as_slice(), 17).is_err());
+        assert!(read_indices(&mut [0u8; 8].as_slice(), 4).is_err());
+        assert_eq!(read_indices(&mut [].as_slice(), 0).unwrap(), [0u16; 4096]);
+    }
+
+    #[test]
+    fn decode_biomes_handles_uniform_and_repeated_sections() {
+        let mut data = vec![0u8; 512];
+        data.push(0);
+        data.extend(9u32.to_le_bytes());
+        data.push(0x7f << 1);
+        let sections = decode_biomes(&data, 2).unwrap();
+        assert_eq!(sections[0], [9; 4096]);
+        assert_eq!(sections[1], [9; 4096]);
+        assert!(decode_biomes(&[0u8; 10], 1).is_err());
+    }
+}

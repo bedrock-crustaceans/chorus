@@ -162,3 +162,126 @@ impl BlockPermutationDefinition {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::component::mineable_component::MineableComponent;
+    use crate::r#impl::acacia_log::ACACIA_LOG;
+    use crate::r#impl::air::AIR;
+    use crate::r#impl::grass_block::GRASS_BLOCK;
+
+    fn lever_like() -> BlockDefinition {
+        BlockDefinition::new(
+            "test:lever",
+            [
+                BlockStateDefinition::new_bool("open_bit", false),
+                BlockStateDefinition::new_int("level", 0, 2),
+                BlockStateDefinition::new_enum("kind", ["a", "b"]),
+            ],
+            [],
+            [],
+        )
+    }
+
+    #[test]
+    fn a_stateless_block_generates_one_permutation() {
+        let (default, permutations, components) = GRASS_BLOCK.generate();
+        assert_eq!(permutations.len(), 1);
+        assert_eq!(components.len(), 1);
+        let permutation = &permutations[&default];
+        assert_eq!(permutation.get_identifier(), "minecraft:grass_block");
+        assert_eq!(permutation.get_index(), 0);
+        assert!(permutation.get_states().is_empty());
+    }
+
+    #[test]
+    fn a_stateless_block_hash_is_stable_across_generations() {
+        let first = AIR.generate().0;
+        assert_eq!(first, AIR.generate().0);
+        assert_eq!(first, -604749536);
+    }
+
+    #[test]
+    fn a_block_with_one_enum_state_generates_one_permutation_per_value() {
+        let (default, permutations, components) = ACACIA_LOG.generate();
+        assert_eq!(permutations.len(), 3);
+        assert_eq!(components.len(), 3);
+        assert_eq!(permutations[&default].get_state_value("pillar_axis"), Some(&BlockState::from("y")));
+
+        let mut indices: Vec<u16> = permutations.values().map(|p| p.get_index()).collect();
+        indices.sort_unstable();
+        assert_eq!(indices, [0, 1, 2]);
+    }
+
+    #[test]
+    fn combinatorial_states_multiply_and_every_hash_is_unique() {
+        let definition = lever_like();
+        let (default, permutations, components) = definition.generate();
+        assert_eq!(permutations.len(), 2 * 3 * 2);
+        assert_eq!(components.len(), 12);
+
+        let mut indices: Vec<u16> = permutations.values().map(|p| p.get_index()).collect();
+        indices.sort_unstable();
+        assert_eq!(indices, (0..12).collect::<Vec<u16>>());
+        assert_eq!(permutations[&default].get_index(), 0);
+        for (hash, permutation) in &permutations {
+            assert_eq!(*hash, permutation.get_hash());
+        }
+    }
+
+    #[test]
+    fn generation_is_repeatable() {
+        let definition = lever_like();
+        let (default_a, permutations_a, _) = definition.generate();
+        let (default_b, permutations_b, _) = definition.generate();
+        assert_eq!(default_a, default_b);
+
+        let mut a: Vec<_> = permutations_a.keys().copied().collect();
+        let mut b: Vec<_> = permutations_b.keys().copied().collect();
+        a.sort_unstable();
+        b.sort_unstable();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn the_default_permutation_uses_the_first_value_of_every_state() {
+        let definition = lever_like();
+        let (default, permutations, _) = definition.generate();
+        let states = permutations[&default].get_states();
+        assert_eq!(states["open_bit"], false);
+        assert_eq!(states["level"], 0);
+        assert_eq!(states["kind"], "a");
+    }
+
+    #[test]
+    fn conditional_components_apply_only_to_matching_permutations() {
+        let definition = BlockDefinition::new(
+            "test:conditional",
+            [BlockStateDefinition::new_bool("lit", false)],
+            [],
+            [BlockPermutationDefinition::new(
+                |states| states["lit"] == true,
+                [Arc::new(MineableComponent::hardness(5.0)) as Arc<dyn BlockComponent>],
+            )],
+        );
+        let (_, permutations, components) = definition.generate();
+
+        for (hash, permutation) in &permutations {
+            let lit = permutation.get_states()["lit"] == true;
+            assert_eq!(components[hash].get::<MineableComponent>().is_some(), lit);
+        }
+    }
+
+    #[test]
+    fn validation_rejects_duplicate_state_names_and_oversized_blocks() {
+        let duplicate = BlockDefinition::new("test:dup", [BlockStateDefinition::new_bool("a", false), BlockStateDefinition::new_bool("a", true)], [], []);
+        assert!(duplicate.validate().is_err());
+
+        let huge = BlockDefinition::new("test:huge", [BlockStateDefinition::new_int("a", 0, 255), BlockStateDefinition::new_int("b", 0, 255)], [], []);
+        assert!(huge.validate().is_err());
+
+        assert!(lever_like().validate().is_ok());
+        assert!(AIR.validate().is_ok());
+    }
+}
