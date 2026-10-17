@@ -3,7 +3,7 @@ use crate::console::Console;
 use crate::network::session::Session;
 use crate::registry::command_registry::CommandRegistry;
 use bevy_ecs::message::Messages;
-use bevy_ecs::prelude::{Entity, Message, World};
+use bevy_ecs::prelude::{Entity, Message, Res, World};
 
 #[derive(Message)]
 pub struct CommandRequestedMessage {
@@ -15,6 +15,10 @@ pub struct CommandRequestedMessage {
 pub struct CommandPreprocessMessage {
     pub entity: Entity,
     pub line: String,
+}
+
+pub fn has_pending_commands(messages: Res<Messages<CommandRequestedMessage>>) -> bool {
+    !messages.is_empty()
 }
 
 pub fn dispatch_commands(world: &mut World) {

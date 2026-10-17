@@ -4,7 +4,8 @@ use crate::entity::components::transform::Transform;
 use crate::level::DimensionId;
 use crate::level::Level;
 use crate::level::dimension_type::DimensionType;
-use bevy_ecs::prelude::{Component, Entity, Resource, Without, World};
+use crate::level::generator::dimension::Dimension;
+use bevy_ecs::prelude::{Component, Entity, Res, Resource, Without, World};
 use std::collections::{HashMap, HashSet};
 use tracing::error;
 
@@ -36,6 +37,14 @@ fn identifier(nbt: &nbtx::Value) -> Option<String> {
         },
         _ => None,
     }
+}
+
+pub fn has_available_chunks(level: Option<Res<Level>>) -> bool {
+    level.is_some_and(|level| level.dimensions().any(Dimension::has_available))
+}
+
+pub fn has_unloaded_chunks(level: Option<Res<Level>>) -> bool {
+    level.is_some_and(|level| level.dimensions().any(Dimension::has_unloaded))
 }
 
 pub fn load_chunk_actors(world: &mut World) {

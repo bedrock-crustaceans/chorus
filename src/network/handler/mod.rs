@@ -1,5 +1,5 @@
 use crate::Tick;
-use crate::command::dispatch::dispatch_commands;
+use crate::command::dispatch::{dispatch_commands, has_pending_commands};
 use crate::network::BedrockProtocol;
 use crate::network::handler::block::decode_block_actions;
 use crate::network::handler::inventory::{handle_inventory_packets, send_initial_inventory};
@@ -41,7 +41,12 @@ impl Plugin for PacketHandlers {
                 )
                     .chain()
                     .in_set(GameSet::Connection),
-                (decode_block_actions, handle_inventory_packets, dispatch_commands, CommandRegistry::broadcast_soft_enum_updates)
+                (
+                    decode_block_actions,
+                    handle_inventory_packets,
+                    dispatch_commands.run_if(has_pending_commands),
+                    CommandRegistry::broadcast_soft_enum_updates,
+                )
                     .chain()
                     .in_set(GameSet::Input),
             ),

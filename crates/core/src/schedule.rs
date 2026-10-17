@@ -4,9 +4,11 @@ use bevy_ecs::system::SystemId;
 use bevy_ecs::world::World;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
+use tracing::warn;
 
 pub const TICK_RATE: f64 = 20.0;
 const MAX_TICKS_PER_UPDATE: u32 = 5;
+const OVERLOAD_WARN_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Tick;
@@ -23,6 +25,7 @@ pub struct TickClock {
     pub interval: Duration,
     accumulated: Duration,
     last_instant: Instant,
+    last_overload_warning: Option<Instant>,
 }
 
 impl Default for TickClock {
@@ -31,6 +34,7 @@ impl Default for TickClock {
             interval: Duration::from_secs_f64(1.0 / TICK_RATE),
             accumulated: Duration::ZERO,
             last_instant: Instant::now(),
+            last_overload_warning: None,
         }
     }
 }
@@ -46,7 +50,9 @@ pub struct JobQueue(VecDeque<SystemId>);
 
 impl JobQueue {
     pub fn push(&mut self, job: SystemId) {
-        self.0.push_back(job);
+        if !self.0.contains(&job) {
+            self.0.push_back(job);
+        }
     }
 
     pub fn pop(&mut self) -> Option<SystemId> {
@@ -72,5 +78,36 @@ pub fn run_fixed_tick(world: &mut World) {
         ticks_run += 1;
     }
 
-    world.resource_mut::<TickClock>().accumulated = if ticks_run == MAX_TICKS_PER_UPDATE { Duration::ZERO } else { accumulated };
+    let mut clock = world.resource_mut::<TickClock>();
+    if ticks_run == MAX_TICKS_PER_UPDATE {
+        clock.accumulated = Duration::ZERO;
+        if accumulated >= tick_duration && clock.last_overload_warning.is_none_or(|last| now.duration_since(last) >= OVERLOAD_WARN_INTERVAL) {
+            clock.last_overload_warning = Some(now);
+            warn!("server is overloaded, dropped {} ms of ticks", accumulated.as_millis());
+        }
+    } else {
+        clock.accumulated = accumulated;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn push_ignores_queued_jobs_and_keeps_order() {
+        let mut world = World::new();
+        let a = world.register_system(|| {});
+        let b = world.register_system(|| {});
+        let mut queue = JobQueue::default();
+        queue.push(a);
+        queue.push(b);
+        queue.push(a);
+        queue.push(b);
+        assert_eq!(queue.pop(), Some(a));
+        assert_eq!(queue.pop(), Some(b));
+        assert_eq!(queue.pop(), None);
+        queue.push(a);
+        assert_eq!(queue.pop(), Some(a));
+    }
 }

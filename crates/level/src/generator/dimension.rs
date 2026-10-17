@@ -77,6 +77,14 @@ impl Dimension {
         self.request_chunk(x, z);
     }
 
+    pub fn has_available(&self) -> bool {
+        !self.available.is_empty()
+    }
+
+    pub fn has_unloaded(&self) -> bool {
+        !self.unloaded.is_empty()
+    }
+
     pub fn take_available(&mut self) -> Vec<(i32, i32)> {
         std::mem::take(&mut self.available)
     }

@@ -146,6 +146,7 @@ fn switch_dimension(session: &mut Session, transform: &Transform, view: &mut Chu
 
 const UNLOAD_MARGIN: i32 = 2;
 const MAX_NEW_REQUESTS_PER_TICK: usize = 256;
+const MAX_CHUNKS_SENT_PER_TICK: usize = 8;
 const UNLOAD_INTERVAL_TICKS: u32 = 20;
 
 pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>, mut ticks: Local<u32>) {
@@ -205,11 +206,16 @@ pub fn send_pending_chunks(config: Res<Config>, mut query: Query<(&mut Session, 
     }
 
     let mut ready: HashMap<i32, HashSet<(i32, i32)>> = HashMap::new();
+    let mut selections: Vec<Vec<(i32, i32)>> = Vec::new();
     for (_, _, view, _) in query.iter() {
-        let Some(dimension) = level.dimension(view.dimension) else { continue };
+        let Some(dimension) = level.dimension(view.dimension) else {
+            selections.push(Vec::new());
+            continue;
+        };
 
-        let ready = ready.entry(view.dimension).or_default();
-        ready.extend(view.pending.iter().copied().filter(|&(x, z)| dimension.get_chunk(x, z).is_some()));
+        let selection = take_ready(&view.pending, MAX_CHUNKS_SENT_PER_TICK, |(x, z)| dimension.get_chunk(x, z).is_some());
+        ready.entry(view.dimension).or_default().extend(selection.iter().copied());
+        selections.push(selection);
     }
 
     let payloads: HashMap<i32, HashMap<(i32, i32), ChunkPayload>> = ready
@@ -225,12 +231,12 @@ pub fn send_pending_chunks(config: Res<Config>, mut query: Query<(&mut Session, 
         return;
     }
 
-    for (mut session, transform, mut view, mut cache) in query.iter_mut() {
+    for ((mut session, transform, mut view, mut cache), selection) in query.iter_mut().zip(selections) {
         let Some(payloads) = payloads.get(&view.dimension) else { continue };
 
         let mut sent: Vec<(i32, i32)> = Vec::new();
 
-        for &(x, z) in &view.pending {
+        for (x, z) in selection {
             let Some(payload) = payloads.get(&(x, z)) else { continue };
 
             let cached = if config.network.chunks.cache {
@@ -276,6 +282,19 @@ pub fn send_pending_chunks(config: Res<Config>, mut query: Query<(&mut Session, 
 
         send_publisher_update(&mut session, transform, &view);
     }
+}
+
+fn take_ready(pending: &VecDeque<(i32, i32)>, limit: usize, is_ready: impl Fn((i32, i32)) -> bool) -> Vec<(i32, i32)> {
+    let mut taken = Vec::new();
+    for &position in pending {
+        if taken.len() >= limit {
+            break;
+        }
+        if is_ready(position) {
+            taken.push(position);
+        }
+    }
+    taken
 }
 
 fn send_publisher_update(session: &mut Session, transform: &Transform, view: &ChunkView) {
@@ -433,5 +452,20 @@ mod tests {
         assert_eq!(resolve_sub_chunk_position((0, 0, i32::MIN), (0, 0, -1)), None);
         assert_eq!(resolve_sub_chunk_position((0, 256, 0), (0, 0, 0)), None);
         assert_eq!(resolve_sub_chunk_position((0, 100, 0), (0, 100, 0)), None);
+    }
+
+    #[test]
+    fn take_ready_keeps_queue_order_and_stops_at_limit() {
+        let pending: VecDeque<(i32, i32)> = (0..10).map(|x| (x, 0)).collect();
+        let taken = take_ready(&pending, 3, |(x, _)| x % 2 == 1);
+        assert_eq!(taken, vec![(1, 0), (3, 0), (5, 0)]);
+    }
+
+    #[test]
+    fn take_ready_skips_unready_and_handles_short_queues() {
+        let pending: VecDeque<(i32, i32)> = (0..4).map(|x| (x, 1)).collect();
+        assert!(take_ready(&pending, 8, |_| false).is_empty());
+        assert_eq!(take_ready(&pending, 8, |_| true).len(), 4);
+        assert!(take_ready(&pending, 0, |_| true).is_empty());
     }
 }
