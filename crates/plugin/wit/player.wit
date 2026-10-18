@@ -4,7 +4,6 @@ interface player {
     use common.{position, game-mode};
 
     record player {
-        uuid: string,
         xuid: string,
         name: string,
         position: position,
