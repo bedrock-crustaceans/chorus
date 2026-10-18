@@ -214,6 +214,19 @@ mod tests {
         assert_eq!(outcome, Some((String::from("hello everyone"), false)));
     }
 
+    /// A plugin that is out of the rotation gets no say: the message goes out as it was typed.
+    #[test]
+    #[ignore]
+    fn a_quarantined_plugin_leaves_chat_alone() {
+        let mut app = loaded_app();
+        app.world_mut().resource_mut::<PluginHostResource>().host().quarantine("hello", "test");
+        let entity = app.world_mut().spawn_empty().id();
+
+        let outcome = events::moderate(app.world_mut(), &chat(entity, "say badword out loud"));
+
+        assert_eq!(outcome, None);
+    }
+
     #[test]
     #[ignore]
     fn an_observed_event_does_not_quarantine_the_plugin() {

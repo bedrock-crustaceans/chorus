@@ -151,7 +151,10 @@ Plugin calls are synchronous and happen inline on the tick. Two things bound the
 (`[plugins] fuel`) caps computation, and an epoch ticker thread bumping the engine epoch every
 `[plugins] budget` caps wall clock, including a host call that blocks without burning fuel. Loading
 and `on_load` run with a much larger deadline, because compiling a component legitimately takes
-longer than a tick. A plugin that traps, panics or returns an error from `on_load` is quarantined
+longer than a tick. Setting `budget = false` removes the wall clock bound and leaves only fuel, which
+cannot stop a host call that blocks. Plugin `stderr` is inherited so a guest panic message reaches the
+operator, which also means a plugin can write arbitrary bytes there, bypassing `ConsoleWriter`. A
+plugin that traps, panics or returns an error from `on_load` is quarantined
 with a log line and dropped from dispatch for the rest of the process; the server keeps ticking.
 `/plugins` lists what loaded and why anything is quarantined.
 
@@ -164,8 +167,9 @@ never panic: a panic there unwinds through wasmtime, so they return errors inste
 
 Commands a plugin registers during `on_load` are staged in `PluginCommands` and only committed into
 `CommandRegistry` once that plugin loads cleanly, so a plugin that fails halfway leaves nothing
-behind. Every plugin command shares one `fn` executor, which finds its owner through
-`CommandContext::command_name()`, the name the sender actually typed.
+behind. Registration closes once loading is over, so a plugin cannot stage commands from a later
+call that nothing would commit. Every plugin command shares one `fn` executor, which finds its owner
+through `CommandContext::command_name()`, the name the sender actually typed.
 
 Events are collected in `GameSet::Actors` and dispatched in `GameSet::Broadcast`, except chat, which
 is blocking and runs in `GameSet::Chat`. An event travels to the plugin by value and comes back; for

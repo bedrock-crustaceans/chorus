@@ -41,6 +41,10 @@ pub struct PluginCommands {
     commands: HashMap<String, PluginCommand>,
     staged: Vec<(String, Vec<String>, CommandDefinition, PluginCommand)>,
     next_id: HashMap<String, u32>,
+    /// Registration closes once `on_load` is done for everyone. Without this a plugin could keep
+    /// staging commands from a later call, where nothing would ever commit them: they would hold
+    /// their names hostage and the list would grow for the life of the process.
+    closed: bool,
 }
 
 impl PluginCommands {
@@ -56,6 +60,10 @@ impl PluginCommands {
 /// `on_load` has returned. Errors come back to the plugin as the `register` import's error, so a
 /// plugin author sees why their command was refused.
 pub fn register_plugin_command(world: &mut World, plugin: &str, definition: Definition) -> Result<u32, String> {
+    if world.get_resource::<PluginCommands>().is_some_and(|pending| pending.closed) {
+        return Err(String::from("commands can only be registered from on_load"));
+    }
+
     let name = definition.name.trim().to_owned();
     if name.is_empty() || name.contains(char::is_whitespace) {
         return Err(format!("{name:?} is not a usable command name"));
@@ -122,7 +130,11 @@ pub fn commit_plugin_commands(world: &mut World, keep: &[String]) {
     if !world.contains_resource::<PluginCommands>() || !world.contains_resource::<CommandRegistry>() {
         return;
     }
-    let staged = std::mem::take(&mut world.resource_mut::<PluginCommands>().staged);
+    let staged = {
+        let mut pending = world.resource_mut::<PluginCommands>();
+        pending.closed = true;
+        std::mem::take(&mut pending.staged)
+    };
 
     for (plugin, names, definition, command) in staged {
         if !keep.contains(&plugin) {
@@ -328,6 +340,14 @@ mod tests {
 
         assert!(world.resource::<CommandRegistry>().get("greet").is_some());
         assert!(world.resource::<CommandRegistry>().get("hi").is_some());
+    }
+
+    #[test]
+    fn registration_closes_once_commands_are_committed() {
+        let mut world = world_with_registry();
+        commit_plugin_commands(&mut world, &[]);
+
+        assert!(register_plugin_command(&mut world, "hello", definition("greet", &[])).is_err());
     }
 
     #[test]
