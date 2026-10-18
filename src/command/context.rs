@@ -4,6 +4,7 @@ use crate::network::BedrockProtocol;
 use crate::network::session::Session;
 use crate::player::identity::PlayerIdentity;
 use crate::registry::command_registry::CommandRegistry;
+use atomicow::CowArc;
 use bedrock::protocol::ProtoVersionPackets;
 use bedrock::protocol::v924::enums::TextPacketType;
 use bevy_ecs::component::Mutable;
@@ -16,11 +17,29 @@ type TextPacket = <BedrockProtocol as ProtoVersionPackets>::TextPacket;
 pub struct CommandContext<'w> {
     world: &'w mut World,
     sender: Entity,
+    command: CowArc<'static, str>,
 }
 
 impl<'w> CommandContext<'w> {
     pub fn new(world: &'w mut World, sender: Entity) -> Self {
-        Self { world, sender }
+        Self {
+            world,
+            sender,
+            command: CowArc::Static(""),
+        }
+    }
+
+    /// The name the sender actually typed, which is the alias when they used one.
+    ///
+    /// Built-in commands know their own name at compile time and never need this. Plugin commands
+    /// do: they all share one executor, so the name is the only thing that says which plugin to
+    /// call.
+    pub fn command_name(&self) -> &str {
+        &self.command
+    }
+
+    pub(crate) fn set_command_name(&mut self, name: &str) {
+        self.command = CowArc::Owned(std::sync::Arc::from(name));
     }
 
     pub fn world(&self) -> &World {

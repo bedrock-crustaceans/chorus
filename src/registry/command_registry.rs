@@ -169,6 +169,7 @@ impl CommandRegistry {
             }
         };
 
+        context.set_command_name(name);
         if let Err(err) = (command.execute)(context, &parsed) {
             context.reply(format!("§c{err}"));
         }

@@ -15,6 +15,7 @@ pub mod form;
 pub mod logger;
 pub mod network;
 pub mod player;
+pub mod plugin;
 pub mod registry;
 pub mod resource;
 pub mod schedule;
@@ -60,6 +61,7 @@ impl LoopRunner {
             if let Some(exit) = app.should_exit() {
                 let _tag = tracing::info_span!("shutdown").entered();
                 let compact = app.world().get_resource::<Config>().is_some_and(|config| config.level.database.shutdown_compaction);
+                plugin::unload_plugins(app.world_mut());
                 actor::storage::save_all_actors(app.world_mut());
                 if let Some(mut level) = app.world_mut().get_resource_mut::<level::Level>() {
                     let saved = level.save_blocking();
@@ -140,7 +142,7 @@ impl Plugin for ChorusPlugin {
             });
         }
 
-        app.insert_resource(config).add_systems(PreStartup, setup_logger).add_plugins(Server);
+        app.insert_resource(config).add_systems(PreStartup, setup_logger).add_plugins(Server).add_plugins(plugin::PluginSystem);
     }
 }
 

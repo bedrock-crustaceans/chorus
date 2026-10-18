@@ -82,6 +82,7 @@ chorus_block.workspace = true
 chorus_entity.workspace = true
 chorus_item.workspace = true
 chorus_level.workspace = true
+chorus_plugin.workspace = true
 chorus_worldgen.workspace = true
 
 bevy_app.workspace = true
