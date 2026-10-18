@@ -19,6 +19,15 @@ use crate::bridge::{HostBridge, NoopBridge};
 use crate::metadata::PluginMetadata;
 use crate::state::HostState;
 
+/// Epochs a dispatch may span. The ticker bumps the epoch once per configured budget, so two
+/// means a call always gets at least one full budget interval even if it starts just before a bump.
+const TICK_DEADLINE: u64 = 2;
+
+/// Loading is not the tick loop. Compiling a component and running its `on_load` legitimately take
+/// far longer than a tick's budget, so nothing is cut off while the server is still starting. Not
+/// `u64::MAX`: wasmtime adds the deadline to the current epoch and panics on overflow.
+const LOAD_DEADLINE: u64 = 1_000_000;
+
 /// Whether a plugin is still in the rotation.
 ///
 /// Quarantine is one way: a plugin that trapped or failed to load stays out for the rest of the
@@ -57,6 +66,7 @@ pub struct PluginHost {
     plugins: Vec<LoadedPlugin>,
     index: HashMap<String, usize>,
     ticker_stop: Arc<AtomicBool>,
+    deadline: u64,
 }
 
 impl PluginHost {
@@ -87,6 +97,7 @@ impl PluginHost {
             plugins: Vec::new(),
             index: HashMap::new(),
             ticker_stop,
+            deadline: TICK_DEADLINE,
         })
     }
 
@@ -168,7 +179,7 @@ impl PluginHost {
 
         let mut store = Store::new(&self.engine, HostState::new(&data_dir, &metadata.name, Arc::clone(&self.bridge))?);
         store.set_fuel(self.fuel)?;
-        store.set_epoch_deadline(1);
+        store.set_epoch_deadline(LOAD_DEADLINE);
         let instance = PluginBindings::instantiate(&mut store, &component, &self.linker)?;
 
         self.index.insert(metadata.name.clone(), self.plugins.len());
@@ -190,7 +201,7 @@ impl PluginHost {
     fn probe_metadata(&self, component: &Component) -> wasmtime::Result<PluginMetadata> {
         let mut store = Store::new(&self.engine, HostState::probe(Arc::new(NoopBridge)));
         store.set_fuel(self.fuel)?;
-        store.set_epoch_deadline(1);
+        store.set_epoch_deadline(LOAD_DEADLINE);
         let instance = PluginBindings::instantiate(&mut store, component, &self.linker)?;
         let reported = instance.chorus_plugin_metadata().call_get(&mut store)?;
 
@@ -219,7 +230,7 @@ impl PluginHost {
             self.quarantine(name, format!("could not refill fuel: {err}"));
             return None;
         }
-        plugin.store.set_epoch_deadline(1);
+        plugin.store.set_epoch_deadline(self.deadline);
 
         plugin.store.data_mut().enter(world);
         let result = f(&mut plugin.store, &plugin.instance);
@@ -235,7 +246,10 @@ impl PluginHost {
     }
 
     /// Calls `on-load` on every plugin that is still running.
+    ///
+    /// Runs without a tick deadline: a plugin is allowed to do real work on startup.
     pub fn load_all(&mut self, world: *mut ()) {
+        self.deadline = LOAD_DEADLINE;
         for name in self.running_names() {
             let outcome = self.call(&name, world, |store, plugin| plugin.call_on_load(store));
             match outcome {
@@ -244,15 +258,18 @@ impl PluginHost {
                 None => {}
             }
         }
+        self.deadline = TICK_DEADLINE;
     }
 
     /// Calls `on-unload` on every plugin that is still running, for a clean shutdown.
     pub fn unload_all(&mut self, world: *mut ()) {
+        self.deadline = LOAD_DEADLINE;
         for name in self.running_names() {
             if let Some(Err(err)) = self.call(&name, world, |store, plugin| plugin.call_on_unload(store)) {
                 warn!(plugin = %name, "on_unload failed: {err}");
             }
         }
+        self.deadline = TICK_DEADLINE;
     }
 }
 
