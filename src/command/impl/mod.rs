@@ -10,7 +10,6 @@ macro_rules! commands {
 
 commands! {
     help::HELP_COMMAND,
-    ping::PING_COMMAND,
     debug::DEBUG_COMMAND,
     status::STATUS_COMMAND,
     list::LIST_COMMAND,
