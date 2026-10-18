@@ -7,6 +7,7 @@
 
 pub mod abi;
 pub mod bridge;
+pub mod event;
 pub mod host;
 pub mod imports;
 pub mod metadata;
