@@ -51,6 +51,7 @@ Chorus is a Cargo workspace. The root package `chorus` (`src/`) is the server: n
 | `chorus_item` | `crates/item` | item stacks, `item_registry` and its bundled JSON |
 | `chorus_level` | `crates/level` | world state: chunk, sub-chunk, palettes, biome ids and the biome definition list, dimension types, the `Level` resource, level messages, and the generation framework under `generator` (`Dimension`, `Generator`, `WorldGenerator`, the phase graph, phase errors) |
 | `chorus_worldgen` | `crates/worldgen` | the concrete generators: `flat`, `random`, `void` and `overworld` |
+| `chorus_plugin` | `crates/plugin` | the WASM plugin ABI: the `chorus:plugin` WIT package, the host side bindings, `AbiVersion`, `PluginMetadata`, `EventId`, the `HostBridge` trait and `PluginHost` (wasmtime engine, loading, fuel and epoch budgets, quarantine) |
 
 Dependencies only point downwards (core, then block, then item and level, then worldgen, then the root). The root `chorus` crate re-exports the old module paths (`chorus::block`, `chorus::level`, `chorus::level::generator::r#impl` for worldgen, `chorus::utils`, `chorus::registry::block_registry`, ...), so app code and downstream users such as Pyrite keep their imports. Shared dependency versions live in `[workspace.dependencies]`.
 
@@ -101,7 +102,8 @@ State transitions emit a `SessionStateChangedMessage`, which handler systems obs
 |---|---|---|
 | `src/world/` | `WorldPlugin` | block breaking and placing (`block.rs`), level event, sound and block update broadcasts, chunk streaming and unloading (`chunks.rs`), the client blob cache (`blob_cache.rs`: clients that send `ClientCacheStatusPacket` get chunks as xxh64 blob ids, and missing blobs are answered from the session's `ClientBlobCache`, which keeps each blob until the client reports it obtained, with plain chunks as the fallback once too many are unconfirmed) |
 | `src/actor/` | `ActorPlugin` | non-player entities: `viewers.rs` (each entity's `Viewers` follow players' view radius, spectators are only shown to other spectators; kinds send their spawn packet on `ActorShown`, `Despawn` removes from clients), `physics.rs` (`Physics` with block collision), `storage.rs` (actors saved with their chunk in vanilla's `digp` + `actorprefix` keys through per-kind codecs in `ActorRegistry`, loaded when the chunk becomes available, saved on unload, autosave, `/save` and exit), `item.rs` (dropped items) |
-| `src/chat.rs` | `ChatPlugin` | chat, broadcast messages, join and quit announcements |
+| `src/chat.rs` | `ChatPlugin` | chat, broadcast messages, join and quit announcements. Chat runs `collect_chat` → `moderate_chat` → `broadcast_chat`: plugins get a say in `moderate_chat`, and `broadcast_chat` sends the resulting `ChatApprovedMessage`s. `PlayerChatMessage` is still written for anything that only wants to observe chat |
+| `src/plugin/` | `PluginSystem` | the WASM plugin bridge: `ChorusBridge` (the host imports against the live `World`), the startup loader, `PluginCommands` (staged command registration), and event dispatch (`events.rs`) |
 
 Commands are dispatched by `dispatch_commands` (`src/command/dispatch.rs`), an exclusive `&mut World` system in the same chain. The server console is a `Console` entity (`src/console/`). On a terminal it runs a crossterm raw-mode prompt (`console/prompt.rs`) polled without blocking on the main thread, with history and line editing; log lines go through `ConsoleWriter`, which prints them above the prompt. When stdin is a pipe it is read without blocking instead (`PeekNamedPipe` on Windows, `poll` on unix). Each line becomes a `CommandRequestedMessage`, so commands run the same way from the console, and console replies are printed with their colour codes as terminal colours. Ctrl+C requests a normal `AppExit`, which saves the level; a second Ctrl+C exits immediately.
 
@@ -131,6 +133,47 @@ Level startup runs in three chained `LevelStartup` sets (`src/registry/mod.rs`):
 
 Worlds are saved in the vanilla Bedrock LevelDB layout under `worlds/<level_name>/` (`db/`, `level.dat`, `levelname.txt`) by `LevelStorage` (`crates/level/src/storage.rs`). A `Dimension` built `with_storage` loads chunks from disk before asking its generator, marks generated and edited chunks unsaved, and saves them when they unload, on the one-minute autosave, on `/save` and on exit. The database is opened in manual compaction mode with batched writes, and compacted every five minutes, in time slices: a pool task runs `compact_step` in 50 ms slices, or with no pool threads the main thread spends about 10 ms of each tick on it, so a single-threaded server never stalls on a full compaction. An existing `level.dat` wins over `level_seed` in the config. Palette entries are written as `{name, states, version}` NBT and read back through `HashUtils::hash_block_nbt`.
 
+### WASM plugins
+
+A plugin is a single WebAssembly component in `plugins/`. `chorus_plugin` owns the contract, the
+`chorus:plugin@0.1.0` WIT package under `crates/plugin/wit/`, and `src/plugin/` owns everything that
+needs the `World`. Plugins can be written in any language with a Component Model toolchain; the Rust
+guest crate and an example live in `examples/plugins/`, outside the Cargo workspace.
+
+`PluginHost::load_directory` loads every `.wasm` file in the configured directory. Each component is
+instantiated once with a throwaway store to read its exported `metadata` (there is no manifest file),
+checked against `ABI_VERSION`, refused if another plugin already claimed that name, then instantiated
+for real with its data folder at `plugins/<name>/` preopened and nothing else: no network, no process
+environment, no other directory. `PluginSystem` loads in `PostStartup` before `Server::start`, so the
+registries and the level already exist when a plugin's `on_load` runs.
+
+Plugin calls are synchronous and happen inline on the tick. Two things bound them: wasmtime fuel
+(`[plugins] fuel`) caps computation, and an epoch ticker thread bumping the engine epoch every
+`[plugins] budget` caps wall clock, including a host call that blocks without burning fuel. Loading
+and `on_load` run with a much larger deadline, because compiling a component legitimately takes
+longer than a tick. A plugin that traps, panics or returns an error from `on_load` is quarantined
+with a log line and dropped from dispatch for the rest of the process; the server keeps ticking.
+`/plugins` lists what loaded and why anything is quarantined.
+
+The host imports (`logging`, `text`, `player`, `command`) are implemented on `HostState` inside
+`chorus_plugin` and forward to the `HostBridge` trait, which `ChorusBridge` implements in
+`src/plugin/host_impl.rs`. `HostState` carries an erased `*mut ()` world pointer that
+`PluginHost::call` sets before entering guest code and clears on the way out; `with_world` in
+`host_impl.rs` is the only place it becomes a `&mut World` again. Host import implementations must
+never panic: a panic there unwinds through wasmtime, so they return errors instead.
+
+Commands a plugin registers during `on_load` are staged in `PluginCommands` and only committed into
+`CommandRegistry` once that plugin loads cleanly, so a plugin that fails halfway leaves nothing
+behind. Every plugin command shares one `fn` executor, which finds its owner through
+`CommandContext::command_name()`, the name the sender actually typed.
+
+Events are collected in `GameSet::Actors` and dispatched in `GameSet::Broadcast`, except chat, which
+is blocking and runs in `GameSet::Chat`. An event travels to the plugin by value and comes back; for
+chat the host reads `message` and `cancelled` out of the returned event and each plugin sees what the
+previous one left. A plugin that returns a different event case than it was handed gets a log line
+and the original event is kept. The v0.1 event ids in `EventId` are part of the ABI and are
+append-only.
+
 ### Resource packs
 
 `ResourcePacks::load` (`src/resource/mod.rs`) is a startup system that scans the configured `resource_packs_directory` for `.mcpack` / `.zip` files and loads them into the `ResourcePacks` Bevy resource. Behavior packs are not loaded yet; `behavior_packs_directory` is only created.
@@ -143,6 +186,7 @@ Worlds are saved in the vanilla Bedrock LevelDB layout under `worlds/<level_name
 - `[network]`: `ip`, `port`, `transport` (`RakNet` | `NetherNet`), `max_batch_size` (bytes a received batch may inflate to once decompressed, default 16 MiB; larger batches are dropped), with `[network.raknet]` `encryption` and `[network.nethernet]` `signaler` (`http` | `lan` | `both`; LAN discovery always binds 7551, HTTP uses `port`)
 - `[level]`: `name`, `seed`, `chunk_saving` (`"modified"`, the default, saves changed chunks and ones kept with `Dimension::persist_chunk` such as by `/generate`; `"all"` saves every generated chunk) (a number, or text parsed like vanilla's `WorldOptions.parseSeed`; `LevelSeed::parse_with` lets a generator use its own rule), `max_view_distance` (also caps how far chunks are generated), `autosave` (an `Interval`: `"30s"`, `"5m"`, seconds, or `false`), and `[level.database]` with `compression` (deflate 0-10), `auto_compaction` (an `Interval`) and `shutdown_compaction`
 - `[packs]`: `resource_directory`, `behavior_directory`, `force_accept`, `force_disable_vibrant_visuals`
+- `[plugins]`: `enabled`, `directory` (default `plugins`), `fuel` (wasmtime fuel per plugin call, default 10 million) and `budget` (an `Interval`, the wall clock a single plugin call may take, default `5ms`)
 - `[permissions]`: `default` (`member`, `operator`, `admin`, `host` or `owner`, which the protocol calls any, game directors, admin, host and owner; default `operator`) and `players`, a table of player names or XUIDs to levels
 - `[log]`: `level` (a tracing `EnvFilter` string, e.g. `"info"` or `"info,chorus=debug"`), `to_file`, `directory`
 

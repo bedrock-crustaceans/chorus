@@ -16,6 +16,7 @@ commands! {
     save::SAVE_COMMAND,
     stop::STOP_COMMAND,
     compact::COMPACT_COMMAND,
+    plugins::PLUGINS_COMMAND,
     generate::GENERATE_COMMAND,
 
     gamemode::GAMEMODE_COMMAND,
