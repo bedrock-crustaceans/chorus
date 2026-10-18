@@ -67,6 +67,7 @@ pub struct Config {
     pub network: NetworkConfig,
     pub level: LevelConfig,
     pub packs: PackConfig,
+    pub plugins: PluginsConfig,
     pub log: LogConfig,
     pub permissions: PermissionConfig,
 }
@@ -371,6 +372,30 @@ impl Default for PackConfig {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
+pub struct PluginsConfig {
+    pub enabled: bool,
+    pub directory: PathBuf,
+    /// Wasmtime fuel handed to a plugin per call. Runs out and the call traps, which quarantines
+    /// the plugin instead of hanging the tick.
+    pub fuel: u64,
+    /// Wall clock a tick may spend in plugin code in total. Catches what fuel cannot, like a host
+    /// call that blocks.
+    pub budget: Interval,
+}
+
+impl Default for PluginsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            directory: PathBuf::from("plugins"),
+            fuel: 10_000_000,
+            budget: Interval::every(Duration::from_millis(5)),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
 pub struct LogConfig {
     pub level: String,
     pub to_file: bool,
@@ -552,5 +577,25 @@ mod tests {
         let config: NetworkConfig = toml::from_str("max_batch_size = 1048576").unwrap();
 
         assert_eq!(config.max_batch_size, 1048576);
+    }
+
+    #[test]
+    fn plugins_section_has_defaults() {
+        let config = PluginsConfig::default();
+
+        assert!(config.enabled);
+        assert_eq!(config.directory, PathBuf::from("plugins"));
+        assert_eq!(config.fuel, 10_000_000);
+        assert_eq!(config.budget.get(), Some(Duration::from_millis(5)));
+    }
+
+    #[test]
+    fn plugins_section_round_trips() {
+        let parsed: Config = toml::from_str("[plugins]\nenabled = false\ndirectory = \"mods\"\nfuel = 1\nbudget = \"20ms\"\n").unwrap();
+
+        assert!(!parsed.plugins.enabled);
+        assert_eq!(parsed.plugins.directory, PathBuf::from("mods"));
+        assert_eq!(parsed.plugins.fuel, 1);
+        assert_eq!(parsed.plugins.budget.get(), Some(Duration::from_millis(20)));
     }
 }
