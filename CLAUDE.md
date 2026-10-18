@@ -63,6 +63,7 @@ Dependencies only point downwards (core, then block, then item and level, then w
 - `run_fixed_tick` (added to `RunFixedMainLoop`) accumulates elapsed time in `TickClock` and runs the `Tick` schedule once per 50 ms (`TICK_RATE = 20.0` in `crates/core/src/schedule.rs`), catching up at most `MAX_TICKS_PER_UPDATE = 5` ticks per `app.update()`.
 - After each update, `LoopRunner` drains the `JobQueue` resource (a queue of registered `SystemId`s) until the tick deadline, then spin-sleeps the remainder. Use `JobQueue::push` for deferred work that should use spare time in the tick (e.g. `Level::queue_poll_generation`).
 - `Server::start_tick` / `Server::end_tick` run in `TickSet::First` / `TickSet::Last` and maintain `ServerState` (tick counter, runtime-ID generator) and `ServerMetrics` (TPS / MSPT).
+- `src/server/memory.rs` pins glibc's mmap threshold at 64 KiB on startup and calls `malloc_trim` whenever chunk generation goes idle; without it freed worldgen buffers stay in RSS. Both are no-ops off glibc.
 
 ### Plugin tree
 

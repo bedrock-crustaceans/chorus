@@ -122,6 +122,12 @@ impl ProtoChunk {
         chunk
     }
 
+    /// Drops the cached zoom fiddles (~80 KiB per chunk). Only the surface pass reads them, and
+    /// retained or cloned chunks after that would just carry them around.
+    pub fn release_fiddles(&mut self) {
+        self.fiddles = Arc::new(Vec::new());
+    }
+
     pub fn min_x(&self) -> i32 {
         self.x << 4
     }
@@ -352,8 +358,11 @@ impl ProtoChunk {
                 if z_even { fract.2 } else { fract.2 - 1.0 },
             );
             let local = (corner.0 - (self.x << 2), corner.1 - (self.min_y >> 2), corner.2 - (self.z << 2));
-            let [fiddle_x, fiddle_y, fiddle_z] = if (-1..=self.height / 4).contains(&local.1) {
-                self.fiddles[self.quart_index(local.0, local.1, local.2)]
+            // falls back to computing them once release_fiddles() dropped the cache, same values either way
+            let [fiddle_x, fiddle_y, fiddle_z] = if (-1..=self.height / 4).contains(&local.1)
+                && let Some(&fiddles) = self.fiddles.get(self.quart_index(local.0, local.1, local.2))
+            {
+                fiddles
             } else {
                 corner_fiddles(zoom_seed, corner)
             };

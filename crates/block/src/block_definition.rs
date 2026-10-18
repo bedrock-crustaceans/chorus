@@ -92,25 +92,32 @@ impl BlockDefinition {
 
         let default = permutations.iter().find(|p| p.get_index() == 0).unwrap().get_hash();
 
+        // permutations that match the same overrides get the same components, so build each set once
+        let mut shared: HashMap<Vec<bool>, BlockComponents> = HashMap::new();
         let components: HashMap<i32, BlockComponents> = permutations
             .iter()
             .map(|permutation| {
-                let hash = permutation.get_hash();
-                let mut components = BlockComponents::new();
+                let matched: Vec<bool> = self.permutations.iter().map(|p| (p.condition)(permutation.get_states())).collect();
+                let components = shared
+                    .entry(matched)
+                    .or_insert_with_key(|matched| {
+                        let mut components = BlockComponents::new();
 
-                for c in self.components.as_ref() {
-                    components.insert(c.clone());
-                }
-
-                for p in self.permutations.as_ref() {
-                    if (p.condition)(permutation.get_states()) {
-                        for c in p.components.as_ref() {
+                        for c in self.components.as_ref() {
                             components.insert(c.clone());
                         }
-                    }
-                }
 
-                (hash, components)
+                        for (p, _) in self.permutations.iter().zip(matched).filter(|(_, matched)| **matched) {
+                            for c in p.components.as_ref() {
+                                components.insert(c.clone());
+                            }
+                        }
+
+                        components
+                    })
+                    .clone();
+
+                (permutation.get_hash(), components)
             })
             .collect();
 

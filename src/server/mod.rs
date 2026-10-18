@@ -10,6 +10,7 @@ use bevy_ecs::system::ResMut;
 use std::time::{Duration, Instant};
 use tracing::info;
 
+pub mod memory;
 pub mod pregen;
 
 pub use chorus_core::schedule::TICK_RATE;
@@ -118,6 +119,8 @@ impl ServerMetrics {
 
 impl Plugin for Server {
     fn build(&self, app: &mut App) {
+        memory::tune_allocator();
+
         app.insert_resource(ServerState::new())
             .insert_resource(ServerMetrics {
                 tps: TICK_RATE,
@@ -131,6 +134,7 @@ impl Plugin for Server {
             .add_systems(Tick, Server::start_tick.in_set(TickSet::First))
             .add_systems(Tick, pregen::Pregen::run.in_set(TickSet::First).after(Server::start_tick))
             .add_systems(Tick, Server::end_tick.in_set(TickSet::Last))
+            .add_systems(Tick, memory::release_after_generation.in_set(TickSet::Last))
             .add_plugins(Registry)
             .add_plugins(ConsolePlugin)
             .add_plugins(Network);

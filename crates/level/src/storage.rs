@@ -106,7 +106,9 @@ pub struct LevelStorage {
     compacting: AtomicBool,
     compaction: Mutex<CompactionProgress>,
     air_id: i32,
-    block_nbt: HashMap<i32, Vec<u8>>,
+    // every permutation's palette nbt packed into one buffer, a Vec each was a few MB of malloc overhead
+    block_nbt: Vec<u8>,
+    block_nbt_ranges: HashMap<i32, (u32, u32)>,
     block_ids: Mutex<HashMap<Vec<u8>, i32>>,
 }
 
@@ -121,10 +123,14 @@ impl LevelStorage {
         };
         let db = Database::open_with(db_path.to_string_lossy(), options).map_err(database_error)?;
 
-        let block_nbt = registry
-            .permutations()
-            .map(|permutation| Ok((permutation.get_hash(), nbtx::to_le_bytes(&permutation.to_nbt())?)))
-            .collect::<StorageResult<HashMap<_, _>>>()?;
+        let mut block_nbt = Vec::new();
+        let mut block_nbt_ranges = HashMap::new();
+        for permutation in registry.permutations() {
+            let start = block_nbt.len() as u32;
+            nbtx::to_le_bytes_in(&mut block_nbt, &permutation.to_nbt())?;
+            block_nbt_ranges.insert(permutation.get_hash(), (start, block_nbt.len() as u32));
+        }
+        block_nbt.shrink_to_fit();
 
         Ok(Self {
             path,
@@ -135,6 +141,7 @@ impl LevelStorage {
             compaction: Mutex::new(CompactionProgress::default()),
             air_id: registry.get_block_id("minecraft:air").expect("air is registered"),
             block_nbt,
+            block_nbt_ranges,
             block_ids: Mutex::new(HashMap::new()),
         })
     }
@@ -417,11 +424,16 @@ impl LevelStorage {
         let mut buf = vec![SUB_CHUNK_VERSION, used as u8, index as u8];
         for layer in &layers[..used] {
             layer.write_blocks_disk(&mut buf, |id, buf| {
-                let nbt = self.block_nbt.get(&id).or_else(|| self.block_nbt.get(&self.air_id)).expect("air has nbt");
+                let nbt = self.block_nbt(id).or_else(|| self.block_nbt(self.air_id)).expect("air has nbt");
                 buf.extend_from_slice(nbt);
             });
         }
         buf
+    }
+
+    fn block_nbt(&self, id: i32) -> Option<&[u8]> {
+        let &(start, end) = self.block_nbt_ranges.get(&id)?;
+        Some(&self.block_nbt[start as usize..end as usize])
     }
 
     fn heightmap(&self, chunk: &Chunk) -> [i16; 256] {

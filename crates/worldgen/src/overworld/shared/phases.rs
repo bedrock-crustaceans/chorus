@@ -102,6 +102,7 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for CarverPhase {
     fn run(generator: &OverworldGenerator<E>, cell: ChunkPos, inputs: &mut PhaseInputs<OverworldGenerator<E>>) -> Result<ProtoChunk, PhaseError> {
         let (mut chunk, noise, mut aquifer) = inputs.take::<SurfacePhase>(cell)?;
         generator.apply_carvers(&noise, &mut aquifer, &mut chunk);
+        chunk.release_fiddles();
         Ok(chunk)
     }
 }

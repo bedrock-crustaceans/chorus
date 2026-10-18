@@ -2,10 +2,12 @@ use crate::component::block_component::BlockComponent;
 use atomicow::CowArc;
 use std::any::TypeId;
 use std::collections::HashMap;
+use std::sync::Arc;
 
+// yeah, most permutations of a block end up with the exact same set, so clones share one map
 #[derive(Clone, Debug)]
 pub struct BlockComponents {
-    map: HashMap<TypeId, CowArc<'static, dyn BlockComponent>>,
+    map: Arc<HashMap<TypeId, CowArc<'static, dyn BlockComponent>>>,
 }
 
 impl Default for BlockComponents {
@@ -16,14 +18,14 @@ impl Default for BlockComponents {
 
 impl BlockComponents {
     pub fn new() -> Self {
-        Self { map: HashMap::new() }
+        Self { map: Arc::new(HashMap::new()) }
     }
 
     pub fn insert(&mut self, component: CowArc<'static, dyn BlockComponent>) {
         let component_ref: &dyn BlockComponent = &*component;
         let type_id = component_ref.as_any().type_id();
 
-        self.map.insert(type_id, component);
+        Arc::make_mut(&mut self.map).insert(type_id, component);
     }
 
     pub fn get<T: BlockComponent>(&self) -> Option<&T> {
