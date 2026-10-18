@@ -14,11 +14,15 @@ chorus_block = { path = "crates/block" }
 chorus_entity = { path = "crates/entity" }
 chorus_item = { path = "crates/item" }
 chorus_level = { path = "crates/level" }
+chorus_plugin = { path = "crates/plugin" }
 chorus_worldgen = { path = "crates/worldgen" }
 
 bevy_app = "0.20.0"
 bevy_ecs = { version = "0.20.0", features = ["debug", "multi_threaded"] }
 bevy_tasks = { version = "0.20.0", features = ["multi_threaded"] }
+
+wasmtime = "49.0"
+wasmtime-wasi = "49.0"
 
 bedrock = { git = "https://github.com/bedrock-crustaceans/bedrock-rs", branch = "main", features = ["level", "network", "network-nethernet", "protocol", "auth", "form", "protocol-packet-meta", "protocol-packet-dyn", "protocol-unknown", "protocol-v2193", "auth-ureq"] }
 bevy-nethernet = { git = "https://github.com/bedrock-crustaceans/nethernet", branch = "main" }

@@ -1,0 +1,46 @@
+/// The v0.1 event set.
+///
+/// An event travels by value and comes back. For a blocking event the host applies the fields it
+/// supports from the returned value; for an observed one it throws the result away. Returning a
+/// different variant case than the one dispatched is a handler error and the host keeps the
+/// original event.
+interface event {
+    use common.{block-pos};
+    use player.{player};
+
+    record player-join-data {
+        player: player,
+    }
+
+    record player-leave-data {
+        player: player,
+    }
+
+    /// Blocking. Both `message` and `cancelled` are read back.
+    record player-chat-data {
+        player: player,
+        message: string,
+        cancelled: bool,
+    }
+
+    record block-break-data {
+        player: player,
+        position: block-pos,
+        block-id: s32,
+    }
+
+    record block-place-data {
+        player: player,
+        position: block-pos,
+        block-id: s32,
+        face: s32,
+    }
+
+    variant event {
+        player-join(player-join-data),
+        player-leave(player-leave-data),
+        player-chat(player-chat-data),
+        block-break(block-break-data),
+        block-place(block-place-data),
+    }
+}

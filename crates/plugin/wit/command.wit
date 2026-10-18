@@ -1,0 +1,59 @@
+/// Registering commands and receiving their arguments.
+///
+/// v0.1 keeps parameters to the three scalar kinds. Enums, soft enums, positions, postfixes and
+/// chaining exist in Chorus but are not exposed yet.
+interface command {
+    use common.{permission-level};
+    use player.{player};
+
+    /// `text`, `integer` and `decimal` rather than string, int and float, because `string` and
+    /// `float` are WIT keywords.
+    enum parameter-type {
+        text,
+        integer,
+        decimal,
+    }
+
+    record parameter {
+        name: string,
+        kind: parameter-type,
+        optional: bool,
+    }
+
+    /// One accepted argument shape. The host tries overloads in order and runs the first that fits.
+    record overload {
+        parameters: list<parameter>,
+    }
+
+    record definition {
+        name: string,
+        description: string,
+        aliases: list<string>,
+        permission: permission-level,
+        overloads: list<overload>,
+    }
+
+    variant argument {
+        text(string),
+        integer(s64),
+        decimal(f64),
+    }
+
+    /// The arguments as parsed, plus which overload matched.
+    record consumed-args {
+        overload: u32,
+        values: list<argument>,
+    }
+
+    /// Who ran the command. `player` is absent for the console.
+    record command-sender {
+        name: string,
+        is-console: bool,
+        permission: permission-level,
+        player: option<player>,
+    }
+
+    /// Registers a command and returns the id the host will pass back to `handle-command`.
+    /// Errors when the name or one of the aliases is already taken.
+    register: func(definition: definition) -> result<u32, string>;
+}

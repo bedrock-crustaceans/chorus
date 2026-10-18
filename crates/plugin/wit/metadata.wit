@@ -1,0 +1,17 @@
+/// What a plugin says about itself. There is no sidecar manifest file: the component is the
+/// whole plugin, so this is the only place the host learns a plugin's name.
+interface metadata {
+    record plugin-metadata {
+        /// Unique. Also names the plugin's data folder and tags its log lines.
+        name: string,
+        version: string,
+        authors: list<string>,
+        description: string,
+        /// The `chorus:plugin` package version this plugin was built against, as `major.minor.patch`.
+        abi-version: string,
+    }
+
+    /// A pure snapshot. The host calls this before anything else is wired up, so it must not
+    /// call back into any host import.
+    get: func() -> plugin-metadata;
+}

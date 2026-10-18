@@ -1,0 +1,36 @@
+package chorus:plugin@0.1.0;
+
+/// The contract between Chorus and a plugin.
+///
+/// Synchronous on purpose: Chorus runs a 50 ms tick loop with no async runtime, so every call
+/// here happens inline on the tick and is bounded by fuel and an epoch deadline.
+world plugin {
+    use event.{event};
+    use command.{command-sender, consumed-args};
+
+    /// Server log.
+    import logging;
+    /// Sending text to players.
+    import text;
+    /// Reading players.
+    import player;
+    /// Registering commands.
+    import command;
+
+    /// Name, version and the ABI version the plugin was built against.
+    export metadata;
+
+    /// Called once after the plugin is instantiated. Register commands here.
+    export on-load: func() -> result<_, string>;
+
+    /// Called on a clean server shutdown. Not called for a quarantined plugin.
+    export on-unload: func() -> result<_, string>;
+
+    /// `event-id` is the discriminant the host dispatched; the returned event must use the same
+    /// variant case.
+    export handle-event: func(event-id: u32, event: event) -> event;
+
+    /// `command-id` is what `command.register` returned. The `s32` is the command's result count,
+    /// which Chorus uses the way vanilla does.
+    export handle-command: func(command-id: u32, sender: command-sender, args: consumed-args) -> result<s32, string>;
+}

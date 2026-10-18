@@ -1,0 +1,61 @@
+/// Shared records and the two interfaces every plugin wants: logging and sending text.
+///
+/// Everything here is Chorus-owned on purpose. No bedrock-rs type reaches a plugin, so a
+/// protocol bump cannot break a plugin that was built against this package.
+interface common {
+    /// A position in the world, in blocks, with the fractional part a client would send.
+    record position {
+        x: f64,
+        y: f64,
+        z: f64,
+    }
+
+    /// A whole-block position.
+    record block-pos {
+        x: s32,
+        y: s32,
+        z: s32,
+    }
+
+    enum game-mode {
+        survival,
+        creative,
+        adventure,
+        spectator,
+    }
+
+    enum log-level {
+        trace,
+        debug,
+        info,
+        warn,
+        error,
+    }
+
+    /// Chorus permission levels, minus `internal`. A plugin can neither ask for nor observe
+    /// `internal`, which is reserved for the server itself.
+    enum permission-level {
+        member,
+        operator,
+        admin,
+        host,
+        owner,
+    }
+}
+
+/// Writes to the server log. Lines are tagged with the plugin's name by the host, so a plugin
+/// does not need to prefix its own messages.
+interface logging {
+    use common.{log-level};
+
+    log: func(level: log-level, message: string);
+}
+
+/// Sends text to players. Messages are sent raw, so Minecraft colour codes work.
+interface text {
+    /// Sends a system message to one player by name. Errors when no player by that name is in game.
+    send-message: func(player-name: string, message: string) -> result<_, string>;
+
+    /// Sends a system message to every player in game.
+    broadcast: func(message: string);
+}

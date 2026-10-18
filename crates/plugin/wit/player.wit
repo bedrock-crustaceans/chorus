@@ -1,0 +1,17 @@
+/// Reading players. Snapshots, not handles: a `player` is a copy taken at the moment of the call,
+/// so holding onto one across ticks tells you where somebody used to be.
+interface player {
+    use common.{position, game-mode};
+
+    record player {
+        uuid: string,
+        xuid: string,
+        name: string,
+        position: position,
+        game-mode: game-mode,
+    }
+
+    get-by-name: func(name: string) -> option<player>;
+
+    all: func() -> list<player>;
+}
