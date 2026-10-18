@@ -6,7 +6,11 @@
 //! reaches into the `World`.
 
 pub mod abi;
+pub mod bridge;
+pub mod host;
+pub mod imports;
 pub mod metadata;
+pub mod state;
 
 wasmtime::component::bindgen!({
     path: "wit",
