@@ -674,3 +674,15 @@ impl BiomeSource {
 #[cfg(test)]
 #[derive(Default)]
 pub struct BiomeHint<'a>(Option<&'a Node>);
+
+#[cfg(test)]
+mod all_order_tests {
+    use super::Biome;
+
+    #[test]
+    fn all_lists_the_biomes_in_discriminant_order() {
+        for (index, biome) in Biome::ALL.iter().enumerate() {
+            assert_eq!(*biome as usize, index);
+        }
+    }
+}

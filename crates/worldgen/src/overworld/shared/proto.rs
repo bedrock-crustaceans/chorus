@@ -3,6 +3,7 @@ use std::sync::Arc;
 use super::biome::Biome;
 use super::blocks::{AIR, BlockId, Blocks};
 use chorus_level::chunk::{BlockEntity as ChunkBlockEntity, Chunk};
+use chorus_level::palette::Palette;
 use chorus_level::sub_chunk::SubChunk;
 
 #[derive(Clone)]
@@ -14,16 +15,66 @@ pub struct ProtoChunk {
     pub air: BlockId,
     pub water: BlockId,
     pub lava: BlockId,
-    blocks: Vec<BlockId>,
-    tops: Vec<i32>,
-    worldgen_heights: Arc<Vec<[i32; 2]>>,
+    sections: Vec<Section>,
+    editing: bool,
+    tops: Vec<i16>,
+    worldgen_heights: Arc<Vec<[i16; 2]>>,
     biomes: Vec<Biome>,
     fiddles: Arc<Vec<[f64; 3]>>,
-    zoom: Arc<Vec<Biome>>,
+    zoom: Arc<Zoom>,
     zoom_seed: Option<i64>,
     entities: Vec<PlacedEntity>,
     post_process: Vec<(u8, i16, u8)>,
     settle: Vec<(u8, i16, u8)>,
+}
+
+#[derive(Clone)]
+enum Section {
+    Packed(Palette),
+    Dense(Box<[BlockId; 4096]>),
+}
+
+impl Section {
+    fn get(&self, local: usize) -> i32 {
+        match self {
+            Self::Packed(palette) => palette.get(local),
+            Self::Dense(blocks) => blocks[local] as i32,
+        }
+    }
+
+    fn to_array(&self) -> [i32; 4096] {
+        match self {
+            Self::Packed(palette) => palette.to_array(),
+            Self::Dense(blocks) => blocks.map(|block| block as i32),
+        }
+    }
+}
+
+pub struct ChunkEdit<'a>(&'a mut ProtoChunk);
+
+impl std::ops::Deref for ChunkEdit<'_> {
+    type Target = ProtoChunk;
+
+    fn deref(&self) -> &ProtoChunk {
+        self.0
+    }
+}
+
+impl std::ops::DerefMut for ChunkEdit<'_> {
+    fn deref_mut(&mut self) -> &mut ProtoChunk {
+        self.0
+    }
+}
+
+impl Drop for ChunkEdit<'_> {
+    fn drop(&mut self) {
+        self.0.editing = false;
+        for section in &mut self.0.sections {
+            if let Section::Dense(blocks) = section {
+                *section = Section::Packed(Palette::from_blocks(&blocks.map(|block| block as i32)));
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -106,19 +157,21 @@ impl ProtoChunk {
             air: AIR,
             water,
             lava,
-            blocks: vec![AIR; (height * 256) as usize],
-            tops: vec![min_y; 256],
+            sections: vec![Section::Packed(Palette::new(AIR as i32)); (height / 16) as usize],
+            editing: false,
+            tops: vec![min_y as i16; 256],
             worldgen_heights: Arc::new(Vec::new()),
             biomes: vec![Biome::Plains; (QUART_SPAN * QUART_SPAN * levels) as usize],
             fiddles: Arc::new(fiddles),
-            zoom: Arc::new(Vec::new()),
+            zoom: Arc::new(Zoom(Vec::new())),
             zoom_seed,
             entities: Vec::new(),
             post_process: Vec::new(),
             settle: Vec::new(),
         };
         chunk.assemble_biomes(around);
-        chunk.zoom = Arc::new(if zoom_seed.is_some() { chunk.compute_zoom() } else { chunk.compute_plain() });
+        let zoom = if zoom_seed.is_some() { chunk.compute_zoom() } else { chunk.compute_plain() };
+        chunk.zoom = Arc::new(Zoom::pack(&zoom));
         chunk
     }
 
@@ -145,22 +198,48 @@ impl ProtoChunk {
         (0..self.height).contains(&ry).then_some(((ry << 8) | (z << 4) | x) as usize)
     }
 
+    fn locate(&self, x: i32, y: i32, z: i32) -> Option<(usize, usize)> {
+        let ry = y - self.min_y;
+        (0..self.height).contains(&ry).then_some(((ry >> 4) as usize, (((ry & 15) << 8) | (z << 4) | x) as usize))
+    }
+
+    pub fn edit(&mut self) -> ChunkEdit<'_> {
+        self.begin_edit();
+        ChunkEdit(self)
+    }
+
+    pub fn begin_edit(&mut self) {
+        self.editing = true;
+    }
+
     pub fn get(&self, x: i32, y: i32, z: i32) -> BlockId {
-        self.index(x, y, z).map_or(self.air, |index| self.blocks[index])
+        self.locate(x, y, z).map_or(self.air, |(section, local)| self.sections[section].get(local) as BlockId)
     }
 
     pub fn set(&mut self, x: i32, y: i32, z: i32, block: BlockId) {
-        let Some(index) = self.index(x, y, z) else { return };
-        self.blocks[index] = block;
+        let Some((section, local)) = self.locate(x, y, z) else { return };
+        let slot = &mut self.sections[section];
+        if self.editing
+            && let Section::Packed(palette) = slot
+        {
+            if palette.get(local) == block as i32 {
+                return;
+            }
+            *slot = Section::Dense(Box::new(palette.to_array().map(|block| block as BlockId)));
+        }
+        match slot {
+            Section::Packed(palette) => palette.set(local, block as i32),
+            Section::Dense(blocks) => blocks[local] = block,
+        }
         let column = ((z << 4) | x) as usize;
         if block != self.air {
-            self.tops[column] = self.tops[column].max(y + 1);
-        } else if y + 1 == self.tops[column] {
+            self.tops[column] = self.tops[column].max(y as i16 + 1);
+        } else if y + 1 == self.tops[column] as i32 {
             let mut top = y;
             while top > self.min_y && self.get(x, top - 1, z) == self.air {
                 top -= 1;
             }
-            self.tops[column] = top;
+            self.tops[column] = top as i16;
         }
     }
 
@@ -168,20 +247,20 @@ impl ProtoChunk {
         let heights = (0..256)
             .map(|column| {
                 let (x, z) = (column as i32 & 15, column as i32 >> 4);
-                let surface = (self.min_y..self.tops[column]).rev().find(|&y| !blocks.is_air(self.get(x, y, z))).map_or(self.min_y, |y| y + 1);
+                let surface = (self.min_y..self.tops[column] as i32).rev().find(|&y| !blocks.is_air(self.get(x, y, z))).map_or(self.min_y, |y| y + 1);
                 let floor = (self.min_y..surface).rev().find(|&y| blocks.entry(self.get(x, y, z)).solid).map_or(self.min_y, |y| y + 1);
-                [surface, floor]
+                [surface as i16, floor as i16]
             })
             .collect();
         self.worldgen_heights = Arc::new(heights);
     }
 
     pub fn worldgen_height(&self, ocean_floor: bool, x: i32, z: i32) -> Option<i32> {
-        self.worldgen_heights.get(((z << 4) | x) as usize).map(|heights| heights[ocean_floor as usize])
+        self.worldgen_heights.get(((z << 4) | x) as usize).map(|heights| heights[ocean_floor as usize] as i32)
     }
 
     pub fn top(&self, x: i32, z: i32) -> i32 {
-        self.tops[((z << 4) | x) as usize]
+        self.tops[((z << 4) | x) as usize] as i32
     }
 
     pub fn mark_post_process(&mut self, x: u8, y: i16, z: u8) {
@@ -241,7 +320,7 @@ impl ProtoChunk {
 
     pub fn biome_at(&self, x: i32, y: i32, z: i32) -> Biome {
         match self.index(x, y, z) {
-            Some(index) => self.zoom[index],
+            Some(index) => self.zoom.get(index),
             None => self.zoomed(x, y, z, true),
         }
     }
@@ -390,10 +469,9 @@ impl ProtoChunk {
                 let mut extra = [air; 4096];
                 let mut waterlogged = false;
                 let mut biomes = [0; 4096];
-                let start = (section as usize) << 12;
-                let section_blocks = &self.blocks[start..start + 4096];
-                let section_biomes = &self.zoom[start..start + 4096];
-                for (local, (&block, &biome)) in section_blocks.iter().zip(section_biomes).enumerate() {
+                let section_blocks = self.sections[section as usize].to_array().map(|block| block as BlockId);
+                let section_biomes = self.zoom.section(section as usize);
+                for (local, (&block, &biome)) in section_blocks.iter().zip(&section_biomes).enumerate() {
                     let index = SubChunk::index((local & 15) as u8, (local >> 8) as u8, ((local >> 4) & 15) as u8);
                     let entry = blocks.entry(block);
                     layer[index] = entry.runtime;
@@ -416,6 +494,27 @@ impl ProtoChunk {
             })
             .collect();
         Chunk::from_sub_chunks(self.x, self.z, (self.min_y >> 4) as i8, sub_chunks, entities)
+    }
+}
+
+struct Zoom(Vec<Palette>);
+
+impl Zoom {
+    fn pack(biomes: &[Biome]) -> Self {
+        Self(
+            biomes
+                .chunks_exact(4096)
+                .map(|section| Palette::from_blocks(&std::array::from_fn(|index| section[index] as i32)))
+                .collect(),
+        )
+    }
+
+    fn get(&self, index: usize) -> Biome {
+        Biome::ALL[self.0[index >> 12].get(index & 4095) as usize]
+    }
+
+    fn section(&self, section: usize) -> [Biome; 4096] {
+        self.0[section].to_array().map(|index| Biome::ALL[index as usize])
     }
 }
 

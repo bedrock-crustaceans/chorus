@@ -61,17 +61,20 @@ impl Java {
         let densities = noise.densities();
         let known = around.iter().enumerate().flat_map(|(i, quarts)| quarts.surface_levels(x + i as i32 / 3 - 1, z + i as i32 % 3 - 1));
         let mut aquifer = Aquifer::new(&generator.terrain, self.aquifer_random, x, z, MIN_Y, HEIGHT, SEA_LEVEL, known);
-        for lz in 0..16 {
-            for lx in 0..16 {
-                for y in (MIN_Y..MIN_Y + HEIGHT).rev() {
-                    let density = densities.get(lx, y, lz) as f64;
-                    let block = match aquifer.compute_substance(&generator.terrain, chunk.min_x() + lx, y, chunk.min_z() + lz, density) {
-                        None => generator.stone,
-                        Some(Fluid::Air) => continue,
-                        Some(Fluid::Water) => generator.water,
-                        Some(Fluid::Lava) => generator.lava,
-                    };
-                    chunk.set(lx, y, lz, block);
+        {
+            let mut chunk = chunk.edit();
+            for lz in 0..16 {
+                for lx in 0..16 {
+                    for y in (MIN_Y..MIN_Y + HEIGHT).rev() {
+                        let density = densities.get(lx, y, lz) as f64;
+                        let block = match aquifer.compute_substance(&generator.terrain, chunk.min_x() + lx, y, chunk.min_z() + lz, density) {
+                            None => generator.stone,
+                            Some(Fluid::Air) => continue,
+                            Some(Fluid::Water) => generator.water,
+                            Some(Fluid::Lava) => generator.lava,
+                        };
+                        chunk.set(lx, y, lz, block);
+                    }
                 }
             }
         }

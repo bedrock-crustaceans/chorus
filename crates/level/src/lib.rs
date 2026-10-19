@@ -5,7 +5,7 @@ pub mod chunk_state;
 pub mod dimension_type;
 pub mod generator;
 pub mod level;
-mod palette;
+pub mod palette;
 pub mod storage;
 pub mod sub_chunk;
 

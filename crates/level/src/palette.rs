@@ -58,11 +58,7 @@ impl Palette {
         }
 
         let bits = BitArray::<4096>::bits_for((values.len() - 1) as u16);
-        let mut indices = BitArray::<4096>::with_bits(bits);
-
-        for (i, &index) in block_indices.iter().enumerate() {
-            indices.set(i, index);
-        }
+        let indices = BitArray::<4096>::from_indices(bits, &block_indices);
 
         Self::Indexed { values, indices }
     }
@@ -71,6 +67,20 @@ impl Palette {
         match &self {
             Self::Uniform { value } => *value,
             Self::Indexed { values, indices } => *values.get_index(indices.get(index) as usize).unwrap().0,
+        }
+    }
+
+    pub fn to_array(&self) -> [i32; 4096] {
+        match self {
+            Self::Uniform { value } => [*value; 4096],
+            Self::Indexed { values, indices } => {
+                let table: Vec<i32> = values.keys().copied().collect();
+                let mut blocks = [0i32; 4096];
+                for (block, index) in blocks.iter_mut().zip(indices.indices()) {
+                    *block = table[index as usize];
+                }
+                blocks
+            }
         }
     }
 

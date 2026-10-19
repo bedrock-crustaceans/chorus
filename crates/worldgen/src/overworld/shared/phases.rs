@@ -79,7 +79,7 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for SurfacePhase {
 
     fn run(generator: &OverworldGenerator<E>, cell: ChunkPos, inputs: &mut PhaseInputs<OverworldGenerator<E>>) -> Result<(ProtoChunk, NoiseChunk, E::Aquifer), PhaseError> {
         let (mut chunk, noise, aquifer) = inputs.take::<NoisePhase>(cell)?;
-        generator.build_surface(&noise, &mut chunk);
+        generator.build_surface(&noise, &mut chunk.edit());
         Ok((chunk, noise, aquifer))
     }
 }
@@ -101,7 +101,7 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for CarverPhase {
 
     fn run(generator: &OverworldGenerator<E>, cell: ChunkPos, inputs: &mut PhaseInputs<OverworldGenerator<E>>) -> Result<ProtoChunk, PhaseError> {
         let (mut chunk, noise, mut aquifer) = inputs.take::<SurfacePhase>(cell)?;
-        generator.apply_carvers(&noise, &mut aquifer, &mut chunk);
+        generator.apply_carvers(&noise, &mut aquifer, &mut chunk.edit());
         chunk.release_fiddles();
         Ok(chunk)
     }
@@ -128,8 +128,11 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for FeaturePhase {
             let (x, z) = (cell.x + dx, cell.z + dz);
             let baseline = inputs.get::<CarverPhase>(ChunkPos::new(x, z))?;
             let mut chunk = (*baseline).clone();
-            for changes in &earlier {
-                changes.overlay_onto(x, z, &baseline, &mut chunk);
+            {
+                let mut edit = chunk.edit();
+                for changes in &earlier {
+                    changes.overlay_onto(x, z, &baseline, &mut edit);
+                }
             }
             chunks.push(chunk);
         }
@@ -152,12 +155,15 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for ColumnPhase {
     fn run(generator: &OverworldGenerator<E>, cell: ChunkPos, inputs: &mut PhaseInputs<OverworldGenerator<E>>) -> Result<ProtoChunk, PhaseError> {
         let baseline = inputs.get::<CarverPhase>(cell)?;
         let mut column = (*baseline).clone();
-        for &(dx, dz) in OWNERS {
-            let owner = inputs.get::<FeaturePhase>(ChunkPos::new(cell.x + dx, cell.z + dz))?;
-            owner.overlay_onto(cell.x, cell.z, &baseline, &mut column);
-            for &(x, y, z, block) in owner.placed(cell.x, cell.z) {
-                if needs_support(&generator.blocks, block) {
-                    column.mark_settle(x, y, z);
+        {
+            let mut edit = column.edit();
+            for &(dx, dz) in OWNERS {
+                let owner = inputs.get::<FeaturePhase>(ChunkPos::new(cell.x + dx, cell.z + dz))?;
+                owner.overlay_onto(cell.x, cell.z, &baseline, &mut edit);
+                for &(x, y, z, block) in owner.placed(cell.x, cell.z) {
+                    if needs_support(&generator.blocks, block) {
+                        edit.mark_settle(x, y, z);
+                    }
                 }
             }
         }
@@ -204,7 +210,8 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for PostProcessPhase {
             .iter()
             .map(|&(dx, dz)| inputs.get::<ColumnPhase>(ChunkPos::new(cell.x + dx, cell.z + dz)))
             .collect::<Result<Vec<_>, _>>()?;
-        let mut chunk = (*inputs.get::<ColumnPhase>(cell)?).clone();
+        let mut owned = (*inputs.get::<ColumnPhase>(cell)?).clone();
+        let mut chunk = owned.edit();
         let shapes = generator.edition.shapes(generator.water);
         let marks = chunk.post_process().to_vec();
         for &(x, y, z) in &marks {
@@ -256,7 +263,8 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for PostProcessPhase {
                 break;
             }
         }
-        Ok(chunk)
+        drop(chunk);
+        Ok(owned)
     }
 }
 

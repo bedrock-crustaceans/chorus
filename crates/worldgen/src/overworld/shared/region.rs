@@ -81,7 +81,10 @@ impl BlockView for Region<'_> {
 }
 
 impl<'a> Region<'a> {
-    pub fn new(owner_x: i32, owner_z: i32, blocks: &'a Blocks, chunks: [ProtoChunk; 9]) -> Self {
+    pub fn new(owner_x: i32, owner_z: i32, blocks: &'a Blocks, mut chunks: [ProtoChunk; 9]) -> Self {
+        for chunk in &mut chunks {
+            chunk.begin_edit();
+        }
         Self {
             owner_x,
             owner_z,

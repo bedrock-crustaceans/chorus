@@ -1,6 +1,8 @@
 #[derive(Clone)]
 pub struct BitArray<const N: usize> {
     bits: u8,
+    per_word: u32,
+    mask: u32,
     blocks: Box<[u32]>,
 }
 
@@ -20,8 +22,27 @@ impl<const N: usize> BitArray<N> {
     pub fn with_bits(bits: u8) -> Self {
         Self {
             bits,
+            per_word: 32 / bits as u32,
+            mask: ((1u64 << bits) - 1) as u32,
             blocks: vec![0u32; N.div_ceil(32 / bits as usize)].into_boxed_slice(),
         }
+    }
+
+    pub fn from_indices(bits: u8, indices: &[u16; N]) -> Self {
+        let mut array = Self::with_bits(bits);
+        let per_word = array.per_word();
+        for (word, group) in array.blocks.iter_mut().zip(indices.chunks(per_word)) {
+            *word = group.iter().enumerate().fold(0u32, |packed, (slot, &index)| packed | (index as u32) << (slot * bits as usize));
+        }
+        array
+    }
+
+    pub fn indices(&self) -> impl Iterator<Item = u16> + '_ {
+        let (bits, mask) = (self.bits as u32, self.mask);
+        self.blocks
+            .iter()
+            .flat_map(move |&word| (0..self.per_word).map(move |slot| ((word >> (slot * bits)) & mask) as u16))
+            .take(N)
     }
 
     pub fn get_blocks(&self) -> &[u32] {
@@ -33,11 +54,11 @@ impl<const N: usize> BitArray<N> {
     }
 
     fn per_word(&self) -> usize {
-        32 / self.bits as usize
+        self.per_word as usize
     }
 
     fn max_value(&self) -> u32 {
-        (1 << self.bits) - 1
+        self.mask
     }
 
     pub fn set(&mut self, index: usize, value: u16) -> u16 {
@@ -77,6 +98,8 @@ impl<const N: usize> BitArray<N> {
         let old_data = std::mem::take(&mut self.blocks);
 
         self.bits = bits;
+        self.per_word = 32 / bits as u32;
+        self.mask = ((1u64 << bits) - 1) as u32;
 
         let per_word = self.per_word();
         let words = N.div_ceil(per_word);
@@ -164,6 +187,19 @@ mod tests {
             array.set(0, max);
             assert_eq!(array.get_bits(), bits);
             assert_eq!((array.get(0), array.get(1), array.get(4095)), (max, 0, max));
+        }
+    }
+
+    #[test]
+    fn from_indices_and_indices_round_trip_at_every_width() {
+        for bits in [1u8, 2, 3, 4, 5, 6, 8, 16] {
+            let max = ((1u32 << bits) - 1) as u16;
+            let source: [u16; 4096] = std::array::from_fn(|i| (i as u32 * 7 % (max as u32 + 1)) as u16);
+            let array = BitArray::<4096>::from_indices(bits, &source);
+            assert_eq!(array.indices().collect::<Vec<_>>(), source);
+            for (i, &value) in source.iter().enumerate() {
+                assert_eq!(array.get(i), value);
+            }
         }
     }
 
