@@ -185,7 +185,10 @@ impl Network {
         for event in events.rak.read() {
             match event {
                 RakServerEvent::SessionConnected { id, .. } => Network::connect(&mut state, &mut commands, SessionId::RakNet(*id), &options),
-                RakServerEvent::SessionDisconnected { id, .. } => Network::disconnect(&mut state, &mut commands, &SessionId::RakNet(*id)),
+                RakServerEvent::SessionDisconnected { id, reason } => {
+                    Network::log_disconnect(*id, *reason);
+                    Network::disconnect(&mut state, &mut commands, &SessionId::RakNet(*id));
+                }
             }
         }
 
@@ -249,6 +252,14 @@ impl Network {
                 error!("failed to renew nethernet identity: {error}");
             }
             None => {}
+        }
+    }
+
+    #[tracing::instrument(name = "network", skip_all)]
+    fn log_disconnect(id: RakSessionId, reason: RakDisconnectReason) {
+        match reason {
+            RakDisconnectReason::Requested | RakDisconnectReason::Remote => info!("Disconnected: {:?} ({:?})", id, reason),
+            RakDisconnectReason::Timeout | RakDisconnectReason::ProtocolViolation | RakDisconnectReason::OutboundBytesExceeded => warn!("Disconnected: {:?} ({:?})", id, reason),
         }
     }
 
