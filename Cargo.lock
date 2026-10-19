@@ -391,7 +391,7 @@ dependencies = [
 [[package]]
 name = "bevy-raknet"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/raknet?branch=main#1b15b7a590645ab80a8b1c35881d089d64e5683c"
+source = "git+https://github.com/bedrock-crustaceans/raknet?branch=main#e461de9304cb8d5a11018cc26ab22f2089e3a696"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -2716,9 +2716,9 @@ checksum = "4a6394b9e965e73d0a289ee54f589087e2c676aedf60885baf52c76b771e4958"
 
 [[package]]
 name = "ppmd-rust"
-version = "1.5.0"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "196a7c80b9a7652aba7cc070827516c2abe4ccdf53d128e1944003cf5726cff1"
+checksum = "494b4379484fc92217cc7d9e3a532375b1d01a61889ec8333025dc3b0377af56"
 
 [[package]]
 name = "primefield"
@@ -2794,7 +2794,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 [[package]]
 name = "raknet"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/raknet?branch=main#1b15b7a590645ab80a8b1c35881d089d64e5683c"
+source = "git+https://github.com/bedrock-crustaceans/raknet?branch=main#e461de9304cb8d5a11018cc26ab22f2089e3a696"
 dependencies = [
  "byteorder",
  "facet 0.46.5",
@@ -4055,9 +4055,9 @@ dependencies = [
 
 [[package]]
 name = "ureq-proto"
-version = "0.6.4"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f86fd172ccca569e458f61b6bdd6220965a9ef36e672a6852953b51a0e1583be"
+checksum = "841583fc36089d7d59419568ae157f43a5a03a2e5a81ba87c77d1596ef46e922"
 dependencies = [
  "base64 0.23.1",
  "http",
@@ -4620,9 +4620,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "9.0.4"
+version = "9.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a954114b47a54df49f83d2722814e86b23d4bb1b54a1b90fb7d92b41619ddc22"
+checksum = "6e04976da629d3b04204ba8105b396a193af8ad2583b2c79bfb3ab8af580a11e"
 dependencies = [
  "aes 0.9.3",
  "bzip2",
