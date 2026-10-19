@@ -3,7 +3,7 @@ use crate::command::parameter::{ArgumentType, CommandEnum, CommandParameter};
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::network::session::Session;
-use crate::player::gamemode::Gamemode;
+use crate::player::gamemode::{FlySpeed, Gamemode};
 use crate::values;
 use chorus_core::permission::PermissionLevel;
 
@@ -14,13 +14,13 @@ pub const GAMEMODE_COMMAND: CommandDefinition = CommandDefinition::new("gamemode
     let gamemode = Gamemode::from_alias(&argument).ok_or_else(|| format!("\"{argument}\" is not a valid game mode."))?;
 
     let permission = context.permission_level();
-    let Some((mut session, mut current, actor, transform)) = context.components_mut::<(&mut Session, &mut Gamemode, &ActorId, &Transform)>() else {
+    let Some((mut session, mut current, actor, transform, fly_speed)) = context.components_mut::<(&mut Session, &mut Gamemode, &ActorId, &Transform, &FlySpeed)>() else {
         return Err("must be sent by player!".to_owned());
     };
     if *current == gamemode {
         return Err("Your game mode was not changed.".to_owned());
     }
-    current.set(&mut session, actor, transform, permission, gamemode);
+    current.set(&mut session, actor, transform, permission, *fly_speed, gamemode);
 
     context.reply(format!("Set own game mode to {}", gamemode.name()));
     Ok(())

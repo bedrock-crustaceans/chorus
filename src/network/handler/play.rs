@@ -11,7 +11,7 @@ use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::PendingTeleport;
 use crate::player::forms::PendingForms;
-use crate::player::gamemode::Gamemode;
+use crate::player::gamemode::{FlySpeed, Gamemode};
 use crate::player::identity::PlayerIdentity;
 use crate::registry::command_registry::CommandRegistry;
 use bedrock::protocol::v662::types::ActorRuntimeID;
@@ -37,7 +37,7 @@ pub struct PlayerQuitMessage {
 }
 
 pub fn on_enter_play(
-    mut sessions: Query<(&mut Session, &ActorId, &PlayerIdentity, &Gamemode)>,
+    mut sessions: Query<(&mut Session, &ActorId, &PlayerIdentity, &Gamemode, &FlySpeed)>,
     commands: Res<CommandRegistry>,
     config: Res<Config>,
     mut entities: Commands,
@@ -48,7 +48,7 @@ pub fn on_enter_play(
         if ev.to != SessionState::Play {
             continue;
         }
-        let Ok((mut session, actor, identity, gamemode)) = sessions.get_mut(ev.entity) else {
+        let Ok((mut session, actor, identity, gamemode, fly_speed)) = sessions.get_mut(ev.entity) else {
             continue;
         };
 
@@ -68,7 +68,7 @@ pub fn on_enter_play(
 
         // spectators never touch the ground, so one joining starts out flying
         session.send(gamemode.actor_data_packet(actor));
-        session.send(gamemode.abilities_packet(actor, permission, !gamemode.has_collision()));
+        session.send(gamemode.abilities_packet(actor, permission, Some(!gamemode.has_collision()), *fly_speed));
 
         let attribute = |name: &str, min: f32, max: f32, value: f32| AttributeData {
             min_value: min,

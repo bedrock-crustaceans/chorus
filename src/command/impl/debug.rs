@@ -1,20 +1,36 @@
 use crate::command::command_definition::CommandDefinition;
-use crate::command::parameter::{CommandEnum, CommandParameter};
+use crate::command::parameter::{ArgumentType, CommandEnum, CommandParameter};
+use crate::player::gamemode::{FlySpeed, Gamemode};
 use crate::values;
 use crate::entity::components::actor_id::ActorId;
-use crate::network::BedrockProtocol;
 use crate::network::session::Session;
 use crate::player::forms::PendingForms;
 use bedrock::form::elems::button::Button;
 use bedrock::form::forms::Form;
 use bedrock::form::forms::simple::SimpleForm;
-use bedrock::protocol::v662::packets::UpdateAbilitiesPacket;
-use bedrock::protocol::v776::enums::AbilitiesIndex;
-use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitiesLayer, SerializedLayer};
 use chorus_core::permission::PermissionLevel;
 use tracing::info;
 
-const FEATURE: CommandEnum = CommandEnum::new("DebugFeature", values!["unhandled", "form", "speed"]);
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FlyAxis {
+    Horizontal,
+    Vertical,
+    Both,
+}
+
+impl FlyAxis {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Horizontal => "horizontal",
+            Self::Vertical => "vertical",
+            Self::Both => "horizontal and vertical",
+        }
+    }
+}
+
+const AXIS: CommandEnum = CommandEnum::new("DebugFlyAxis", values!["horizontal", "vertical", "both"]);
+
+const FEATURE: CommandEnum = CommandEnum::new("DebugFeature", values!["unhandled", "form", "flyspeed"]);
 
 pub const DEBUG_COMMAND: CommandDefinition = CommandDefinition::new("debug", "Used for debugging", |context, args| {
         match args.string("feature") {
@@ -49,42 +65,39 @@ pub const DEBUG_COMMAND: CommandDefinition = CommandDefinition::new("debug", "Us
                     },
                 );
             }
-            Some("speed") => {
-                let level = context.permission_level();
-                let Some((mut session, actor)) = context.components_mut::<(&mut Session, &ActorId)>() else {
+            Some("flyspeed") => {
+                let multiplier = args.float("multiplier");
+                if multiplier.is_some_and(|multiplier| multiplier < 0.0) {
+                    return Err("the fly speed multiplier can't be negative".to_owned());
+                }
+                let axis = match args.string("axis") {
+                    None | Some("horizontal") => FlyAxis::Horizontal,
+                    Some("vertical") => FlyAxis::Vertical,
+                    Some("both") => FlyAxis::Both,
+                    Some(other) => return Err(format!("\"{other}\" is not a fly speed axis.")),
+                };
+                let permission = context.permission_level();
+                let Some((mut session, gamemode, actor, mut fly_speed)) = context.components_mut::<(&mut Session, &Gamemode, &ActorId, &mut FlySpeed)>() else {
                     return Err("must be sent by player!".to_owned());
                 };
+                let Some(multiplier) = multiplier else {
+                    let (horizontal, vertical) = (fly_speed.horizontal, fly_speed.vertical);
+                    context.reply(format!("Fly speed is {horizontal}x horizontal and {vertical}x vertical"));
+                    return Ok(());
+                };
 
-                let ability_values = (1u32 << AbilitiesIndex::Build as u32)
-                    | (1u32 << AbilitiesIndex::Mine as u32)
-                    | (1u32 << AbilitiesIndex::DoorsAndSwitches as u32)
-                    | (1u32 << AbilitiesIndex::OpenContainers as u32)
-                    | (1u32 << AbilitiesIndex::AttackPlayers as u32)
-                    | (1u32 << AbilitiesIndex::AttackMobs as u32);
-
-
-                session.send(BedrockProtocol::UpdateAbilitiesPacket(
-                    UpdateAbilitiesPacket {
-                        data: SerializedAbilitiesData {
-                            target_player_raw_id: actor.unique_id,
-                            player_permissions: 1,
-                            command_permissions: level.into(),
-                            layers: vec![SerializedLayer {
-                                serialized_layer: SerializedAbilitiesLayer::Base,
-                                abilities_set: 0xFFFFF,
-                                ability_values,
-                                fly_speed: 1.0,
-                                vertical_fly_speed: 1.0,
-                                walk_speed: 0.1,
-                            }],
-                        },
-                    }
-                    .into(),
-                ));
+                if axis != FlyAxis::Vertical {
+                    fly_speed.horizontal = multiplier;
+                }
+                if axis != FlyAxis::Horizontal {
+                    fly_speed.vertical = multiplier;
+                }
+                session.send(gamemode.abilities_packet(actor, permission, None, *fly_speed));
+                context.reply(format!("Set {} fly speed to {multiplier}x", axis.label()));
             }
             _ => {}
         }
         Ok(())
 })
 .permission(PermissionLevel::Operator)
-.overloads(crate::overloads![[CommandParameter::enumeration("feature", FEATURE)]]);
+.overloads(crate::overloads![[CommandParameter::enumeration("feature", FEATURE), CommandParameter::new("multiplier", ArgumentType::Float).optional(), CommandParameter::enumeration("axis", AXIS).optional()]]);
