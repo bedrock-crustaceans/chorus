@@ -44,6 +44,7 @@ pub struct PhaseGraph<G: Generator> {
     pending_dispatch: BinaryHeap<Reverse<(u64, NodeKey)>>,
     next_order: u64,
     focus: Vec<ChunkPos>,
+    focus_by_x: Vec<ChunkPos>,
     reach: FxHashMap<PhaseId, f64>,
     in_flight: usize,
     finished: Vec<(ChunkPos, Outcome)>,
@@ -61,6 +62,7 @@ impl<G: Generator> PhaseGraph<G> {
             pending_dispatch: BinaryHeap::new(),
             next_order: 0,
             focus: Vec::new(),
+            focus_by_x: Vec::new(),
             reach: phase_reach::<G>(),
             in_flight: 0,
             finished: Vec::new(),
@@ -216,22 +218,24 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn rank(&self, node: &Node<G>) -> u64 {
-        let Some(distance) = self
-            .focus
-            .iter()
-            .map(|focus| (((node.cell.x - focus.x) as f64).powi(2) + ((node.cell.z - focus.z) as f64).powi(2)).sqrt())
-            .reduce(f64::min)
-        else {
-            return 0;
-        };
+    fn nearest_focus(&self, cell: ChunkPos) -> Option<f64> {
+        nearest_distance(&self.focus_by_x, cell)
+    }
+
+    fn rank_at(&self, node: &Node<G>, distance: Option<f64>) -> u64 {
+        let Some(distance) = distance else { return 0 };
         let reach = self.reach.get(&node.descriptor.phase).copied().unwrap_or(0.0);
         ((distance - reach).max(0.0) * 16.0).min(u32::MAX as f64) as u64
     }
 
     fn push_ready(&mut self, key: NodeKey) {
+        let distance = self.nearest_focus(self.graph.nodes[key].cell);
+        self.enqueue(key, distance);
+    }
+
+    fn enqueue(&mut self, key: NodeKey, distance: Option<f64>) {
         let node = &self.graph.nodes[key];
-        let priority = (self.rank(node) << 32) | (node.order & u32::MAX as u64);
+        let priority = (self.rank_at(node, distance) << 32) | (node.order & u32::MAX as u64);
         self.graph.nodes[key].priority = priority;
         self.pending_dispatch.push(Reverse((priority, key)));
     }
@@ -241,8 +245,11 @@ impl<G: Generator> PhaseGraph<G> {
         if focus == self.focus {
             return;
         }
+        self.focus_by_x = focus.clone();
+        self.focus_by_x.sort_unstable_by_key(|focus| focus.x);
         self.focus = focus;
-        let entries = std::mem::take(&mut self.pending_dispatch);
+        let entries = std::mem::take(&mut self.pending_dispatch).into_vec();
+        let mut ranked = Vec::with_capacity(entries.len());
         for Reverse((priority, key)) in entries {
             let ready = self
                 .graph
@@ -250,9 +257,14 @@ impl<G: Generator> PhaseGraph<G> {
                 .get(key)
                 .is_some_and(|node| node.priority == priority && matches!(node.status, NodeStatus::Pending { remaining: 0 }));
             if ready {
-                self.push_ready(key);
+                let node = &self.graph.nodes[key];
+                let distance = self.nearest_focus(node.cell);
+                let priority = (self.rank_at(node, distance) << 32) | (node.order & u32::MAX as u64);
+                self.graph.nodes[key].priority = priority;
+                ranked.push(Reverse((priority, key)));
             }
         }
+        self.pending_dispatch = BinaryHeap::from(ranked);
     }
 
     fn start(&mut self, key: NodeKey) -> Result<(PhaseDescriptor<G>, ChunkPos, PhaseInputs<G>), Arc<PhaseFailure>> {
@@ -560,4 +572,57 @@ fn phase_reach<G: Generator>() -> FxHashMap<PhaseId, f64> {
         }
     }
     reach
+}
+
+fn nearest_distance(by_x: &[ChunkPos], cell: ChunkPos) -> Option<f64> {
+    let split = by_x.partition_point(|focus| focus.x < cell.x);
+    let mut best: Option<f64> = None;
+    let mut visit = |focus: &ChunkPos| {
+        let dx = (focus.x - cell.x) as f64;
+        if best.is_some_and(|best| dx.abs() >= best) {
+            return false;
+        }
+        let dz = (cell.z - focus.z) as f64;
+        let distance = (dx * dx + dz * dz).sqrt();
+        best = Some(best.map_or(distance, |best| best.min(distance)));
+        true
+    };
+    by_x[split..].iter().all(&mut visit);
+    by_x[..split].iter().rev().all(&mut visit);
+    best
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn brute_force(foci: &[ChunkPos], cell: ChunkPos) -> Option<f64> {
+        foci.iter()
+            .map(|focus| (((cell.x - focus.x) as f64).powi(2) + ((cell.z - focus.z) as f64).powi(2)).sqrt())
+            .reduce(f64::min)
+    }
+
+    #[test]
+    fn no_foci_have_no_distance() {
+        assert_eq!(nearest_distance(&[], ChunkPos::new(3, 4)), None);
+    }
+
+    #[test]
+    fn the_nearest_focus_matches_a_scan_of_every_focus() {
+        let mut state = 0x2545f4914f6cdd1du64;
+        let mut next = |span: i32| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state % span as u64) as i32 - span / 2
+        };
+        for count in [1usize, 2, 5, 40, 150] {
+            let mut foci: Vec<ChunkPos> = (0..count).map(|_| ChunkPos::new(next(600), next(600))).collect();
+            foci.sort_unstable_by_key(|focus| focus.x);
+            for _ in 0..500 {
+                let cell = ChunkPos::new(next(800), next(800));
+                assert_eq!(nearest_distance(&foci, cell), brute_force(&foci, cell), "{count} foci, cell {cell:?}");
+            }
+        }
+    }
 }
