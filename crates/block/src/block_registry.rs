@@ -7,6 +7,7 @@ use atomicow::CowArc;
 use bevy_ecs::prelude::{Commands, Resource};
 use rand::prelude::IteratorRandom;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::{info, warn};
 
 #[derive(Resource)]
@@ -16,7 +17,7 @@ pub struct BlockRegistry {
     default_hash: HashMap<CowArc<'static, str>, i32>,
     indexed_hash: HashMap<(CowArc<'static, str>, u16), i32>,
 
-    permutations: HashMap<i32, BlockPermutation>,
+    permutations: Arc<HashMap<i32, BlockPermutation>>,
     components: HashMap<i32, BlockComponents>,
 }
 
@@ -34,7 +35,7 @@ impl BlockRegistry {
             default_hash: HashMap::new(),
             indexed_hash: HashMap::new(),
 
-            permutations: HashMap::new(),
+            permutations: Arc::new(HashMap::new()),
             components: HashMap::new(),
         }
     }
@@ -66,7 +67,7 @@ impl BlockRegistry {
         let indexed_hashes: HashMap<(CowArc<'static, str>, u16), i32> = permutations.iter().map(|(hash, p)| ((definition.identifier.clone(), p.get_index()), *hash)).collect();
 
         self.indexed_hash.extend(indexed_hashes);
-        self.permutations.extend(permutations);
+        Arc::make_mut(&mut self.permutations).extend(permutations);
         self.components.extend(components);
 
         self.definitions.insert(definition.identifier.clone(), definition);
@@ -112,6 +113,10 @@ impl BlockRegistry {
 
     pub fn get_permutation(&self, hash: i32) -> Option<&BlockPermutation> {
         self.permutations.get(&hash)
+    }
+
+    pub fn permutation_table(&self) -> Arc<HashMap<i32, BlockPermutation>> {
+        Arc::clone(&self.permutations)
     }
 
     pub fn permutations(&self) -> impl Iterator<Item = &BlockPermutation> {

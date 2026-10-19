@@ -2,6 +2,7 @@ use crate::chunk::{BlockEntity, Chunk};
 use crate::dimension_type::DimensionType;
 use crate::sub_chunk::SubChunk;
 use bedrock::level::db::{CompactionMode, Database, OpenOptions, WriteBatch};
+use chorus_block::block_permutation::BlockPermutation;
 use chorus_block::block_registry::BlockRegistry;
 use chorus_block::hash_utils::HashUtils;
 use glam::IVec3;
@@ -10,7 +11,7 @@ use std::fmt::{Display, Formatter};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::{debug, error, info};
 
@@ -106,9 +107,8 @@ pub struct LevelStorage {
     compacting: AtomicBool,
     compaction: Mutex<CompactionProgress>,
     air_id: i32,
-    // every permutation's palette nbt packed into one buffer, a Vec each was a few MB of malloc overhead
-    block_nbt: Vec<u8>,
-    block_nbt_ranges: HashMap<i32, (u32, u32)>,
+    permutations: Arc<HashMap<i32, BlockPermutation>>,
+    block_nbt: HashMap<i32, OnceLock<Arc<[u8]>>>,
     block_ids: Mutex<HashMap<Vec<u8>, i32>>,
 }
 
@@ -123,15 +123,6 @@ impl LevelStorage {
         };
         let db = Database::open_with(db_path.to_string_lossy(), options).map_err(database_error)?;
 
-        let mut block_nbt = Vec::new();
-        let mut block_nbt_ranges = HashMap::new();
-        for permutation in registry.permutations() {
-            let start = block_nbt.len() as u32;
-            nbtx::to_le_bytes_in(&mut block_nbt, &permutation.to_nbt())?;
-            block_nbt_ranges.insert(permutation.get_hash(), (start, block_nbt.len() as u32));
-        }
-        block_nbt.shrink_to_fit();
-
         Ok(Self {
             path,
             db: Mutex::new(db),
@@ -140,8 +131,8 @@ impl LevelStorage {
             compacting: AtomicBool::new(false),
             compaction: Mutex::new(CompactionProgress::default()),
             air_id: registry.get_block_id("minecraft:air").expect("air is registered"),
-            block_nbt,
-            block_nbt_ranges,
+            permutations: registry.permutation_table(),
+            block_nbt: registry.permutations().map(|permutation| (permutation.get_hash(), OnceLock::new())).collect(),
             block_ids: Mutex::new(HashMap::new()),
         })
     }
@@ -386,7 +377,7 @@ impl LevelStorage {
             if sub_chunk.is_all_air() && sub_chunk.layers().iter().skip(1).all(|layer| layer.count(self.air_id) == 4096) {
                 self.remove(sub_key);
             } else {
-                self.put(sub_key, self.encode_sub_chunk(sub_chunk, index));
+                self.put(sub_key, self.encode_sub_chunk(sub_chunk, index)?);
             }
         }
 
@@ -414,7 +405,7 @@ impl LevelStorage {
         Ok(())
     }
 
-    fn encode_sub_chunk(&self, sub_chunk: &SubChunk, index: i8) -> Vec<u8> {
+    fn encode_sub_chunk(&self, sub_chunk: &SubChunk, index: i8) -> StorageResult<Vec<u8>> {
         let layers = sub_chunk.layers();
         let used = if layers.len() > 1 && layers[1..].iter().any(|layer| layer.count(self.air_id) != 4096) {
             layers.len()
@@ -422,18 +413,31 @@ impl LevelStorage {
             1
         };
         let mut buf = vec![SUB_CHUNK_VERSION, used as u8, index as u8];
+        let mut failure = None;
         for layer in &layers[..used] {
-            layer.write_blocks_disk(&mut buf, |id, buf| {
-                let nbt = self.block_nbt(id).or_else(|| self.block_nbt(self.air_id)).expect("air has nbt");
-                buf.extend_from_slice(nbt);
+            layer.write_blocks_disk(&mut buf, |id, buf| match self.block_nbt(id) {
+                Ok(nbt) => buf.extend_from_slice(&nbt),
+                Err(err) => {
+                    failure.get_or_insert(err);
+                }
             });
         }
-        buf
+        match failure {
+            Some(err) => Err(err),
+            None => Ok(buf),
+        }
     }
 
-    fn block_nbt(&self, id: i32) -> Option<&[u8]> {
-        let &(start, end) = self.block_nbt_ranges.get(&id)?;
-        Some(&self.block_nbt[start as usize..end as usize])
+    fn block_nbt(&self, id: i32) -> StorageResult<Arc<[u8]>> {
+        let cell = self.block_nbt.get(&id).or_else(|| self.block_nbt.get(&self.air_id)).expect("air is registered");
+        if let Some(nbt) = cell.get() {
+            return Ok(Arc::clone(nbt));
+        }
+        let id = if self.permutations.contains_key(&id) { id } else { self.air_id };
+        let permutation = self.permutations.get(&id).expect("air is registered");
+        let mut bytes = Vec::new();
+        nbtx::to_le_bytes_in(&mut bytes, &permutation.to_nbt())?;
+        Ok(Arc::clone(cell.get_or_init(|| bytes.into())))
     }
 
     fn heightmap(&self, chunk: &Chunk) -> [i16; 256] {
