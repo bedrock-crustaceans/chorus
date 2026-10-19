@@ -6,6 +6,7 @@ use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
+use crate::network::transport::Transports;
 use crate::player::block_break::BlockBreaking;
 use crate::player::chunk_view::ChunkView;
 use crate::world::blob_cache::{ClientBlobCache, blob_id};
@@ -40,9 +41,13 @@ struct ChunkPayload {
 }
 
 impl ChunkPayload {
+    fn len(&self) -> usize {
+        self.blobs.iter().map(|(_, blob)| blob.len()).sum::<usize>() + self.tail.len()
+    }
+
     fn full(&self) -> &[u8] {
         self.full.get_or_init(|| {
-            let mut data = Vec::with_capacity(self.blobs.iter().map(|(_, blob)| blob.len()).sum::<usize>() + self.tail.len());
+            let mut data = Vec::with_capacity(self.len());
             for (_, blob) in &self.blobs {
                 data.extend_from_slice(blob);
             }
@@ -146,7 +151,6 @@ fn switch_dimension(session: &mut Session, transform: &Transform, view: &mut Chu
 
 const UNLOAD_MARGIN: i32 = 2;
 const MAX_NEW_REQUESTS_PER_TICK: usize = 256;
-const MAX_CHUNKS_SENT_PER_TICK: usize = 8;
 const UNLOAD_INTERVAL_TICKS: u32 = 20;
 
 pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>, mut ticks: Local<u32>) {
@@ -170,7 +174,13 @@ pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>,
     }
 }
 
-pub fn send_pending_chunks(config: Res<Config>, mut query: Query<(&mut Session, &Transform, &mut ChunkView, Option<&mut ClientBlobCache>)>, mut level: ResMut<Level>) {
+pub fn send_pending_chunks(
+    config: Res<Config>,
+    transports: Transports,
+    mut query: Query<(&mut Session, &Transform, &mut ChunkView, Option<&mut ClientBlobCache>)>,
+    mut level: ResMut<Level>,
+    mut average_chunk_bytes: Local<usize>,
+) {
     let mut focus: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
     let mut to_request: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
 
@@ -207,13 +217,14 @@ pub fn send_pending_chunks(config: Res<Config>, mut query: Query<(&mut Session, 
 
     let mut ready: HashMap<i32, HashSet<(i32, i32)>> = HashMap::new();
     let mut selections: Vec<Vec<(i32, i32)>> = Vec::new();
-    for (_, _, view, _) in query.iter() {
+    for (session, _, view, _) in query.iter() {
         let Some(dimension) = level.dimension(view.dimension) else {
             selections.push(Vec::new());
             continue;
         };
 
-        let selection = take_ready(&view.pending, MAX_CHUNKS_SENT_PER_TICK, |(x, z)| dimension.get_chunk(x, z).is_some());
+        let limit = chunk_allowance(transports.send_capacity(&session.id), *average_chunk_bytes);
+        let selection = take_ready(&view.pending, limit, |(x, z)| dimension.get_chunk(x, z).is_some());
         ready.entry(view.dimension).or_default().extend(selection.iter().copied());
         selections.push(selection);
     }
@@ -230,6 +241,9 @@ pub fn send_pending_chunks(config: Res<Config>, mut query: Query<(&mut Session, 
     if payloads.is_empty() {
         return;
     }
+
+    let (total_bytes, total_chunks) = payloads.values().flat_map(HashMap::values).fold((0, 0), |(bytes, chunks), payload| (bytes + payload.len(), chunks + 1));
+    *average_chunk_bytes = total_bytes / total_chunks.max(1);
 
     for ((mut session, transform, mut view, mut cache), selection) in query.iter_mut().zip(selections) {
         let Some(payloads) = payloads.get(&view.dimension) else { continue };
@@ -281,6 +295,14 @@ pub fn send_pending_chunks(config: Res<Config>, mut query: Query<(&mut Session, 
         view.pending.retain(|position| !sent.contains(position));
 
         send_publisher_update(&mut session, transform, &view);
+    }
+}
+
+fn chunk_allowance(capacity: Option<usize>, average_chunk_bytes: usize) -> usize {
+    match capacity {
+        None => usize::MAX,
+        Some(0) => 0,
+        Some(capacity) => (capacity / average_chunk_bytes.max(1)).max(1),
     }
 }
 
@@ -452,6 +474,15 @@ mod tests {
         assert_eq!(resolve_sub_chunk_position((0, 0, i32::MIN), (0, 0, -1)), None);
         assert_eq!(resolve_sub_chunk_position((0, 256, 0), (0, 0, 0)), None);
         assert_eq!(resolve_sub_chunk_position((0, 100, 0), (0, 100, 0)), None);
+    }
+
+    #[test]
+    fn the_allowance_follows_the_transport_capacity() {
+        assert_eq!(chunk_allowance(None, 1000), usize::MAX);
+        assert_eq!(chunk_allowance(Some(0), 1000), 0);
+        assert_eq!(chunk_allowance(Some(10_500), 1000), 10);
+        assert_eq!(chunk_allowance(Some(10), 1000), 1);
+        assert_eq!(chunk_allowance(Some(5000), 0), 5000);
     }
 
     #[test]

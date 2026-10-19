@@ -67,6 +67,13 @@ impl Transports<'_> {
         }
     }
 
+    pub fn send_capacity(&self, id: &SessionId) -> Option<usize> {
+        match id {
+            SessionId::RakNet(id) => self.rak.as_ref()?.send_capacity(*id),
+            SessionId::NetherNetLan(_) | SessionId::NetherNetHttp(_) => None,
+        }
+    }
+
     pub fn disconnect(&mut self, id: &SessionId) {
         match id {
             SessionId::RakNet(id) => self.rak.as_mut().map(|server| server.disconnect(*id)),
