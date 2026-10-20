@@ -415,7 +415,7 @@ dependencies = [
 [[package]]
 name = "bevy-raknet"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/raknet?branch=main#e461de9304cb8d5a11018cc26ab22f2089e3a696"
+source = "git+https://github.com/bedrock-crustaceans/raknet?branch=main#9bd968ed3b72092f0817c29c6d065e026d9b2f1b"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -1486,7 +1486,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2865,7 +2865,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 [[package]]
 name = "raknet"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/raknet?branch=main#e461de9304cb8d5a11018cc26ab22f2089e3a696"
+source = "git+https://github.com/bedrock-crustaceans/raknet?branch=main#9bd968ed3b72092f0817c29c6d065e026d9b2f1b"
 dependencies = [
  "byteorder",
  "facet 0.46.5",
@@ -3342,7 +3342,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

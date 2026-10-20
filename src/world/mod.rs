@@ -1,5 +1,5 @@
-use crate::Tick;
 use crate::schedule::GameSet;
+use crate::{Priority, Scheduler, Tick};
 use bevy_app::{App, Plugin};
 use bevy_ecs::schedule::IntoScheduleConfigs;
 
@@ -11,6 +11,7 @@ pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
+        Scheduler::register::<chunks::ChunkSendTask, _>(app.world_mut(), Priority::Io, chunks::transmit_pending_chunks);
         app.add_message::<block::BlockActionMessage>().init_resource::<chunks::ChunkSerializer>().add_systems(
             Tick,
             (
@@ -19,7 +20,7 @@ impl Plugin for WorldPlugin {
                 (
                     blob_cache::handle_blob_status,
                     chunks::update_chunk_order,
-                    chunks::send_pending_chunks,
+                    chunks::request_view_chunks,
                     chunks::unload_distant_chunks,
                     chunks::handle_sub_chunk_request,
                 )

@@ -21,9 +21,10 @@ use bedrock::protocol::v2193::packets::{HeightMapDataType, SubChunkDataEntry, Su
 use bevy_ecs::change_detection::ResMut;
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::{Local, Query, Resource};
-use bevy_ecs::system::Res;
+use bevy_ecs::system::{In, Res};
 use bevy_tasks::ComputeTaskPool;
 use chorus_core::config::Config;
+use chorus_core::schedule::{Budget, Scheduler, Wake};
 use chorus_level::chunk::Chunk;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::mpsc::{Receiver, Sender, channel};
@@ -266,13 +267,11 @@ pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>,
     }
 }
 
-pub fn send_pending_chunks(
-    config: Res<Config>,
-    transports: Transports,
+pub fn request_view_chunks(
     mut query: Query<(&mut Session, &Transform, &mut ChunkView, Option<&mut ClientBlobCache>)>,
     mut level: ResMut<Level>,
     mut serializer: ResMut<ChunkSerializer>,
-    mut average_chunk_bytes: Local<usize>,
+    mut scheduler: ResMut<Scheduler>,
 ) {
     let mut focus: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
     let mut to_request: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
@@ -308,6 +307,31 @@ pub fn send_pending_chunks(
         }
     }
 
+    if !serializer.ready.is_empty() {
+        let wanted: HashSet<ChunkKey> = query
+            .iter()
+            .flat_map(|(_, _, view, _)| {
+                let dimension_id = view.dimension;
+                view.pending.iter().map(move |&(x, z)| (dimension_id, x, z))
+            })
+            .collect();
+        serializer.retain_wanted(&wanted);
+    }
+
+    scheduler.wake::<ChunkSendTask>();
+}
+
+pub struct ChunkSendTask;
+
+pub fn transmit_pending_chunks(
+    _budget: In<Budget>,
+    config: Res<Config>,
+    transports: Transports,
+    mut query: Query<(&mut Session, &Transform, &mut ChunkView, Option<&mut ClientBlobCache>)>,
+    level: Res<Level>,
+    mut serializer: ResMut<ChunkSerializer>,
+    mut average_chunk_bytes: Local<usize>,
+) -> Wake {
     serializer.collect();
     let mut selections: Vec<Vec<(i32, i32)>> = Vec::new();
     for (session, _, view, _) in query.iter() {
@@ -396,16 +420,7 @@ pub fn send_pending_chunks(
         *average_chunk_bytes = total_bytes / sent_keys.len();
     }
 
-    if !serializer.ready.is_empty() {
-        let wanted: HashSet<ChunkKey> = query
-            .iter()
-            .flat_map(|(_, _, view, _)| {
-                let dimension_id = view.dimension;
-                view.pending.iter().map(move |&(x, z)| (dimension_id, x, z))
-            })
-            .collect();
-        serializer.retain_wanted(&wanted);
-    }
+    Wake::Done
 }
 
 fn chunk_allowance(capacity: Option<usize>, average_chunk_bytes: usize) -> usize {

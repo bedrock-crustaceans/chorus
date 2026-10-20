@@ -16,6 +16,7 @@ use crate::network::session::state::SessionStateChangedMessage;
 use crate::network::session::{Batch, LoginConfig, Session};
 use crate::network::transport::{SessionId, Transports};
 use crate::world::block::{BlockBreakMessage, BlockPlaceMessage};
+use crate::world::chunks::ChunkSendTask;
 use crate::{Budget, Priority, Scheduler, Tick, TickSet, Wake};
 use bedrock::network::info::MINECRAFT_EDITION_MOTD;
 use bedrock::network::motd::BedrockMOTD;
@@ -47,6 +48,8 @@ pub struct NetworkState {
 
 struct ReceiveTask;
 
+struct RakNetTask;
+
 #[derive(SystemParam)]
 pub struct ConnectionEvents<'w, 's> {
     rak: MessageReader<'w, 's, RakServerEvent>,
@@ -59,6 +62,7 @@ pub struct Network;
 impl Plugin for Network {
     fn build(&self, app: &mut App) {
         Scheduler::register::<ReceiveTask, _>(app.world_mut(), Priority::Io, Network::receive);
+        Scheduler::register::<RakNetTask, _>(app.world_mut(), Priority::Io, Network::pump_raknet);
 
         app.add_plugins((PacketHandlers, crate::world::WorldPlugin, crate::actor::ActorPlugin, crate::chat::ChatPlugin))
             .add_plugins(LoginAuthOIDC)
@@ -208,6 +212,14 @@ impl Network {
 
     fn queue_receive(mut scheduler: ResMut<Scheduler>) {
         scheduler.wake::<ReceiveTask>();
+        scheduler.wake::<RakNetTask>();
+    }
+
+    fn pump_raknet(_budget: In<Budget>, server: Option<ResMut<RakServer>>, mut scheduler: ResMut<Scheduler>) -> Wake {
+        let Some(mut server) = server else { return Wake::Done };
+        server.update();
+        scheduler.wake::<ChunkSendTask>();
+        server.next_timeout().map_or(Wake::Done, Wake::after)
     }
 
     fn receive(
@@ -219,9 +231,7 @@ impl Network {
         mut query: Query<&mut Session>,
         mut events: MessageWriter<PacketReceivedMessage>,
     ) -> Wake {
-        let mut any = false;
         while let Some((id, data)) = transport.recv() {
-            any = true;
             bandwidth.counters().add_received(data.len() as u64);
 
             let Some(&entity) = state.sessions.get(&id) else {
@@ -236,7 +246,7 @@ impl Network {
             }
         }
 
-        if any { Wake::Now } else { Wake::Done }
+        Wake::Done
     }
 
     fn renew_identity(identity: Option<ResMut<NetherIdentity>>, http: Option<ResMut<NetherHttpServer>>) {
