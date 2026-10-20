@@ -10,9 +10,12 @@ use tracing::debug;
 const CONFIG_PATH: &str = "chorus.toml";
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[serde(rename_all = "lowercase")]
 pub enum NetworkTransport {
     #[default]
+    #[serde(alias = "RakNet")]
     RakNet,
+    #[serde(alias = "NetherNet")]
     NetherNet,
 }
 
@@ -552,5 +555,30 @@ mod tests {
         let config: NetworkConfig = toml::from_str("max_batch_size = 1048576").unwrap();
 
         assert_eq!(config.max_batch_size, 1048576);
+    }
+
+    #[test]
+    fn the_transport_is_written_in_lowercase() {
+        let config = NetworkConfig {
+            transport: NetworkTransport::NetherNet,
+            ..NetworkConfig::default()
+        };
+        let written = toml::to_string(&config).unwrap();
+
+        assert!(written.contains("transport = \"nethernet\""), "{written}");
+        assert!(toml::to_string(&NetworkConfig::default()).unwrap().contains("transport = \"raknet\""));
+    }
+
+    #[test]
+    fn the_transport_accepts_lowercase_and_the_old_spelling() {
+        for (text, expected) in [
+            ("raknet", NetworkTransport::RakNet),
+            ("nethernet", NetworkTransport::NetherNet),
+            ("RakNet", NetworkTransport::RakNet),
+            ("NetherNet", NetworkTransport::NetherNet),
+        ] {
+            let config: NetworkConfig = toml::from_str(&format!("transport = \"{text}\"")).unwrap();
+            assert_eq!(config.transport, expected, "{text}");
+        }
     }
 }
