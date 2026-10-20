@@ -13,7 +13,7 @@ use crate::network::handler::resource::ResourcePackResponseMessage;
 use crate::network::handler::{PacketHandlers, PacketReceivedMessage};
 use crate::network::login::auth::{Auth, LoginAuthOIDC};
 use crate::network::session::state::SessionStateChangedMessage;
-use crate::network::session::{LoginConfig, Session};
+use crate::network::session::{Batch, LoginConfig, Session};
 use crate::network::transport::{SessionId, Transports};
 use crate::world::block::{BlockBreakMessage, BlockPlaceMessage};
 use crate::{JobQueue, Tick, TickSet};
@@ -26,6 +26,7 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::system::{SystemId, SystemParam};
 use bevy_nethernet::prelude::*;
 use bevy_raknet::prelude::*;
+use bevy_tasks::ComputeTaskPool;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
@@ -283,8 +284,36 @@ impl Network {
 
     /// Pushes everything the handlers queued this tick out, and reaps closed sessions.
     pub fn flush(mut transport: Transports, mut state: ResMut<NetworkState>, bandwidth: Res<BandwidthTracker>, mut query: Query<(Entity, &mut Session)>, mut commands: Commands) {
-        for (entity, mut session) in query.iter_mut() {
-            for batch in session.take_outgoing() {
+        let mut sessions: Vec<(Entity, Mut<Session>)> = query.iter_mut().collect();
+
+        let mut busy: Vec<usize> = Vec::new();
+        for (index, (_, session)) in sessions.iter().enumerate() {
+            if session.has_queued() {
+                busy.push(index);
+            }
+        }
+        let mut encoded: HashMap<usize, Vec<Batch>> = HashMap::new();
+        if !busy.is_empty() {
+            let mut selected: Vec<(usize, &mut Mut<Session>)> = Vec::new();
+            for (index, (_, session)) in sessions.iter_mut().enumerate() {
+                if busy.binary_search(&index).is_ok() {
+                    selected.push((index, session));
+                }
+            }
+            let results = ComputeTaskPool::get().scope(|scope| {
+                for (index, session) in selected {
+                    scope.spawn(async move { (index, session.take_outgoing()) });
+                }
+            });
+            encoded.extend(results);
+        }
+
+        for (index, (entity, mut session)) in sessions.into_iter().enumerate() {
+            let batches = match encoded.remove(&index) {
+                Some(batches) => batches,
+                None => session.take_outgoing(),
+            };
+            for batch in batches {
                 bandwidth.counters().add_sent(batch.data.len() as u64);
                 transport.send(&session.id, batch);
             }

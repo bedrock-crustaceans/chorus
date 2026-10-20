@@ -27,7 +27,7 @@ pub trait WorldGenerator: Send + Sync {
 pub struct Dimension {
     pub dimension_type: DimensionType,
     generator: Box<dyn WorldGenerator>,
-    chunks: HashMap<(i32, i32), Chunk>,
+    chunks: HashMap<(i32, i32), Arc<Chunk>>,
     storage: Option<Arc<LevelStorage>>,
     chunk_saving: ChunkSaving,
     persist: HashSet<(i32, i32)>,
@@ -69,7 +69,7 @@ impl Dimension {
     pub fn persist_chunk(&mut self, x: i32, z: i32) {
         if self.storage.is_some() {
             if let Some(chunk) = self.chunks.get_mut(&(x, z)) {
-                chunk.mark_dirty();
+                Arc::make_mut(chunk).mark_dirty();
             } else {
                 self.persist.insert((x, z));
             }
@@ -119,7 +119,7 @@ impl Dimension {
         };
         match storage.save_chunk(self.dimension_type, chunk) {
             Ok(()) => {
-                chunk.mark_saved();
+                Arc::make_mut(chunk).mark_saved();
                 true
             }
             Err(err) => {
@@ -186,7 +186,7 @@ impl Dimension {
             let cancelled = self.cancelled.remove(&(x, z));
             match result {
                 Ok(Some(chunk)) => {
-                    self.chunks.entry((x, z)).or_insert(chunk);
+                    self.chunks.entry((x, z)).or_insert_with(|| Arc::new(chunk));
                     self.persist.remove(&(x, z));
                     generated.push((x, z));
                 }
@@ -207,7 +207,7 @@ impl Dimension {
                     if self.persist.remove(&(x, z)) || self.chunk_saving == ChunkSaving::All {
                         chunk.mark_dirty();
                     }
-                    self.chunks.insert((x, z), chunk);
+                    self.chunks.insert((x, z), Arc::new(chunk));
                     generated.push((x, z));
                 }
                 Err(failure) => error!("failed to generate chunk ({x}, {z}) in {}: {failure}", self.name()),
@@ -249,7 +249,15 @@ impl Dimension {
     }
 
     pub fn get_chunk(&self, x: i32, z: i32) -> Option<&Chunk> {
-        self.chunks.get(&(x, z))
+        self.chunks.get(&(x, z)).map(|chunk| &**chunk)
+    }
+
+    pub fn chunk_handle(&self, x: i32, z: i32) -> Option<Arc<Chunk>> {
+        self.chunks.get(&(x, z)).cloned()
+    }
+
+    pub fn holds_chunk(&self, x: i32, z: i32, chunk: &Arc<Chunk>) -> bool {
+        self.chunks.get(&(x, z)).is_some_and(|held| Arc::ptr_eq(held, chunk))
     }
 
     pub fn get_block(&self, x: i32, y: i32, z: i32, layer: usize) -> Option<i32> {
@@ -259,6 +267,6 @@ impl Dimension {
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, layer: usize, block_id: i32) -> bool {
         let position = (x >> 4, z >> 4);
         let Some(chunk) = self.chunks.get_mut(&position) else { return false };
-        chunk.set_block((x & 0xF) as u8, y, (z & 0xF) as u8, layer, block_id)
+        Arc::make_mut(chunk).set_block((x & 0xF) as u8, y, (z & 0xF) as u8, layer, block_id)
     }
 }

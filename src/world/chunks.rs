@@ -20,16 +20,18 @@ use bedrock::protocol::v2168::types::SubChunkPos;
 use bedrock::protocol::v2193::packets::{HeightMapDataType, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult};
 use bevy_ecs::change_detection::ResMut;
 use bevy_ecs::message::MessageReader;
-use bevy_ecs::prelude::{Local, Query};
+use bevy_ecs::prelude::{Local, Query, Resource};
 use bevy_ecs::system::Res;
 use bevy_tasks::ComputeTaskPool;
 use chorus_core::config::Config;
-use std::cell::OnceCell;
+use chorus_level::chunk::Chunk;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::Arc;
+use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::{Arc, Mutex, OnceLock};
 use tracing::debug;
 
 struct ChunkPayload {
+    source: Arc<Chunk>,
     sub_chunk_count: u32,
     sub_chunk_limit: u16,
     // every sub chunk, then all biomes, each with its id; this is what a caching client gets by id
@@ -37,7 +39,7 @@ struct ChunkPayload {
     // border blocks and block entities, never cached
     tail: Vec<u8>,
     // the whole thing glued back together, only built once some client without the cache needs it
-    full: OnceCell<Vec<u8>>,
+    full: OnceLock<Vec<u8>>,
 }
 
 impl ChunkPayload {
@@ -54,6 +56,63 @@ impl ChunkPayload {
             data.extend_from_slice(&self.tail);
             data
         })
+    }
+}
+
+type ChunkKey = (i32, i32, i32);
+
+#[derive(Resource)]
+pub struct ChunkSerializer {
+    sender: Sender<(ChunkKey, ChunkPayload)>,
+    receiver: Mutex<Receiver<(ChunkKey, ChunkPayload)>>,
+    in_flight: HashSet<ChunkKey>,
+    ready: HashMap<ChunkKey, Arc<ChunkPayload>>,
+}
+
+impl Default for ChunkSerializer {
+    fn default() -> Self {
+        let (sender, receiver) = channel();
+        Self {
+            sender,
+            receiver: Mutex::new(receiver),
+            in_flight: HashSet::new(),
+            ready: HashMap::new(),
+        }
+    }
+}
+
+impl ChunkSerializer {
+    fn collect(&mut self) {
+        let receiver = self.receiver.get_mut().expect("the receiver is never locked elsewhere");
+        while let Ok((key, payload)) = receiver.try_recv() {
+            self.in_flight.remove(&key);
+            self.ready.insert(key, Arc::new(payload));
+        }
+    }
+
+    fn request(&mut self, key: ChunkKey, chunk: Arc<Chunk>) {
+        if self.ready.contains_key(&key) || !self.in_flight.insert(key) {
+            return;
+        }
+        let pool = ComputeTaskPool::get();
+        if pool.thread_num() == 0 {
+            self.in_flight.remove(&key);
+            self.ready.insert(key, Arc::new(build_payload(chunk)));
+            return;
+        }
+        let sender = self.sender.clone();
+        pool.spawn(async move {
+            let _ = sender.send((key, build_payload(chunk)));
+        })
+        .detach();
+    }
+
+    fn current(&self, key: &ChunkKey, dimension: &Dimension) -> bool {
+        self.ready.get(key).is_some_and(|payload| dimension.holds_chunk(key.1, key.2, &payload.source))
+    }
+
+    fn retain_wanted(&mut self, wanted: &HashSet<ChunkKey>) {
+        self.ready.retain(|key, _| wanted.contains(key));
     }
 }
 
@@ -179,6 +238,7 @@ pub fn send_pending_chunks(
     transports: Transports,
     mut query: Query<(&mut Session, &Transform, &mut ChunkView, Option<&mut ClientBlobCache>)>,
     mut level: ResMut<Level>,
+    mut serializer: ResMut<ChunkSerializer>,
     mut average_chunk_bytes: Local<usize>,
 ) {
     let mut focus: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
@@ -215,43 +275,43 @@ pub fn send_pending_chunks(
         }
     }
 
-    let mut ready: HashMap<i32, HashSet<(i32, i32)>> = HashMap::new();
+    serializer.collect();
     let mut selections: Vec<Vec<(i32, i32)>> = Vec::new();
     for (session, _, view, _) in query.iter() {
         let Some(dimension) = level.dimension(view.dimension) else {
             selections.push(Vec::new());
             continue;
         };
-
+        let dimension_id = view.dimension;
         let limit = chunk_allowance(transports.send_capacity(&session.id), *average_chunk_bytes);
-        let selection = take_ready(&view.pending, limit, |(x, z)| dimension.get_chunk(x, z).is_some());
-        ready.entry(view.dimension).or_default().extend(selection.iter().copied());
+        let selection = take_ready(&view.pending, limit, |(x, z)| serializer.current(&(dimension_id, x, z), dimension));
+
+        let mut lookahead = limit;
+        for &(x, z) in &view.pending {
+            if lookahead == 0 {
+                break;
+            }
+            let key = (dimension_id, x, z);
+            if serializer.current(&key, dimension) || serializer.in_flight.contains(&key) {
+                lookahead -= 1;
+                continue;
+            }
+            serializer.ready.remove(&key);
+            if let Some(chunk) = dimension.chunk_handle(x, z) {
+                serializer.request(key, chunk);
+                lookahead -= 1;
+            }
+        }
         selections.push(selection);
     }
 
-    let payloads: HashMap<i32, HashMap<(i32, i32), ChunkPayload>> = ready
-        .into_iter()
-        .filter(|(_, positions)| !positions.is_empty())
-        .filter_map(|(id, positions)| {
-            let positions: Vec<(i32, i32)> = positions.into_iter().collect();
-            Some((id, serialize_chunks(level.dimension(id)?, &positions)))
-        })
-        .collect();
-
-    if payloads.is_empty() {
-        return;
-    }
-
-    let (total_bytes, total_chunks) = payloads.values().flat_map(HashMap::values).fold((0, 0), |(bytes, chunks), payload| (bytes + payload.len(), chunks + 1));
-    *average_chunk_bytes = total_bytes / total_chunks.max(1);
-
+    let mut sent_keys: HashSet<ChunkKey> = HashSet::new();
     for ((mut session, transform, mut view, mut cache), selection) in query.iter_mut().zip(selections) {
-        let Some(payloads) = payloads.get(&view.dimension) else { continue };
-
+        let dimension_id = view.dimension;
         let mut sent: Vec<(i32, i32)> = Vec::new();
 
         for (x, z) in selection {
-            let Some(payload) = payloads.get(&(x, z)) else { continue };
+            let Some(payload) = serializer.ready.get(&(dimension_id, x, z)).cloned() else { continue };
 
             let cached = if config.network.chunks.cache {
                 cache.as_mut().filter(|cache| cache.has_room(payload.blobs.len()))
@@ -281,6 +341,7 @@ pub fn send_pending_chunks(
             ));
 
             sent.push((x, z));
+            sent_keys.insert((dimension_id, x, z));
         }
 
         if sent.is_empty() {
@@ -295,6 +356,22 @@ pub fn send_pending_chunks(
         view.pending.retain(|position| !sent.contains(position));
 
         send_publisher_update(&mut session, transform, &view);
+    }
+
+    if !sent_keys.is_empty() {
+        let total_bytes: usize = sent_keys.iter().filter_map(|key| serializer.ready.get(key)).map(|payload| payload.len()).sum();
+        *average_chunk_bytes = total_bytes / sent_keys.len();
+    }
+
+    if !serializer.ready.is_empty() {
+        let wanted: HashSet<ChunkKey> = query
+            .iter()
+            .flat_map(|(_, _, view, _)| {
+                let dimension_id = view.dimension;
+                view.pending.iter().map(move |&(x, z)| (dimension_id, x, z))
+            })
+            .collect();
+        serializer.retain_wanted(&wanted);
     }
 }
 
@@ -334,39 +411,26 @@ fn send_publisher_update(session: &mut Session, transform: &Transform, view: &Ch
     ));
 }
 
-fn serialize_chunks(dimension: &Dimension, positions: &[(i32, i32)]) -> HashMap<(i32, i32), ChunkPayload> {
-    let serialized = ComputeTaskPool::get().scope(|scope| {
-        for &(x, z) in positions {
-            let Some(chunk) = dimension.get_chunk(x, z) else { continue };
+fn build_payload(chunk: Arc<Chunk>) -> ChunkPayload {
+    let mut blobs: Vec<Vec<u8>> = chunk
+        .sub_chunks()
+        .iter()
+        .enumerate()
+        .map(|(i, sub_chunk)| sub_chunk.serialize_network(chunk.min_sub_chunk_y().wrapping_add(i as i8)))
+        .collect();
+    blobs.push(chunk.sub_chunks().iter().flat_map(|sub_chunk| sub_chunk.serialize_biomes()).collect());
 
-            scope.spawn(async move {
-                // same bytes as Chunk::serialize, just cut where the client cache wants them
-                let mut blobs: Vec<Vec<u8>> = chunk
-                    .sub_chunks()
-                    .iter()
-                    .enumerate()
-                    .map(|(i, sub_chunk)| sub_chunk.serialize_network(chunk.min_sub_chunk_y().wrapping_add(i as i8)))
-                    .collect();
-                blobs.push(chunk.sub_chunks().iter().flat_map(|sub_chunk| sub_chunk.serialize_biomes()).collect());
+    let mut tail = vec![0u8]; // border blocks
+    tail.extend(chunk.serialize_block_entities(None));
 
-                let mut tail = vec![0u8]; // border blocks
-                tail.extend(chunk.serialize_block_entities(None));
-
-                (
-                    (x, z),
-                    ChunkPayload {
-                        sub_chunk_count: chunk.sub_chunk_count() as u32,
-                        sub_chunk_limit: chunk.highest_non_air_sub_chunk_y() as u16,
-                        blobs: blobs.into_iter().map(|blob| (blob_id(&blob), Arc::from(blob))).collect(),
-                        tail,
-                        full: OnceCell::new(),
-                    },
-                )
-            });
-        }
-    });
-
-    serialized.into_iter().collect()
+    ChunkPayload {
+        sub_chunk_count: chunk.sub_chunk_count() as u32,
+        sub_chunk_limit: chunk.highest_non_air_sub_chunk_y() as u16,
+        blobs: blobs.into_iter().map(|blob| (blob_id(&blob), Arc::from(blob))).collect(),
+        tail,
+        full: OnceLock::new(),
+        source: chunk,
+    }
 }
 
 const MAX_SUB_CHUNKS_PER_REQUEST: usize = 256;
@@ -462,6 +526,72 @@ pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use bevy_tasks::TaskPool;
+    use std::time::{Duration, Instant};
+
+    fn small_chunk() -> Arc<Chunk> {
+        Arc::new(Chunk::new(0, 0, -4, 24, 0, 1))
+    }
+
+    fn wait_for_ready(serializer: &mut ChunkSerializer, key: ChunkKey) {
+        let start = Instant::now();
+        while !serializer.ready.contains_key(&key) {
+            serializer.collect();
+            assert!(start.elapsed() < Duration::from_secs(20), "the payload never arrived");
+            std::thread::yield_now();
+        }
+    }
+
+    #[test]
+    fn a_requested_chunk_is_serialized_on_the_pool_and_collected() {
+        ComputeTaskPool::get_or_init(TaskPool::default);
+        let mut serializer = ChunkSerializer::default();
+        let chunk = small_chunk();
+        serializer.request((0, 0, 0), chunk.clone());
+        assert!(serializer.in_flight.contains(&(0, 0, 0)) || serializer.ready.contains_key(&(0, 0, 0)));
+        wait_for_ready(&mut serializer, (0, 0, 0));
+        assert!(serializer.in_flight.is_empty());
+        assert!(Arc::ptr_eq(&serializer.ready[&(0, 0, 0)].source, &chunk));
+    }
+
+    #[test]
+    fn requesting_a_chunk_twice_builds_one_payload() {
+        ComputeTaskPool::get_or_init(TaskPool::default);
+        let mut serializer = ChunkSerializer::default();
+        let chunk = small_chunk();
+        serializer.request((0, 1, 1), chunk.clone());
+        serializer.request((0, 1, 1), chunk.clone());
+        assert!(serializer.in_flight.len() <= 1);
+        wait_for_ready(&mut serializer, (0, 1, 1));
+        let first = serializer.ready[&(0, 1, 1)].clone();
+        serializer.request((0, 1, 1), chunk);
+        assert!(Arc::ptr_eq(&first, &serializer.ready[&(0, 1, 1)]));
+        assert!(serializer.in_flight.is_empty());
+    }
+
+    #[test]
+    fn payloads_nobody_wants_any_more_are_dropped() {
+        ComputeTaskPool::get_or_init(TaskPool::default);
+        let mut serializer = ChunkSerializer::default();
+        for key in [(0, 2, 2), (0, 3, 3)] {
+            serializer.request(key, small_chunk());
+            wait_for_ready(&mut serializer, key);
+        }
+        serializer.retain_wanted(&HashSet::from([(0, 3, 3)]));
+        assert!(!serializer.ready.contains_key(&(0, 2, 2)));
+        assert!(serializer.ready.contains_key(&(0, 3, 3)));
+    }
+
+    #[test]
+    fn a_payload_built_from_the_same_chunk_matches_a_direct_build() {
+        let chunk = small_chunk();
+        let first = build_payload(chunk.clone());
+        let second = build_payload(chunk);
+        assert_eq!(first.len(), second.len());
+        assert_eq!(first.full(), second.full());
+        assert_eq!(first.sub_chunk_count, second.sub_chunk_count);
+    }
 
     #[test]
     fn resolves_in_range_positions() {

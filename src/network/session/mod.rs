@@ -110,6 +110,10 @@ impl Session {
         }
     }
 
+    pub fn has_queued(&self) -> bool {
+        !self.out_q.is_empty()
+    }
+
     /// Drains everything encoded this tick for [`Network::flush`](crate::network::network::Network::flush)
     /// to hand to the transport, in the order it was produced.
     pub fn take_outgoing(&mut self) -> Vec<Batch> {

@@ -11,7 +11,7 @@ pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_message::<block::BlockActionMessage>().add_systems(
+        app.add_message::<block::BlockActionMessage>().init_resource::<chunks::ChunkSerializer>().add_systems(
             Tick,
             (
                 blob_cache::handle_cache_status.in_set(GameSet::Connection),
