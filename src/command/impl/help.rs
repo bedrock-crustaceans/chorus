@@ -11,7 +11,7 @@ pub static HELP_COMMAND: CommandDefinition = CommandDefinition::new("help", "Lis
 
     let lines = match args.string("command") {
         Some(name) => {
-            let command = registry.get(name).filter(|command| command.permission <= level).ok_or_else(|| format!("No command matching \"{name}\" found."))?;
+            let command = registry.get(name).filter(|command| command.permission <= level).ok_or_else(|| format!("No help for {}", name.to_lowercase()))?;
             describe(command)
         }
         None => {
@@ -37,21 +37,20 @@ fn list(commands: &[&CommandDefinition], page: usize) -> Vec<String> {
     let total_pages = commands.len().div_ceil(PAGE_SIZE).max(1);
     let page = page.min(total_pages);
 
-    let mut lines = vec![format!("§3» §b§lHelp§r §8(page {page} of {total_pages}, /help <page>)")];
+    let mut lines = vec![format!("§2--- Showing help page {page} of {total_pages} (/help <page>) ---")];
     for command in commands.iter().skip((page - 1) * PAGE_SIZE).take(PAGE_SIZE) {
-        lines.push(format!("  §f/{}§8: §7{}", command.name, command.description));
+        lines.extend(usage_lines(command));
     }
+    lines.push("§2Tip: Use the <tab> key while typing a command to auto-complete the command or its arguments".to_owned());
     lines
 }
 
 fn describe(command: &CommandDefinition) -> Vec<String> {
-    let mut lines = vec![format!("§3» §b§l/{}§r §8- §7{}", command.name, command.description)];
-    lines.extend(command.usage().lines().map(|usage| format!("  §f{usage}")));
-    if !command.aliases.is_empty() {
-        let mut aliases: Vec<&str> = command.aliases.iter().map(|alias| alias.as_ref()).collect();
-        aliases.sort_unstable();
-        lines.push(format!("  §7Aliases§8: §f{}", aliases.join(", ")));
-    }
-    lines.push(format!("  §7Permission§8: §f{}", command.permission.name()));
+    let mut lines = vec![format!("§e{}", command.name), format!("§e{}", command.description), "Usage:".to_owned()];
+    lines.extend(usage_lines(command));
     lines
+}
+
+fn usage_lines(command: &CommandDefinition) -> impl Iterator<Item = String> {
+    command.usage().lines().map(|usage| format!("- {usage}")).collect::<Vec<_>>().into_iter()
 }

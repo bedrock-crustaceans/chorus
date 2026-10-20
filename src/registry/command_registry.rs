@@ -150,9 +150,10 @@ impl CommandRegistry {
         lookups.insert(COMMAND_NAME_ENUM.to_owned(), registry.index.keys().cloned().collect());
         let command = registry.get(name).cloned();
         let Some(command) = command else {
-            context.reply(format!("§cUnknown command: {name}. Type /help for a list of commands."));
+            context.reply(format!("§cUnknown command: {name}. Please check that the command exists and that you have permission to use it."));
             return;
         };
+        context.set_style(command.style);
         if context.permission_level() < command.permission {
             context.reply(format!("§cYou don't have permission to use /{}.", command.name));
             return;

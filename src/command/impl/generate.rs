@@ -49,6 +49,8 @@ pub static GENERATE_COMMAND: CommandDefinition = CommandDefinition::new("generat
     Ok(())
 })
 .aliases(crate::values!["pregen"])
+.style(crate::command::style::CommandStyle::Chorus)
+.flags(crate::command::command_definition::CommandFlags::HIGHLIGHTED)
 .permission(PermissionLevel::Admin)
 .overloads(crate::overloads![
     [CommandParameter::new("radius", ArgumentType::Int)],

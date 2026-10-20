@@ -6,15 +6,45 @@ const BYTES_PER_KIBIBYTE: f64 = 1024.;
 const KIBIBYTES_PER_GIBIBYTE: f64 = 1024.;
 const GROUP_SIZE: usize = 3;
 
-pub fn usage(percent: f64) -> String {
-    let color = if percent < USAGE_WARNING {
-        "§a"
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tone {
+    Good,
+    Warning,
+    Critical,
+}
+
+impl Tone {
+    pub fn color(self) -> &'static str {
+        match self {
+            Self::Good => "§a",
+            Self::Warning => "§6",
+            Self::Critical => "§c",
+        }
+    }
+}
+
+pub fn usage_tone(percent: f64) -> Tone {
+    if percent < USAGE_WARNING {
+        Tone::Good
     } else if percent < USAGE_CRITICAL {
-        "§6"
+        Tone::Warning
     } else {
-        "§c"
-    };
-    format!("{color}{}%§f", decimal(percent, 1))
+        Tone::Critical
+    }
+}
+
+pub fn tps_tone(value: f64) -> Tone {
+    if value < TPS_CRITICAL {
+        Tone::Critical
+    } else if value < TPS_WARNING {
+        Tone::Warning
+    } else {
+        Tone::Good
+    }
+}
+
+pub fn usage(percent: f64) -> String {
+    format!("{}{}%§f", usage_tone(percent).color(), decimal(percent, 1))
 }
 
 pub fn milliseconds(value: f64) -> String {
@@ -22,14 +52,7 @@ pub fn milliseconds(value: f64) -> String {
 }
 
 pub fn tps(value: f64) -> String {
-    let color = if value < TPS_CRITICAL {
-        "§c"
-    } else if value < TPS_WARNING {
-        "§6"
-    } else {
-        "§a"
-    };
-    format!("{color}{}§f", decimal(value, 1))
+    format!("{}{}§f", tps_tone(value).color(), decimal(value, 1))
 }
 
 pub fn decimal(value: f64, places: usize) -> String {
@@ -42,12 +65,22 @@ pub fn decimal(value: f64, places: usize) -> String {
 }
 
 pub fn megabytes(bytes: u64) -> String {
+    let (amount, unit) = megabytes_parts(bytes);
+    format!("{amount} {unit}")
+}
+
+pub fn megabytes_parts(bytes: u64) -> (String, &'static str) {
     let megabytes = bytes as f64 / BYTES_PER_KIBIBYTE / BYTES_PER_KIBIBYTE;
     if megabytes >= KIBIBYTES_PER_GIBIBYTE {
-        format!("{} GB", decimal(megabytes / KIBIBYTES_PER_GIBIBYTE, 2))
+        (decimal(megabytes / KIBIBYTES_PER_GIBIBYTE, 2), "GB")
     } else {
-        format!("{} MB", decimal(megabytes, 1))
+        (decimal(megabytes, 1), "MB")
     }
+}
+
+pub fn percent(value: usize, total: usize) -> String {
+    let percent = if total == 0 { 100. } else { value as f64 * 100. / total as f64 };
+    format!("{}%", decimal(percent, 0))
 }
 
 pub fn thousands(value: usize) -> String {

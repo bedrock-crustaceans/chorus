@@ -10,4 +10,6 @@ pub static COMPACT_COMMAND: CommandDefinition = CommandDefinition::new("compact"
     context.reply("Compacting the level database in the background");
     Ok(())
 })
+.style(crate::command::style::CommandStyle::Chorus)
+.flags(crate::command::command_definition::CommandFlags::HIGHLIGHTED)
 .permission(PermissionLevel::Admin);

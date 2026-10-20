@@ -1,4 +1,6 @@
 use crate::command::permission::CommandPermission;
+use crate::command::report::Report;
+use crate::command::style::CommandStyle;
 use crate::console::{self, Console};
 use crate::network::BedrockProtocol;
 use crate::network::session::Session;
@@ -16,11 +18,34 @@ type TextPacket = <BedrockProtocol as ProtoVersionPackets>::TextPacket;
 pub struct CommandContext<'w> {
     world: &'w mut World,
     sender: Entity,
+    style: CommandStyle,
 }
 
 impl<'w> CommandContext<'w> {
     pub fn new(world: &'w mut World, sender: Entity) -> Self {
-        Self { world, sender }
+        Self {
+            world,
+            sender,
+            style: CommandStyle::default(),
+        }
+    }
+
+    pub fn set_style(&mut self, style: CommandStyle) {
+        self.style = style;
+    }
+
+    pub fn style(&self) -> CommandStyle {
+        self.style
+    }
+
+    pub fn report(&self) -> Report {
+        Report::new(self.style)
+    }
+
+    pub fn reply_report(&mut self, report: Report) {
+        for line in report.into_lines() {
+            self.reply(line);
+        }
     }
 
     pub fn world(&self) -> &World {

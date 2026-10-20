@@ -6,3 +6,5 @@ pub mod dispatch;
 pub mod r#impl;
 pub mod parameter;
 pub mod permission;
+pub mod report;
+pub mod style;

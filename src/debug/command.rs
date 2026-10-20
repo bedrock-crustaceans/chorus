@@ -103,6 +103,8 @@ pub static DEBUG_COMMAND: CommandDefinition = CommandDefinition::new("debug", "U
     }
     Ok(())
 })
+.style(crate::command::style::CommandStyle::Chorus)
+.flags(crate::command::command_definition::CommandFlags::HIGHLIGHTED)
 .permission(PermissionLevel::Operator)
 .overloads(crate::overloads![
     [

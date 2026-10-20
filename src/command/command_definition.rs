@@ -2,6 +2,7 @@ use crate::command::args::CommandArgs;
 use crate::command::command_result::CommandResult;
 use crate::command::context::CommandContext;
 use crate::command::parameter::{ChainedSubcommand, CommandOverload};
+use crate::command::style::CommandStyle;
 use atomicow::CowArc;
 use chorus_core::permission::PermissionLevel;
 
@@ -21,6 +22,7 @@ impl CommandFlags {
     pub const MESSAGE_TYPE: Self = Self(0x40);
     pub const NOT_CHEAT: Self = Self(0x80);
     pub const ASYNC: Self = Self(0x100);
+    pub const HIGHLIGHTED: Self = Self::NOT_CHEAT.with(Self::TEST_USAGE);
 
     pub const fn with(self, other: Self) -> Self {
         Self(self.0 | other.0)
@@ -38,6 +40,7 @@ pub struct CommandDefinition {
     pub aliases: CowArc<'static, [CowArc<'static, str>]>,
     pub permission: PermissionLevel,
     pub flags: CommandFlags,
+    pub style: CommandStyle,
     pub overloads: CowArc<'static, [CommandOverload]>,
     pub chained_subcommands: CowArc<'static, [ChainedSubcommand]>,
     pub execute: CommandExecutor,
@@ -51,6 +54,7 @@ impl CommandDefinition {
             aliases: CowArc::Static(&[]),
             permission: PermissionLevel::Member,
             flags: CommandFlags::NOT_CHEAT,
+            style: CommandStyle::Vanilla,
             overloads: CowArc::Static(&[]),
             chained_subcommands: CowArc::Static(&[]),
             execute,
@@ -69,6 +73,11 @@ impl CommandDefinition {
 
     pub const fn permission(mut self, permission: PermissionLevel) -> Self {
         self.permission = permission;
+        self
+    }
+
+    pub const fn style(mut self, style: CommandStyle) -> Self {
+        self.style = style;
         self
     }
 

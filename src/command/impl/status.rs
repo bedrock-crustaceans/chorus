@@ -1,22 +1,24 @@
-use crate::command::command_definition::CommandDefinition;
+use crate::Scheduler;
+use crate::command::command_definition::{CommandDefinition, CommandFlags};
 use crate::command::context::CommandContext;
 use crate::command::parameter::{CommandEnum, CommandParameter};
+use crate::command::report::{Report, Value, duration_text};
+use crate::command::style::CommandStyle;
 use crate::config::Config;
-use crate::values;
+use crate::format::{decimal, percent, thousands, tps_tone, usage_tone};
 use crate::level::DimensionId;
 use crate::level::generator::dimension::Dimension;
 use crate::level::level::Level;
-use crate::format::{decimal, megabytes, milliseconds, thousands, tps, usage};
 use crate::network::bandwidth::BandwidthTracker;
-use crate::Scheduler;
 use crate::player::Player;
 use crate::player::chunk_view::ChunkView;
-use crate::world::chunks::ChunkSerializer;
 use crate::server::pregen::Pregen;
 use crate::server::{ServerMetrics, ServerState};
 use crate::utils::process::process_stats;
-use chorus_core::permission::PermissionLevel;
+use crate::values;
+use crate::world::chunks::ChunkSerializer;
 use bevy_tasks::{AsyncComputeTaskPool, ComputeTaskPool, IoTaskPool};
+use chorus_core::permission::PermissionLevel;
 
 const SECTION: CommandEnum = CommandEnum::new("StatusSection", values!["performance", "network", "memory", "worlds", "chunks", "tasks", "storage", "all"]);
 
@@ -33,20 +35,22 @@ pub static STATUS_COMMAND: CommandDefinition = CommandDefinition::new("status", 
         Some(_) => &[Section::Storage],
     };
 
-    let mut report = Report::default();
+    let mut report = context.report();
     for section in sections {
         section.write(context, &mut report);
     }
     if sections == [Section::Summary] {
         report.hint(format!("/status <{}> for more", SECTION.values.join("|")));
     }
-    for line in report.lines {
-        context.reply(line);
-    }
+    context.reply_report(report);
     Ok(())
 })
+.style(CommandStyle::Chorus)
+.flags(CommandFlags::HIGHLIGHTED)
 .permission(PermissionLevel::Operator)
-.overloads(crate::overloads![[CommandParameter::enumeration("section", SECTION).optional()]]);
+.overloads(crate::overloads![
+    [CommandParameter::enumeration("section", SECTION).optional()],
+]);
 
 #[derive(PartialEq)]
 enum Section {
@@ -75,93 +79,66 @@ impl Section {
     }
 }
 
-#[derive(Default)]
-struct Report {
-    lines: Vec<String>,
-}
-
-impl Report {
-    fn header(&mut self, title: &str) {
-        self.lines.push(format!("§3» §b§l{title}§r"));
-    }
-
-    fn row(&mut self, label: &str, value: impl AsRef<str>) {
-        self.lines.push(format!("  §7{label}§8: §f{}", value.as_ref()));
-    }
-
-    fn stacked(&mut self, label: &str, value: impl AsRef<str>) {
-        self.lines.push(format!("  §7{label}§8:"));
-        self.lines.push(format!("    §f{}", value.as_ref()));
-    }
-
-    fn hint(&mut self, text: impl AsRef<str>) {
-        self.lines.push(format!("  §8§o{}§r", text.as_ref()));
-    }
-}
-
 fn summary(context: &CommandContext, report: &mut Report) {
     let metrics = context.resource::<ServerMetrics>();
     let level = context.resource::<Level>();
-    report.header("Server status");
-    report.row("Uptime", format_duration(context.resource::<ServerState>().uptime().as_secs()));
-    report.row("TPS", format!("{} {}", tps(metrics.tps()), detail(format!("{} avg, {} of the tick", tps(metrics.tps_average()), usage(metrics.tick_usage())))));
-    report.row("Players", ratio(players(context, None), context.resource::<Config>().server.max_players as usize));
-    if let Some(stats) = process_stats() {
-        report.row("Memory", megabytes(stats.resident_bytes));
-    }
-    let loaded: usize = level.dimensions().map(Dimension::chunk_count).sum();
-    report.row("Chunks", format!("{} loaded {}", thousands(loaded), detail(format!("{} unsaved", thousands(level.unsaved_count())))));
-    if let Some(pregen) = context.world().get_resource::<Pregen>() {
-        report.row("Pregenerating", pregen.progress());
-    }
+    report.section("Server status", |report| {
+        report.row("Uptime", Value::duration(context.resource::<ServerState>().uptime()));
+        report.row("TPS", tps_value(metrics.tps()).note(format!("{} avg, {}% of the tick", decimal(metrics.tps_average(), 1), decimal(metrics.tick_usage(), 1))));
+        report.row("Players", Value::ratio(players(context, None), context.resource::<Config>().server.max_players as usize));
+        if let Some(stats) = process_stats() {
+            report.row("Memory", Value::bytes(stats.resident_bytes));
+        }
+        let loaded: usize = level.dimensions().map(Dimension::chunk_count).sum();
+        report.row("Chunks", Value::count(loaded).unit("loaded").note(format!("{} unsaved", level.unsaved_count())));
+        if let Some(pregen) = context.world().get_resource::<Pregen>() {
+            report.row("Pregenerating", pregen.progress());
+        }
+    });
 }
 
 fn performance(context: &CommandContext, report: &mut Report) {
     let metrics = context.resource::<ServerMetrics>();
-    report.header("Performance");
-    report.row("TPS", format!("{} {}", tps(metrics.tps()), detail(format!("{} avg, {} min", tps(metrics.tps_average()), tps(metrics.tps_min())))));
-    report.row(
-        "Tick time",
-        format!(
-            "{} {}",
-            milliseconds(metrics.mspt()),
-            detail(format!("{} avg, {} max", milliseconds(metrics.mspt_average()), milliseconds(metrics.mspt_max())))
-        ),
-    );
-    report.row("Tick usage", format!("{} {}", usage(metrics.tick_usage()), detail(format!("{} avg", usage(metrics.tick_usage_average())))));
-    let threads = |count: Option<usize>| count.map_or_else(|| "§8-".to_owned(), |count| format!("§f{count}"));
-    report.row(
-        "Pool threads",
-        format!(
-            "{} §7compute§8, {} §7async§8, {} §7io",
-            threads(ComputeTaskPool::try_get().map(|pool| pool.thread_num())),
-            threads(AsyncComputeTaskPool::try_get().map(|pool| pool.thread_num())),
-            threads(IoTaskPool::try_get().map(|pool| pool.thread_num()))
-        ),
-    );
+    report.section("Performance", |report| {
+        report.row("TPS", tps_value(metrics.tps()).note(format!("{} avg, {} min", decimal(metrics.tps_average(), 1), decimal(metrics.tps_min(), 1))));
+        report.row(
+            "Tick time",
+            Value::new(decimal(metrics.mspt(), 2)).unit("ms").note(format!("{} avg, {} max", decimal(metrics.mspt_average(), 2), decimal(metrics.mspt_max(), 2))),
+        );
+        report.row("Tick usage", Value::percent(metrics.tick_usage()).tone(usage_tone(metrics.tick_usage())).note(format!("{}% avg", decimal(metrics.tick_usage_average(), 1))));
+        let threads = |count: Option<usize>, name: &str| Value::new(count.map_or_else(|| "-".to_owned(), |count| count.to_string())).unit(name);
+        report.row(
+            "Pool threads",
+            threads(ComputeTaskPool::try_get().map(|pool| pool.thread_num()), "compute")
+                .and(threads(AsyncComputeTaskPool::try_get().map(|pool| pool.thread_num()), "async"))
+                .and(threads(IoTaskPool::try_get().map(|pool| pool.thread_num()), "io")),
+        );
+    });
 }
 
 fn network(context: &CommandContext, report: &mut Report) {
     let config = context.resource::<Config>();
     let bandwidth = context.resource::<BandwidthTracker>();
-    report.header("Network");
-    report.row("Listening", format!("{}:{} {}", config.network.ip, config.network.port, detail(format!("{:?}", config.network.transport))));
-    report.row("Players", ratio(players(context, None), config.server.max_players as usize));
-    report.row("Upload", format!("{} §7kB/s", decimal(bandwidth.average_sent() / 1024., 1)));
-    report.row("Download", format!("{} §7kB/s", decimal(bandwidth.average_received() / 1024., 1)));
+    report.section("Network", |report| {
+        report.row("Listening", Value::new(format!("{}:{}", config.network.ip, config.network.port)).note(format!("{:?}", config.network.transport)));
+        report.row("Players", Value::ratio(players(context, None), config.server.max_players as usize));
+        report.row("Upload", Value::new(decimal(bandwidth.average_sent() / 1024., 1)).unit("kB/s"));
+        report.row("Download", Value::new(decimal(bandwidth.average_received() / 1024., 1)).unit("kB/s"));
+    });
 }
 
 fn memory(report: &mut Report) {
-    report.header("Memory");
-    let Some(stats) = process_stats() else {
-        report.hint("process stats are unavailable on this platform");
-        return;
-    };
-    report.row("Resident", megabytes(stats.resident_bytes));
-    report.row("Virtual", megabytes(stats.virtual_bytes));
-    if let Some(threads) = stats.threads {
-        report.row("Threads", threads.to_string());
-    }
+    report.section("Memory", |report| {
+        let Some(stats) = process_stats() else {
+            report.hint("process stats are unavailable on this platform");
+            return;
+        };
+        report.row("Resident", Value::bytes(stats.resident_bytes));
+        report.row("Virtual", Value::bytes(stats.virtual_bytes));
+        if let Some(threads) = stats.threads {
+            report.row("Threads", Value::new(threads));
+        }
+    });
 }
 
 fn worlds(context: &CommandContext, report: &mut Report) {
@@ -169,93 +146,85 @@ fn worlds(context: &CommandContext, report: &mut Report) {
     let mut dimensions: Vec<&Dimension> = level.dimensions().collect();
     dimensions.sort_by_key(|dimension| dimension.id());
 
-    report.header("Worlds");
-    for dimension in dimensions {
-        let id = dimension.id();
-        let entities = context
-            .world()
-            .iter_entities()
-            .filter(|entity| entity.get::<DimensionId>().is_some_and(|dimension| dimension.0 == id))
-            .count();
-        let generating = if dimension.has_pending_generation() { "§8, §agenerating" } else { "" };
-        report.row(
-            dimension.name(),
-            format!(
-                "{} §7chunks {}§8, §f{} §7players§8, §f{} §7entities",
-                thousands(dimension.chunk_count()),
-                detail(format!("{} unsaved{generating}", thousands(dimension.unsaved_count()))),
-                players(context, Some(id)),
-                thousands(entities)
-            ),
-        );
-    }
+    report.section("Worlds", |report| {
+        for dimension in dimensions {
+            let id = dimension.id();
+            let entities = context
+                .world()
+                .iter_entities()
+                .filter(|entity| entity.get::<DimensionId>().is_some_and(|dimension| dimension.0 == id))
+                .count();
+            report.section(dimension.name(), |report| {
+                report.row("Chunks", Value::count(dimension.chunk_count()).note(format!("{} unsaved", dimension.unsaved_count())));
+                if dimension.has_pending_generation() {
+                    report.row("Generating", "yes");
+                }
+                report.row("Players", Value::count(players(context, Some(id))));
+                report.row("Entities", Value::count(entities));
+            });
+        }
+    });
 }
 
 fn chunks(context: &CommandContext, report: &mut Report) {
     let level = context.resource::<Level>();
     let serializer = context.resource::<ChunkSerializer>();
-    report.header("Chunks");
-    let Some(view) = context.get::<ChunkView>() else {
-        report.hint("run this as a player to see the chunk view");
-        return;
-    };
-    let stats = serializer.view_stats(view, level.dimension(view.dimension));
-    report.stacked("View", format!("radius {} {}", view.radius, detail(format!("{} chunks", thousands(stats.wanted)))));
-    report.stacked("Generated", format!("{} {}", progress(stats.generated, stats.wanted), detail(format!("radius {} of {}", decimal(stats.generated_radius as f64, 1), stats.radius))));
-    report.stacked("Sent", format!("{} {}", progress(stats.sent, stats.wanted), detail(format!("radius {} of {}", decimal(stats.sent_radius as f64, 1), stats.radius))));
-    report.stacked("Waiting", format!("{} {}", thousands(stats.queued), detail(format!("{} serialized §8|§7 {} serializing", thousands(stats.ready), thousands(stats.in_flight)))));
+    report.section("Chunks", |report| {
+        let Some(view) = context.get::<ChunkView>() else {
+            report.hint("run this as a player to see the chunk view");
+            return;
+        };
+        let stats = serializer.view_stats(view, level.dimension(view.dimension));
+        report.row("View", Value::new(view.radius).unit("radius").note(format!("{} chunks", thousands(stats.wanted))));
+        report.row(
+            "Generated",
+            Value::ratio(stats.generated, stats.wanted).note(format!("{}, radius {} of {}", percent(stats.generated, stats.wanted), decimal(stats.generated_radius as f64, 1), stats.radius)),
+        );
+        report.row("Sent", Value::ratio(stats.sent, stats.wanted).note(format!("{}, radius {} of {}", percent(stats.sent, stats.wanted), decimal(stats.sent_radius as f64, 1), stats.radius)));
+        report.row("Waiting", Value::count(stats.queued).note(format!("{} serialized, {} serializing", stats.ready, stats.in_flight)));
+    });
 }
 
 fn tasks(context: &CommandContext, report: &mut Report) {
-    report.header("Tasks");
     let mut tasks = context.resource::<Scheduler>().tasks();
     tasks.sort_by_key(|task| (task.priority, std::cmp::Reverse(task.stats.runtime)));
-    for task in tasks {
-        let state = match (task.queued, task.next_run_in) {
-            (true, _) => "§aready".to_owned(),
-            (false, Some(wait)) => format!("§7next in {}", duration(wait)),
-            (false, None) => "§8idle".to_owned(),
-        };
-        report.stacked(
-            &format!("{} §8({:?})", task.name, task.priority),
-            format!("{} runs §8| §f{} total §8| §f{} avg §8| {state}", thousands(task.stats.runs as usize), duration(task.stats.runtime), duration(task.stats.average())),
-        );
-    }
-}
-
-fn duration(value: std::time::Duration) -> String {
-    let micros = value.as_micros();
-    if micros < 1_000 {
-        format!("{micros} µs")
-    } else if micros < 1_000_000 {
-        format!("{} ms", decimal(micros as f64 / 1_000.0, 1))
-    } else {
-        format!("{} s", decimal(micros as f64 / 1_000_000.0, 2))
-    }
-}
-
-fn progress(value: usize, total: usize) -> String {
-    let percent = if total == 0 { 100. } else { value as f64 * 100. / total as f64 };
-    format!("{}§8/§7{} {}", thousands(value), thousands(total), detail(format!("{}%", decimal(percent, 0))))
+    report.section("Tasks", |report| {
+        for task in tasks {
+            let state = match (task.queued, task.next_run_in) {
+                (true, _) => "ready".to_owned(),
+                (false, Some(wait)) => format!("next in {}", duration_text(wait)),
+                (false, None) => "idle".to_owned(),
+            };
+            report.row(
+                task.name,
+                Value::count(task.stats.runs as usize).unit("runs").and(Value::duration(task.stats.runtime)).note(format!("{:?}, {} avg, {state}", task.priority, duration_text(task.stats.average()))),
+            );
+        }
+    });
 }
 
 fn storage(context: &CommandContext, report: &mut Report) {
     let level = context.resource::<Level>();
-    report.header("Storage");
-    report.row("Level", format!("{} {}", level.name, detail(format!("seed {}", level.seed))));
-    report.row("Unsaved chunks", thousands(level.unsaved_count()));
-    match level.storage() {
-        Some(storage) => {
-            report.row("Path", storage.path().display().to_string());
-            report.row("Database size", megabytes(storage.disk_size()));
-            report.row("Pending writes", thousands(storage.pending_writes()));
-            report.row("Compacting", flag(storage.is_compacting()));
+    report.section("Storage", |report| {
+        report.row("Level", Value::new(&level.name).note(format!("seed {}", level.seed)));
+        report.row("Unsaved chunks", Value::count(level.unsaved_count()));
+        match level.storage() {
+            Some(storage) => {
+                report.row("Path", storage.path().display().to_string());
+                report.row("Database size", Value::bytes(storage.disk_size()));
+                report.row("Pending writes", Value::count(storage.pending_writes()));
+                report.row("Compacting", if storage.is_compacting() { "yes" } else { "no" });
+            }
+            None => report.hint("this level is not saved to disk"),
         }
-        None => report.hint("this level is not saved to disk"),
-    }
-    if let Some(pregen) = context.world().get_resource::<Pregen>() {
-        report.row("Pregenerating", pregen.progress());
-    }
+        if let Some(pregen) = context.world().get_resource::<Pregen>() {
+            report.row("Pregenerating", pregen.progress());
+        }
+    });
+}
+
+fn tps_value(tps: f64) -> Value {
+    Value::new(decimal(tps, 1)).tone(tps_tone(tps))
 }
 
 fn players(context: &CommandContext, dimension: Option<i32>) -> usize {
@@ -265,26 +234,4 @@ fn players(context: &CommandContext, dimension: Option<i32>) -> usize {
         .filter(|entity| entity.contains::<Player>())
         .filter(|entity| dimension.is_none_or(|id| entity.get::<DimensionId>().is_some_and(|dimension| dimension.0 == id)))
         .count()
-}
-
-fn detail(text: impl AsRef<str>) -> String {
-    format!("§8(§7{}§8)§f", text.as_ref().replace("§f", "§7"))
-}
-
-fn ratio(value: usize, max: usize) -> String {
-    format!("{value}§8/§7{max}§f")
-}
-
-fn flag(value: bool) -> &'static str {
-    if value { "§ayes" } else { "§7no" }
-}
-
-fn format_duration(seconds: u64) -> String {
-    let (days, hours, minutes, seconds) = (seconds / 86_400, seconds % 86_400 / 3_600, seconds % 3_600 / 60, seconds % 60);
-    match (days, hours, minutes) {
-        (0, 0, 0) => format!("{seconds}s"),
-        (0, 0, _) => format!("{minutes}m {seconds}s"),
-        (0, _, _) => format!("{hours}h {minutes}m {seconds}s"),
-        _ => format!("{days}d {hours}h {minutes}m"),
-    }
 }
