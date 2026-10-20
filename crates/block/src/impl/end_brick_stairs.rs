@@ -9,7 +9,7 @@ use crate::state::common::{MINECRAFT_CORNER, UPSIDE_DOWN_BIT, WEIRDO_DIRECTION};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const END_BRICK_STAIRS: BlockDefinition = const_block! {
+pub static END_BRICK_STAIRS: BlockDefinition = const_block! {
     identifier: block_id::END_BRICK_STAIRS,
     states: [UPSIDE_DOWN_BIT, WEIRDO_DIRECTION, MINECRAFT_CORNER],
     components: [

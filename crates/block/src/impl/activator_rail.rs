@@ -10,7 +10,7 @@ use crate::const_block;
 use crate::state::common::{RAIL_DATA_BIT, RAIL_DIRECTION_6};
 use glam::Vec3;
 
-pub const ACTIVATOR_RAIL: BlockDefinition = const_block! {
+pub static ACTIVATOR_RAIL: BlockDefinition = const_block! {
     identifier: block_id::ACTIVATOR_RAIL,
     states: [RAIL_DATA_BIT, RAIL_DIRECTION_6],
     components: [

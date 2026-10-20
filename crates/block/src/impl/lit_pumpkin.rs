@@ -7,7 +7,7 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 use crate::state::common::MINECRAFT_CARDINAL_DIRECTION;
 
-pub const LIT_PUMPKIN: BlockDefinition = const_block! {
+pub static LIT_PUMPKIN: BlockDefinition = const_block! {
     identifier: block_id::LIT_PUMPKIN,
     states: [MINECRAFT_CARDINAL_DIRECTION],
     components: [

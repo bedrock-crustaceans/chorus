@@ -12,7 +12,7 @@ use crate::state::common::LIQUID_DEPTH;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const WATER: BlockDefinition = const_block! {
+pub static WATER: BlockDefinition = const_block! {
     identifier: block_id::WATER,
     states: [LIQUID_DEPTH],
     components: [

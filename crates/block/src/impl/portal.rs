@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::PORTAL_AXIS;
 
-pub const PORTAL: BlockDefinition = const_block! {
+pub static PORTAL: BlockDefinition = const_block! {
     identifier: block_id::PORTAL,
     states: [PORTAL_AXIS],
     components: [

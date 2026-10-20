@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{GROWTH, MINECRAFT_CARDINAL_DIRECTION};
 
-pub const SHELF_MUSHROOM: BlockDefinition = const_block! {
+pub static SHELF_MUSHROOM: BlockDefinition = const_block! {
     identifier: block_id::SHELF_MUSHROOM,
     states: [GROWTH, MINECRAFT_CARDINAL_DIRECTION],
     components: [

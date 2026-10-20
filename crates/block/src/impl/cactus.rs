@@ -8,7 +8,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::AGE_16;
 
-pub const CACTUS: BlockDefinition = const_block! {
+pub static CACTUS: BlockDefinition = const_block! {
     identifier: block_id::CACTUS,
     states: [AGE_16],
     components: [

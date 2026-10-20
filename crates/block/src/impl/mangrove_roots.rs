@@ -7,7 +7,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const MANGROVE_ROOTS: BlockDefinition = const_block! {
+pub static MANGROVE_ROOTS: BlockDefinition = const_block! {
     identifier: block_id::MANGROVE_ROOTS,
     states: [],
     components: [

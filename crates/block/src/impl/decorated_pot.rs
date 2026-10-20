@@ -9,7 +9,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::DIRECTION;
 
-pub const DECORATED_POT: BlockDefinition = const_block! {
+pub static DECORATED_POT: BlockDefinition = const_block! {
     identifier: block_id::DECORATED_POT,
     states: [DIRECTION],
     components: [

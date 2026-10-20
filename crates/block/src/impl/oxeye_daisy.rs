@@ -10,7 +10,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const OXEYE_DAISY: BlockDefinition = const_block! {
+pub static OXEYE_DAISY: BlockDefinition = const_block! {
     identifier: block_id::OXEYE_DAISY,
     states: [],
     components: [

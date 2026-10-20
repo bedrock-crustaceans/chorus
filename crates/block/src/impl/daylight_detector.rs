@@ -10,7 +10,7 @@ use crate::const_block;
 use crate::state::common::REDSTONE_SIGNAL;
 use glam::Vec3;
 
-pub const DAYLIGHT_DETECTOR: BlockDefinition = const_block! {
+pub static DAYLIGHT_DETECTOR: BlockDefinition = const_block! {
     identifier: block_id::DAYLIGHT_DETECTOR,
     states: [REDSTONE_SIGNAL],
     components: [

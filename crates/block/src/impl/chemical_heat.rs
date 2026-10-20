@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const CHEMICAL_HEAT: BlockDefinition = const_block! {
+pub static CHEMICAL_HEAT: BlockDefinition = const_block! {
     identifier: block_id::CHEMICAL_HEAT,
     states: [],
     components: [

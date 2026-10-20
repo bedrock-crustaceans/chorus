@@ -7,7 +7,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const SPORE_BLOSSOM: BlockDefinition = const_block! {
+pub static SPORE_BLOSSOM: BlockDefinition = const_block! {
     identifier: block_id::SPORE_BLOSSOM,
     states: [],
     components: [

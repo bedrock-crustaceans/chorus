@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::MINECRAFT_VERTICAL_HALF;
 
-pub const QUARTZ_DOUBLE_SLAB: BlockDefinition = const_block! {
+pub static QUARTZ_DOUBLE_SLAB: BlockDefinition = const_block! {
     identifier: block_id::QUARTZ_DOUBLE_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [

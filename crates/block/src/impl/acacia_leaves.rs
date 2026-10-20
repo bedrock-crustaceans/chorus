@@ -8,7 +8,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{PERSISTENT_BIT, UPDATE_BIT};
 
-pub const ACACIA_LEAVES: BlockDefinition = const_block! {
+pub static ACACIA_LEAVES: BlockDefinition = const_block! {
     identifier: block_id::ACACIA_LEAVES,
     states: [PERSISTENT_BIT, UPDATE_BIT],
     components: [

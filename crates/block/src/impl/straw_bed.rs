@@ -9,7 +9,7 @@ use crate::const_block;
 use crate::state::common::{HEAD_PIECE_BIT, MINECRAFT_CARDINAL_DIRECTION, OCCUPIED_BIT};
 use glam::Vec3;
 
-pub const STRAW_BED: BlockDefinition = const_block! {
+pub static STRAW_BED: BlockDefinition = const_block! {
     identifier: block_id::STRAW_BED,
     states: [HEAD_PIECE_BIT, MINECRAFT_CARDINAL_DIRECTION, OCCUPIED_BIT],
     components: [

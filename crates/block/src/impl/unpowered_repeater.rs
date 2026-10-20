@@ -10,7 +10,7 @@ use crate::const_block;
 use crate::state::common::{MINECRAFT_CARDINAL_DIRECTION, REPEATER_DELAY};
 use glam::Vec3;
 
-pub const UNPOWERED_REPEATER: BlockDefinition = const_block! {
+pub static UNPOWERED_REPEATER: BlockDefinition = const_block! {
     identifier: block_id::UNPOWERED_REPEATER,
     states: [MINECRAFT_CARDINAL_DIRECTION, REPEATER_DELAY],
     components: [

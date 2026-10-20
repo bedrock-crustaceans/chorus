@@ -9,7 +9,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const TUBE_CORAL: BlockDefinition = const_block! {
+pub static TUBE_CORAL: BlockDefinition = const_block! {
     identifier: block_id::TUBE_CORAL,
     states: [],
     components: [

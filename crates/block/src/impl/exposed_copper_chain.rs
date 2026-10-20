@@ -8,7 +8,7 @@ use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 use glam::Vec3;
 
-pub const EXPOSED_COPPER_CHAIN: BlockDefinition = const_block! {
+pub static EXPOSED_COPPER_CHAIN: BlockDefinition = const_block! {
     identifier: block_id::EXPOSED_COPPER_CHAIN,
     states: [PILLAR_AXIS],
     components: [

@@ -5,7 +5,7 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 use crate::state::common::{DRIPSTONE_THICKNESS, HANGING};
 
-pub const POINTED_DRIPSTONE: BlockDefinition = const_block! {
+pub static POINTED_DRIPSTONE: BlockDefinition = const_block! {
     identifier: block_id::POINTED_DRIPSTONE,
     states: [DRIPSTONE_THICKNESS, HANGING],
     components: [

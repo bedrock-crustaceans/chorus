@@ -11,7 +11,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const SHORT_GRASS: BlockDefinition = const_block! {
+pub static SHORT_GRASS: BlockDefinition = const_block! {
     identifier: block_id::SHORT_GRASS,
     states: [],
     components: [

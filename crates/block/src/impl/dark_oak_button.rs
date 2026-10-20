@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{BUTTON_PRESSED_BIT, FACING_DIRECTION};
 
-pub const DARK_OAK_BUTTON: BlockDefinition = const_block! {
+pub static DARK_OAK_BUTTON: BlockDefinition = const_block! {
     identifier: block_id::DARK_OAK_BUTTON,
     states: [BUTTON_PRESSED_BIT, FACING_DIRECTION],
     components: [

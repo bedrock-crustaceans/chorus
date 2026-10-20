@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::GROWTH;
 
-pub const TORCHFLOWER_CROP: BlockDefinition = const_block! {
+pub static TORCHFLOWER_CROP: BlockDefinition = const_block! {
     identifier: block_id::TORCHFLOWER_CROP,
     states: [GROWTH],
     components: [

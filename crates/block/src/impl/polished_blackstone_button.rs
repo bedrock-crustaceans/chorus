@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{BUTTON_PRESSED_BIT, FACING_DIRECTION};
 
-pub const POLISHED_BLACKSTONE_BUTTON: BlockDefinition = const_block! {
+pub static POLISHED_BLACKSTONE_BUTTON: BlockDefinition = const_block! {
     identifier: block_id::POLISHED_BLACKSTONE_BUTTON,
     states: [BUTTON_PRESSED_BIT, FACING_DIRECTION],
     components: [

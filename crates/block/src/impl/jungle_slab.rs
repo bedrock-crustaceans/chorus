@@ -10,7 +10,7 @@ use crate::state::common::MINECRAFT_VERTICAL_HALF;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const JUNGLE_SLAB: BlockDefinition = const_block! {
+pub static JUNGLE_SLAB: BlockDefinition = const_block! {
     identifier: block_id::JUNGLE_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [

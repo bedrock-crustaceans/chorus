@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::GROUND_SIGN_DIRECTION;
 
-pub const ACACIA_STANDING_SIGN: BlockDefinition = const_block! {
+pub static ACACIA_STANDING_SIGN: BlockDefinition = const_block! {
     identifier: block_id::ACACIA_STANDING_SIGN,
     states: [GROUND_SIGN_DIRECTION],
     components: [

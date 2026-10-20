@@ -7,7 +7,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::MOISTURIZED_AMOUNT;
 
-pub const FARMLAND: BlockDefinition = const_block! {
+pub static FARMLAND: BlockDefinition = const_block! {
     identifier: block_id::FARMLAND,
     states: [MOISTURIZED_AMOUNT],
     components: [

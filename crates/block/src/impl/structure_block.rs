@@ -6,7 +6,7 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 use crate::state::common::STRUCTURE_BLOCK_TYPE;
 
-pub const STRUCTURE_BLOCK: BlockDefinition = const_block! {
+pub static STRUCTURE_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::STRUCTURE_BLOCK,
     states: [STRUCTURE_BLOCK_TYPE],
     components: [

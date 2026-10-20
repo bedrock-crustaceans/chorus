@@ -10,7 +10,7 @@ use crate::const_block;
 use crate::state::common::{MINECRAFT_CARDINAL_DIRECTION, OUTPUT_LIT_BIT, OUTPUT_SUBTRACT_BIT};
 use glam::Vec3;
 
-pub const POWERED_COMPARATOR: BlockDefinition = const_block! {
+pub static POWERED_COMPARATOR: BlockDefinition = const_block! {
     identifier: block_id::POWERED_COMPARATOR,
     states: [MINECRAFT_CARDINAL_DIRECTION, OUTPUT_LIT_BIT, OUTPUT_SUBTRACT_BIT],
     components: [

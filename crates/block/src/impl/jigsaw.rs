@@ -6,7 +6,7 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 use crate::state::common::{FACING_DIRECTION, ROTATION};
 
-pub const JIGSAW: BlockDefinition = const_block! {
+pub static JIGSAW: BlockDefinition = const_block! {
     identifier: block_id::JIGSAW,
     states: [FACING_DIRECTION, ROTATION],
     components: [

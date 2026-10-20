@@ -33,7 +33,7 @@ const AXIS: CommandEnum = CommandEnum::new("DebugFlyAxis", values!["horizontal",
 
 const FEATURE: CommandEnum = CommandEnum::new("DebugFeature", values!["unhandled", "form", "flyspeed"]);
 
-pub const DEBUG_COMMAND: &CommandDefinition = &CommandDefinition::new("debug", "Used for debugging", |context, args| {
+pub static DEBUG_COMMAND: CommandDefinition = CommandDefinition::new("debug", "Used for debugging", |context, args| {
     if args.has("hud") {
         return super::hud::command::run(context, args);
     }

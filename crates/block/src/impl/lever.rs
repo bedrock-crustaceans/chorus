@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{LEVER_DIRECTION, OPEN_BIT};
 
-pub const LEVER: BlockDefinition = const_block! {
+pub static LEVER: BlockDefinition = const_block! {
     identifier: block_id::LEVER,
     states: [LEVER_DIRECTION, OPEN_BIT],
     components: [

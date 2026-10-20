@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const DEPRECATED_PURPUR_BLOCK_2: BlockDefinition = const_block! {
+pub static DEPRECATED_PURPUR_BLOCK_2: BlockDefinition = const_block! {
     identifier: block_id::DEPRECATED_PURPUR_BLOCK_2,
     states: [PILLAR_AXIS],
     components: [

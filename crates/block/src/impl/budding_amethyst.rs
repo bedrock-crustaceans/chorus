@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 
-pub const BUDDING_AMETHYST: BlockDefinition = const_block! {
+pub static BUDDING_AMETHYST: BlockDefinition = const_block! {
     identifier: block_id::BUDDING_AMETHYST,
     states: [],
     components: [

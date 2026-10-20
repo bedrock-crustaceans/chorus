@@ -9,7 +9,7 @@ use crate::state::common::{MINECRAFT_CORNER, UPSIDE_DOWN_BIT, WEIRDO_DIRECTION};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const MAGENTA_CONCRETE_STAIRS: BlockDefinition = const_block! {
+pub static MAGENTA_CONCRETE_STAIRS: BlockDefinition = const_block! {
     identifier: block_id::MAGENTA_CONCRETE_STAIRS,
     states: [UPSIDE_DOWN_BIT, WEIRDO_DIRECTION, MINECRAFT_CORNER],
     components: [

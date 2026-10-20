@@ -9,7 +9,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::MINECRAFT_BLOCK_FACE;
 
-pub const LARGE_AMETHYST_BUD: BlockDefinition = const_block! {
+pub static LARGE_AMETHYST_BUD: BlockDefinition = const_block! {
     identifier: block_id::LARGE_AMETHYST_BUD,
     states: [MINECRAFT_BLOCK_FACE],
     components: [

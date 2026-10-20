@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::state::common::{LIT, POWERED_BIT};
 use crate::{const_block, const_permutation};
 
-pub const OXIDIZED_COPPER_BULB: BlockDefinition = const_block! {
+pub static OXIDIZED_COPPER_BULB: BlockDefinition = const_block! {
     identifier: block_id::OXIDIZED_COPPER_BULB,
     states: [LIT, POWERED_BIT],
     components: [

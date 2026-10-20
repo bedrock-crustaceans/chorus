@@ -4,7 +4,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 
-pub const INVISIBLE_BEDROCK: BlockDefinition = const_block! {
+pub static INVISIBLE_BEDROCK: BlockDefinition = const_block! {
     identifier: block_id::INVISIBLE_BEDROCK,
     states: [],
     components: [

@@ -9,7 +9,7 @@ use crate::state::common::MINECRAFT_CARDINAL_DIRECTION;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const ANVIL: BlockDefinition = const_block! {
+pub static ANVIL: BlockDefinition = const_block! {
     identifier: block_id::ANVIL,
     states: [MINECRAFT_CARDINAL_DIRECTION],
     components: [

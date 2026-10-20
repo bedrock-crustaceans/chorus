@@ -10,7 +10,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const PINK_TULIP: BlockDefinition = const_block! {
+pub static PINK_TULIP: BlockDefinition = const_block! {
     identifier: block_id::PINK_TULIP,
     states: [],
     components: [

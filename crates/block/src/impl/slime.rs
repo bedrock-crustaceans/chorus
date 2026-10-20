@@ -7,7 +7,7 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const SLIME: BlockDefinition = const_block! {
+pub static SLIME: BlockDefinition = const_block! {
     identifier: block_id::SLIME,
     states: [],
     components: [

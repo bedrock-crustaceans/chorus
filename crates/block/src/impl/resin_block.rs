@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const RESIN_BLOCK: BlockDefinition = const_block! {
+pub static RESIN_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::RESIN_BLOCK,
     states: [],
     components: [

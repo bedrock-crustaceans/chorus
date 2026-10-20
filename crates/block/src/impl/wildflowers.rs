@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{GROWTH, MINECRAFT_CARDINAL_DIRECTION};
 
-pub const WILDFLOWERS: BlockDefinition = const_block! {
+pub static WILDFLOWERS: BlockDefinition = const_block! {
     identifier: block_id::WILDFLOWERS,
     states: [GROWTH, MINECRAFT_CARDINAL_DIRECTION],
     components: [

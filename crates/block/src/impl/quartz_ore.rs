@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const QUARTZ_ORE: BlockDefinition = const_block! {
+pub static QUARTZ_ORE: BlockDefinition = const_block! {
     identifier: block_id::QUARTZ_ORE,
     states: [],
     components: [

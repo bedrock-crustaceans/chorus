@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use glam::Vec3;
 
-pub const BROWN_CARPET: BlockDefinition = const_block! {
+pub static BROWN_CARPET: BlockDefinition = const_block! {
     identifier: block_id::BROWN_CARPET,
     states: [],
     components: [

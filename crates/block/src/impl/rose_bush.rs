@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::UPPER_BLOCK_BIT;
 
-pub const ROSE_BUSH: BlockDefinition = const_block! {
+pub static ROSE_BUSH: BlockDefinition = const_block! {
     identifier: block_id::ROSE_BUSH,
     states: [UPPER_BLOCK_BIT],
     components: [

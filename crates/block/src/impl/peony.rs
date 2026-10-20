@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::UPPER_BLOCK_BIT;
 
-pub const PEONY: BlockDefinition = const_block! {
+pub static PEONY: BlockDefinition = const_block! {
     identifier: block_id::PEONY,
     states: [UPPER_BLOCK_BIT],
     components: [

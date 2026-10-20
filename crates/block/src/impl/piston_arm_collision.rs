@@ -9,7 +9,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::FACING_DIRECTION;
 
-pub const PISTON_ARM_COLLISION: BlockDefinition = const_block! {
+pub static PISTON_ARM_COLLISION: BlockDefinition = const_block! {
     identifier: block_id::PISTON_ARM_COLLISION,
     states: [FACING_DIRECTION],
     components: [

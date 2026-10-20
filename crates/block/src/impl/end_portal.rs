@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use glam::Vec3;
 
-pub const END_PORTAL: BlockDefinition = const_block! {
+pub static END_PORTAL: BlockDefinition = const_block! {
     identifier: block_id::END_PORTAL,
     states: [],
     components: [

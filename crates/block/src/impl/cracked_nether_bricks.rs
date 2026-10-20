@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const CRACKED_NETHER_BRICKS: BlockDefinition = const_block! {
+pub static CRACKED_NETHER_BRICKS: BlockDefinition = const_block! {
     identifier: block_id::CRACKED_NETHER_BRICKS,
     states: [],
     components: [

@@ -9,7 +9,7 @@ use crate::state::common::MINECRAFT_VERTICAL_HALF;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const SMOOTH_QUARTZ_SLAB: BlockDefinition = const_block! {
+pub static SMOOTH_QUARTZ_SLAB: BlockDefinition = const_block! {
     identifier: block_id::SMOOTH_QUARTZ_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [

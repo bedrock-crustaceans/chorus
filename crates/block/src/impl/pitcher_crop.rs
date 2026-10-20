@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{GROWTH, UPPER_BLOCK_BIT};
 
-pub const PITCHER_CROP: BlockDefinition = const_block! {
+pub static PITCHER_CROP: BlockDefinition = const_block! {
     identifier: block_id::PITCHER_CROP,
     states: [GROWTH, UPPER_BLOCK_BIT],
     components: [

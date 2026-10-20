@@ -9,7 +9,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const WITHER_ROSE: BlockDefinition = const_block! {
+pub static WITHER_ROSE: BlockDefinition = const_block! {
     identifier: block_id::WITHER_ROSE,
     states: [],
     components: [

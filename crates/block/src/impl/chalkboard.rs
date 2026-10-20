@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::DIRECTION_16;
 
-pub const CHALKBOARD: BlockDefinition = const_block! {
+pub static CHALKBOARD: BlockDefinition = const_block! {
     identifier: block_id::CHALKBOARD,
     states: [DIRECTION_16],
     components: [

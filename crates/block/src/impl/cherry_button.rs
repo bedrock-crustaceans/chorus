@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{BUTTON_PRESSED_BIT, FACING_DIRECTION};
 
-pub const CHERRY_BUTTON: BlockDefinition = const_block! {
+pub static CHERRY_BUTTON: BlockDefinition = const_block! {
     identifier: block_id::CHERRY_BUTTON,
     states: [BUTTON_PRESSED_BIT, FACING_DIRECTION],
     components: [

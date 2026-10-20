@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::UPPER_BLOCK_BIT;
 
-pub const LARGE_FERN: BlockDefinition = const_block! {
+pub static LARGE_FERN: BlockDefinition = const_block! {
     identifier: block_id::LARGE_FERN,
     states: [UPPER_BLOCK_BIT],
     components: [

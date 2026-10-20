@@ -7,7 +7,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const GLOWSTONE: BlockDefinition = const_block! {
+pub static GLOWSTONE: BlockDefinition = const_block! {
     identifier: block_id::GLOWSTONE,
     states: [],
     components: [

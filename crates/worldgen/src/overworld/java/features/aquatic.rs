@@ -135,12 +135,12 @@ fn wet(table: &mut BlockTable, name: &'static str, states: &[State]) -> BlockId 
 
 fn sea_pickle(table: &mut BlockTable) -> Feature {
     for count in 0..4 {
-        wet(table, SEA_PICKLE, &[state(CLUSTER_COUNT, int(count))]);
+        wet(table, SEA_PICKLE, &[state(&CLUSTER_COUNT, int(count))]);
     }
     let source = wet(table, SEA_PICKLE, &[]);
     simple(StateProvider::RandomizedInt {
         source: Box::new(source.into()),
-        property: key(CLUSTER_COUNT),
+        property: key(&CLUSTER_COUNT),
         values: IntProvider::Uniform(0, 3),
     })
 }
@@ -155,7 +155,7 @@ fn coral_decoration(table: &mut BlockTable) -> Feature {
     ]);
     let mut features = vec![Placed::new(top, vec![Modifier::Offset(0.into(), 1.into(), 0.into())])];
     for direction in [Direction::North, Direction::East, Direction::South, Direction::West] {
-        let facing = state(CORAL_DIRECTION, int(coral_direction(direction)));
+        let facing = state(&CORAL_DIRECTION, int(coral_direction(direction)));
         let fans = CORALS.iter().map(|coral| (wet(table, coral.wall_fan, std::slice::from_ref(&facing)), 1)).collect();
         let offset = direction.offset();
         let placement = vec![
@@ -203,8 +203,8 @@ fn warm_ocean_vegetation(table: &mut BlockTable) -> Feature {
 }
 
 fn seagrass(table: &mut BlockTable, tall_percentage: i32) -> Feature {
-    table.get(SEAGRASS, &[state(SEA_GRASS_TYPE, text("double_top"))]);
-    let tall = table.get(SEAGRASS, &[state(SEA_GRASS_TYPE, text("double_bot"))]);
+    table.get(SEAGRASS, &[state(&SEA_GRASS_TYPE, text("double_top"))]);
+    let tall = table.get(SEAGRASS, &[state(&SEA_GRASS_TYPE, text("double_bot"))]);
     let tall = Placed::new(simple(tall), vec![filter(water(table, IVec3::Y))]);
     let short = Placed::new(simple(table.name(SEAGRASS)), Vec::new());
     Feature::WeightedSelector(vec![(tall, tall_percentage), (short, 100 - tall_percentage)])
@@ -212,11 +212,11 @@ fn seagrass(table: &mut BlockTable, tall_percentage: i32) -> Feature {
 
 fn kelp(table: &mut BlockTable) -> Feature {
     for age in 20..=23 {
-        table.get(KELP, &[state(KELP_AGE, int(age))]);
+        table.get(KELP, &[state(&KELP_AGE, int(age))]);
     }
     let head = StateProvider::RandomizedInt {
         source: Box::new(table.name(KELP).into()),
-        property: key(KELP_AGE),
+        property: key(&KELP_AGE),
         values: IntProvider::Uniform(20, 23),
     };
     Feature::BlockColumn(BlockColumn {

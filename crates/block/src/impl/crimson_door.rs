@@ -11,7 +11,7 @@ use crate::state::common::{DOOR_HINGE_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BI
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const CRIMSON_DOOR: BlockDefinition = const_block! {
+pub static CRIMSON_DOOR: BlockDefinition = const_block! {
     identifier: block_id::CRIMSON_DOOR,
     states: [DOOR_HINGE_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT, UPPER_BLOCK_BIT],
     components: [

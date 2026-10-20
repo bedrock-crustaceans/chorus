@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::CORAL_FAN_DIRECTION;
 
-pub const BRAIN_CORAL_FAN: BlockDefinition = const_block! {
+pub static BRAIN_CORAL_FAN: BlockDefinition = const_block! {
     identifier: block_id::BRAIN_CORAL_FAN,
     states: [CORAL_FAN_DIRECTION],
     components: [

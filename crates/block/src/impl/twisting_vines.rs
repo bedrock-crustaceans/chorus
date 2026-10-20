@@ -12,7 +12,7 @@ use crate::const_block;
 use crate::state::common::TWISTING_VINES_AGE;
 use glam::Vec3;
 
-pub const TWISTING_VINES: BlockDefinition = const_block! {
+pub static TWISTING_VINES: BlockDefinition = const_block! {
     identifier: block_id::TWISTING_VINES,
     states: [TWISTING_VINES_AGE],
     components: [

@@ -10,7 +10,7 @@ use crate::const_block;
 use crate::state::common::{MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST};
 use glam::Vec3;
 
-pub const JUNGLE_FENCE: BlockDefinition = const_block! {
+pub static JUNGLE_FENCE: BlockDefinition = const_block! {
     identifier: block_id::JUNGLE_FENCE,
     states: [MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST],
     components: [

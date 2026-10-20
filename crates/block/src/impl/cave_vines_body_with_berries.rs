@@ -9,7 +9,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::GROWING_PLANT_AGE;
 
-pub const CAVE_VINES_BODY_WITH_BERRIES: BlockDefinition = const_block! {
+pub static CAVE_VINES_BODY_WITH_BERRIES: BlockDefinition = const_block! {
     identifier: block_id::CAVE_VINES_BODY_WITH_BERRIES,
     states: [GROWING_PLANT_AGE],
     components: [

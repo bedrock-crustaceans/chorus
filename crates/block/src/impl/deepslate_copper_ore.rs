@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const DEEPSLATE_COPPER_ORE: BlockDefinition = const_block! {
+pub static DEEPSLATE_COPPER_ORE: BlockDefinition = const_block! {
     identifier: block_id::DEEPSLATE_COPPER_ORE,
     states: [],
     components: [

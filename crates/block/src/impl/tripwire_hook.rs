@@ -6,7 +6,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{ATTACHED_BIT, DIRECTION, POWERED_BIT};
 
-pub const TRIPWIRE_HOOK: BlockDefinition = const_block! {
+pub static TRIPWIRE_HOOK: BlockDefinition = const_block! {
     identifier: block_id::TRIPWIRE_HOOK,
     states: [ATTACHED_BIT, DIRECTION, POWERED_BIT],
     components: [

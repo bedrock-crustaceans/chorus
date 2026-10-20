@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::FACING_DIRECTION;
 
-pub const WARPED_WALL_SIGN: BlockDefinition = const_block! {
+pub static WARPED_WALL_SIGN: BlockDefinition = const_block! {
     identifier: block_id::WARPED_WALL_SIGN,
     states: [FACING_DIRECTION],
     components: [

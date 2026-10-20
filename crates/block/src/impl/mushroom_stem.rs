@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::HUGE_MUSHROOM_BITS;
 
-pub const MUSHROOM_STEM: BlockDefinition = const_block! {
+pub static MUSHROOM_STEM: BlockDefinition = const_block! {
     identifier: block_id::MUSHROOM_STEM,
     states: [HUGE_MUSHROOM_BITS],
     components: [

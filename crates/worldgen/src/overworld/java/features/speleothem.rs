@@ -37,7 +37,7 @@ impl SpeleothemBlocks {
         let mut states = Vec::with_capacity(20);
         for hanging in [true, false] {
             for thickness in THICKNESSES {
-                let dry = table.get(pointed, &[state(DRIPSTONE_THICKNESS, text(thickness)), state(HANGING, flag(hanging))]);
+                let dry = table.get(pointed, &[state(&DRIPSTONE_THICKNESS, text(thickness)), state(&HANGING, flag(hanging))]);
                 states.push(dry);
                 states.push(table.flooded(dry));
             }

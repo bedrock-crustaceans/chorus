@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::MINECRAFT_CARDINAL_DIRECTION;
 
-pub const FURNACE: BlockDefinition = const_block! {
+pub static FURNACE: BlockDefinition = const_block! {
     identifier: block_id::FURNACE,
     states: [MINECRAFT_CARDINAL_DIRECTION],
     components: [

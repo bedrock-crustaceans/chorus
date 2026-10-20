@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{BUTTON_PRESSED_BIT, FACING_DIRECTION};
 
-pub const JUNGLE_BUTTON: BlockDefinition = const_block! {
+pub static JUNGLE_BUTTON: BlockDefinition = const_block! {
     identifier: block_id::JUNGLE_BUTTON,
     states: [BUTTON_PRESSED_BIT, FACING_DIRECTION],
     components: [

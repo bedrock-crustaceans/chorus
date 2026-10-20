@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const STRIPPED_CRIMSON_HYPHAE: BlockDefinition = const_block! {
+pub static STRIPPED_CRIMSON_HYPHAE: BlockDefinition = const_block! {
     identifier: block_id::STRIPPED_CRIMSON_HYPHAE,
     states: [PILLAR_AXIS],
     components: [

@@ -10,7 +10,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const OPEN_EYEBLOSSOM: BlockDefinition = const_block! {
+pub static OPEN_EYEBLOSSOM: BlockDefinition = const_block! {
     identifier: block_id::OPEN_EYEBLOSSOM,
     states: [],
     components: [

@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::CORAL_DIRECTION;
 
-pub const BUBBLE_CORAL_WALL_FAN: BlockDefinition = const_block! {
+pub static BUBBLE_CORAL_WALL_FAN: BlockDefinition = const_block! {
     identifier: block_id::BUBBLE_CORAL_WALL_FAN,
     states: [CORAL_DIRECTION],
     components: [

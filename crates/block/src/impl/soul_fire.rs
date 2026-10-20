@@ -12,7 +12,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::AGE_16;
 
-pub const SOUL_FIRE: BlockDefinition = const_block! {
+pub static SOUL_FIRE: BlockDefinition = const_block! {
     identifier: block_id::SOUL_FIRE,
     states: [AGE_16],
     components: [

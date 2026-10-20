@@ -8,7 +8,7 @@ use crate::component::replaceable_component::ReplaceableComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const LIGHT_BLOCK_0: BlockDefinition = const_block! {
+pub static LIGHT_BLOCK_0: BlockDefinition = const_block! {
     identifier: block_id::LIGHT_BLOCK_0,
     states: [],
     components: [

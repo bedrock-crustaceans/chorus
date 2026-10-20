@@ -10,7 +10,7 @@ use crate::const_block;
 use crate::state::common::UPDATE_BIT;
 use glam::Vec3;
 
-pub const FLOWER_POT: BlockDefinition = const_block! {
+pub static FLOWER_POT: BlockDefinition = const_block! {
     identifier: block_id::FLOWER_POT,
     states: [UPDATE_BIT],
     components: [

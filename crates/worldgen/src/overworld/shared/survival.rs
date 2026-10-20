@@ -146,7 +146,7 @@ pub fn coral_direction(facing: Direction) -> i32 {
 }
 
 pub fn coral_fan_facing(blocks: &Blocks, fan: BlockId) -> Direction {
-    match blocks.int(fan, CORAL_DIRECTION) {
+    match blocks.int(fan, &CORAL_DIRECTION) {
         Some(1) => Direction::East,
         Some(2) => Direction::North,
         Some(3) => Direction::South,
@@ -251,7 +251,7 @@ pub fn can_survive(region: &(impl BlockView + ?Sized), block: BlockId, pos: IVec
         Support::SolidFloor => blocks.entry(below).solid,
         Support::Kelp => (sturdy(region, pos - IVec3::Y) || blocks.name_of(below) == KELP) && !blocks.is(below, Tag::CannotSupportKelp),
         Support::Propagule => {
-            if blocks.flag(block, HANGING) {
+            if blocks.flag(block, &HANGING) {
                 blocks.is(region.get(pos + IVec3::Y), Tag::SupportsHangingMangrovePropagule)
             } else {
                 blocks.is(below, Tag::SupportsMangrovePropagule)
@@ -262,7 +262,7 @@ pub fn can_survive(region: &(impl BlockView + ?Sized), block: BlockId, pos: IVec
             if blocks.is(below, Tag::CannotSupportSnowLayer) {
                 return false;
             }
-            blocks.is(below, Tag::SupportOverrideSnowLayer) || blocks.entry(below).full || (blocks.name_of(below) == SNOW_LAYER && blocks.int(below, HEIGHT) == Some(7))
+            blocks.is(below, Tag::SupportOverrideSnowLayer) || blocks.entry(below).full || (blocks.name_of(below) == SNOW_LAYER && blocks.int(below, &HEIGHT) == Some(7))
         }
         Support::AnyFloor => !blocks.is_air(below),
         Support::SporeBlossom => sturdy(region, pos + IVec3::Y) && fluid_at(blocks, region.get(pos)).is_none(),

@@ -3,7 +3,7 @@ use crate::config::Config;
 use crate::player::Player;
 use crate::player::identity::PlayerIdentity;
 
-pub const LIST_COMMAND: CommandDefinition = CommandDefinition::new("list", "Lists the players currently online", |context, _| {
+pub static LIST_COMMAND: CommandDefinition = CommandDefinition::new("list", "Lists the players currently online", |context, _| {
     let mut names: Vec<String> = context
         .world()
         .iter_entities()

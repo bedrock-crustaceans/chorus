@@ -12,7 +12,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::UPPER_BLOCK_BIT;
 
-pub const TALL_GRASS: BlockDefinition = const_block! {
+pub static TALL_GRASS: BlockDefinition = const_block! {
     identifier: block_id::TALL_GRASS,
     states: [UPPER_BLOCK_BIT],
     components: [

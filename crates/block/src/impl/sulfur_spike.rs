@@ -5,7 +5,7 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 use crate::state::common::{DRIPSTONE_THICKNESS, HANGING};
 
-pub const SULFUR_SPIKE: BlockDefinition = const_block! {
+pub static SULFUR_SPIKE: BlockDefinition = const_block! {
     identifier: block_id::SULFUR_SPIKE,
     states: [DRIPSTONE_THICKNESS, HANGING],
     components: [

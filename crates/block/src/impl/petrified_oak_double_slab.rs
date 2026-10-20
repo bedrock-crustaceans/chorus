@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::MINECRAFT_VERTICAL_HALF;
 
-pub const PETRIFIED_OAK_DOUBLE_SLAB: BlockDefinition = const_block! {
+pub static PETRIFIED_OAK_DOUBLE_SLAB: BlockDefinition = const_block! {
     identifier: block_id::PETRIFIED_OAK_DOUBLE_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [

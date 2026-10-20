@@ -7,7 +7,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const SEA_LANTERN: BlockDefinition = const_block! {
+pub static SEA_LANTERN: BlockDefinition = const_block! {
     identifier: block_id::SEA_LANTERN,
     states: [],
     components: [

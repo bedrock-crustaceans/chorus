@@ -10,7 +10,7 @@ use crate::const_block;
 use crate::state::common::MINECRAFT_CARDINAL_DIRECTION;
 use glam::Vec3;
 
-pub const WAXED_WEATHERED_COPPER_GOLEM_STATUE: BlockDefinition = const_block! {
+pub static WAXED_WEATHERED_COPPER_GOLEM_STATUE: BlockDefinition = const_block! {
     identifier: block_id::WAXED_WEATHERED_COPPER_GOLEM_STATUE,
     states: [MINECRAFT_CARDINAL_DIRECTION],
     components: [

@@ -4,7 +4,7 @@ use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const LIT_REDSTONE_LAMP: BlockDefinition = const_block! {
+pub static LIT_REDSTONE_LAMP: BlockDefinition = const_block! {
     identifier: block_id::LIT_REDSTONE_LAMP,
     states: [],
     components: [

@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const GRASS_PATH: BlockDefinition = const_block! {
+pub static GRASS_PATH: BlockDefinition = const_block! {
     identifier: block_id::GRASS_PATH,
     states: [],
     components: [

@@ -5,7 +5,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const OCHRE_FROGLIGHT: BlockDefinition = const_block! {
+pub static OCHRE_FROGLIGHT: BlockDefinition = const_block! {
     identifier: block_id::OCHRE_FROGLIGHT,
     states: [PILLAR_AXIS],
     components: [

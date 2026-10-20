@@ -10,7 +10,7 @@ use crate::state::common::FACING_DIRECTION;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const PLAYER_HEAD: BlockDefinition = const_block! {
+pub static PLAYER_HEAD: BlockDefinition = const_block! {
     identifier: block_id::PLAYER_HEAD,
     states: [FACING_DIRECTION],
     components: [

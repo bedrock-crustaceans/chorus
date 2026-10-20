@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::DIRECTION;
 
-pub const LOOM: BlockDefinition = const_block! {
+pub static LOOM: BlockDefinition = const_block! {
     identifier: block_id::LOOM,
     states: [DIRECTION],
     components: [

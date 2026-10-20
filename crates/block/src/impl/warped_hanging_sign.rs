@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{ATTACHED_BIT, FACING_DIRECTION, GROUND_SIGN_DIRECTION, HANGING};
 
-pub const WARPED_HANGING_SIGN: BlockDefinition = const_block! {
+pub static WARPED_HANGING_SIGN: BlockDefinition = const_block! {
     identifier: block_id::WARPED_HANGING_SIGN,
     states: [ATTACHED_BIT, FACING_DIRECTION, GROUND_SIGN_DIRECTION, HANGING],
     components: [

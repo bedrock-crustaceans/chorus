@@ -9,7 +9,7 @@ use crate::state::common::{ATTACHMENT, DIRECTION};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const GRINDSTONE: BlockDefinition = const_block! {
+pub static GRINDSTONE: BlockDefinition = const_block! {
     identifier: block_id::GRINDSTONE,
     states: [ATTACHMENT, DIRECTION],
     components: [

@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const BASALT: BlockDefinition = const_block! {
+pub static BASALT: BlockDefinition = const_block! {
     identifier: block_id::BASALT,
     states: [PILLAR_AXIS],
     components: [

@@ -9,7 +9,7 @@ use crate::const_block;
 use crate::state::common::FACING_DIRECTION;
 use glam::Vec3;
 
-pub const END_ROD: BlockDefinition = const_block! {
+pub static END_ROD: BlockDefinition = const_block! {
     identifier: block_id::END_ROD,
     states: [FACING_DIRECTION],
     components: [

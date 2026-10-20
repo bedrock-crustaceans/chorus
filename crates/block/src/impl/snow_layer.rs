@@ -12,7 +12,7 @@ use crate::state::common::{COVERED_BIT, HEIGHT};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const SNOW_LAYER: BlockDefinition = const_block! {
+pub static SNOW_LAYER: BlockDefinition = const_block! {
     identifier: block_id::SNOW_LAYER,
     states: [COVERED_BIT, HEIGHT],
     components: [

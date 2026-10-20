@@ -9,7 +9,7 @@ use crate::state::common::LIT;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const PINK_CANDLE_CAKE: BlockDefinition = const_block! {
+pub static PINK_CANDLE_CAKE: BlockDefinition = const_block! {
     identifier: block_id::PINK_CANDLE_CAKE,
     states: [LIT],
     components: [

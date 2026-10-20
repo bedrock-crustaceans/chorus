@@ -5,7 +5,7 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 use crate::state::common::{CONDITIONAL_BIT, FACING_DIRECTION};
 
-pub const REPEATING_COMMAND_BLOCK: BlockDefinition = const_block! {
+pub static REPEATING_COMMAND_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::REPEATING_COMMAND_BLOCK,
     states: [CONDITIONAL_BIT, FACING_DIRECTION],
     components: [

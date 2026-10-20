@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const DIRT_WITH_ROOTS: BlockDefinition = const_block! {
+pub static DIRT_WITH_ROOTS: BlockDefinition = const_block! {
     identifier: block_id::DIRT_WITH_ROOTS,
     states: [],
     components: [

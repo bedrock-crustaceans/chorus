@@ -10,7 +10,7 @@ use crate::state::common::FACING_DIRECTION;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const ZOMBIE_HEAD: BlockDefinition = const_block! {
+pub static ZOMBIE_HEAD: BlockDefinition = const_block! {
     identifier: block_id::ZOMBIE_HEAD,
     states: [FACING_DIRECTION],
     components: [

@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const CHERRY_WOOD: BlockDefinition = const_block! {
+pub static CHERRY_WOOD: BlockDefinition = const_block! {
     identifier: block_id::CHERRY_WOOD,
     states: [PILLAR_AXIS],
     components: [

@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::GROWTH;
 
-pub const WHEAT: BlockDefinition = const_block! {
+pub static WHEAT: BlockDefinition = const_block! {
     identifier: block_id::WHEAT,
     states: [GROWTH],
     components: [

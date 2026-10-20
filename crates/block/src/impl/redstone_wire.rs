@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::REDSTONE_SIGNAL;
 
-pub const REDSTONE_WIRE: BlockDefinition = const_block! {
+pub static REDSTONE_WIRE: BlockDefinition = const_block! {
     identifier: block_id::REDSTONE_WIRE,
     states: [REDSTONE_SIGNAL],
     components: [

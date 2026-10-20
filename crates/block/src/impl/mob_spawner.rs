@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 
-pub const MOB_SPAWNER: BlockDefinition = const_block! {
+pub static MOB_SPAWNER: BlockDefinition = const_block! {
     identifier: block_id::MOB_SPAWNER,
     states: [],
     components: [

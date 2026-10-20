@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const NETHER_WART_BLOCK: BlockDefinition = const_block! {
+pub static NETHER_WART_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::NETHER_WART_BLOCK,
     states: [],
     components: [

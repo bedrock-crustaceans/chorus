@@ -11,7 +11,7 @@ use crate::const_block;
 use crate::state::common::{PALE_MOSS_CARPET_SIDE_EAST, PALE_MOSS_CARPET_SIDE_NORTH, PALE_MOSS_CARPET_SIDE_SOUTH, PALE_MOSS_CARPET_SIDE_WEST, UPPER_BLOCK_BIT};
 use glam::Vec3;
 
-pub const PALE_MOSS_CARPET: BlockDefinition = const_block! {
+pub static PALE_MOSS_CARPET: BlockDefinition = const_block! {
     identifier: block_id::PALE_MOSS_CARPET,
     states: [PALE_MOSS_CARPET_SIDE_EAST, PALE_MOSS_CARPET_SIDE_NORTH, PALE_MOSS_CARPET_SIDE_SOUTH, PALE_MOSS_CARPET_SIDE_WEST, UPPER_BLOCK_BIT],
     components: [

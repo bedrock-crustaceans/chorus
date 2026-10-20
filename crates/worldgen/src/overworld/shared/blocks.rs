@@ -16,14 +16,14 @@ pub const AIR: BlockId = 0;
 
 pub type State = (&'static str, BlockState);
 
-pub fn key(definition: BlockStateDefinition) -> &'static str {
+pub fn key(definition: &BlockStateDefinition) -> &'static str {
     match definition.identifier() {
         CowArc::Static(identifier) => identifier,
         other => Box::leak(other.to_string().into_boxed_str()),
     }
 }
 
-pub fn state(definition: BlockStateDefinition, value: BlockState) -> State {
+pub fn state(definition: &BlockStateDefinition, value: BlockState) -> State {
     (key(definition), value)
 }
 
@@ -120,8 +120,8 @@ pub struct Entry {
 
 fn upper_half(states: &[State]) -> Option<bool> {
     states.iter().find_map(|(name, value)| match value {
-        BlockState::Bool(upper) if *name == key(UPPER_BLOCK_BIT) => Some(*upper),
-        BlockState::Enum(kind) if *name == key(SEA_GRASS_TYPE) => match kind.as_ref() {
+        BlockState::Bool(upper) if *name == key(&UPPER_BLOCK_BIT) => Some(*upper),
+        BlockState::Enum(kind) if *name == key(&SEA_GRASS_TYPE) => match kind.as_ref() {
             "double_top" => Some(true),
             "double_bot" => Some(false),
             _ => None,
@@ -290,23 +290,23 @@ impl Blocks {
         self.entries[id as usize].name
     }
 
-    pub fn state(&self, id: BlockId, definition: BlockStateDefinition) -> Option<&BlockState> {
+    pub fn state(&self, id: BlockId, definition: &BlockStateDefinition) -> Option<&BlockState> {
         let wanted = key(definition);
         self.entries[id as usize].states.iter().find(|(k, _)| *k == wanted).map(|(_, v)| v)
     }
 
-    pub fn flag(&self, id: BlockId, definition: BlockStateDefinition) -> bool {
+    pub fn flag(&self, id: BlockId, definition: &BlockStateDefinition) -> bool {
         matches!(self.state(id, definition), Some(BlockState::Bool(true)))
     }
 
-    pub fn int(&self, id: BlockId, definition: BlockStateDefinition) -> Option<i32> {
+    pub fn int(&self, id: BlockId, definition: &BlockStateDefinition) -> Option<i32> {
         match self.state(id, definition) {
             Some(BlockState::Int(value)) => Some(*value),
             _ => None,
         }
     }
 
-    pub fn text(&self, id: BlockId, definition: BlockStateDefinition) -> Option<&str> {
+    pub fn text(&self, id: BlockId, definition: &BlockStateDefinition) -> Option<&str> {
         match self.state(id, definition) {
             Some(BlockState::Enum(value)) => Some(value.as_ref()),
             _ => None,

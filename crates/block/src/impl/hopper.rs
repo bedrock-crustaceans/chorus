@@ -7,7 +7,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{FACING_DIRECTION, TOGGLE_BIT};
 
-pub const HOPPER: BlockDefinition = const_block! {
+pub static HOPPER: BlockDefinition = const_block! {
     identifier: block_id::HOPPER,
     states: [FACING_DIRECTION, TOGGLE_BIT],
     components: [

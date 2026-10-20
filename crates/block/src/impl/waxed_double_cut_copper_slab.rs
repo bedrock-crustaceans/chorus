@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::MINECRAFT_VERTICAL_HALF;
 
-pub const WAXED_DOUBLE_CUT_COPPER_SLAB: BlockDefinition = const_block! {
+pub static WAXED_DOUBLE_CUT_COPPER_SLAB: BlockDefinition = const_block! {
     identifier: block_id::WAXED_DOUBLE_CUT_COPPER_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [

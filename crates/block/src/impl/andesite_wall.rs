@@ -10,7 +10,7 @@ use crate::const_block;
 use crate::state::common::{WALL_CONNECTION_TYPE_EAST, WALL_CONNECTION_TYPE_NORTH, WALL_CONNECTION_TYPE_SOUTH, WALL_CONNECTION_TYPE_WEST, WALL_POST_BIT};
 use glam::Vec3;
 
-pub const ANDESITE_WALL: BlockDefinition = const_block! {
+pub static ANDESITE_WALL: BlockDefinition = const_block! {
     identifier: block_id::ANDESITE_WALL,
     states: [WALL_CONNECTION_TYPE_EAST, WALL_CONNECTION_TYPE_NORTH, WALL_CONNECTION_TYPE_SOUTH, WALL_CONNECTION_TYPE_WEST, WALL_POST_BIT],
     components: [

@@ -11,7 +11,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const BROWN_MUSHROOM: BlockDefinition = const_block! {
+pub static BROWN_MUSHROOM: BlockDefinition = const_block! {
     identifier: block_id::BROWN_MUSHROOM,
     states: [],
     components: [

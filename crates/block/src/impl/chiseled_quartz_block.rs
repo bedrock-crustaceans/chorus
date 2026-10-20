@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const CHISELED_QUARTZ_BLOCK: BlockDefinition = const_block! {
+pub static CHISELED_QUARTZ_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::CHISELED_QUARTZ_BLOCK,
     states: [PILLAR_AXIS],
     components: [

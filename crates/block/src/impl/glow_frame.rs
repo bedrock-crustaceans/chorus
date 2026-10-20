@@ -10,7 +10,7 @@ use crate::state::common::{FACING_DIRECTION, ITEM_FRAME_MAP_BIT, ITEM_FRAME_PHOT
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const GLOW_FRAME: BlockDefinition = const_block! {
+pub static GLOW_FRAME: BlockDefinition = const_block! {
     identifier: block_id::GLOW_FRAME,
     states: [FACING_DIRECTION, ITEM_FRAME_MAP_BIT, ITEM_FRAME_PHOTO_BIT],
     components: [

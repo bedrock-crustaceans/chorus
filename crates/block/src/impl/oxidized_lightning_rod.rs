@@ -8,7 +8,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{FACING_DIRECTION, POWERED_BIT};
 
-pub const OXIDIZED_LIGHTNING_ROD: BlockDefinition = const_block! {
+pub static OXIDIZED_LIGHTNING_ROD: BlockDefinition = const_block! {
     identifier: block_id::OXIDIZED_LIGHTNING_ROD,
     states: [FACING_DIRECTION, POWERED_BIT],
     components: [

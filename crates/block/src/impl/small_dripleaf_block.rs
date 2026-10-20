@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{MINECRAFT_CARDINAL_DIRECTION, UPPER_BLOCK_BIT};
 
-pub const SMALL_DRIPLEAF_BLOCK: BlockDefinition = const_block! {
+pub static SMALL_DRIPLEAF_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::SMALL_DRIPLEAF_BLOCK,
     states: [MINECRAFT_CARDINAL_DIRECTION, UPPER_BLOCK_BIT],
     components: [

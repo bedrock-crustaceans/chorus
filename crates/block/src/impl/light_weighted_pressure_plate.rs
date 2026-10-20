@@ -12,7 +12,7 @@ use crate::const_block;
 use crate::state::common::REDSTONE_SIGNAL;
 use glam::Vec3;
 
-pub const LIGHT_WEIGHTED_PRESSURE_PLATE: BlockDefinition = const_block! {
+pub static LIGHT_WEIGHTED_PRESSURE_PLATE: BlockDefinition = const_block! {
     identifier: block_id::LIGHT_WEIGHTED_PRESSURE_PLATE,
     states: [REDSTONE_SIGNAL],
     components: [

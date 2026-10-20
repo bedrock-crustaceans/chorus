@@ -9,7 +9,7 @@ use crate::const_block;
 use crate::state::common::MINECRAFT_CARDINAL_DIRECTION;
 use glam::Vec3;
 
-pub const COPPER_CHEST: BlockDefinition = const_block! {
+pub static COPPER_CHEST: BlockDefinition = const_block! {
     identifier: block_id::COPPER_CHEST,
     states: [MINECRAFT_CARDINAL_DIRECTION],
     components: [

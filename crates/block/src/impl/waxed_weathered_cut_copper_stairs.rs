@@ -9,7 +9,7 @@ use crate::state::common::{MINECRAFT_CORNER, UPSIDE_DOWN_BIT, WEIRDO_DIRECTION};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const WAXED_WEATHERED_CUT_COPPER_STAIRS: BlockDefinition = const_block! {
+pub static WAXED_WEATHERED_CUT_COPPER_STAIRS: BlockDefinition = const_block! {
     identifier: block_id::WAXED_WEATHERED_CUT_COPPER_STAIRS,
     states: [UPSIDE_DOWN_BIT, WEIRDO_DIRECTION, MINECRAFT_CORNER],
     components: [

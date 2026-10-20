@@ -6,7 +6,7 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 use crate::state::common::INFINIBURN_BIT;
 
-pub const BEDROCK: BlockDefinition = const_block! {
+pub static BEDROCK: BlockDefinition = const_block! {
     identifier: block_id::BEDROCK,
     states: [INFINIBURN_BIT],
     components: [

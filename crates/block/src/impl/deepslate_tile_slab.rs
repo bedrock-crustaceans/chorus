@@ -9,7 +9,7 @@ use crate::state::common::MINECRAFT_VERTICAL_HALF;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const DEEPSLATE_TILE_SLAB: BlockDefinition = const_block! {
+pub static DEEPSLATE_TILE_SLAB: BlockDefinition = const_block! {
     identifier: block_id::DEEPSLATE_TILE_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [

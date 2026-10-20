@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::AGE_BIT;
 
-pub const PALE_OAK_SAPLING: BlockDefinition = const_block! {
+pub static PALE_OAK_SAPLING: BlockDefinition = const_block! {
     identifier: block_id::PALE_OAK_SAPLING,
     states: [AGE_BIT],
     components: [

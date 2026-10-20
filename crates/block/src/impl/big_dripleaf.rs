@@ -13,7 +13,7 @@ use crate::state::common::{BIG_DRIPLEAF_HEAD, BIG_DRIPLEAF_TILT, MINECRAFT_CARDI
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const BIG_DRIPLEAF: BlockDefinition = const_block! {
+pub static BIG_DRIPLEAF: BlockDefinition = const_block! {
     identifier: block_id::BIG_DRIPLEAF,
     states: [BIG_DRIPLEAF_HEAD, BIG_DRIPLEAF_TILT, MINECRAFT_CARDINAL_DIRECTION],
     components: [

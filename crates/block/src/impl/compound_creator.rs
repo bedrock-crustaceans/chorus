@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::DIRECTION;
 
-pub const COMPOUND_CREATOR: BlockDefinition = const_block! {
+pub static COMPOUND_CREATOR: BlockDefinition = const_block! {
     identifier: block_id::COMPOUND_CREATOR,
     states: [DIRECTION],
     components: [

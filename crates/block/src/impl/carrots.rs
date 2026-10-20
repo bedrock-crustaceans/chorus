@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::GROWTH;
 
-pub const CARROTS: BlockDefinition = const_block! {
+pub static CARROTS: BlockDefinition = const_block! {
     identifier: block_id::CARROTS,
     states: [GROWTH],
     components: [

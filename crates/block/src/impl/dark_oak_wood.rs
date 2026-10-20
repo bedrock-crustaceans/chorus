@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const DARK_OAK_WOOD: BlockDefinition = const_block! {
+pub static DARK_OAK_WOOD: BlockDefinition = const_block! {
     identifier: block_id::DARK_OAK_WOOD,
     states: [PILLAR_AXIS],
     components: [

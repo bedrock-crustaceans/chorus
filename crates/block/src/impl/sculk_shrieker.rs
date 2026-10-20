@@ -9,7 +9,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{ACTIVE, CAN_SUMMON};
 
-pub const SCULK_SHRIEKER: BlockDefinition = const_block! {
+pub static SCULK_SHRIEKER: BlockDefinition = const_block! {
     identifier: block_id::SCULK_SHRIEKER,
     states: [ACTIVE, CAN_SUMMON],
     components: [

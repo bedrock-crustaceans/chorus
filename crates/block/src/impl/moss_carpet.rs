@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use glam::Vec3;
 
-pub const MOSS_CARPET: BlockDefinition = const_block! {
+pub static MOSS_CARPET: BlockDefinition = const_block! {
     identifier: block_id::MOSS_CARPET,
     states: [],
     components: [

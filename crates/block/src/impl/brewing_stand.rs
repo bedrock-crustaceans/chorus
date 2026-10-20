@@ -11,7 +11,7 @@ use crate::const_block;
 use crate::state::common::{BREWING_STAND_SLOT_A_BIT, BREWING_STAND_SLOT_B_BIT, BREWING_STAND_SLOT_C_BIT};
 use glam::Vec3;
 
-pub const BREWING_STAND: BlockDefinition = const_block! {
+pub static BREWING_STAND: BlockDefinition = const_block! {
     identifier: block_id::BREWING_STAND,
     states: [BREWING_STAND_SLOT_A_BIT, BREWING_STAND_SLOT_B_BIT, BREWING_STAND_SLOT_C_BIT],
     components: [

@@ -10,7 +10,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const BLUE_ORCHID: BlockDefinition = const_block! {
+pub static BLUE_ORCHID: BlockDefinition = const_block! {
     identifier: block_id::BLUE_ORCHID,
     states: [],
     components: [

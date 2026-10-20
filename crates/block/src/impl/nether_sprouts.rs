@@ -11,7 +11,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const NETHER_SPROUTS: BlockDefinition = const_block! {
+pub static NETHER_SPROUTS: BlockDefinition = const_block! {
     identifier: block_id::NETHER_SPROUTS,
     states: [],
     components: [

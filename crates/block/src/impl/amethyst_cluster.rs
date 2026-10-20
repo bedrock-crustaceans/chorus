@@ -9,7 +9,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::MINECRAFT_BLOCK_FACE;
 
-pub const AMETHYST_CLUSTER: BlockDefinition = const_block! {
+pub static AMETHYST_CLUSTER: BlockDefinition = const_block! {
     identifier: block_id::AMETHYST_CLUSTER,
     states: [MINECRAFT_BLOCK_FACE],
     components: [

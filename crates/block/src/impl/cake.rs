@@ -9,7 +9,7 @@ use crate::const_block;
 use crate::state::common::BITE_COUNTER;
 use glam::Vec3;
 
-pub const CAKE: BlockDefinition = const_block! {
+pub static CAKE: BlockDefinition = const_block! {
     identifier: block_id::CAKE,
     states: [BITE_COUNTER],
     components: [

@@ -10,7 +10,7 @@ use crate::state::common::MINECRAFT_VERTICAL_HALF;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const BAMBOO_MOSAIC_SLAB: BlockDefinition = const_block! {
+pub static BAMBOO_MOSAIC_SLAB: BlockDefinition = const_block! {
     identifier: block_id::BAMBOO_MOSAIC_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [

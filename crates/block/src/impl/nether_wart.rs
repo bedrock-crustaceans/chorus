@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::AGE_4;
 
-pub const NETHER_WART: BlockDefinition = const_block! {
+pub static NETHER_WART: BlockDefinition = const_block! {
     identifier: block_id::NETHER_WART,
     states: [AGE_4],
     components: [

@@ -5,7 +5,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const GREEN_WOOL: BlockDefinition = const_block! {
+pub static GREEN_WOOL: BlockDefinition = const_block! {
     identifier: block_id::GREEN_WOOL,
     states: [],
     components: [

@@ -9,7 +9,7 @@ use crate::const_block;
 use crate::state::common::{DIRECTION, HEAD_PIECE_BIT, OCCUPIED_BIT};
 use glam::Vec3;
 
-pub const BED: BlockDefinition = const_block! {
+pub static BED: BlockDefinition = const_block! {
     identifier: block_id::BED,
     states: [DIRECTION, HEAD_PIECE_BIT, OCCUPIED_BIT],
     components: [

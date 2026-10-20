@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::AGE_16;
 
-pub const REEDS: BlockDefinition = const_block! {
+pub static REEDS: BlockDefinition = const_block! {
     identifier: block_id::REEDS,
     states: [AGE_16],
     components: [

@@ -9,7 +9,7 @@ use crate::player::{PLAYER_EYE_HEIGHT, PendingTeleport, teleport};
 use chorus_core::permission::PermissionLevel;
 use glam::Vec3;
 
-pub const TP_COMMAND: CommandDefinition = CommandDefinition::new("tp", "Teleports you to a position or a player", |context, args| {
+pub static TP_COMMAND: CommandDefinition = CommandDefinition::new("tp", "Teleports you to a position or a player", |context, args| {
     let feet = context.get::<Transform>().ok_or("must be sent by player!")?.position - Vec3::new(0.0, PLAYER_EYE_HEIGHT, 0.0);
     let rotation = context.get::<Transform>().map(|transform| transform.rotation).unwrap_or_default();
 

@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const CRACKED_DEEPSLATE_TILES: BlockDefinition = const_block! {
+pub static CRACKED_DEEPSLATE_TILES: BlockDefinition = const_block! {
     identifier: block_id::CRACKED_DEEPSLATE_TILES,
     states: [],
     components: [

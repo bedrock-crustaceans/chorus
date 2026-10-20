@@ -8,7 +8,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::AGE_4;
 
-pub const FROSTED_ICE: BlockDefinition = const_block! {
+pub static FROSTED_ICE: BlockDefinition = const_block! {
     identifier: block_id::FROSTED_ICE,
     states: [AGE_4],
     components: [

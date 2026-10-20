@@ -12,7 +12,7 @@ use crate::state::common::HANGING;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const EXPOSED_COPPER_LANTERN: BlockDefinition = const_block! {
+pub static EXPOSED_COPPER_LANTERN: BlockDefinition = const_block! {
     identifier: block_id::EXPOSED_COPPER_LANTERN,
     states: [HANGING],
     components: [

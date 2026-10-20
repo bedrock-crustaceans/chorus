@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::GROUND_SIGN_DIRECTION;
 
-pub const STANDING_BANNER: BlockDefinition = const_block! {
+pub static STANDING_BANNER: BlockDefinition = const_block! {
     identifier: block_id::STANDING_BANNER,
     states: [GROUND_SIGN_DIRECTION],
     components: [

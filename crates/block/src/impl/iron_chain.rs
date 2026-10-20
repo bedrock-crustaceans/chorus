@@ -8,7 +8,7 @@ use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 use glam::Vec3;
 
-pub const IRON_CHAIN: BlockDefinition = const_block! {
+pub static IRON_CHAIN: BlockDefinition = const_block! {
     identifier: block_id::IRON_CHAIN,
     states: [PILLAR_AXIS],
     components: [

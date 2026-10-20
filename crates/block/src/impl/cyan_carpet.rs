@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use glam::Vec3;
 
-pub const CYAN_CARPET: BlockDefinition = const_block! {
+pub static CYAN_CARPET: BlockDefinition = const_block! {
     identifier: block_id::CYAN_CARPET,
     states: [],
     components: [

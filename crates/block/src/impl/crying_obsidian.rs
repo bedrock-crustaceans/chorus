@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 
-pub const CRYING_OBSIDIAN: BlockDefinition = const_block! {
+pub static CRYING_OBSIDIAN: BlockDefinition = const_block! {
     identifier: block_id::CRYING_OBSIDIAN,
     states: [],
     components: [

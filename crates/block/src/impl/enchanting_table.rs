@@ -9,7 +9,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use glam::Vec3;
 
-pub const ENCHANTING_TABLE: BlockDefinition = const_block! {
+pub static ENCHANTING_TABLE: BlockDefinition = const_block! {
     identifier: block_id::ENCHANTING_TABLE,
     states: [],
     components: [

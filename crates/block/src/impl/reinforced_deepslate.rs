@@ -3,7 +3,7 @@ use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
 use crate::const_block;
 
-pub const REINFORCED_DEEPSLATE: BlockDefinition = const_block! {
+pub static REINFORCED_DEEPSLATE: BlockDefinition = const_block! {
     identifier: block_id::REINFORCED_DEEPSLATE,
     states: [],
     components: [

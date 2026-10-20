@@ -9,7 +9,7 @@ use crate::state::common::MINECRAFT_VERTICAL_HALF;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const ANDESITE_SLAB: BlockDefinition = const_block! {
+pub static ANDESITE_SLAB: BlockDefinition = const_block! {
     identifier: block_id::ANDESITE_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [

@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::EXPLODE_BIT;
 
-pub const UNDERWATER_TNT: BlockDefinition = const_block! {
+pub static UNDERWATER_TNT: BlockDefinition = const_block! {
     identifier: block_id::UNDERWATER_TNT,
     states: [EXPLODE_BIT],
     components: [

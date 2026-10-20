@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{HANGING, PROPAGULE_STAGE};
 
-pub const MANGROVE_PROPAGULE: BlockDefinition = const_block! {
+pub static MANGROVE_PROPAGULE: BlockDefinition = const_block! {
     identifier: block_id::MANGROVE_PROPAGULE,
     states: [HANGING, PROPAGULE_STAGE],
     components: [

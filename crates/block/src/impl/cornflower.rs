@@ -10,7 +10,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const CORNFLOWER: BlockDefinition = const_block! {
+pub static CORNFLOWER: BlockDefinition = const_block! {
     identifier: block_id::CORNFLOWER,
     states: [],
     components: [

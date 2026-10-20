@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const CHISELED_CINNABAR: BlockDefinition = const_block! {
+pub static CHISELED_CINNABAR: BlockDefinition = const_block! {
     identifier: block_id::CHISELED_CINNABAR,
     states: [],
     components: [

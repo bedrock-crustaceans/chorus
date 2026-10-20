@@ -9,7 +9,7 @@ use crate::const_block;
 use crate::state::common::MINECRAFT_CARDINAL_DIRECTION;
 use glam::Vec3;
 
-pub const WAXED_OXIDIZED_COPPER_CHEST: BlockDefinition = const_block! {
+pub static WAXED_OXIDIZED_COPPER_CHEST: BlockDefinition = const_block! {
     identifier: block_id::WAXED_OXIDIZED_COPPER_CHEST,
     states: [MINECRAFT_CARDINAL_DIRECTION],
     components: [

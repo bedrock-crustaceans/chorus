@@ -9,7 +9,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const DEAD_BUBBLE_CORAL: BlockDefinition = const_block! {
+pub static DEAD_BUBBLE_CORAL: BlockDefinition = const_block! {
     identifier: block_id::DEAD_BUBBLE_CORAL,
     states: [],
     components: [

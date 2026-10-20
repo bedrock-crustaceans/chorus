@@ -12,7 +12,7 @@ use crate::state::common::VINE_DIRECTION_BITS;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const VINE: BlockDefinition = const_block! {
+pub static VINE: BlockDefinition = const_block! {
     identifier: block_id::VINE,
     states: [VINE_DIRECTION_BITS],
     components: [

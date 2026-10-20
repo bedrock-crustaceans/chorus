@@ -9,7 +9,7 @@ use crate::state::common::{DIRECTION, OPEN_BIT, UPSIDE_DOWN_BIT};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const WARPED_TRAPDOOR: BlockDefinition = const_block! {
+pub static WARPED_TRAPDOOR: BlockDefinition = const_block! {
     identifier: block_id::WARPED_TRAPDOOR,
     states: [DIRECTION, OPEN_BIT, UPSIDE_DOWN_BIT],
     components: [

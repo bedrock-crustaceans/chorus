@@ -8,7 +8,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const POWDER_SNOW: BlockDefinition = const_block! {
+pub static POWDER_SNOW: BlockDefinition = const_block! {
     identifier: block_id::POWDER_SNOW,
     states: [],
     components: [

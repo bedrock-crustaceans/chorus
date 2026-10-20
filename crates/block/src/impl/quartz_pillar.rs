@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const QUARTZ_PILLAR: BlockDefinition = const_block! {
+pub static QUARTZ_PILLAR: BlockDefinition = const_block! {
     identifier: block_id::QUARTZ_PILLAR,
     states: [PILLAR_AXIS],
     components: [

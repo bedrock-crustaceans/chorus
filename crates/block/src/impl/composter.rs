@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::COMPOSTER_FILL_LEVEL;
 
-pub const COMPOSTER: BlockDefinition = const_block! {
+pub static COMPOSTER: BlockDefinition = const_block! {
     identifier: block_id::COMPOSTER,
     states: [COMPOSTER_FILL_LEVEL],
     components: [

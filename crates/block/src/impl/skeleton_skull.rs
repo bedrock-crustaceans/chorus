@@ -10,7 +10,7 @@ use crate::state::common::FACING_DIRECTION;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const SKELETON_SKULL: BlockDefinition = const_block! {
+pub static SKELETON_SKULL: BlockDefinition = const_block! {
     identifier: block_id::SKELETON_SKULL,
     states: [FACING_DIRECTION],
     components: [

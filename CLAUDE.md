@@ -115,7 +115,7 @@ A command is a const `CommandDefinition` built with `CommandDefinition::new(name
 
 `BlockDefinition` (`crates/block/src/block_definition.rs`) declares a block's identifier, states (combinatorial state values), base components, and conditional permutation overrides. `BlockDefinition::generate()` expands all permutations, computes FNV hashes, and returns maps from hash → `BlockPermutation` and hash → `BlockComponents`.
 
-Use the `const_block!` / `const_permutation!` macros for compile-time static definitions (see `crates/block/src/impl/grass_block.rs` for a minimal example). Runtime-allocated definitions use `BlockDefinition::new(...)`. All vanilla blocks are hand-written consts under `crates/block/src/impl/` and collected in `DEFINITIONS`.
+Use the `const_block!` / `const_permutation!` macros for compile-time static definitions (see `crates/block/src/impl/grass_block.rs` for a minimal example). Runtime-allocated definitions use `BlockDefinition::new(...)`. All vanilla blocks are hand-written `static`s under `crates/block/src/impl/` and collected in `DEFINITIONS`. Definitions (blocks, block states, commands) are `static`s and are passed around by reference.
 
 `BlockRegistry` (`crates/block/src/block_registry.rs`) is a Bevy `Resource`. Add new blocks by calling `registry.register_all([...])` inside `BlockRegistry::init`.
 

@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const STRIPPED_WARPED_STEM: BlockDefinition = const_block! {
+pub static STRIPPED_WARPED_STEM: BlockDefinition = const_block! {
     identifier: block_id::STRIPPED_WARPED_STEM,
     states: [PILLAR_AXIS],
     components: [

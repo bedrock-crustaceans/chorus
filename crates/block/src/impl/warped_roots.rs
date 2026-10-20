@@ -11,7 +11,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const WARPED_ROOTS: BlockDefinition = const_block! {
+pub static WARPED_ROOTS: BlockDefinition = const_block! {
     identifier: block_id::WARPED_ROOTS,
     states: [],
     components: [

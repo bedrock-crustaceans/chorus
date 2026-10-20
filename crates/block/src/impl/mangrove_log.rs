@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::state::common::PILLAR_AXIS;
 use crate::{const_block, const_permutation};
 
-pub const MANGROVE_LOG: BlockDefinition = const_block! {
+pub static MANGROVE_LOG: BlockDefinition = const_block! {
     identifier: block_id::MANGROVE_LOG,
     states: [PILLAR_AXIS],
     components: [

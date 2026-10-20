@@ -10,7 +10,7 @@ use crate::const_block;
 use crate::state::common::RAIL_DIRECTION_10;
 use glam::Vec3;
 
-pub const RAIL: BlockDefinition = const_block! {
+pub static RAIL: BlockDefinition = const_block! {
     identifier: block_id::RAIL,
     states: [RAIL_DIRECTION_10],
     components: [

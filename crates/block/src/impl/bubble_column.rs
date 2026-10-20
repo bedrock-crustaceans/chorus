@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::DRAG_DOWN;
 
-pub const BUBBLE_COLUMN: BlockDefinition = const_block! {
+pub static BUBBLE_COLUMN: BlockDefinition = const_block! {
     identifier: block_id::BUBBLE_COLUMN,
     states: [DRAG_DOWN],
     components: [

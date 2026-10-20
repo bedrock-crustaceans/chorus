@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const PALE_MOSS_BLOCK: BlockDefinition = const_block! {
+pub static PALE_MOSS_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::PALE_MOSS_BLOCK,
     states: [],
     components: [

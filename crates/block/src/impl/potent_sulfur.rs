@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::POTENT_SULFUR_STATE;
 
-pub const POTENT_SULFUR: BlockDefinition = const_block! {
+pub static POTENT_SULFUR: BlockDefinition = const_block! {
     identifier: block_id::POTENT_SULFUR,
     states: [POTENT_SULFUR_STATE],
     components: [

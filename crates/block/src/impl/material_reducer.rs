@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::DIRECTION;
 
-pub const MATERIAL_REDUCER: BlockDefinition = const_block! {
+pub static MATERIAL_REDUCER: BlockDefinition = const_block! {
     identifier: block_id::MATERIAL_REDUCER,
     states: [DIRECTION],
     components: [

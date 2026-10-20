@@ -10,7 +10,7 @@ use crate::const_block;
 use crate::state::common::{WALL_CONNECTION_TYPE_EAST, WALL_CONNECTION_TYPE_NORTH, WALL_CONNECTION_TYPE_SOUTH, WALL_CONNECTION_TYPE_WEST, WALL_POST_BIT};
 use glam::Vec3;
 
-pub const POLISHED_SULFUR_WALL: BlockDefinition = const_block! {
+pub static POLISHED_SULFUR_WALL: BlockDefinition = const_block! {
     identifier: block_id::POLISHED_SULFUR_WALL,
     states: [WALL_CONNECTION_TYPE_EAST, WALL_CONNECTION_TYPE_NORTH, WALL_CONNECTION_TYPE_SOUTH, WALL_CONNECTION_TYPE_WEST, WALL_POST_BIT],
     components: [

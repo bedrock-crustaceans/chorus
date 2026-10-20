@@ -5,7 +5,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const VERDANT_FROGLIGHT: BlockDefinition = const_block! {
+pub static VERDANT_FROGLIGHT: BlockDefinition = const_block! {
     identifier: block_id::VERDANT_FROGLIGHT,
     states: [PILLAR_AXIS],
     components: [

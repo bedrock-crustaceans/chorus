@@ -9,7 +9,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{AGE_BIT, BAMBOO_LEAF_SIZE, BAMBOO_STALK_THICKNESS};
 
-pub const BAMBOO: BlockDefinition = const_block! {
+pub static BAMBOO: BlockDefinition = const_block! {
     identifier: block_id::BAMBOO,
     states: [AGE_BIT, BAMBOO_LEAF_SIZE, BAMBOO_STALK_THICKNESS],
     components: [

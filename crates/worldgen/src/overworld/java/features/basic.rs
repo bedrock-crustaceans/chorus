@@ -44,9 +44,9 @@ impl SimpleBlock {
 }
 
 fn upper_half(blocks: &Blocks, lower: BlockId) -> Option<BlockId> {
-    match (blocks.state(lower, UPPER_BLOCK_BIT), blocks.text(lower, SEA_GRASS_TYPE)) {
-        (Some(BlockState::Bool(false)), _) => Some(blocks.with(lower, state(UPPER_BLOCK_BIT, flag(true)))),
-        (_, Some("double_bot")) => Some(blocks.with(lower, state(SEA_GRASS_TYPE, text("double_top")))),
+    match (blocks.state(lower, &UPPER_BLOCK_BIT), blocks.text(lower, &SEA_GRASS_TYPE)) {
+        (Some(BlockState::Bool(false)), _) => Some(blocks.with(lower, state(&UPPER_BLOCK_BIT, flag(true)))),
+        (_, Some("double_bot")) => Some(blocks.with(lower, state(&SEA_GRASS_TYPE, text("double_top")))),
         _ => None,
     }
 }

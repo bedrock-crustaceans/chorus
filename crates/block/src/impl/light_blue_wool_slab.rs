@@ -10,7 +10,7 @@ use crate::state::common::MINECRAFT_VERTICAL_HALF;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const LIGHT_BLUE_WOOL_SLAB: BlockDefinition = const_block! {
+pub static LIGHT_BLUE_WOOL_SLAB: BlockDefinition = const_block! {
     identifier: block_id::LIGHT_BLUE_WOOL_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [

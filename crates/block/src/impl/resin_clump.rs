@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::MULTI_FACE_DIRECTION_BITS;
 
-pub const RESIN_CLUMP: BlockDefinition = const_block! {
+pub static RESIN_CLUMP: BlockDefinition = const_block! {
     identifier: block_id::RESIN_CLUMP,
     states: [MULTI_FACE_DIRECTION_BITS],
     components: [

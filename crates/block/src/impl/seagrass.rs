@@ -12,7 +12,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::SEA_GRASS_TYPE;
 
-pub const SEAGRASS: BlockDefinition = const_block! {
+pub static SEAGRASS: BlockDefinition = const_block! {
     identifier: block_id::SEAGRASS,
     states: [SEA_GRASS_TYPE],
     components: [

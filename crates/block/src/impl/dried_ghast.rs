@@ -6,7 +6,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{MINECRAFT_CARDINAL_DIRECTION, REHYDRATION_LEVEL};
 
-pub const DRIED_GHAST: BlockDefinition = const_block! {
+pub static DRIED_GHAST: BlockDefinition = const_block! {
     identifier: block_id::DRIED_GHAST,
     states: [MINECRAFT_CARDINAL_DIRECTION, REHYDRATION_LEVEL],
     components: [

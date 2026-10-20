@@ -5,7 +5,7 @@ use chorus_core::permission::PermissionLevel;
 
 const PAGE_SIZE: usize = 7;
 
-pub const HELP_COMMAND: CommandDefinition = CommandDefinition::new("help", "Lists commands or shows how to use one", |context, args| {
+pub static HELP_COMMAND: CommandDefinition = CommandDefinition::new("help", "Lists commands or shows how to use one", |context, args| {
     let level = context.permission_level();
     let registry = context.registry();
 

@@ -10,7 +10,7 @@ use crate::state::common::{CAULDRON_LIQUID, FILL_LEVEL};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const CAULDRON: BlockDefinition = const_block! {
+pub static CAULDRON: BlockDefinition = const_block! {
     identifier: block_id::CAULDRON,
     states: [CAULDRON_LIQUID, FILL_LEVEL],
     components: [

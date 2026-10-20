@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::{MINECRAFT_CARDINAL_DIRECTION, POWERED_BIT, POWERED_SHELF_TYPE};
 
-pub const JUNGLE_SHELF: BlockDefinition = const_block! {
+pub static JUNGLE_SHELF: BlockDefinition = const_block! {
     identifier: block_id::JUNGLE_SHELF,
     states: [MINECRAFT_CARDINAL_DIRECTION, POWERED_BIT, POWERED_SHELF_TYPE],
     components: [

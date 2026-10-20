@@ -6,7 +6,7 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::state::common::{CREAKING_HEART_STATE, NATURAL, PILLAR_AXIS};
 use crate::{const_block, const_permutation};
 
-pub const CREAKING_HEART: BlockDefinition = const_block! {
+pub static CREAKING_HEART: BlockDefinition = const_block! {
     identifier: block_id::CREAKING_HEART,
     states: [CREAKING_HEART_STATE, NATURAL, PILLAR_AXIS],
     components: [

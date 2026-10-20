@@ -7,7 +7,7 @@ use bedrock::protocol::v2168::packets::TransferPlayerPacket;
 use chorus_core::permission::PermissionLevel;
 use chorus_core::protocol::BedrockProtocol;
 
-pub const TRANSFER_COMMAND: CommandDefinition = CommandDefinition::new("transfer", "Transfers a player to another server", |context, args| {
+pub static TRANSFER_COMMAND: CommandDefinition = CommandDefinition::new("transfer", "Transfers a player to another server", |context, args| {
     let name = args.string("pfidOrMsa").unwrap_or_default();
 
     let world = context.world_mut();

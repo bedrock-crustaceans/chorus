@@ -12,7 +12,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::state::common::GROWTH;
 use crate::{const_block, const_permutation};
 
-pub const SWEET_BERRY_BUSH: BlockDefinition = const_block! {
+pub static SWEET_BERRY_BUSH: BlockDefinition = const_block! {
     identifier: block_id::SWEET_BERRY_BUSH,
     states: [GROWTH],
     components: [

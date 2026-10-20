@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{GROWTH, MINECRAFT_CARDINAL_DIRECTION};
 
-pub const LEAF_LITTER: BlockDefinition = const_block! {
+pub static LEAF_LITTER: BlockDefinition = const_block! {
     identifier: block_id::LEAF_LITTER,
     states: [GROWTH, MINECRAFT_CARDINAL_DIRECTION],
     components: [

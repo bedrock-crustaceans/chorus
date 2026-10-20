@@ -8,7 +8,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::AGE_6;
 
-pub const CHORUS_FLOWER: BlockDefinition = const_block! {
+pub static CHORUS_FLOWER: BlockDefinition = const_block! {
     identifier: block_id::CHORUS_FLOWER,
     states: [AGE_6],
     components: [

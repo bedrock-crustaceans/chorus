@@ -10,7 +10,7 @@ use crate::state::common::FACING_DIRECTION;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const CREEPER_HEAD: BlockDefinition = const_block! {
+pub static CREEPER_HEAD: BlockDefinition = const_block! {
     identifier: block_id::CREEPER_HEAD,
     states: [FACING_DIRECTION],
     components: [

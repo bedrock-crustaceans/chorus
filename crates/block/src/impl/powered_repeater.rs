@@ -11,7 +11,7 @@ use crate::const_block;
 use crate::state::common::{MINECRAFT_CARDINAL_DIRECTION, REPEATER_DELAY};
 use glam::Vec3;
 
-pub const POWERED_REPEATER: BlockDefinition = const_block! {
+pub static POWERED_REPEATER: BlockDefinition = const_block! {
     identifier: block_id::POWERED_REPEATER,
     states: [MINECRAFT_CARDINAL_DIRECTION, REPEATER_DELAY],
     components: [

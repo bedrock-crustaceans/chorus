@@ -240,8 +240,8 @@ pub fn segmented(table: &mut BlockTable, name: &'static str, min: i32, max: i32)
     let mut states = Vec::new();
     for amount in min..=max {
         for direction in Direction::HORIZONTAL {
-            let facing = state(MINECRAFT_CARDINAL_DIRECTION, text(direction.name()));
-            states.push((table.get(name, &[state(GROWTH, int(amount - 1)), facing]), 1));
+            let facing = state(&MINECRAFT_CARDINAL_DIRECTION, text(direction.name()));
+            states.push((table.get(name, &[state(&GROWTH, int(amount - 1)), facing]), 1));
         }
     }
     states
@@ -251,8 +251,8 @@ const DOUBLE_PLANTS: &[&str] = &[SUNFLOWER, LILAC, ROSE_BUSH, PEONY, TALL_GRASS,
 
 fn plant(table: &mut BlockTable, name: &'static str) -> BlockId {
     if DOUBLE_PLANTS.contains(&name) {
-        table.get(name, &[state(UPPER_BLOCK_BIT, flag(true))]);
-        table.get(name, &[state(UPPER_BLOCK_BIT, flag(false))])
+        table.get(name, &[state(&UPPER_BLOCK_BIT, flag(true))]);
+        table.get(name, &[state(&UPPER_BLOCK_BIT, flag(false))])
     } else {
         table.name(name)
     }
@@ -301,7 +301,7 @@ fn bamboo(table: &mut BlockTable, probability: f32) -> Feature {
     let stalk = |table: &mut BlockTable, leaves: &'static str, aged: bool| {
         table.get(
             BAMBOO,
-            &[state(BAMBOO_STALK_THICKNESS, text("thick")), state(BAMBOO_LEAF_SIZE, text(leaves)), state(AGE_BIT, flag(aged))],
+            &[state(&BAMBOO_STALK_THICKNESS, text("thick")), state(&BAMBOO_LEAF_SIZE, text(leaves)), state(&AGE_BIT, flag(aged))],
         )
     };
     Feature::Bamboo(Bamboo {
@@ -392,7 +392,7 @@ fn random_selector(features: Vec<(Placed, f32)>, default: Placed) -> Feature {
 
 pub fn vines(table: &mut BlockTable) -> Feature {
     Feature::Vines(Vines {
-        faces: [Direction::Up, Direction::North, Direction::South, Direction::West, Direction::East].map(|face| table.get(VINE, &[state(VINE_DIRECTION_BITS, int(vine_bit(face)))])),
+        faces: [Direction::Up, Direction::North, Direction::South, Direction::West, Direction::East].map(|face| table.get(VINE, &[state(&VINE_DIRECTION_BITS, int(vine_bit(face)))])),
     })
 }
 
@@ -598,7 +598,7 @@ pub fn define(key: Key, table: &mut BlockTable) -> Option<Placed> {
         Key::PatchBerryCommon | Key::PatchBerryRare => {
             let rarity = if key == Key::PatchBerryCommon { 32 } else { 384 };
             (
-                simple(table.get(SWEET_BERRY_BUSH, &[state(GROWTH, int(3))])),
+                simple(table.get(SWEET_BERRY_BUSH, &[state(&GROWTH, int(3))])),
                 with(surface(rarity, WorldSurfaceWg), patch(96, 7, 3, on_grass(table))),
             )
         }

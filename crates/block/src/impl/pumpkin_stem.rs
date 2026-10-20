@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{FACING_DIRECTION, GROWTH};
 
-pub const PUMPKIN_STEM: BlockDefinition = const_block! {
+pub static PUMPKIN_STEM: BlockDefinition = const_block! {
     identifier: block_id::PUMPKIN_STEM,
     states: [FACING_DIRECTION, GROWTH],
     components: [

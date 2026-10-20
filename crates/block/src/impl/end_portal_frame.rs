@@ -11,7 +11,7 @@ use crate::state::common::{END_PORTAL_EYE_BIT, MINECRAFT_CARDINAL_DIRECTION};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const END_PORTAL_FRAME: BlockDefinition = const_block! {
+pub static END_PORTAL_FRAME: BlockDefinition = const_block! {
     identifier: block_id::END_PORTAL_FRAME,
     states: [END_PORTAL_EYE_BIT, MINECRAFT_CARDINAL_DIRECTION],
     components: [

@@ -11,7 +11,7 @@ use crate::const_block;
 use crate::state::common::{STABILITY, STABILITY_CHECK};
 use glam::Vec3;
 
-pub const SCAFFOLDING: BlockDefinition = const_block! {
+pub static SCAFFOLDING: BlockDefinition = const_block! {
     identifier: block_id::SCAFFOLDING,
     states: [STABILITY, STABILITY_CHECK],
     components: [

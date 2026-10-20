@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const BAMBOO_BLOCK: BlockDefinition = const_block! {
+pub static BAMBOO_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::BAMBOO_BLOCK,
     states: [PILLAR_AXIS],
     components: [

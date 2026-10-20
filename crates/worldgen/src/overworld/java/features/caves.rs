@@ -455,13 +455,13 @@ fn cluster(table: &mut BlockTable, base: &'static str, pointed: &'static str, re
 fn cave_vines(table: &mut BlockTable, body_height: IntProvider) -> Feature {
     let body = StateProvider::Weighted(vec![(table.name(CAVE_VINES), 4), (table.name(CAVE_VINES_BODY_WITH_BERRIES), 1)]);
     for age in 23..=25 {
-        table.get(CAVE_VINES, &[state(GROWING_PLANT_AGE, int(age))]);
-        table.get(CAVE_VINES_HEAD_WITH_BERRIES, &[state(GROWING_PLANT_AGE, int(age))]);
+        table.get(CAVE_VINES, &[state(&GROWING_PLANT_AGE, int(age))]);
+        table.get(CAVE_VINES_HEAD_WITH_BERRIES, &[state(&GROWING_PLANT_AGE, int(age))]);
     }
     let head_source = StateProvider::Weighted(vec![(table.name(CAVE_VINES), 4), (table.name(CAVE_VINES_HEAD_WITH_BERRIES), 1)]);
     let head = StateProvider::RandomizedInt {
         source: Box::new(head_source),
-        property: key(GROWING_PLANT_AGE),
+        property: key(&GROWING_PLANT_AGE),
         values: IntProvider::Uniform(23, 25),
     };
     Feature::BlockColumn(BlockColumn {
@@ -499,9 +499,9 @@ fn moss_patch(table: &mut BlockTable, ceiling: bool) -> Feature {
 fn dripleaf(table: &mut BlockTable) -> Feature {
     let mut small = Vec::new();
     for direction in [Direction::East, Direction::West, Direction::North, Direction::South] {
-        let facing = state(MINECRAFT_CARDINAL_DIRECTION, text(direction.name()));
-        let upper = table.get(SMALL_DRIPLEAF_BLOCK, &[facing.clone(), state(UPPER_BLOCK_BIT, flag(true))]);
-        let lower = table.get(SMALL_DRIPLEAF_BLOCK, &[facing, state(UPPER_BLOCK_BIT, flag(false))]);
+        let facing = state(&MINECRAFT_CARDINAL_DIRECTION, text(direction.name()));
+        let upper = table.get(SMALL_DRIPLEAF_BLOCK, &[facing.clone(), state(&UPPER_BLOCK_BIT, flag(true))]);
+        let lower = table.get(SMALL_DRIPLEAF_BLOCK, &[facing, state(&UPPER_BLOCK_BIT, flag(false))]);
         table.flooded(upper);
         table.flooded(lower);
         small.push((lower, 1));
@@ -509,7 +509,7 @@ fn dripleaf(table: &mut BlockTable) -> Feature {
     let mut features = vec![Placed::new(simple(StateProvider::Weighted(small)), Vec::new())];
     for direction in [Direction::East, Direction::West, Direction::South, Direction::North] {
         let state = |table: &mut BlockTable, head: bool| {
-            let dry = table.get(BIG_DRIPLEAF, &[state(BIG_DRIPLEAF_HEAD, flag(head)), state(MINECRAFT_CARDINAL_DIRECTION, text(direction.name()))]);
+            let dry = table.get(BIG_DRIPLEAF, &[state(&BIG_DRIPLEAF_HEAD, flag(head)), state(&MINECRAFT_CARDINAL_DIRECTION, text(direction.name()))]);
             table.flooded(dry);
             dry
         };
@@ -567,7 +567,7 @@ fn geode(table: &mut BlockTable, seed: i64) -> Feature {
         .iter()
         .map(|name| {
             Direction::ALL.map(|direction| {
-                let dry = table.get(name, &[state(MINECRAFT_BLOCK_FACE, text(direction.name()))]);
+                let dry = table.get(name, &[state(&MINECRAFT_BLOCK_FACE, text(direction.name()))]);
                 [dry, table.flooded(dry)]
             })
         })
@@ -599,7 +599,7 @@ fn sculk_patch(table: &mut BlockTable) -> Feature {
             sensor
         },
         shrieker: {
-            let shrieker = table.get(SCULK_SHRIEKER, &[state(CAN_SUMMON, flag(true))]);
+            let shrieker = table.get(SCULK_SHRIEKER, &[state(&CAN_SUMMON, flag(true))]);
             table.flooded(shrieker);
             shrieker
         },
@@ -652,7 +652,7 @@ pub fn define(key: Key, table: &mut BlockTable, seed: i64) -> Option<Placed> {
                 air: table.name(AIR),
                 cobblestone: table.name(COBBLESTONE),
                 mossy: table.name(MOSSY_COBBLESTONE),
-                chests: Direction::HORIZONTAL.map(|d| table.get(CHEST, &[state(MINECRAFT_CARDINAL_DIRECTION, text(d.name()))])),
+                chests: Direction::HORIZONTAL.map(|d| table.get(CHEST, &[state(&MINECRAFT_CARDINAL_DIRECTION, text(d.name()))])),
                 spawner: table.name(MOB_SPAWNER),
                 chest_kind: table.kind(CHEST),
                 spawner_kind: table.kind(MOB_SPAWNER),

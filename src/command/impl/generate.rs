@@ -6,7 +6,7 @@ use crate::level::{DimensionId, Level};
 use crate::server::pregen::{MAX_CHUNKS, Pregen};
 use chorus_core::permission::PermissionLevel;
 
-pub const GENERATE_COMMAND: CommandDefinition = CommandDefinition::new("generate", "Pregenerates chunks around you or in a rectangle", |context, args| {
+pub static GENERATE_COMMAND: CommandDefinition = CommandDefinition::new("generate", "Pregenerates chunks around you or in a rectangle", |context, args| {
     if args.has("stop") {
         let pregen = context.world_mut().remove_resource::<Pregen>().ok_or("nothing is being pregenerated")?;
         context.reply(format!("Stopped pregenerating at {}", pregen.progress()));

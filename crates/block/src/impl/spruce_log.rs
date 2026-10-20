@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::state::common::PILLAR_AXIS;
 use crate::{const_block, const_permutation};
 
-pub const SPRUCE_LOG: BlockDefinition = const_block! {
+pub static SPRUCE_LOG: BlockDefinition = const_block! {
     identifier: block_id::SPRUCE_LOG,
     states: [PILLAR_AXIS],
     components: [

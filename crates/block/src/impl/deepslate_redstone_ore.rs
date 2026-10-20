@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const DEEPSLATE_REDSTONE_ORE: BlockDefinition = const_block! {
+pub static DEEPSLATE_REDSTONE_ORE: BlockDefinition = const_block! {
     identifier: block_id::DEEPSLATE_REDSTONE_ORE,
     states: [],
     components: [

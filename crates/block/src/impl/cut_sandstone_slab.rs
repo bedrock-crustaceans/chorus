@@ -9,7 +9,7 @@ use crate::state::common::MINECRAFT_VERTICAL_HALF;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const CUT_SANDSTONE_SLAB: BlockDefinition = const_block! {
+pub static CUT_SANDSTONE_SLAB: BlockDefinition = const_block! {
     identifier: block_id::CUT_SANDSTONE_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [

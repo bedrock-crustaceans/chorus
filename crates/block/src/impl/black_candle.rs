@@ -12,7 +12,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::state::common::{CANDLES, LIT};
 use crate::{const_block, const_permutation};
 
-pub const BLACK_CANDLE: BlockDefinition = const_block! {
+pub static BLACK_CANDLE: BlockDefinition = const_block! {
     identifier: block_id::BLACK_CANDLE,
     states: [CANDLES, LIT],
     components: [

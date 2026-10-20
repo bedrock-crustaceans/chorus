@@ -8,7 +8,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const LIGHT_BLUE_SHULKER_BOX: BlockDefinition = const_block! {
+pub static LIGHT_BLUE_SHULKER_BOX: BlockDefinition = const_block! {
     identifier: block_id::LIGHT_BLUE_SHULKER_BOX,
     states: [],
     components: [

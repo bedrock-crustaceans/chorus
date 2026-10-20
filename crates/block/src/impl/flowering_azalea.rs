@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const FLOWERING_AZALEA: BlockDefinition = const_block! {
+pub static FLOWERING_AZALEA: BlockDefinition = const_block! {
     identifier: block_id::FLOWERING_AZALEA,
     states: [],
     components: [

@@ -9,7 +9,7 @@ use crate::state::common::{IN_WALL_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const CRIMSON_FENCE_GATE: BlockDefinition = const_block! {
+pub static CRIMSON_FENCE_GATE: BlockDefinition = const_block! {
     identifier: block_id::CRIMSON_FENCE_GATE,
     states: [IN_WALL_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT],
     components: [

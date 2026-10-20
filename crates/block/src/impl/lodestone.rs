@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 
-pub const LODESTONE: BlockDefinition = const_block! {
+pub static LODESTONE: BlockDefinition = const_block! {
     identifier: block_id::LODESTONE,
     states: [],
     components: [

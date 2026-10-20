@@ -9,7 +9,7 @@ use crate::state::common::{DIRECTION, OPEN_BIT, UPSIDE_DOWN_BIT};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const BIRCH_TRAPDOOR: BlockDefinition = const_block! {
+pub static BIRCH_TRAPDOOR: BlockDefinition = const_block! {
     identifier: block_id::BIRCH_TRAPDOOR,
     states: [DIRECTION, OPEN_BIT, UPSIDE_DOWN_BIT],
     components: [

@@ -10,7 +10,7 @@ use crate::state::common::{IN_WALL_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const PALE_OAK_FENCE_GATE: BlockDefinition = const_block! {
+pub static PALE_OAK_FENCE_GATE: BlockDefinition = const_block! {
     identifier: block_id::PALE_OAK_FENCE_GATE,
     states: [IN_WALL_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT],
     components: [

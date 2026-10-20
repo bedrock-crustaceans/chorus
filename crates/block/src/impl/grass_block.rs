@@ -4,7 +4,7 @@ use crate::component::loot_component::LootComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const GRASS_BLOCK: BlockDefinition = const_block! {
+pub static GRASS_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::GRASS_BLOCK,
     states: [],
     components: [

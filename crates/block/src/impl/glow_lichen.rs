@@ -12,7 +12,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::MULTI_FACE_DIRECTION_BITS;
 
-pub const GLOW_LICHEN: BlockDefinition = const_block! {
+pub static GLOW_LICHEN: BlockDefinition = const_block! {
     identifier: block_id::GLOW_LICHEN,
     states: [MULTI_FACE_DIRECTION_BITS],
     components: [

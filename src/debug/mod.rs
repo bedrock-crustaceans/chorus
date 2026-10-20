@@ -17,7 +17,7 @@ impl Plugin for DebugPlugin {
 
 impl DebugPlugin {
     fn register_command(mut registry: ResMut<CommandRegistry>) {
-        registry.register(DEBUG_COMMAND);
+        registry.register(&DEBUG_COMMAND);
     }
 }
 

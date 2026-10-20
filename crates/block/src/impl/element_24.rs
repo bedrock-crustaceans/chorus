@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const ELEMENT_24: BlockDefinition = const_block! {
+pub static ELEMENT_24: BlockDefinition = const_block! {
     identifier: block_id::ELEMENT_24,
     states: [],
     components: [

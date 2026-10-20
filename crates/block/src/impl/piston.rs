@@ -8,7 +8,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::FACING_DIRECTION;
 
-pub const PISTON: BlockDefinition = const_block! {
+pub static PISTON: BlockDefinition = const_block! {
     identifier: block_id::PISTON,
     states: [FACING_DIRECTION],
     components: [

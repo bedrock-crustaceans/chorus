@@ -12,7 +12,7 @@ use crate::const_block;
 use crate::state::common::REDSTONE_SIGNAL;
 use glam::Vec3;
 
-pub const PALE_OAK_PRESSURE_PLATE: BlockDefinition = const_block! {
+pub static PALE_OAK_PRESSURE_PLATE: BlockDefinition = const_block! {
     identifier: block_id::PALE_OAK_PRESSURE_PLATE,
     states: [REDSTONE_SIGNAL],
     components: [

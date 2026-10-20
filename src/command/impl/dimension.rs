@@ -4,7 +4,7 @@ use crate::level::DimensionId;
 use crate::level::level::Level;
 use chorus_core::permission::PermissionLevel;
 
-pub const DIMENSION_COMMAND: CommandDefinition = CommandDefinition::new("dimension", "Debug: moves you to another dimension at the same position", |context, args| {
+pub static DIMENSION_COMMAND: CommandDefinition = CommandDefinition::new("dimension", "Debug: moves you to another dimension at the same position", |context, args| {
     let id = args.int("id").unwrap_or_default();
     let name = context.world().resource::<Level>().dimension(id).ok_or_else(|| format!("Dimension {id} isn't registered."))?.name();
 

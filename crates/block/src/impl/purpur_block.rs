@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const PURPUR_BLOCK: BlockDefinition = const_block! {
+pub static PURPUR_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::PURPUR_BLOCK,
     states: [PILLAR_AXIS],
     components: [

@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::EXPLODE_BIT;
 
-pub const TNT: BlockDefinition = const_block! {
+pub static TNT: BlockDefinition = const_block! {
     identifier: block_id::TNT,
     states: [EXPLODE_BIT],
     components: [

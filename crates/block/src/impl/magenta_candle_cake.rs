@@ -9,7 +9,7 @@ use crate::state::common::LIT;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const MAGENTA_CANDLE_CAKE: BlockDefinition = const_block! {
+pub static MAGENTA_CANDLE_CAKE: BlockDefinition = const_block! {
     identifier: block_id::MAGENTA_CANDLE_CAKE,
     states: [LIT],
     components: [

@@ -6,7 +6,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::CRACKED_STATE;
 
-pub const SNIFFER_EGG: BlockDefinition = const_block! {
+pub static SNIFFER_EGG: BlockDefinition = const_block! {
     identifier: block_id::SNIFFER_EGG,
     states: [CRACKED_STATE],
     components: [

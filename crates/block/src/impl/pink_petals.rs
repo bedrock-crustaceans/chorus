@@ -10,7 +10,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{GROWTH, MINECRAFT_CARDINAL_DIRECTION};
 
-pub const PINK_PETALS: BlockDefinition = const_block! {
+pub static PINK_PETALS: BlockDefinition = const_block! {
     identifier: block_id::PINK_PETALS,
     states: [GROWTH, MINECRAFT_CARDINAL_DIRECTION],
     components: [

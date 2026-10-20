@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const EXPOSED_CUT_COPPER: BlockDefinition = const_block! {
+pub static EXPOSED_CUT_COPPER: BlockDefinition = const_block! {
     identifier: block_id::EXPOSED_CUT_COPPER,
     states: [],
     components: [

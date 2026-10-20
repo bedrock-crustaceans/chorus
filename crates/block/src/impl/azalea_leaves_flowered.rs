@@ -9,7 +9,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{PERSISTENT_BIT, UPDATE_BIT};
 
-pub const AZALEA_LEAVES_FLOWERED: BlockDefinition = const_block! {
+pub static AZALEA_LEAVES_FLOWERED: BlockDefinition = const_block! {
     identifier: block_id::AZALEA_LEAVES_FLOWERED,
     states: [PERSISTENT_BIT, UPDATE_BIT],
     components: [

@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::{FACING_DIRECTION, TRIGGERED_BIT};
 
-pub const DISPENSER: BlockDefinition = const_block! {
+pub static DISPENSER: BlockDefinition = const_block! {
     identifier: block_id::DISPENSER,
     states: [FACING_DIRECTION, TRIGGERED_BIT],
     components: [

@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const WARPED_HYPHAE: BlockDefinition = const_block! {
+pub static WARPED_HYPHAE: BlockDefinition = const_block! {
     identifier: block_id::WARPED_HYPHAE,
     states: [PILLAR_AXIS],
     components: [

@@ -13,9 +13,9 @@ use chorus_block::state::common::{
 };
 
 pub fn log(table: &mut BlockTable, name: &'static str) -> BlockId {
-    table.get(name, &[state(PILLAR_AXIS, text("x"))]);
-    table.get(name, &[state(PILLAR_AXIS, text("z"))]);
-    table.get(name, &[state(PILLAR_AXIS, text("y"))])
+    table.get(name, &[state(&PILLAR_AXIS, text("x"))]);
+    table.get(name, &[state(&PILLAR_AXIS, text("z"))]);
+    table.get(name, &[state(&PILLAR_AXIS, text("y"))])
 }
 
 pub fn leaves(table: &mut BlockTable, name: &'static str) -> BlockId {
@@ -25,7 +25,7 @@ pub fn leaves(table: &mut BlockTable, name: &'static str) -> BlockId {
 }
 
 fn vines(table: &mut BlockTable) -> [BlockId; 4] {
-    [Direction::East, Direction::West, Direction::South, Direction::North].map(|face| table.get(VINE, &[state(VINE_DIRECTION_BITS, int(vine_bit(face)))]))
+    [Direction::East, Direction::West, Direction::South, Direction::North].map(|face| table.get(VINE, &[state(&VINE_DIRECTION_BITS, int(vine_bit(face)))]))
 }
 
 fn soil_beneath_tree(table: &mut BlockTable) -> StateProvider {
@@ -171,7 +171,7 @@ fn with_decorators(mut tree: Tree, decorators: Vec<Decorator>) -> Tree {
 fn beehive(table: &mut BlockTable, probability: f32) -> Decorator {
     Decorator::Beehive {
         probability,
-        nest: table.get(BEE_NEST, &[state(DIRECTION, int(legacy_direction(Direction::South)))]),
+        nest: table.get(BEE_NEST, &[state(&DIRECTION, int(legacy_direction(Direction::South)))]),
     }
 }
 
@@ -200,7 +200,7 @@ fn shelf_mushroom(table: &mut BlockTable, probability: f32) -> Decorator {
     let mut states = Vec::new();
     for age in 0..=1 {
         for direction in Direction::HORIZONTAL {
-            states.push(table.get(SHELF_MUSHROOM, &[state(GROWTH, int(age)), state(MINECRAFT_CARDINAL_DIRECTION, text(direction.name()))]));
+            states.push(table.get(SHELF_MUSHROOM, &[state(&GROWTH, int(age)), state(&MINECRAFT_CARDINAL_DIRECTION, text(direction.name()))]));
         }
     }
     Decorator::ShelfMushroom { probability, states }
@@ -218,7 +218,7 @@ fn cocoa(table: &mut BlockTable, probability: f32) -> Decorator {
     let mut states = Vec::new();
     for age in 0..=2 {
         for direction in Direction::HORIZONTAL {
-            states.push(table.get(COCOA, &[state(AGE_3, int(age)), state(DIRECTION, int(legacy_direction(direction)))]));
+            states.push(table.get(COCOA, &[state(&AGE_3, int(age)), state(&DIRECTION, int(legacy_direction(direction)))]));
         }
     }
     Decorator::Cocoa { probability, states }
@@ -230,8 +230,8 @@ fn pale_moss(table: &mut BlockTable) -> Decorator {
         trunk: 0.4,
         ground: 0.8,
         patch: Box::new(vegetation::pale_moss_patch(table)),
-        hanging: table.get(PALE_HANGING_MOSS, &[state(TIP, flag(false))]),
-        tip: table.get(PALE_HANGING_MOSS, &[state(TIP, flag(true))]),
+        hanging: table.get(PALE_HANGING_MOSS, &[state(&TIP, flag(false))]),
+        tip: table.get(PALE_HANGING_MOSS, &[state(&TIP, flag(true))]),
     }
 }
 
@@ -263,11 +263,11 @@ fn mangrove(table: &mut BlockTable, base: i32, rand_b: i32, steps: i32, root_off
         random_skew_chance: 0.2,
     });
     for age in 0..=4 {
-        table.get(MANGROVE_PROPAGULE, &[state(PROPAGULE_STAGE, int(age)), state(HANGING, flag(true))]);
+        table.get(MANGROVE_PROPAGULE, &[state(&PROPAGULE_STAGE, int(age)), state(&HANGING, flag(true))]);
     }
     let propagule = StateProvider::RandomizedInt {
-        source: Box::new(table.get(MANGROVE_PROPAGULE, &[state(HANGING, flag(true))]).into()),
-        property: key(PROPAGULE_STAGE),
+        source: Box::new(table.get(MANGROVE_PROPAGULE, &[state(&HANGING, flag(true))]).into()),
+        property: key(&PROPAGULE_STAGE),
         values: IntProvider::Uniform(0, 4),
     };
     tree.decorators = vec![
@@ -322,8 +322,8 @@ fn cap_bits(index: usize) -> i32 {
 
 fn huge_mushroom(table: &mut BlockTable, red: bool) -> HugeMushroom {
     let cap_name = if red { RED_MUSHROOM_BLOCK } else { BROWN_MUSHROOM_BLOCK };
-    let cap = (0..32).map(|index| table.get(cap_name, &[state(HUGE_MUSHROOM_BITS, int(cap_bits(index)))])).collect();
-    let stem = table.get(MUSHROOM_STEM, &[state(HUGE_MUSHROOM_BITS, int(STEM_SIDES))]);
+    let cap = (0..32).map(|index| table.get(cap_name, &[state(&HUGE_MUSHROOM_BITS, int(cap_bits(index)))])).collect();
+    let stem = table.get(MUSHROOM_STEM, &[state(&HUGE_MUSHROOM_BITS, int(STEM_SIDES))]);
     let tag = if red { Tag::HugeRedMushroomCanPlaceOn } else { Tag::HugeBrownMushroomCanPlaceOn };
     HugeMushroom {
         red,
@@ -438,7 +438,7 @@ impl Species {
                     pale_moss(table),
                     Decorator::CreakingHeart {
                         probability: 1.0,
-                        heart: table.get(CREAKING_HEART, &[state(CREAKING_HEART_STATE, text("dormant")), state(NATURAL, flag(true))]),
+                        heart: table.get(CREAKING_HEART, &[state(&CREAKING_HEART_STATE, text("dormant")), state(&NATURAL, flag(true))]),
                     },
                 ];
                 with_decorators(dark_oak_like(table, PALE_OAK_LOG, PALE_OAK_LEAVES), decorators)

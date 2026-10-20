@@ -9,7 +9,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const WAXED_OXIDIZED_COPPER_GRATE: BlockDefinition = const_block! {
+pub static WAXED_OXIDIZED_COPPER_GRATE: BlockDefinition = const_block! {
     identifier: block_id::WAXED_OXIDIZED_COPPER_GRATE,
     states: [],
     components: [

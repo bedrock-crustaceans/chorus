@@ -798,7 +798,7 @@ pub fn define(key: Key, table: &mut BlockTable) -> Option<Placed> {
         Key::SulfurPool => {
             let not_spike = matching(table, &[SULFUR_SPIKE]).not();
             let pool = Placed::new(lake(table, WATER, SULFUR, not_spike), Vec::new());
-            let potent = table.get(POTENT_SULFUR, &[state(POTENT_SULFUR_STATE, text("wet"))]);
+            let potent = table.get(POTENT_SULFUR, &[state(&POTENT_SULFUR_STATE, text("wet"))]);
             let scan = Modifier::EnvironmentScan {
                 direction: Direction::Down,
                 target: BlockPredicate::AllOf(vec![BlockPredicate::Solid(IVec3::ZERO), BlockPredicate::MatchingFluids(IVec3::Y, vec![Fluid::Water])]),

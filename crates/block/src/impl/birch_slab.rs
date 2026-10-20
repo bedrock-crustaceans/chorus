@@ -10,7 +10,7 @@ use crate::state::common::MINECRAFT_VERTICAL_HALF;
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const BIRCH_SLAB: BlockDefinition = const_block! {
+pub static BIRCH_SLAB: BlockDefinition = const_block! {
     identifier: block_id::BIRCH_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [

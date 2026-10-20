@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::AGE_BIT;
 
-pub const BIRCH_SAPLING: BlockDefinition = const_block! {
+pub static BIRCH_SAPLING: BlockDefinition = const_block! {
     identifier: block_id::BIRCH_SAPLING,
     states: [AGE_BIT],
     components: [

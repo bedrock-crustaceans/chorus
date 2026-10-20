@@ -11,7 +11,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::TORCH_FACING_DIRECTION;
 
-pub const REDSTONE_TORCH: BlockDefinition = const_block! {
+pub static REDSTONE_TORCH: BlockDefinition = const_block! {
     identifier: block_id::REDSTONE_TORCH,
     states: [TORCH_FACING_DIRECTION],
     components: [

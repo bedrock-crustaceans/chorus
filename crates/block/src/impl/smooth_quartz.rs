@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const SMOOTH_QUARTZ: BlockDefinition = const_block! {
+pub static SMOOTH_QUARTZ: BlockDefinition = const_block! {
     identifier: block_id::SMOOTH_QUARTZ,
     states: [PILLAR_AXIS],
     components: [

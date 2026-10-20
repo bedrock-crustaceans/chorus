@@ -90,7 +90,7 @@ fn random_horizontal(random: &mut dyn RandomSource) -> Direction {
 }
 
 fn pillar(axis: &'static str) -> State {
-    blocks::state(PILLAR_AXIS, text(axis))
+    blocks::state(&PILLAR_AXIS, text(axis))
 }
 
 fn axis_of(direction: Direction) -> &'static str {
@@ -888,7 +888,7 @@ impl Tree {
 
     fn try_place_leaf(&self, region: &mut Region, random: &mut dyn RandomSource, pos: IVec3, grown: &mut Grown) -> bool {
         let current = region.get(pos);
-        if region.blocks.flag(current, PERSISTENT_BIT) || !valid_tree_pos(region, pos) {
+        if region.blocks.flag(current, &PERSISTENT_BIT) || !valid_tree_pos(region, pos) {
             return false;
         }
         let state = self.foliage.state(region, random, pos);

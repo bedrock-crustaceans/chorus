@@ -9,7 +9,7 @@ use crate::const_block;
 use crate::state::common::{MINECRAFT_CARDINAL_DIRECTION, POWERED_BIT};
 use glam::Vec3;
 
-pub const LECTERN: BlockDefinition = const_block! {
+pub static LECTERN: BlockDefinition = const_block! {
     identifier: block_id::LECTERN,
     states: [MINECRAFT_CARDINAL_DIRECTION, POWERED_BIT],
     components: [

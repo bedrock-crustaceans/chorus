@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::const_block;
 use crate::state::common::{CRAFTING, ORIENTATION, TRIGGERED_BIT};
 
-pub const CRAFTER: BlockDefinition = const_block! {
+pub static CRAFTER: BlockDefinition = const_block! {
     identifier: block_id::CRAFTER,
     states: [CRAFTING, ORIENTATION, TRIGGERED_BIT],
     components: [

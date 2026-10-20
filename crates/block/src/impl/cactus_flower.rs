@@ -10,7 +10,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const CACTUS_FLOWER: BlockDefinition = const_block! {
+pub static CACTUS_FLOWER: BlockDefinition = const_block! {
     identifier: block_id::CACTUS_FLOWER,
     states: [],
     components: [

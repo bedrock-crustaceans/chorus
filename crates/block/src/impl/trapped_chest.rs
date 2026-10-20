@@ -9,7 +9,7 @@ use crate::const_block;
 use crate::state::common::MINECRAFT_CARDINAL_DIRECTION;
 use glam::Vec3;
 
-pub const TRAPPED_CHEST: BlockDefinition = const_block! {
+pub static TRAPPED_CHEST: BlockDefinition = const_block! {
     identifier: block_id::TRAPPED_CHEST,
     states: [MINECRAFT_CARDINAL_DIRECTION],
     components: [

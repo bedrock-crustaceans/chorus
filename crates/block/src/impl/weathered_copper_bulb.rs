@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::state::common::{LIT, POWERED_BIT};
 use crate::{const_block, const_permutation};
 
-pub const WEATHERED_COPPER_BULB: BlockDefinition = const_block! {
+pub static WEATHERED_COPPER_BULB: BlockDefinition = const_block! {
     identifier: block_id::WEATHERED_COPPER_BULB,
     states: [LIT, POWERED_BIT],
     components: [

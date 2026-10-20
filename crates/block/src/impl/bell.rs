@@ -9,7 +9,7 @@ use crate::state::common::{ATTACHMENT, DIRECTION, TOGGLE_BIT};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const BELL: BlockDefinition = const_block! {
+pub static BELL: BlockDefinition = const_block! {
     identifier: block_id::BELL,
     states: [ATTACHMENT, DIRECTION, TOGGLE_BIT],
     components: [

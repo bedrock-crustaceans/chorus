@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const CRIMSON_STEM: BlockDefinition = const_block! {
+pub static CRIMSON_STEM: BlockDefinition = const_block! {
     identifier: block_id::CRIMSON_STEM,
     states: [PILLAR_AXIS],
     components: [

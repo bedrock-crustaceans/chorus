@@ -10,7 +10,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const LILY_OF_THE_VALLEY: BlockDefinition = const_block! {
+pub static LILY_OF_THE_VALLEY: BlockDefinition = const_block! {
     identifier: block_id::LILY_OF_THE_VALLEY,
     states: [],
     components: [

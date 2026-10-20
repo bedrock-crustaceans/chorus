@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::{BOOKS_STORED, DIRECTION};
 
-pub const CHISELED_BOOKSHELF: BlockDefinition = const_block! {
+pub static CHISELED_BOOKSHELF: BlockDefinition = const_block! {
     identifier: block_id::CHISELED_BOOKSHELF,
     states: [BOOKS_STORED, DIRECTION],
     components: [

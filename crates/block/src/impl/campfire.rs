@@ -9,7 +9,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::state::common::{EXTINGUISHED, MINECRAFT_CARDINAL_DIRECTION};
 use crate::{const_block, const_permutation};
 
-pub const CAMPFIRE: BlockDefinition = const_block! {
+pub static CAMPFIRE: BlockDefinition = const_block! {
     identifier: block_id::CAMPFIRE,
     states: [EXTINGUISHED, MINECRAFT_CARDINAL_DIRECTION],
     components: [

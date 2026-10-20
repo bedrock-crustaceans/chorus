@@ -11,7 +11,7 @@ use crate::const_block;
 use crate::state::common::{CRACKED_STATE, TURTLE_EGG_COUNT};
 use glam::Vec3;
 
-pub const TURTLE_EGG: BlockDefinition = const_block! {
+pub static TURTLE_EGG: BlockDefinition = const_block! {
     identifier: block_id::TURTLE_EGG,
     states: [CRACKED_STATE, TURTLE_EGG_COUNT],
     components: [

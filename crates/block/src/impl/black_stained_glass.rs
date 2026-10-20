@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const BLACK_STAINED_GLASS: BlockDefinition = const_block! {
+pub static BLACK_STAINED_GLASS: BlockDefinition = const_block! {
     identifier: block_id::BLACK_STAINED_GLASS,
     states: [],
     components: [

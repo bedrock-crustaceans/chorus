@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 
-pub const STRUCTURE_VOID: BlockDefinition = const_block! {
+pub static STRUCTURE_VOID: BlockDefinition = const_block! {
     identifier: block_id::STRUCTURE_VOID,
     states: [],
     components: [

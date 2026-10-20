@@ -7,7 +7,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST};
 
-pub const WAXED_EXPOSED_COPPER_BARS: BlockDefinition = const_block! {
+pub static WAXED_EXPOSED_COPPER_BARS: BlockDefinition = const_block! {
     identifier: block_id::WAXED_EXPOSED_COPPER_BARS,
     states: [MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST],
     components: [

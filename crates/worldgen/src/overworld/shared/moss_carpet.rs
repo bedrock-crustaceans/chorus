@@ -23,7 +23,7 @@ struct Carpet {
 }
 
 const SIDE_NAMES: [&str; 3] = ["none", "short", "tall"];
-const SIDE_STATES: [BlockStateDefinition; 4] = [PALE_MOSS_CARPET_SIDE_NORTH, PALE_MOSS_CARPET_SIDE_EAST, PALE_MOSS_CARPET_SIDE_SOUTH, PALE_MOSS_CARPET_SIDE_WEST];
+const SIDE_STATES: [&BlockStateDefinition; 4] = [&PALE_MOSS_CARPET_SIDE_NORTH, &PALE_MOSS_CARPET_SIDE_EAST, &PALE_MOSS_CARPET_SIDE_SOUTH, &PALE_MOSS_CARPET_SIDE_WEST];
 
 impl Carpet {
     fn index(self) -> usize {
@@ -54,9 +54,9 @@ impl MossCarpet {
         let states = (0..162)
             .map(|index| {
                 let carpet = Carpet::from_index(index);
-                let mut states = vec![state(UPPER_BLOCK_BIT, flag(!carpet.base))];
+                let mut states = vec![state(&UPPER_BLOCK_BIT, flag(!carpet.base))];
                 for (definition, side) in SIDE_STATES.into_iter().zip(carpet.sides) {
-                    states.push(state(definition, text(SIDE_NAMES[side as usize])));
+                    states.push(state(&definition, text(SIDE_NAMES[side as usize])));
                 }
                 table.get(PALE_MOSS_CARPET, &states)
             })

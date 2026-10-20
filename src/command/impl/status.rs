@@ -19,7 +19,7 @@ use bevy_tasks::{AsyncComputeTaskPool, ComputeTaskPool, IoTaskPool};
 
 const SECTION: CommandEnum = CommandEnum::new("StatusSection", values!["performance", "network", "memory", "worlds", "chunks", "storage", "all"]);
 
-pub const STATUS_COMMAND: CommandDefinition = CommandDefinition::new("status", "Shows how the server is doing", |context, args| {
+pub static STATUS_COMMAND: CommandDefinition = CommandDefinition::new("status", "Shows how the server is doing", |context, args| {
     let sections: &[Section] = match args.string("section") {
         None => &[Section::Summary],
         Some("all") => &[Section::Performance, Section::Network, Section::Memory, Section::Worlds, Section::Chunks, Section::Storage],

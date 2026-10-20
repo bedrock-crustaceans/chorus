@@ -30,7 +30,7 @@ impl MultifaceStates {
         let mut masks = HashMap::new();
         for mask in 0u8..128 {
             let bits = Direction::ALL.iter().filter(|&&d| mask & face_bit(d) != 0).map(|&d| multiface_bit(d)).sum();
-            let dry = table.get(name, &[state(MULTI_FACE_DIRECTION_BITS, int(bits))]);
+            let dry = table.get(name, &[state(&MULTI_FACE_DIRECTION_BITS, int(bits))]);
             let id = if mask & WATERLOGGED_BIT != 0 { table.flooded(dry) } else { dry };
             states.push(id);
             masks.insert(id, mask);

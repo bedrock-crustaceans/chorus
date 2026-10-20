@@ -7,7 +7,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST};
 
-pub const BROWN_STAINED_GLASS_PANE: BlockDefinition = const_block! {
+pub static BROWN_STAINED_GLASS_PANE: BlockDefinition = const_block! {
     identifier: block_id::BROWN_STAINED_GLASS_PANE,
     states: [MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST],
     components: [

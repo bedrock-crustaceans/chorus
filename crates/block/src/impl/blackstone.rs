@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const BLACKSTONE: BlockDefinition = const_block! {
+pub static BLACKSTONE: BlockDefinition = const_block! {
     identifier: block_id::BLACKSTONE,
     states: [],
     components: [

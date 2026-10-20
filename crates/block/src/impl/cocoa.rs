@@ -10,7 +10,7 @@ use crate::state::common::{AGE_3, DIRECTION};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const COCOA: BlockDefinition = const_block! {
+pub static COCOA: BlockDefinition = const_block! {
     identifier: block_id::COCOA,
     states: [AGE_3, DIRECTION],
     components: [

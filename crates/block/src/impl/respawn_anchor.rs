@@ -7,7 +7,7 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::state::common::RESPAWN_ANCHOR_CHARGE;
 use crate::{const_block, const_permutation};
 
-pub const RESPAWN_ANCHOR: BlockDefinition = const_block! {
+pub static RESPAWN_ANCHOR: BlockDefinition = const_block! {
     identifier: block_id::RESPAWN_ANCHOR,
     states: [RESPAWN_ANCHOR_CHARGE],
     components: [

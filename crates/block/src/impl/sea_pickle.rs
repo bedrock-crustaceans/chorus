@@ -12,7 +12,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::state::common::{CLUSTER_COUNT, DEAD_BIT};
 use crate::{const_block, const_permutation};
 
-pub const SEA_PICKLE: BlockDefinition = const_block! {
+pub static SEA_PICKLE: BlockDefinition = const_block! {
     identifier: block_id::SEA_PICKLE,
     states: [CLUSTER_COUNT, DEAD_BIT],
     components: [

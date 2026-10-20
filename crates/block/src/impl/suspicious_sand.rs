@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::{BRUSHED_PROGRESS, HANGING};
 
-pub const SUSPICIOUS_SAND: BlockDefinition = const_block! {
+pub static SUSPICIOUS_SAND: BlockDefinition = const_block! {
     identifier: block_id::SUSPICIOUS_SAND,
     states: [BRUSHED_PROGRESS, HANGING],
     components: [

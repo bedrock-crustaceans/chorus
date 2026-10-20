@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const STRIPPED_PALE_OAK_LOG: BlockDefinition = const_block! {
+pub static STRIPPED_PALE_OAK_LOG: BlockDefinition = const_block! {
     identifier: block_id::STRIPPED_PALE_OAK_LOG,
     states: [PILLAR_AXIS],
     components: [

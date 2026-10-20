@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::{DIRECTION, HONEY_LEVEL};
 
-pub const BEEHIVE: BlockDefinition = const_block! {
+pub static BEEHIVE: BlockDefinition = const_block! {
     identifier: block_id::BEEHIVE,
     states: [DIRECTION, HONEY_LEVEL],
     components: [

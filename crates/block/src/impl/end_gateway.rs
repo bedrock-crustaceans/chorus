@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 
-pub const END_GATEWAY: BlockDefinition = const_block! {
+pub static END_GATEWAY: BlockDefinition = const_block! {
     identifier: block_id::END_GATEWAY,
     states: [],
     components: [

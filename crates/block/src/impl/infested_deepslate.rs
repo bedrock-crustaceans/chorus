@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const INFESTED_DEEPSLATE: BlockDefinition = const_block! {
+pub static INFESTED_DEEPSLATE: BlockDefinition = const_block! {
     identifier: block_id::INFESTED_DEEPSLATE,
     states: [PILLAR_AXIS],
     components: [

@@ -13,7 +13,7 @@ fn broken(blocks: &Blocks, state: BlockId, water: BlockId) -> BlockId {
 }
 
 fn vine_has_face(blocks: &Blocks, vine: BlockId, face: Direction) -> bool {
-    let bits = blocks.int(vine, VINE_DIRECTION_BITS).unwrap_or(0);
+    let bits = blocks.int(vine, &VINE_DIRECTION_BITS).unwrap_or(0);
     if bits == 0 {
         return face == Direction::Up;
     }
@@ -62,7 +62,7 @@ impl Shapes<'_> {
                 if supported { state } else { AIR }
             }
             GLOW_LICHEN | SCULK_VEIN => {
-                let bits = blocks.int(state, MULTI_FACE_DIRECTION_BITS).unwrap_or(0);
+                let bits = blocks.int(state, &MULTI_FACE_DIRECTION_BITS).unwrap_or(0);
                 let bit = multiface_bit(direction);
                 if bits & bit == 0 || blocks.entry(neighbour).full {
                     return state;
@@ -71,11 +71,11 @@ impl Shapes<'_> {
                 if remaining == 0 {
                     AIR
                 } else {
-                    blocks.with(state, blocks::state(MULTI_FACE_DIRECTION_BITS, int(remaining)))
+                    blocks.with(state, blocks::state(&MULTI_FACE_DIRECTION_BITS, int(remaining)))
                 }
             }
             COCOA => {
-                let facing = from_legacy_direction(blocks.int(state, DIRECTION).unwrap_or(0));
+                let facing = from_legacy_direction(blocks.int(state, &DIRECTION).unwrap_or(0));
                 if facing == direction && !blocks.is(neighbour, Tag::Logs) { AIR } else { state }
             }
             _ => {

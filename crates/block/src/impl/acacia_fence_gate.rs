@@ -10,7 +10,7 @@ use crate::state::common::{IN_WALL_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const ACACIA_FENCE_GATE: BlockDefinition = const_block! {
+pub static ACACIA_FENCE_GATE: BlockDefinition = const_block! {
     identifier: block_id::ACACIA_FENCE_GATE,
     states: [IN_WALL_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT],
     components: [

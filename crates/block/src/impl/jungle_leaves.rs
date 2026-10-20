@@ -8,7 +8,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{PERSISTENT_BIT, UPDATE_BIT};
 
-pub const JUNGLE_LEAVES: BlockDefinition = const_block! {
+pub static JUNGLE_LEAVES: BlockDefinition = const_block! {
     identifier: block_id::JUNGLE_LEAVES,
     states: [PERSISTENT_BIT, UPDATE_BIT],
     components: [

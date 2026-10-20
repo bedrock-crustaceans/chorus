@@ -9,7 +9,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::SCULK_SENSOR_PHASE;
 
-pub const SCULK_SENSOR: BlockDefinition = const_block! {
+pub static SCULK_SENSOR: BlockDefinition = const_block! {
     identifier: block_id::SCULK_SENSOR,
     states: [SCULK_SENSOR_PHASE],
     components: [

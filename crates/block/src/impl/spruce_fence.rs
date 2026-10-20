@@ -10,7 +10,7 @@ use crate::const_block;
 use crate::state::common::{MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST};
 use glam::Vec3;
 
-pub const SPRUCE_FENCE: BlockDefinition = const_block! {
+pub static SPRUCE_FENCE: BlockDefinition = const_block! {
     identifier: block_id::SPRUCE_FENCE,
     states: [MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST],
     components: [

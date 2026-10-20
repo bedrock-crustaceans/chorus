@@ -7,7 +7,7 @@ use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
-pub const MUDDY_MANGROVE_ROOTS: BlockDefinition = const_block! {
+pub static MUDDY_MANGROVE_ROOTS: BlockDefinition = const_block! {
     identifier: block_id::MUDDY_MANGROVE_ROOTS,
     states: [PILLAR_AXIS],
     components: [

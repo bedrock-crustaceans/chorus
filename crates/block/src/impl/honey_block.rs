@@ -6,7 +6,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 
-pub const HONEY_BLOCK: BlockDefinition = const_block! {
+pub static HONEY_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::HONEY_BLOCK,
     states: [],
     components: [

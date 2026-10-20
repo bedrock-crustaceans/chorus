@@ -11,7 +11,7 @@ use crate::state::common::{DOOR_HINGE_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BI
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const JUNGLE_DOOR: BlockDefinition = const_block! {
+pub static JUNGLE_DOOR: BlockDefinition = const_block! {
     identifier: block_id::JUNGLE_DOOR,
     states: [DOOR_HINGE_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT, UPPER_BLOCK_BIT],
     components: [

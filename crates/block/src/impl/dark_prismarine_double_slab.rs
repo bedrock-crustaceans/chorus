@@ -5,7 +5,7 @@ use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 use crate::state::common::MINECRAFT_VERTICAL_HALF;
 
-pub const DARK_PRISMARINE_DOUBLE_SLAB: BlockDefinition = const_block! {
+pub static DARK_PRISMARINE_DOUBLE_SLAB: BlockDefinition = const_block! {
     identifier: block_id::DARK_PRISMARINE_DOUBLE_SLAB,
     states: [MINECRAFT_VERTICAL_HALF],
     components: [

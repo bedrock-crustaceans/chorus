@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const TUBE_CORAL_BLOCK: BlockDefinition = const_block! {
+pub static TUBE_CORAL_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::TUBE_CORAL_BLOCK,
     states: [],
     components: [

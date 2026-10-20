@@ -11,7 +11,7 @@ use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
-pub const FERN: BlockDefinition = const_block! {
+pub static FERN: BlockDefinition = const_block! {
     identifier: block_id::FERN,
     states: [],
     components: [

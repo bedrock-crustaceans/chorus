@@ -3,7 +3,7 @@ use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
 use crate::const_block;
 
-pub const NETHERREACTOR: BlockDefinition = const_block! {
+pub static NETHERREACTOR: BlockDefinition = const_block! {
     identifier: block_id::NETHERREACTOR,
     states: [],
     components: [

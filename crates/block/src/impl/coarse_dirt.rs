@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const COARSE_DIRT: BlockDefinition = const_block! {
+pub static COARSE_DIRT: BlockDefinition = const_block! {
     identifier: block_id::COARSE_DIRT,
     states: [],
     components: [

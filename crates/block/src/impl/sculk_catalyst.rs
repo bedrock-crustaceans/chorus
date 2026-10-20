@@ -7,7 +7,7 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 use crate::state::common::BLOOM;
 
-pub const SCULK_CATALYST: BlockDefinition = const_block! {
+pub static SCULK_CATALYST: BlockDefinition = const_block! {
     identifier: block_id::SCULK_CATALYST,
     states: [BLOOM],
     components: [

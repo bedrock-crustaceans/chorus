@@ -9,7 +9,7 @@ use crate::state::common::{MINECRAFT_CORNER, UPSIDE_DOWN_BIT, WEIRDO_DIRECTION};
 use crate::{const_block, const_permutation};
 use glam::Vec3;
 
-pub const POLISHED_GRANITE_STAIRS: BlockDefinition = const_block! {
+pub static POLISHED_GRANITE_STAIRS: BlockDefinition = const_block! {
     identifier: block_id::POLISHED_GRANITE_STAIRS,
     states: [UPSIDE_DOWN_BIT, WEIRDO_DIRECTION, MINECRAFT_CORNER],
     components: [

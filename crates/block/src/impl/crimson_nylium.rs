@@ -4,7 +4,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
 
-pub const CRIMSON_NYLIUM: BlockDefinition = const_block! {
+pub static CRIMSON_NYLIUM: BlockDefinition = const_block! {
     identifier: block_id::CRIMSON_NYLIUM,
     states: [],
     components: [

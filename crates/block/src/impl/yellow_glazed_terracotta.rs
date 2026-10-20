@@ -6,7 +6,7 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::const_block;
 use crate::state::common::FACING_DIRECTION;
 
-pub const YELLOW_GLAZED_TERRACOTTA: BlockDefinition = const_block! {
+pub static YELLOW_GLAZED_TERRACOTTA: BlockDefinition = const_block! {
     identifier: block_id::YELLOW_GLAZED_TERRACOTTA,
     states: [FACING_DIRECTION],
     components: [

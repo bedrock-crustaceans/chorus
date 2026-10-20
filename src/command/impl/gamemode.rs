@@ -9,7 +9,7 @@ use chorus_core::permission::PermissionLevel;
 
 const GAME_MODES: CommandEnum = CommandEnum::new("GameMode", values!["survival", "creative", "adventure", "spectator", "default", "s", "c", "a", "d"]);
 
-pub const GAMEMODE_COMMAND: CommandDefinition = CommandDefinition::new("gamemode", "Sets your game mode", |context, args| {
+pub static GAMEMODE_COMMAND: CommandDefinition = CommandDefinition::new("gamemode", "Sets your game mode", |context, args| {
     let argument = args.string("gameMode").map(str::to_owned).or_else(|| args.int("gameModeId").map(|id| id.to_string())).unwrap_or_default();
     let gamemode = Gamemode::from_alias(&argument).ok_or_else(|| format!("\"{argument}\" is not a valid game mode."))?;
 
