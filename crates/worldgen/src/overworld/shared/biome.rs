@@ -627,25 +627,20 @@ impl BiomeSource {
     pub fn find_column(&self, climate: [f32; 5], depths: &[f32], hints: &mut [Option<Nearest>], out: &mut [Biome]) {
         let q = |v: f32| (v * 10000.0) as i64;
         let target = [q(climate[0]), q(climate[1]), q(climate[2]), q(climate[3]), 0, q(climate[4]), 0];
-        let winners: Vec<(Nearest, (i64, i64))> = self
-            .groups
-            .iter()
-            .zip(hints.iter_mut())
-            .map(|(group, hint)| {
-                let mut best = hint.map(|hint| Nearest {
-                    distance: fixed_distance_below(&hint.space, &target, i64::MAX).expect("no limit"),
-                    ..hint
-                });
-                group.tree.nearest_fixed(&target, &mut best);
-                *hint = best;
-                (best.expect("every depth group has leaves"), group.depth)
-            })
-            .collect();
+        for (group, hint) in self.groups.iter().zip(hints.iter_mut()) {
+            let mut best = hint.map(|hint| Nearest {
+                distance: fixed_distance_below(&hint.space, &target, i64::MAX).expect("no limit"),
+                ..hint
+            });
+            group.tree.nearest_fixed(&target, &mut best);
+            *hint = best;
+        }
         for (&depth, biome) in depths.iter().zip(out) {
             let depth = q(depth);
             let mut best: Option<(i64, usize)> = None;
-            for (winner, interval) in &winners {
-                let key = (winner.distance + parameter_distance(*interval, depth).pow(2), winner.order);
+            for (group, hint) in self.groups.iter().zip(hints.iter()) {
+                let winner = hint.as_ref().expect("every depth group has leaves");
+                let key = (winner.distance + parameter_distance(group.depth, depth).pow(2), winner.order);
                 if best.is_none_or(|best| key < best) {
                     best = Some(key);
                     *biome = winner.biome;

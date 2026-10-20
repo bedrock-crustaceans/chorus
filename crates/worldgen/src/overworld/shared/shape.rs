@@ -12,13 +12,15 @@ fn broken(blocks: &Blocks, state: BlockId, water: BlockId) -> BlockId {
     if blocks.entry(state).flooded { water } else { AIR }
 }
 
-fn vine_faces(blocks: &Blocks, vine: BlockId) -> Vec<Direction> {
+fn vine_has_face(blocks: &Blocks, vine: BlockId, face: Direction) -> bool {
     let bits = blocks.int(vine, VINE_DIRECTION_BITS).unwrap_or(0);
     if bits == 0 {
-        return vec![Direction::Up];
+        return face == Direction::Up;
     }
-    Direction::HORIZONTAL.into_iter().filter(|&face| bits & vine_bit(face) != 0).collect()
+    face != Direction::Up && bits & vine_bit(face) != 0
 }
+
+const VINE_CANDIDATES: [Direction; 5] = [Direction::Up, Direction::North, Direction::East, Direction::South, Direction::West];
 
 fn half(blocks: &Blocks, state: BlockId) -> Option<bool> {
     blocks.entry(state).upper
@@ -53,9 +55,9 @@ impl Shapes<'_> {
                     return state;
                 }
                 let above = view.get(pos + IVec3::Y);
-                let supported = vine_faces(blocks, state).into_iter().all(|face| {
+                let supported = VINE_CANDIDATES.into_iter().filter(|&face| vine_has_face(blocks, state, face)).all(|face| {
                     let attached = blocks.entry(view.get(pos + face.offset())).full;
-                    attached || (face != Direction::Up && blocks.same_kind(above, state) && vine_faces(blocks, above).contains(&face))
+                    attached || (face != Direction::Up && blocks.same_kind(above, state) && vine_has_face(blocks, above, face))
                 });
                 if supported { state } else { AIR }
             }

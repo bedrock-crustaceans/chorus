@@ -1,3 +1,4 @@
+use crate::overworld::shared::scratch::Scratch;
 use glam::IVec3;
 
 use super::super::blocks::{BlockId, BlockTable};
@@ -35,6 +36,11 @@ impl RuleTest {
     }
 }
 
+thread_local! {
+    static SPARE_ORE_DATA: std::cell::RefCell<Vec<[f64; 4]>> = const { std::cell::RefCell::new(Vec::new()) };
+    static SPARE_ORE_TESTED: std::cell::RefCell<Vec<u64>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
 pub struct Ore {
     targets: Vec<(RuleTest, BlockId)>,
     size: i32,
@@ -69,7 +75,7 @@ impl Ore {
 
     fn do_place(&self, ctx: &mut Context, random: &mut dyn RandomSource, [x0, x1, z0, z1, y0, y1]: [f64; 6], start: IVec3, size_xz: i32, size_y: i32) -> bool {
         let size = self.size as usize;
-        let mut data = vec![[0.0f64; 4]; size];
+        let mut data = Scratch::take(&SPARE_ORE_DATA, size, [0.0f64; 4]);
         for (i, entry) in data.iter_mut().enumerate() {
             let step = i as f32 / self.size as f32;
             let lerp = |a: f64, b: f64| a + step as f64 * (b - a);
@@ -101,9 +107,9 @@ impl Ore {
 
         assert!(size_xz <= 64, "ore blob wider than a tested-row mask");
         let stride = size_xz * size_y;
-        let mut tested = vec![0u64; stride as usize];
+        let mut tested = Scratch::take(&SPARE_ORE_TESTED, stride as usize, 0u64);
         let mut placed = 0;
-        for &[xx, yy, zz, r] in &data {
+        for &[xx, yy, zz, r] in data.iter() {
             if r < 0.0 {
                 continue;
             }

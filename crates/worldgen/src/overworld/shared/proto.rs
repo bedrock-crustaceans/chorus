@@ -2,9 +2,15 @@ use std::sync::Arc;
 
 use super::biome::Biome;
 use super::blocks::{AIR, BlockId, Blocks};
+use super::scratch::Scratch;
 use chorus_level::chunk::{BlockEntity as ChunkBlockEntity, Chunk};
-use chorus_level::palette::Palette;
+use chorus_level::section_store::{SectionStore, SectionStoreBuilder};
 use chorus_level::sub_chunk::SubChunk;
+
+thread_local! {
+    static SPARE_DENSE: std::cell::RefCell<Vec<Box<[BlockId; 4096]>>> = const { std::cell::RefCell::new(Vec::new()) };
+    static SPARE_ZOOM: std::cell::RefCell<Vec<Biome>> = const { std::cell::RefCell::new(Vec::new()) };
+}
 
 #[derive(Clone)]
 pub struct ProtoChunk {
@@ -15,8 +21,8 @@ pub struct ProtoChunk {
     pub air: BlockId,
     pub water: BlockId,
     pub lava: BlockId,
-    sections: Vec<Section>,
-    editing: bool,
+    sections: SectionStore,
+    dense: Vec<Option<Box<[BlockId; 4096]>>>,
     tops: Vec<i16>,
     worldgen_heights: Arc<Vec<[i16; 2]>>,
     biomes: Vec<Biome>,
@@ -28,26 +34,12 @@ pub struct ProtoChunk {
     settle: Vec<(u8, i16, u8)>,
 }
 
-#[derive(Clone)]
-enum Section {
-    Packed(Palette),
-    Dense(Box<[BlockId; 4096]>),
+fn take_dense() -> Box<[BlockId; 4096]> {
+    SPARE_DENSE.try_with(|spare| spare.borrow_mut().pop()).ok().flatten().unwrap_or_else(|| Box::new([0; 4096]))
 }
 
-impl Section {
-    fn get(&self, local: usize) -> i32 {
-        match self {
-            Self::Packed(palette) => palette.get(local),
-            Self::Dense(blocks) => blocks[local] as i32,
-        }
-    }
-
-    fn to_array(&self) -> [i32; 4096] {
-        match self {
-            Self::Packed(palette) => palette.to_array(),
-            Self::Dense(blocks) => blocks.map(|block| block as i32),
-        }
-    }
+fn give_dense(blocks: Box<[BlockId; 4096]>) {
+    let _ = SPARE_DENSE.try_with(|spare| spare.borrow_mut().push(blocks));
 }
 
 pub struct ChunkEdit<'a>(&'a mut ProtoChunk);
@@ -68,12 +60,7 @@ impl std::ops::DerefMut for ChunkEdit<'_> {
 
 impl Drop for ChunkEdit<'_> {
     fn drop(&mut self) {
-        self.0.editing = false;
-        for section in &mut self.0.sections {
-            if let Section::Dense(blocks) = section {
-                *section = Section::Packed(Palette::from_blocks(&blocks.map(|block| block as i32)));
-            }
-        }
+        self.0.compact();
     }
 }
 
@@ -157,13 +144,13 @@ impl ProtoChunk {
             air: AIR,
             water,
             lava,
-            sections: vec![Section::Packed(Palette::new(AIR as i32)); (height / 16) as usize],
-            editing: false,
+            sections: SectionStore::uniform(AIR as i32, (height / 16) as usize),
+            dense: Vec::new(),
             tops: vec![min_y as i16; 256],
             worldgen_heights: Arc::new(Vec::new()),
             biomes: vec![Biome::Plains; (QUART_SPAN * QUART_SPAN * levels) as usize],
             fiddles: Arc::new(fiddles),
-            zoom: Arc::new(Zoom(Vec::new())),
+            zoom: Arc::new(Zoom(SectionStore::uniform(0, 0))),
             zoom_seed,
             entities: Vec::new(),
             post_process: Vec::new(),
@@ -204,32 +191,64 @@ impl ProtoChunk {
     }
 
     pub fn edit(&mut self) -> ChunkEdit<'_> {
-        self.begin_edit();
         ChunkEdit(self)
     }
 
-    pub fn begin_edit(&mut self) {
-        self.editing = true;
+    fn compact(&mut self) {
+        if self.dense.iter().all(Option::is_none) {
+            self.dense = Vec::new();
+            return;
+        }
+        let mut builder = SectionStoreBuilder::default();
+        for (section, dense) in self.dense.drain(..).enumerate() {
+            match dense {
+                Some(blocks) => {
+                    builder.push_blocks(&blocks.map(|block| block as i32));
+                    give_dense(blocks);
+                }
+                None => builder.push_section(&self.sections, section),
+            }
+        }
+        self.sections = builder.build();
+    }
+
+    pub fn release_dense(&mut self) {
+        for blocks in self.dense.drain(..).flatten() {
+            give_dense(blocks);
+        }
+    }
+
+    fn section_array(&self, section: usize) -> [i32; 4096] {
+        match self.dense.get(section) {
+            Some(Some(blocks)) => blocks.map(|block| block as i32),
+            _ => self.sections.to_array(section),
+        }
     }
 
     pub fn get(&self, x: i32, y: i32, z: i32) -> BlockId {
-        self.locate(x, y, z).map_or(self.air, |(section, local)| self.sections[section].get(local) as BlockId)
+        self.locate(x, y, z).map_or(self.air, |(section, local)| match self.dense.get(section) {
+            Some(Some(blocks)) => blocks[local],
+            _ => self.sections.get(section, local) as BlockId,
+        })
     }
 
     pub fn set(&mut self, x: i32, y: i32, z: i32, block: BlockId) {
         let Some((section, local)) = self.locate(x, y, z) else { return };
-        let slot = &mut self.sections[section];
-        if self.editing
-            && let Section::Packed(palette) = slot
-        {
-            if palette.get(local) == block as i32 {
+        if !matches!(self.dense.get(section), Some(Some(_))) {
+            if self.sections.get(section, local) == block as i32 {
                 return;
             }
-            *slot = Section::Dense(Box::new(palette.to_array().map(|block| block as BlockId)));
+            if self.dense.is_empty() {
+                self.dense = vec![None; self.sections.len()];
+            }
+            let mut blocks = take_dense();
+            for (dense, value) in blocks.iter_mut().zip(self.sections.to_array(section)) {
+                *dense = value as BlockId;
+            }
+            self.dense[section] = Some(blocks);
         }
-        match slot {
-            Section::Packed(palette) => palette.set(local, block as i32),
-            Section::Dense(blocks) => blocks[local] = block,
+        if let Some(Some(blocks)) = self.dense.get_mut(section) {
+            blocks[local] = block;
         }
         let column = ((z << 4) | x) as usize;
         if block != self.air {
@@ -333,8 +352,8 @@ impl ProtoChunk {
         self.biomes[self.quart_index(x >> 2, qy, z >> 2)]
     }
 
-    fn compute_plain(&self) -> Vec<Biome> {
-        let mut plain = vec![Biome::Plains; (self.height * 256) as usize];
+    fn compute_plain(&self) -> Scratch<Biome> {
+        let mut plain = Scratch::take(&SPARE_ZOOM, (self.height * 256) as usize, Biome::Plains);
         for y in self.min_y..=self.max_y() {
             for z in 0..16 {
                 for x in 0..16 {
@@ -345,8 +364,8 @@ impl ProtoChunk {
         plain
     }
 
-    fn compute_zoom(&self) -> Vec<Biome> {
-        let mut zoom = vec![Biome::Plains; (self.height * 256) as usize];
+    fn compute_zoom(&self) -> Scratch<Biome> {
+        let mut zoom = Scratch::take(&SPARE_ZOOM, (self.height * 256) as usize, Biome::Plains);
         let parent_min_y = (self.min_y - 2) >> 2;
         let parent_max_y = (self.max_y() - 2) >> 2;
         let local_y = |parent: i32| parent - (self.min_y >> 2);
@@ -469,7 +488,7 @@ impl ProtoChunk {
                 let mut extra = [air; 4096];
                 let mut waterlogged = false;
                 let mut biomes = [0; 4096];
-                let section_blocks = self.sections[section as usize].to_array().map(|block| block as BlockId);
+                let section_blocks = self.section_array(section as usize).map(|block| block as BlockId);
                 let section_biomes = self.zoom.section(section as usize);
                 for (local, (&block, &biome)) in section_blocks.iter().zip(&section_biomes).enumerate() {
                     let index = SubChunk::index((local & 15) as u8, (local >> 8) as u8, ((local >> 4) & 15) as u8);
@@ -497,24 +516,23 @@ impl ProtoChunk {
     }
 }
 
-struct Zoom(Vec<Palette>);
+struct Zoom(SectionStore);
 
 impl Zoom {
     fn pack(biomes: &[Biome]) -> Self {
-        Self(
-            biomes
-                .chunks_exact(4096)
-                .map(|section| Palette::from_blocks(&std::array::from_fn(|index| section[index] as i32)))
-                .collect(),
-        )
+        let mut builder = SectionStoreBuilder::default();
+        for section in biomes.chunks_exact(4096) {
+            builder.push_blocks(&std::array::from_fn(|index| section[index] as i32));
+        }
+        Self(builder.build())
     }
 
     fn get(&self, index: usize) -> Biome {
-        Biome::ALL[self.0[index >> 12].get(index & 4095) as usize]
+        Biome::ALL[self.0.get(index >> 12, index & 4095) as usize]
     }
 
     fn section(&self, section: usize) -> [Biome; 4096] {
-        self.0[section].to_array().map(|index| Biome::ALL[index as usize])
+        self.0.to_array(section).map(|index| Biome::ALL[index as usize])
     }
 }
 

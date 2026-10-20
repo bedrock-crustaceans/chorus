@@ -11,6 +11,7 @@ use super::predicate::{BlockPredicate, Direction, Fluid, fluid_at};
 use super::provider::{IntProvider, StateProvider};
 use super::region::{Heightmap, Region};
 use super::{Context, Feature, Shapes};
+use crate::overworld::shared::scratch::Scratch;
 use chorus_block::block_id::{VINE, WATER};
 use chorus_block::state::common::{PERSISTENT_BIT, PILLAR_AXIS};
 
@@ -1139,6 +1140,12 @@ impl Tree {
 
 const MAX_LEAF_DISTANCE: usize = 7;
 
+thread_local! {
+    static SPARE_FILLED: std::cell::RefCell<Vec<bool>> = const { std::cell::RefCell::new(Vec::new()) };
+    static SPARE_VISITED: std::cell::RefCell<Vec<bool>> = const { std::cell::RefCell::new(Vec::new()) };
+    static SPARE_EDGES: std::cell::RefCell<(Vec<Vec<IVec3>>, Vec<(Direction, IVec3)>)> = const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
+}
+
 fn update_tree_edges(ctx: &mut Context, grown: &Grown, decorations: &[IVec3]) {
     let everything = grown.roots.order.iter().chain(&grown.trunks.order).chain(&grown.foliage.order).chain(decorations);
     let Some((min, max)) = everything.fold(None, |bounds: Option<(IVec3, IVec3)>, &pos| Some(bounds.map_or((pos, pos), |(min, max)| (min.min(pos), max.max(pos))))) else {
@@ -1149,16 +1156,20 @@ fn update_tree_edges(ctx: &mut Context, grown: &Grown, decorations: &[IVec3]) {
         let local = pos - min;
         (local.cmpge(IVec3::ZERO).all() && local.cmplt(size).all()).then(|| ((local.x * size.y + local.y) * size.z + local.z) as usize)
     };
-    let mut filled = vec![false; (size.x * size.y * size.z) as usize];
+    let cells = (size.x * size.y * size.z) as usize;
+    let mut filled = Scratch::take(&SPARE_FILLED, cells, false);
     for pos in decorations.iter().chain(&grown.roots.order) {
         if let Some(i) = index(*pos) {
             filled[i] = true;
         }
     }
     let blocks = ctx.region.blocks;
-    let mut visited = vec![false; filled.len()];
-    let mut layers: Vec<Vec<IVec3>> = vec![Vec::new(); MAX_LEAF_DISTANCE];
-    layers[0] = grown.trunks.iteration_order();
+    let mut visited = Scratch::take(&SPARE_VISITED, cells, false);
+    let (mut layers, mut faces) = SPARE_EDGES.try_with(|spare| std::mem::take(&mut *spare.borrow_mut())).unwrap_or_default();
+    layers.resize_with(MAX_LEAF_DISTANCE, Vec::new);
+    layers.iter_mut().for_each(Vec::clear);
+    faces.clear();
+    layers[0].extend(grown.trunks.iteration_order());
     let mut distance = 0;
     while distance < MAX_LEAF_DISTANCE {
         let Some(pos) = layers[distance].pop() else {
@@ -1193,7 +1204,6 @@ fn update_tree_edges(ctx: &mut Context, grown: &Grown, decorations: &[IVec3]) {
         }
     }
     let full = |x: i32, y: i32, z: i32| x >= 0 && y >= 0 && z >= 0 && x < size.x && y < size.y && z < size.z && filled[((x * size.y + y) * size.z + z) as usize];
-    let mut faces = Vec::new();
     for x in 0..size.x {
         for y in 0..size.y {
             for z in 0..=size.z {
@@ -1219,7 +1229,7 @@ fn update_tree_edges(ctx: &mut Context, grown: &Grown, decorations: &[IVec3]) {
         carpet: &ctx.catalog.moss_carpet,
         water: ctx.region.water(),
     };
-    for (direction, local) in faces {
+    for &(direction, local) in &faces {
         let pos = min + local;
         let neighbour = pos + direction.offset();
         let state = ctx.region.get(pos);
@@ -1233,6 +1243,7 @@ fn update_tree_edges(ctx: &mut Context, grown: &Grown, decorations: &[IVec3]) {
             ctx.region.set(neighbour, neighbour_updated);
         }
     }
+    let _ = SPARE_EDGES.try_with(|spare| *spare.borrow_mut() = (layers, faces));
 }
 
 fn faces_between(faces: &mut Vec<(Direction, IVec3)>, last: bool, current: bool, at: IVec3, negative: Direction, positive: Direction) {

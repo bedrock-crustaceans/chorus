@@ -19,6 +19,27 @@ impl Palette {
         Self::Uniform { value }
     }
 
+    pub fn bits(&self) -> u8 {
+        match self {
+            Self::Uniform { .. } => 0,
+            Self::Indexed { indices, .. } => indices.get_bits(),
+        }
+    }
+
+    pub fn extend_values(&self, out: &mut Vec<i32>) {
+        match self {
+            Self::Uniform { value } => out.push(*value),
+            Self::Indexed { values, .. } => out.extend(values.keys().copied()),
+        }
+    }
+
+    pub fn words(&self) -> &[u32] {
+        match self {
+            Self::Uniform { .. } => &[],
+            Self::Indexed { indices, .. } => indices.get_blocks(),
+        }
+    }
+
     pub fn is_all(&self, value: i32) -> bool {
         self.count(value) == 4096
     }
@@ -28,7 +49,7 @@ impl Palette {
             return Self::Uniform { value: blocks[0] };
         }
 
-        let mut unique: Vec<(i32, u16)> = Vec::new();
+        let mut unique: Vec<(i32, u16)> = Vec::with_capacity(16);
         let mut block_indices = [0u16; 4096];
         let mut last: Option<(i32, usize)> = None;
 

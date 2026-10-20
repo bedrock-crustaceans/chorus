@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 
 use super::random::{Legacy, RandomSource, WorldgenRandom};
 use super::terrain::{HEIGHT, MIN_Y};
+use crate::overworld::shared::scratch::Scratch;
 
 const RANGE: i32 = 4;
 const PROTECTED_BLOCKS_ON_TOP: i32 = 7;
@@ -18,11 +19,15 @@ pub fn cos(value: f64) -> f32 {
     SIN[((value * 10430.378350470453 + 16384.0) as i64 & 65535) as usize]
 }
 
+thread_local! {
+    static SPARE_MASK: std::cell::RefCell<Vec<bool>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
 pub struct CarvingMask {
     min_y: i32,
     max_y: i32,
     height: i32,
-    bits: Vec<bool>,
+    bits: Scratch<bool>,
 }
 
 impl CarvingMask {
@@ -33,7 +38,7 @@ impl CarvingMask {
             min_y,
             max_y,
             height,
-            bits: vec![false; (256 * height) as usize],
+            bits: Scratch::take(&SPARE_MASK, (256 * height) as usize, false),
         }
     }
 

@@ -1,5 +1,6 @@
 use super::noise::{BlendedNoise, MAX_COLUMN, NoiseStack, NormalNoise, lerp, lerp3};
 use super::random::PositionalFactory;
+use super::scratch::Scratch;
 use super::spline::{Spline, SplineInput, overworld_factor, overworld_jaggedness, overworld_offset};
 
 pub const MIN_Y: i32 = -64;
@@ -131,6 +132,30 @@ fn underground(sloped_cheese: f32, entrances: f32, layer: f32, cheese: f32, spag
     subtractions.max(if pillars < 0.03 { -1000000.0 } else { pillars })
 }
 
+struct IndexList {
+    items: [usize; MAX_COLUMN],
+    len: usize,
+}
+
+impl IndexList {
+    fn of(source: impl Iterator<Item = usize>, keep: impl Fn(usize) -> bool) -> Self {
+        let mut list = Self { items: [0; MAX_COLUMN], len: 0 };
+        for i in source.filter(|&i| keep(i)) {
+            list.items[list.len] = i;
+            list.len += 1;
+        }
+        list
+    }
+}
+
+impl std::ops::Deref for IndexList {
+    type Target = [usize];
+
+    fn deref(&self) -> &[usize] {
+        &self.items[..self.len]
+    }
+}
+
 struct ColumnSampler<'a> {
     x: i32,
     z: i32,
@@ -149,18 +174,25 @@ impl ColumnSampler<'_> {
     }
 
     fn sample_by_rarity(&self, noise: &Noise, indices: &[usize], rarity: &[f32]) -> [f32; MAX_COLUMN] {
-        let mut groups: Vec<(f32, Vec<usize>)> = Vec::new();
-        for &i in indices {
-            match groups.iter_mut().find(|(value, _)| *value == rarity[i]) {
-                Some((_, group)) => group.push(i),
-                None => groups.push((rarity[i], vec![i])),
-            }
-        }
         let mut out = [0.0; MAX_COLUMN];
-        for (value, group) in groups {
+        let mut handled = [false; MAX_COLUMN];
+        for (position, &first) in indices.iter().enumerate() {
+            if handled[position] {
+                continue;
+            }
+            let value = rarity[first];
+            let group = IndexList::of(
+                indices.iter().enumerate().skip(position).filter(|&(later, &i)| !handled[later] && rarity[i] == value).map(|(_, &i)| i),
+                |_| true,
+            );
+            for (later, &i) in indices.iter().enumerate().skip(position) {
+                if rarity[i] == value {
+                    handled[later] = true;
+                }
+            }
             let scale = 1.0 / value as f64;
             let part = self.sample(noise, &group, scale, scale);
-            for i in group {
+            for &i in group.iter() {
                 out[i] = part[i];
             }
         }
@@ -511,31 +543,35 @@ impl Terrain {
 
     fn corner_column(&self, x: i32, z: i32, out: &mut [Corner]) {
         let column = self.column(x, z);
-        let ys: Vec<i32> = (0..out.len()).map(|cy| MIN_Y + cy as i32 * CELL_HEIGHT).collect();
-        let sampler = ColumnSampler { x, z, ys: &ys };
-        let select = |keep: &dyn Fn(i32) -> bool| -> Vec<usize> { (0..ys.len()).filter(|&i| keep(ys[i])).collect() };
+        let count = out.len();
+        let mut heights = [0i32; MAX_COLUMN];
+        for (cy, y) in heights[..count].iter_mut().enumerate() {
+            *y = MIN_Y + cy as i32 * CELL_HEIGHT;
+        }
+        let ys = &heights[..count];
+        let sampler = ColumnSampler { x, z, ys };
+        let select = |keep: &dyn Fn(i32) -> bool| IndexList::of(0..count, |i| keep(ys[i]));
 
         let live = select(&slide_uses_value);
-        let mut base = vec![0.0; ys.len()];
-        self.base_3d.column(x, z, &ys, &live, &mut base);
-        let sloped: Vec<f32> = ys
-            .iter()
-            .zip(&base)
-            .map(|(&y, &base)| Self::initial_density(&column, Self::depth(&column, y) + column.jaggedness) + base)
-            .collect();
+        let mut base = [0.0f32; MAX_COLUMN];
+        self.base_3d.column(x, z, ys, &live, &mut base[..count]);
+        let mut sloped = [0.0f32; MAX_COLUMN];
+        for ((slot, &y), &base) in sloped.iter_mut().zip(ys).zip(&base) {
+            *slot = Self::initial_density(&column, Self::depth(&column, y) + column.jaggedness) + base;
+        }
 
         let cave_entrance = sampler.sample(&self.cave_entrance, &live, 0.75, 0.5);
         let roughness_modulator = sampler.sample(&self.spaghetti_roughness_modulator, &live, 1.0, 1.0);
         let roughness_noise = sampler.sample(&self.spaghetti_roughness, &live, 1.0, 1.0);
-        let rarity_3d: Vec<f32> = sampler.sample(&self.spaghetti_3d_rarity, &live, 2.0, 1.0).into_iter().map(spaghetti_3d_rarity).collect();
+        let rarity_3d = sampler.sample(&self.spaghetti_3d_rarity, &live, 2.0, 1.0).map(spaghetti_3d_rarity);
         let first_3d = sampler.sample_by_rarity(&self.spaghetti_3d_1, &live, &rarity_3d);
         let second_3d = sampler.sample_by_rarity(&self.spaghetti_3d_2, &live, &rarity_3d);
         let thickness_3d = sampler.sample(&self.spaghetti_3d_thickness, &live, 1.0, 1.0);
 
-        let deep: Vec<usize> = live.iter().copied().filter(|&i| sloped[i] >= SURFACE_DENSITY_THRESHOLD).collect();
+        let deep = IndexList::of(live.iter().copied(), |i| sloped[i] >= SURFACE_DENSITY_THRESHOLD);
         let cave_layer = sampler.sample(&self.cave_layer, &deep, 1.0, 8.0);
         let cave_cheese = sampler.sample(&self.cave_cheese, &deep, 1.0, 0.6666666666666666);
-        let rarity_2d: Vec<f32> = sampler.sample(&self.spaghetti_2d_modulator, &deep, 2.0, 1.0).into_iter().map(spaghetti_2d_rarity).collect();
+        let rarity_2d = sampler.sample(&self.spaghetti_2d_modulator, &deep, 2.0, 1.0).map(spaghetti_2d_rarity);
         let cave_2d = sampler.sample_by_rarity(&self.spaghetti_2d, &deep, &rarity_2d);
         let elevation_2d = sampler.sample(&self.spaghetti_2d_elevation, &deep, 1.0, 0.0);
         let thickness_2d = sampler.sample(&self.spaghetti_2d_thickness, &deep, 2.0, 1.0);
@@ -673,7 +709,11 @@ impl CellValues {
     }
 }
 
-pub struct Densities(Vec<f32>);
+thread_local! {
+    static SPARE_DENSITIES: std::cell::RefCell<Vec<f32>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+pub struct Densities(Scratch<f32>);
 
 impl Densities {
     pub fn get(&self, lx: i32, y: i32, lz: i32) -> f32 {
@@ -737,7 +777,7 @@ impl NoiseChunk {
     }
 
     pub fn densities(&self) -> Densities {
-        let mut values = vec![0.0; (16 * 16 * HEIGHT) as usize];
+        let mut values = Scratch::take(&SPARE_DENSITIES, (16 * 16 * HEIGHT) as usize, 0.0);
         for cz in 0..16 / CELL_WIDTH {
             for cx in 0..16 / CELL_WIDTH {
                 for cy in 0..HEIGHT / CELL_HEIGHT {

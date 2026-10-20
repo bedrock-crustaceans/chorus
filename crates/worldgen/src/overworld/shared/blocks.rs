@@ -114,6 +114,8 @@ pub struct Entry {
     pub flooded: bool,
     pub upper: Option<bool>,
     pub support: Support,
+    flooded_id: BlockId,
+    variants: Vec<(&'static str, BlockState, BlockId)>,
 }
 
 fn upper_half(states: &[State]) -> Option<bool> {
@@ -137,7 +139,23 @@ pub struct BlockTable<'a> {
 
 pub struct Blocks {
     entries: Vec<Entry>,
-    index: HashMap<String, BlockId>,
+}
+
+fn single_difference(from: &[State], to: &[State]) -> Option<State> {
+    let changed = |states: &[State], other: &[State]| {
+        states
+            .iter()
+            .filter(|(k, v)| other.iter().find(|(ok, _)| ok == k).is_none_or(|(_, ov)| ov != v))
+            .cloned()
+            .collect::<Vec<State>>()
+    };
+    let added = changed(to, from);
+    let removed = changed(from, to);
+    match (added.as_slice(), removed.as_slice()) {
+        ([change], []) => Some(change.clone()),
+        ([change], [gone]) if gone.0 == change.0 => Some(change.clone()),
+        _ => None,
+    }
 }
 
 fn index_key(name: &str, states: &[State], flooded: bool) -> String {
@@ -197,6 +215,8 @@ impl<'a> BlockTable<'a> {
             flooded,
             upper: upper_half(states),
             support: Support::of(name, |tag| tags & (1 << tag as u32) != 0),
+            flooded_id: 0,
+            variants: Vec::new(),
         });
         let id = (self.entries.len() - 1) as BlockId;
         self.index.insert(index_key, id);
@@ -208,11 +228,26 @@ impl<'a> BlockTable<'a> {
         self.entries[id as usize].kind
     }
 
-    pub fn finish(self) -> Blocks {
-        Blocks {
-            entries: self.entries,
-            index: self.index,
+    pub fn finish(mut self) -> Blocks {
+        for id in 0..self.entries.len() {
+            let entry = &self.entries[id];
+            let flooded_key = index_key(entry.name, &entry.states, true);
+            self.entries[id].flooded_id = self.index.get(&flooded_key).copied().unwrap_or(id as BlockId);
         }
+        let mut groups: HashMap<(&'static str, bool), Vec<usize>> = HashMap::new();
+        for (id, entry) in self.entries.iter().enumerate() {
+            groups.entry((entry.name, entry.flooded)).or_default().push(id);
+        }
+        for members in groups.values() {
+            for &from in members {
+                let variants: Vec<_> = members
+                    .iter()
+                    .filter_map(|&to| single_difference(&self.entries[from].states, &self.entries[to].states).map(|(k, v)| (k, v, to as BlockId)))
+                    .collect();
+                self.entries[from].variants = variants;
+            }
+        }
+        Blocks { entries: self.entries }
     }
 }
 
@@ -280,14 +315,11 @@ impl Blocks {
 
     pub fn with(&self, id: BlockId, (wanted, value): State) -> BlockId {
         let entry = &self.entries[id as usize];
-        let mut states: Vec<State> = entry.states.iter().filter(|(k, _)| *k != wanted).cloned().collect();
-        states.push((wanted, value));
-        self.index.get(&index_key(entry.name, &states, entry.flooded)).copied().unwrap_or(id)
+        entry.variants.iter().find(|(k, v, _)| *k == wanted && *v == value).map_or(id, |&(_, _, variant)| variant)
     }
 
     pub fn flooded(&self, id: BlockId) -> BlockId {
-        let entry = &self.entries[id as usize];
-        self.index.get(&index_key(entry.name, &entry.states, true)).copied().unwrap_or(id)
+        self.entries[id as usize].flooded_id
     }
 }
 

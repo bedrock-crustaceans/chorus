@@ -6,6 +6,7 @@ pub mod dimension_type;
 pub mod generator;
 pub mod level;
 pub mod palette;
+pub mod section_store;
 pub mod storage;
 pub mod sub_chunk;
 

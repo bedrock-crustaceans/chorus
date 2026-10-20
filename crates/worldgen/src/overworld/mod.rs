@@ -73,9 +73,11 @@ impl<E: Edition> OverworldGenerator<E> {
         let mut biomes = vec![Biome::Plains; 16 * levels];
         let mut column_biomes = vec![Biome::Plains; levels];
         let mut hints = self.biomes.column_hints();
+        let mut depths: Vec<f32> = Vec::with_capacity(levels);
         for (index, (column, _)) in quarts.iter().enumerate() {
             let climate = column.at(MIN_Y);
-            let depths: Vec<f32> = (-1..=HEIGHT / 4).map(|qy| column.at(MIN_Y + qy * 4).depth).collect();
+            depths.clear();
+            depths.extend((-1..=HEIGHT / 4).map(|qy| column.at(MIN_Y + qy * 4).depth));
             let fixed = [climate.temperature, climate.vegetation, climate.continents, climate.erosion, climate.ridges];
             self.biomes.find_column(fixed, &depths, &mut hints, &mut column_biomes);
             for (level, &biome) in column_biomes.iter().enumerate() {

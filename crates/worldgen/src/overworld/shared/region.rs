@@ -3,6 +3,7 @@ use glam::IVec3;
 use super::biome::Biome;
 use super::blocks::{AIR, BlockId, Blocks};
 use super::proto::{BlockEntity, PlacedEntity, ProtoChunk};
+use super::scratch::Scratch;
 use super::tags::Tag;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -45,6 +46,11 @@ pub fn slot(dx: i32, dz: i32) -> Option<usize> {
     ((-1..=1).contains(&dx) && (-1..=1).contains(&dz)).then_some(((dx + 1) * 3 + dz + 1) as usize)
 }
 
+thread_local! {
+    static SPARE_DIRTY: std::cell::RefCell<Vec<Vec<(u8, i16, u8)>>> = const { std::cell::RefCell::new(Vec::new()) };
+    static SPARE_HEIGHTS: std::cell::RefCell<Vec<Option<i32>>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
 pub struct Region<'a> {
     pub owner_x: i32,
     pub owner_z: i32,
@@ -54,7 +60,7 @@ pub struct Region<'a> {
     entities: [Vec<PlacedEntity>; 9],
     marks: [Vec<(u8, i16, u8)>; 9],
     record: Option<Vec<IVec3>>,
-    heights: Vec<Option<i32>>,
+    heights: Scratch<Option<i32>>,
 }
 
 pub struct Changes {
@@ -81,20 +87,17 @@ impl BlockView for Region<'_> {
 }
 
 impl<'a> Region<'a> {
-    pub fn new(owner_x: i32, owner_z: i32, blocks: &'a Blocks, mut chunks: [ProtoChunk; 9]) -> Self {
-        for chunk in &mut chunks {
-            chunk.begin_edit();
-        }
+    pub fn new(owner_x: i32, owner_z: i32, blocks: &'a Blocks, chunks: [ProtoChunk; 9]) -> Self {
         Self {
             owner_x,
             owner_z,
             blocks,
             chunks,
-            dirty: Default::default(),
+            dirty: std::array::from_fn(|_| SPARE_DIRTY.try_with(|spare| spare.borrow_mut().pop()).ok().flatten().unwrap_or_default()),
             entities: Default::default(),
             marks: Default::default(),
             record: None,
-            heights: vec![None; 4 * SPAN * SPAN],
+            heights: Scratch::take(&SPARE_HEIGHTS, 4 * SPAN * SPAN, None),
         }
     }
 
@@ -260,11 +263,18 @@ impl<'a> Region<'a> {
         height
     }
 
-    pub fn into_changes(self) -> Changes {
+    pub fn into_changes(mut self) -> Changes {
         let changes = std::array::from_fn(|slot| {
             let chunk = &self.chunks[slot];
             self.dirty[slot].iter().map(|&(x, y, z)| (x, y, z, chunk.get(x as i32, y as i32, z as i32))).collect()
         });
+        for chunk in &mut self.chunks {
+            chunk.release_dense();
+        }
+        for mut dirty in std::mem::take(&mut self.dirty) {
+            dirty.clear();
+            let _ = SPARE_DIRTY.try_with(|spare| spare.borrow_mut().push(dirty));
+        }
         Changes {
             owner_x: self.owner_x,
             owner_z: self.owner_z,

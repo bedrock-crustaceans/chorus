@@ -7,6 +7,7 @@ pub mod phases;
 pub mod proto;
 pub mod random;
 pub mod region;
+pub mod scratch;
 pub mod shape;
 pub mod spline;
 pub mod survival;

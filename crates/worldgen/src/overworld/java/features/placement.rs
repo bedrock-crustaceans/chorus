@@ -74,6 +74,10 @@ pub struct Placed {
     pub placement: Vec<Modifier>,
 }
 
+thread_local! {
+    static SPARE_PLACEMENT: std::cell::RefCell<(Vec<(IVec3, usize)>, Vec<IVec3>)> = const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
+}
+
 impl Placed {
     pub fn new(feature: Feature, placement: Vec<Modifier>) -> Self {
         Self { feature, placement }
@@ -84,8 +88,9 @@ impl Placed {
             return self.feature.place(ctx, random, origin);
         }
         let mut placed = false;
-        let mut stack = vec![(origin, 0usize)];
-        let mut modified = Vec::new();
+        let (mut stack, mut modified) = SPARE_PLACEMENT.try_with(|spare| std::mem::take(&mut *spare.borrow_mut())).unwrap_or_default();
+        stack.clear();
+        stack.push((origin, 0usize));
         while let Some((pos, index)) = stack.pop() {
             modified.clear();
             self.apply(&self.placement[index], ctx, random, pos, top, &mut modified);
@@ -100,6 +105,7 @@ impl Placed {
                 }
             }
         }
+        let _ = SPARE_PLACEMENT.try_with(|spare| *spare.borrow_mut() = (stack, modified));
         placed
     }
 

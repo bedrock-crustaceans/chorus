@@ -383,19 +383,43 @@ impl BlendedNoise {
 
     pub fn column(&self, x: i32, z: i32, ys: &[i32], indices: &[usize], out: &mut [f32]) {
         let (x, z) = (x as f64, z as f64);
-        let main_ys: Vec<f64> = ys.iter().map(|&y| y as f64 * self.y_multiplier / self.y_factor).collect();
-        let limit_ys: Vec<f64> = ys.iter().map(|&y| y as f64 * self.y_multiplier).collect();
-        let mut main = vec![0.0; ys.len()];
-        self.main
-            .column_subset(x * self.xz_multiplier / self.xz_factor, z * self.xz_multiplier / self.xz_factor, &main_ys, indices, &mut main);
-        let alpha: Vec<f32> = main.iter().map(|value| (value + 0.5).clamp(0.0, 1.0)).collect();
-        let needs_min: Vec<usize> = indices.iter().copied().filter(|&i| alpha[i] != 1.0).collect();
-        let needs_max: Vec<usize> = indices.iter().copied().filter(|&i| alpha[i] != 0.0).collect();
+        let count = ys.len();
+        let mut main_ys = [0.0f64; MAX_COLUMN];
+        let mut limit_ys = [0.0f64; MAX_COLUMN];
+        for ((main_y, limit_y), &y) in main_ys.iter_mut().zip(limit_ys.iter_mut()).zip(ys) {
+            *main_y = y as f64 * self.y_multiplier / self.y_factor;
+            *limit_y = y as f64 * self.y_multiplier;
+        }
+        let mut main = [0.0f32; MAX_COLUMN];
+        self.main.column_subset(
+            x * self.xz_multiplier / self.xz_factor,
+            z * self.xz_multiplier / self.xz_factor,
+            &main_ys[..count],
+            indices,
+            &mut main[..count],
+        );
+        let mut alpha = [0.0f32; MAX_COLUMN];
+        for (slot, value) in alpha.iter_mut().zip(&main[..count]) {
+            *slot = (value + 0.5).clamp(0.0, 1.0);
+        }
+        let mut needs_min = [0usize; MAX_COLUMN];
+        let mut needs_max = [0usize; MAX_COLUMN];
+        let (mut min_count, mut max_count) = (0, 0);
+        for &i in indices {
+            if alpha[i] != 1.0 {
+                needs_min[min_count] = i;
+                min_count += 1;
+            }
+            if alpha[i] != 0.0 {
+                needs_max[max_count] = i;
+                max_count += 1;
+            }
+        }
         let (limit_x, limit_z) = (x * self.xz_multiplier, z * self.xz_multiplier);
-        let mut min = vec![0.0; ys.len()];
-        let mut max = vec![0.0; ys.len()];
-        self.min_limit.column_subset(limit_x, limit_z, &limit_ys, &needs_min, &mut min);
-        self.max_limit.column_subset(limit_x, limit_z, &limit_ys, &needs_max, &mut max);
+        let mut min = [0.0f32; MAX_COLUMN];
+        let mut max = [0.0f32; MAX_COLUMN];
+        self.min_limit.column_subset(limit_x, limit_z, &limit_ys[..count], &needs_min[..min_count], &mut min[..count]);
+        self.max_limit.column_subset(limit_x, limit_z, &limit_ys[..count], &needs_max[..max_count], &mut max[..count]);
         for &i in indices {
             out[i] = if alpha[i] == 0.0 {
                 min[i]
