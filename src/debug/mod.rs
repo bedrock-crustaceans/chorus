@@ -1,5 +1,6 @@
 pub mod command;
 pub mod hud;
+pub mod profile;
 
 use crate::registry::command_registry::CommandRegistry;
 use bevy_app::{App, Plugin, Startup};

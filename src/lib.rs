@@ -4,7 +4,7 @@ use crate::server::Server;
 use bevy_app::{App, AppExit, Plugin, PluginsState, PreStartup, RunFixedMainLoop, TaskPoolOptions, TaskPoolPlugin, TaskPoolThreadAssignmentPolicy};
 use bevy_ecs::schedule::{IntoScheduleConfigs, Schedule};
 use chorus_core::schedule::{run_fixed_tick, run_tasks};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tracing::{info, warn};
 
 pub mod actor;
@@ -77,7 +77,9 @@ impl LoopRunner {
                 return exit;
             }
 
-            let deadline = Instant::now() + app.world().resource::<TickClock>().remaining();
+            let gap_started = Instant::now();
+            let deadline = gap_started + app.world().resource::<TickClock>().remaining();
+            let mut slept = Duration::ZERO;
 
             loop {
                 run_tasks(app.world_mut(), deadline);
@@ -89,7 +91,9 @@ impl LoopRunner {
                     Some(wake) if wake < deadline => std::thread::sleep(wake.saturating_duration_since(now)),
                     _ => spin_sleep::sleep(deadline.saturating_duration_since(now)),
                 }
+                slept += now.elapsed();
             }
+            app.world_mut().resource_mut::<Scheduler>().record_gap(gap_started.elapsed(), slept);
         }
     }
 }

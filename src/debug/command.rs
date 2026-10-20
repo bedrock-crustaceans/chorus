@@ -37,6 +37,9 @@ pub static DEBUG_COMMAND: CommandDefinition = CommandDefinition::new("debug", "U
     if args.has("hud") {
         return super::hud::command::run(context, args);
     }
+    if args.has("profile") {
+        return super::profile::run(context, args);
+    }
     match args.string("feature") {
         Some("unhandled") => {
             let Some(session) = context.get::<Session>() else {
@@ -112,6 +115,8 @@ pub static DEBUG_COMMAND: CommandDefinition = CommandDefinition::new("debug", "U
         CommandParameter::new("multiplier", ArgumentType::Float).optional(),
         CommandParameter::enumeration("axis", AXIS).optional()
     ],
+    [CommandParameter::literal("profile"), CommandParameter::literal("start"), CommandParameter::new("seconds", ArgumentType::Int).optional()],
+    [CommandParameter::literal("profile"), CommandParameter::literal("stop")],
     [CommandParameter::literal("hud"), CommandParameter::enumeration("action", HUD_ACTION).optional()],
     [
         CommandParameter::literal("hud"),

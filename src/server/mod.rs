@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use tracing::info;
 
 pub mod pregen;
+pub mod profile;
 
 pub use chorus_core::schedule::TICK_RATE;
 
@@ -132,6 +133,7 @@ impl Plugin for Server {
             .add_systems(Tick, pregen::Pregen::run.in_set(TickSet::First).after(Server::start_tick))
             .add_systems(Tick, Server::end_tick.in_set(TickSet::Last))
             .add_plugins(Registry)
+            .add_plugins(profile::ProfilePlugin)
             .add_plugins(ConsolePlugin)
             .add_plugins(crate::debug::DebugPlugin)
             .add_plugins(Network);

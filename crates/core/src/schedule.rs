@@ -114,6 +114,12 @@ pub struct TaskInfo {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct GapReport {
+    pub duration: Duration,
+    pub slept: Duration,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TaskStats {
     pub runs: u64,
     pub runtime: Duration,
@@ -131,6 +137,7 @@ pub struct Scheduler {
     index: HashMap<TypeId, usize>,
     ready: [Vec<usize>; PRIORITIES],
     clock: [Duration; PRIORITIES],
+    last_gap: GapReport,
     sequence: u64,
     timers: BinaryHeap<Reverse<(Instant, usize)>>,
 }
@@ -154,6 +161,14 @@ impl Scheduler {
             runtime: Duration::ZERO,
             runs: 0,
         });
+    }
+
+    pub fn record_gap(&mut self, duration: Duration, slept: Duration) {
+        self.last_gap = GapReport { duration, slept };
+    }
+
+    pub fn last_gap(&self) -> GapReport {
+        self.last_gap
     }
 
     pub fn tasks(&self) -> Vec<TaskInfo> {
@@ -473,6 +488,13 @@ mod tests {
         assert_eq!((find("Second").priority, find("Second").stats.runs, find("Second").queued), (Priority::Io, 1, false));
         assert_eq!(find("First").stats.runs, 0);
         assert!(find("Background").next_run_in.is_some_and(|wait| wait > Duration::from_secs(50)));
+    }
+
+    #[test]
+    fn the_last_recorded_gap_is_kept() {
+        let mut scheduler = Scheduler::default();
+        scheduler.record_gap(Duration::from_millis(40), Duration::from_millis(30));
+        assert_eq!(scheduler.last_gap(), GapReport { duration: Duration::from_millis(40), slept: Duration::from_millis(30) });
     }
 
     #[test]
