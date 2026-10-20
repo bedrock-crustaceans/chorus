@@ -259,7 +259,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 [[package]]
 name = "bedrock"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#ab7bb9521af078d4094c86da8b127d5f53cf0d31"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#e81b22f1dc9f7f259f3b13d61431bb535b4f56e3"
 dependencies = [
  "bedrock_auth",
  "bedrock_form",
@@ -274,7 +274,7 @@ dependencies = [
 [[package]]
 name = "bedrock_auth"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#ab7bb9521af078d4094c86da8b127d5f53cf0d31"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#e81b22f1dc9f7f259f3b13d61431bb535b4f56e3"
 dependencies = [
  "base64 0.23.1",
  "md-5 0.11.0",
@@ -292,7 +292,7 @@ dependencies = [
 [[package]]
 name = "bedrock_form"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#ab7bb9521af078d4094c86da8b127d5f53cf0d31"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#e81b22f1dc9f7f259f3b13d61431bb535b4f56e3"
 dependencies = [
  "facet 0.50.0-rc.7",
  "facet-format",
@@ -303,7 +303,7 @@ dependencies = [
 [[package]]
 name = "bedrock_level"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#ab7bb9521af078d4094c86da8b127d5f53cf0d31"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#e81b22f1dc9f7f259f3b13d61431bb535b4f56e3"
 dependencies = [
  "bedrock_shared",
  "bytemuck",
@@ -322,7 +322,7 @@ dependencies = [
 [[package]]
 name = "bedrock_macros"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#ab7bb9521af078d4094c86da8b127d5f53cf0d31"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#e81b22f1dc9f7f259f3b13d61431bb535b4f56e3"
 dependencies = [
  "nbtx",
  "proc-macro2",
@@ -333,7 +333,7 @@ dependencies = [
 [[package]]
 name = "bedrock_network"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#ab7bb9521af078d4094c86da8b127d5f53cf0d31"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#e81b22f1dc9f7f259f3b13d61431bb535b4f56e3"
 dependencies = [
  "aes 0.9.3",
  "bedrock_auth",
@@ -355,7 +355,7 @@ dependencies = [
 [[package]]
 name = "bedrock_protocol"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#ab7bb9521af078d4094c86da8b127d5f53cf0d31"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#e81b22f1dc9f7f259f3b13d61431bb535b4f56e3"
 dependencies = [
  "bedrock_macros",
  "bedrock_protocol_core",
@@ -370,7 +370,7 @@ dependencies = [
 [[package]]
 name = "bedrock_protocol_core"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#ab7bb9521af078d4094c86da8b127d5f53cf0d31"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#e81b22f1dc9f7f259f3b13d61431bb535b4f56e3"
 dependencies = [
  "byteorder",
  "nbtx",
@@ -384,7 +384,7 @@ dependencies = [
 [[package]]
 name = "bedrock_shared"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#ab7bb9521af078d4094c86da8b127d5f53cf0d31"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#e81b22f1dc9f7f259f3b13d61431bb535b4f56e3"
 dependencies = [
  "bedrock_macros",
  "bedrock_protocol_core",
@@ -765,9 +765,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.8.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6651c9ed80effdc7db0ff72512157f901af5e3549e341e24b1dd4887d836d838"
+checksum = "877bf67ac8e52449eb2f9e98a344ea163beb70dd1f9eebe3cc5357dcfeaee4df"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -980,7 +980,7 @@ checksum = "e8cf2a2c93cd704877c0858356ed03480ff301ee950b43f1cbe4573b088bfa6c"
 dependencies = [
  "block-buffer 0.12.1",
  "crypto-common 0.2.2",
- "inout 0.2.4",
+ "inout 0.2.5",
 ]
 
 [[package]]
@@ -1740,9 +1740,9 @@ checksum = "64cd1e32ddd350061ae6edb1b082d7c54915b5c672c389143b9a63403a109f24"
 
 [[package]]
 name = "find-msvc-tools"
-version = "0.1.14"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484"
+checksum = "1c66915cc5391097de7a2b0b972e8505aa33c0df401fd3a6811dbdb32881ba48"
 
 [[package]]
 name = "fixedbitset"
@@ -2191,9 +2191,9 @@ dependencies = [
 
 [[package]]
 name = "inout"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ce983bb6fb399067d101fbfc9e74174e07e9f29a2bc679efefeb8c645819c3f"
+checksum = "3b5cf4372d022092674a83b8febf5865f7a573cc0c5baec5e49c879b6a20978f"
 dependencies = [
  "hybrid-array",
 ]
@@ -3916,9 +3916,9 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 
 [[package]]
 name = "tokio"
-version = "1.53.3"
+version = "1.54.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e"
+checksum = "a0c168a474b95bfecfe908a65d4bdffc523144b649a74c09c286afb35d53e0bc"
 dependencies = [
  "pin-project-lite",
 ]
@@ -4050,9 +4050,9 @@ dependencies = [
 
 [[package]]
 name = "typed-path"
-version = "0.12.3"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e28f89b80c87b8fb0cf04ab448d5dd0dd0ade2f8891bae878de66a75a28600e"
+checksum = "54ec2755506471f54baf5e4bb5499d8e510cc1caf271270e778a736bd2d7336c"
 
 [[package]]
 name = "typeid"
@@ -4302,9 +4302,9 @@ dependencies = [
 
 [[package]]
 name = "webpki-roots"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dcd9d09a39985f5344844e66b0c530a33843579125f23e21e9f0f220850f22a"
+checksum = "1c1c8e20c8a38fc7d65abfe74eb7280e4aa667e8eec8bc84996d2874810748d9"
 dependencies = [
  "rustls-pki-types",
 ]
