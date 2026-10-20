@@ -115,7 +115,11 @@ pub static DEBUG_COMMAND: CommandDefinition = CommandDefinition::new("debug", "U
         CommandParameter::new("multiplier", ArgumentType::Float).optional(),
         CommandParameter::enumeration("axis", AXIS).optional()
     ],
-    [CommandParameter::literal("profile"), CommandParameter::literal("start"), CommandParameter::new("seconds", ArgumentType::Int).optional()],
+    [
+        CommandParameter::literal("profile"),
+        CommandParameter::literal("start"),
+        CommandParameter::new("seconds", ArgumentType::Int).optional()
+    ],
     [CommandParameter::literal("profile"), CommandParameter::literal("stop")],
     [CommandParameter::literal("hud"), CommandParameter::enumeration("action", HUD_ACTION).optional()],
     [

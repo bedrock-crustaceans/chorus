@@ -29,7 +29,7 @@ pub fn run(context: &mut CommandContext, args: &CommandArgs) -> Result<(), Strin
 #[cfg(test)]
 mod tests {
     use crate::command::args::parse;
-        use crate::debug::DEBUG_COMMAND;
+    use crate::debug::DEBUG_COMMAND;
     use chorus_core::permission::PermissionLevel;
     use std::collections::HashMap;
 
@@ -41,6 +41,10 @@ mod tests {
     fn profile_start_takes_an_optional_duration() {
         assert_eq!(seconds(&DEBUG_COMMAND, "profile start 45"), Some(45));
         assert_eq!(seconds(&DEBUG_COMMAND, "profile start"), None);
-        assert!(parse("debug", &DEBUG_COMMAND.overloads, "profile stop", &HashMap::new(), PermissionLevel::Operator).unwrap().has("stop"));
+        assert!(
+            parse("debug", &DEBUG_COMMAND.overloads, "profile stop", &HashMap::new(), PermissionLevel::Operator)
+                .unwrap()
+                .has("stop")
+        );
     }
 }

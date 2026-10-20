@@ -494,7 +494,13 @@ mod tests {
     fn the_last_recorded_gap_is_kept() {
         let mut scheduler = Scheduler::default();
         scheduler.record_gap(Duration::from_millis(40), Duration::from_millis(30));
-        assert_eq!(scheduler.last_gap(), GapReport { duration: Duration::from_millis(40), slept: Duration::from_millis(30) });
+        assert_eq!(
+            scheduler.last_gap(),
+            GapReport {
+                duration: Duration::from_millis(40),
+                slept: Duration::from_millis(30)
+            }
+        );
     }
 
     #[test]

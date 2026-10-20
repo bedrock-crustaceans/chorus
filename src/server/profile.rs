@@ -80,7 +80,11 @@ impl TickProfile {
     fn record(mut profile: ResMut<TickProfile>, state: Res<ServerState>, scheduler: Res<Scheduler>) {
         let end = Instant::now();
         let marks = profile.marks;
-        let Some(session) = profile.session.as_mut().filter(|session| state.tick > session.first_tick && session.samples.len() < MAX_PROFILE_SAMPLES) else {
+        let Some(session) = profile
+            .session
+            .as_mut()
+            .filter(|session| state.tick > session.first_tick && session.samples.len() < MAX_PROFILE_SAMPLES)
+        else {
             return;
         };
 
@@ -241,8 +245,16 @@ mod tests {
         let mut app = App::new();
         app.add_schedule(Schedule::new(Tick));
         app.configure_sets(Tick, (TickSet::First, TickSet::Update, TickSet::Last).chain());
-        app.configure_sets(Tick, (GameSet::Connection, GameSet::Input, GameSet::World, GameSet::Actors, GameSet::Chat, GameSet::Chunks, GameSet::Broadcast).chain().in_set(TickSet::Update));
-        app.insert_resource(ServerState::new()).init_resource::<Scheduler>().init_resource::<TickClock>().add_plugins(ProfilePlugin);
+        app.configure_sets(
+            Tick,
+            (GameSet::Connection, GameSet::Input, GameSet::World, GameSet::Actors, GameSet::Chat, GameSet::Chunks, GameSet::Broadcast)
+                .chain()
+                .in_set(TickSet::Update),
+        );
+        app.insert_resource(ServerState::new())
+            .init_resource::<Scheduler>()
+            .init_resource::<TickClock>()
+            .add_plugins(ProfilePlugin);
         app.add_systems(
             Tick,
             (|mut state: ResMut<ServerState>| {
