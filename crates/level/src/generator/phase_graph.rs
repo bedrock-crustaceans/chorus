@@ -126,7 +126,7 @@ impl<G: Generator> PhaseGraph<G> {
                     if let Some(retention) = self.graph.retained.get_mut(&descriptor.phase)
                         && retention.ghost_set.remove(&(cell, hop))
                     {
-                        retention.capacity = (retention.capacity + 1).min(descriptor.retain);
+                        retention.capacity = (retention.capacity + 1).min(retention_ceiling(descriptor.retain, self.focus.len()));
                     }
 
                     let key = self.graph.nodes.insert(Node {
@@ -380,7 +380,7 @@ impl<G: Generator> PhaseGraph<G> {
             if retention.ghost_set.insert(ghost) {
                 retention.ghosts.push_back(ghost);
             }
-            if retention.ghosts.len() > retention.ceiling {
+            if retention.ghosts.len() > retention_ceiling(retention.ceiling, self.focus.len()) {
                 let forgotten = retention.ghosts.pop_front().expect("ghosts is longer than the ceiling");
                 retention.ghost_set.remove(&forgotten);
             }
@@ -598,6 +598,10 @@ fn phase_reach<G: Generator>() -> FxHashMap<PhaseId, f64> {
     reach
 }
 
+fn retention_ceiling(per_focus: usize, foci: usize) -> usize {
+    per_focus.saturating_mul(foci.max(1))
+}
+
 fn nearest_distance(by_x: &[ChunkPos], cell: ChunkPos) -> Option<f64> {
     let split = by_x.partition_point(|focus| focus.x < cell.x);
     let mut best: Option<f64> = None;
@@ -624,6 +628,14 @@ mod tests {
         foci.iter()
             .map(|focus| (((cell.x - focus.x) as f64).powi(2) + ((cell.z - focus.z) as f64).powi(2)).sqrt())
             .reduce(f64::min)
+    }
+
+    #[test]
+    fn the_retention_ceiling_scales_with_the_number_of_foci() {
+        assert_eq!(retention_ceiling(1024, 0), 1024);
+        assert_eq!(retention_ceiling(1024, 1), 1024);
+        assert_eq!(retention_ceiling(1024, 100), 102_400);
+        assert_eq!(retention_ceiling(usize::MAX, 4), usize::MAX);
     }
 
     #[test]
