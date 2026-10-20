@@ -267,10 +267,11 @@ impl Prompt {
 pub fn start(visible: bool) -> std::io::Result<()> {
     terminal::enable_raw_mode()?;
     let mut prompt = Prompt { visible, ..Default::default() };
+    let mut state = STATE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     let mut out = stdout().lock();
     prompt.draw(&mut out);
     let _ = out.flush();
-    *STATE.lock().expect("console prompt lock poisoned") = Some(prompt);
+    *state = Some(prompt);
     Ok(())
 }
 
