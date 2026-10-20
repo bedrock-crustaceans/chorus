@@ -133,6 +133,7 @@ impl Plugin for Server {
             .add_systems(Tick, Server::end_tick.in_set(TickSet::Last))
             .add_plugins(Registry)
             .add_plugins(ConsolePlugin)
+            .add_plugins(crate::debug::DebugPlugin)
             .add_plugins(Network);
     }
 }

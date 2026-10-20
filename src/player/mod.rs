@@ -1,3 +1,4 @@
+use crate::debug::hud::DebugHud;
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::level::DimensionId;
@@ -28,7 +29,7 @@ pub const PLAYER_EYE_HEIGHT: f32 = 1.62;
 const TELEPORT_ARRIVAL_DISTANCE: f32 = 1.0;
 
 #[derive(Component, Default)]
-#[require(DimensionId, ChunkView, BlockBreaking, PlayerInventory, PendingForms, Gamemode, FlySpeed, PendingTeleport)]
+#[require(DimensionId, ChunkView, BlockBreaking, PlayerInventory, PendingForms, Gamemode, FlySpeed, PendingTeleport, DebugHud)]
 pub struct Player;
 
 #[derive(Component, Default)]

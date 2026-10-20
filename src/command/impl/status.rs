@@ -6,6 +6,7 @@ use crate::values;
 use crate::level::DimensionId;
 use crate::level::generator::dimension::Dimension;
 use crate::level::level::Level;
+use crate::format::{decimal, megabytes, milliseconds, thousands, tps, usage};
 use crate::network::bandwidth::BandwidthTracker;
 use crate::player::Player;
 use crate::player::chunk_view::ChunkView;
@@ -246,32 +247,6 @@ fn flag(value: bool) -> &'static str {
     if value { "§ayes" } else { "§7no" }
 }
 
-fn usage(percent: f64) -> String {
-    let color = if percent < 50. {
-        "§a"
-    } else if percent < 80. {
-        "§6"
-    } else {
-        "§c"
-    };
-    format!("{color}{}%§f", decimal(percent, 1))
-}
-
-fn milliseconds(value: f64) -> String {
-    format!("{} ms", decimal(value, 2))
-}
-
-fn tps(value: f64) -> String {
-    let color = if value < 12. {
-        "§c"
-    } else if value < 17. {
-        "§6"
-    } else {
-        "§a"
-    };
-    format!("{color}{}§f", decimal(value, 1))
-}
-
 fn format_duration(seconds: u64) -> String {
     let (days, hours, minutes, seconds) = (seconds / 86_400, seconds % 86_400 / 3_600, seconds % 3_600 / 60, seconds % 60);
     match (days, hours, minutes) {
@@ -280,34 +255,4 @@ fn format_duration(seconds: u64) -> String {
         (0, _, _) => format!("{hours}h {minutes}m {seconds}s"),
         _ => format!("{days}d {hours}h {minutes}m"),
     }
-}
-
-fn decimal(value: f64, places: usize) -> String {
-    let formatted = format!("{value:.places$}");
-    if formatted.contains('.') {
-        formatted.trim_end_matches('0').trim_end_matches('.').to_owned()
-    } else {
-        formatted
-    }
-}
-
-fn megabytes(bytes: u64) -> String {
-    let megabytes = bytes as f64 / 1024. / 1024.;
-    if megabytes >= 1024. {
-        format!("{} GB", decimal(megabytes / 1024., 2))
-    } else {
-        format!("{} MB", decimal(megabytes, 1))
-    }
-}
-
-fn thousands(value: usize) -> String {
-    let digits = value.to_string();
-    let mut grouped = String::with_capacity(digits.len() + digits.len() / 3);
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            grouped.push(',');
-        }
-        grouped.push(digit);
-    }
-    grouped
 }
