@@ -723,3 +723,130 @@ fn chunk_saving_policy() {
     drop(dimension);
     let _ = std::fs::remove_dir_all(directory);
 }
+
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static HEAP_PROFILER: dhat::Alloc = dhat::Alloc;
+
+#[cfg(feature = "dhat-heap")]
+#[test]
+#[ignore]
+fn heap_profile() {
+    use chorus_level::dimension_type::DimensionType;
+    use chorus_level::generator::dimension::Dimension;
+
+    let foci_per_side: i32 = std::env::var("PROFILE_FOCI").ok().and_then(|v| v.parse().ok()).unwrap_or(2);
+    let radius: i32 = std::env::var("PROFILE_RADIUS").ok().and_then(|v| v.parse().ok()).unwrap_or(8);
+    let threads: usize = std::env::var("PROFILE_THREADS").ok().and_then(|v| v.parse().ok()).unwrap_or(4);
+    bevy_tasks::AsyncComputeTaskPool::get_or_init(|| bevy_tasks::TaskPoolBuilder::new().num_threads(threads).build());
+    let (generator, _) = generator(0);
+    let mut dimension = Dimension::new(DimensionType::Overworld, generator);
+    let spacing = radius * 4;
+    let centers: Vec<(i32, i32)> = (0..foci_per_side).flat_map(|i| (0..foci_per_side).map(move |j| (i * spacing, j * spacing))).collect();
+    let mut positions: Vec<(i32, i32)> = Vec::new();
+    for &(cx, cz) in &centers {
+        for dx in -radius..=radius {
+            for dz in -radius..=radius {
+                if dx * dx + dz * dz <= radius * radius {
+                    positions.push((cx + dx, cz + dz));
+                }
+            }
+        }
+    }
+
+    let profiler = dhat::Profiler::builder().file_name("dhat-heap.json").build();
+    dimension.set_focus(&centers);
+    dimension.request_chunks(&positions);
+    let mut done = 0;
+    while done < positions.len() {
+        done += dimension.tick().len();
+        std::thread::yield_now();
+    }
+    let stats = dhat::HeapStats::get();
+    println!(
+        "DHAT chunks={} total_blocks={} total_bytes={} live_blocks={} live_bytes={} peak_bytes={}",
+        positions.len(),
+        stats.total_blocks,
+        stats.total_bytes,
+        stats.curr_blocks,
+        stats.curr_bytes,
+        stats.max_bytes
+    );
+    drop(profiler);
+    drop(dimension);
+}
+
+#[test]
+#[ignore]
+fn retention_usefulness() {
+    use chorus_level::dimension_type::DimensionType;
+    use chorus_level::generator::dimension::Dimension;
+
+    let foci_per_side: i32 = std::env::var("SCALE_FOCI").ok().and_then(|v| v.parse().ok()).unwrap_or(4);
+    let radius: i32 = std::env::var("SCALE_RADIUS").ok().and_then(|v| v.parse().ok()).unwrap_or(8);
+    bevy_tasks::AsyncComputeTaskPool::get_or_init(bevy_tasks::TaskPool::default);
+    let (generator, _) = generator(0);
+    let mut dimension = Dimension::new(DimensionType::Overworld, generator);
+    let spacing = radius * 4;
+    let centers: Vec<(i32, i32)> = (0..foci_per_side).flat_map(|i| (0..foci_per_side).map(move |j| (i * spacing, j * spacing))).collect();
+    let mut positions: Vec<(i32, i32)> = Vec::new();
+    for &(cx, cz) in &centers {
+        for dx in -radius..=radius {
+            for dz in -radius..=radius {
+                if dx * dx + dz * dz <= radius * radius {
+                    positions.push((cx + dx, cz + dz));
+                }
+            }
+        }
+    }
+    dimension.set_focus(&centers);
+    dimension.request_chunks(&positions);
+    let mut done = 0;
+    while done < positions.len() {
+        done += dimension.tick().len();
+        std::thread::yield_now();
+    }
+    println!("RETENTION foci={} chunks={}", centers.len(), positions.len());
+    println!("{}", dimension.retention_report());
+}
+
+#[test]
+#[ignore]
+fn retention_usefulness_walking() {
+    use chorus_level::dimension_type::DimensionType;
+    use chorus_level::generator::dimension::Dimension;
+    use std::collections::HashSet;
+
+    let walkers: i32 = std::env::var("WALKERS").ok().and_then(|v| v.parse().ok()).unwrap_or(4);
+    let steps: i32 = std::env::var("STEPS").ok().and_then(|v| v.parse().ok()).unwrap_or(40);
+    let radius: i32 = std::env::var("SCALE_RADIUS").ok().and_then(|v| v.parse().ok()).unwrap_or(8);
+    bevy_tasks::AsyncComputeTaskPool::get_or_init(bevy_tasks::TaskPool::default);
+    let (generator, _) = generator(0);
+    let mut dimension = Dimension::new(DimensionType::Overworld, generator);
+    let origins: Vec<(i32, i32)> = (0..walkers).map(|i| (i * radius * 6, 0)).collect();
+    let mut requested: HashSet<(i32, i32)> = HashSet::new();
+    let mut total = 0;
+    for step in 0..steps {
+        let centers: Vec<(i32, i32)> = origins.iter().map(|&(x, z)| (x, z + step)).collect();
+        let mut fresh = Vec::new();
+        for &(cx, cz) in &centers {
+            for dx in -radius..=radius {
+                for dz in -radius..=radius {
+                    if dx * dx + dz * dz <= radius * radius && requested.insert((cx + dx, cz + dz)) {
+                        fresh.push((cx + dx, cz + dz));
+                    }
+                }
+            }
+        }
+        dimension.set_focus(&centers);
+        dimension.request_chunks(&fresh);
+        let mut done = 0;
+        while done < fresh.len() {
+            done += dimension.tick().len();
+            std::thread::yield_now();
+        }
+        total += fresh.len();
+    }
+    println!("RETENTION walkers={walkers} steps={steps} chunks={total}");
+    println!("{}", dimension.retention_report());
+}

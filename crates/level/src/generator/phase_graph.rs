@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use crossbeam_channel::{Receiver, Sender};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::chunk::Chunk;
 use crate::generator::dimension::{Generator, WorldGenerator};
@@ -16,6 +16,7 @@ use crate::generator::phase::{PhaseDescriptor, PhaseId, PhaseInputs};
 use crate::generator::pos::ChunkPos;
 
 const RETENTION_WINDOW: Duration = Duration::from_secs(5);
+const REPORT_INTERVAL: Duration = Duration::from_secs(30);
 const COMPLETION_WAIT: Duration = Duration::from_millis(1);
 
 enum Completion {
@@ -46,6 +47,11 @@ pub struct PhaseGraph<G: Generator> {
     focus: Vec<ChunkPos>,
     focus_by_x: Vec<ChunkPos>,
     reach: FxHashMap<PhaseId, f64>,
+    hops: FxHashMap<PhaseId, u32>,
+    terminal: PhaseId,
+    completed: FxHashSet<ChunkPos>,
+    started: FxHashMap<&'static str, u64>,
+    last_report: Instant,
     in_flight: usize,
     finished: Vec<(ChunkPos, Outcome)>,
     discarded: Vec<Outcome>,
@@ -54,6 +60,7 @@ pub struct PhaseGraph<G: Generator> {
 impl<G: Generator> PhaseGraph<G> {
     pub fn new(generator: G) -> Self {
         let (completions_tx, completions_rx) = crossbeam_channel::unbounded();
+        let (reach, hops) = phase_shape::<G>();
 
         Self {
             generator: Arc::new(generator),
@@ -64,7 +71,12 @@ impl<G: Generator> PhaseGraph<G> {
             next_order: 0,
             focus: Vec::new(),
             focus_by_x: Vec::new(),
-            reach: phase_reach::<G>(),
+            reach,
+            hops,
+            terminal: PhaseId::of::<G::Terminal>(),
+            completed: FxHashSet::default(),
+            started: FxHashMap::default(),
+            last_report: Instant::now(),
             in_flight: 0,
             finished: Vec::new(),
             discarded: Vec::new(),
@@ -127,9 +139,11 @@ impl<G: Generator> PhaseGraph<G> {
                         && retention.ghost_set.remove(&(cell, hop))
                     {
                         retention.capacity = (retention.capacity + 1).min(retention_ceiling(descriptor.retain, self.focus.len()));
+                        retention.stats.ghost_hits += 1;
                     }
 
                     let key = self.graph.nodes.insert(Node {
+                        reused: false,
                         descriptor,
                         cell,
                         hop,
@@ -204,6 +218,11 @@ impl<G: Generator> PhaseGraph<G> {
                             && let Some(retention) = self.graph.retained.get_mut(&dependency.descriptor.phase)
                         {
                             retention.window_max_depth = retention.window_max_depth.max(retention.pushes - stamp);
+                            retention.stats.reuse_events += 1;
+                            if !dependency.reused {
+                                dependency.reused = true;
+                                retention.stats.nodes_reused += 1;
+                            }
                         }
                     }
 
@@ -273,6 +292,7 @@ impl<G: Generator> PhaseGraph<G> {
         let node = &self.graph.nodes[key];
         let descriptor = node.descriptor;
         let cell = node.cell;
+        *self.started.entry(descriptor.name).or_default() += 1;
         let mut resolved = Vec::with_capacity(node.deps.len());
         let mut failed = None;
         for dependency_key in &node.deps {
@@ -314,7 +334,11 @@ impl<G: Generator> PhaseGraph<G> {
             node.requested = false;
             self.finished.push((node.cell, outcome.clone()));
         }
+        let finished_terminal = (node.descriptor.phase == self.terminal).then_some(node.cell);
         node.status = NodeStatus::Done(outcome);
+        if let Some(cell) = finished_terminal {
+            self.completed.insert(cell);
+        }
 
         for i in 0..self.graph.nodes[key].dependents.len() {
             let dependent_key = self.graph.nodes[key].dependents[i];
@@ -331,6 +355,53 @@ impl<G: Generator> PhaseGraph<G> {
         }
 
         self.try_evict(key);
+        if let Some(cell) = finished_terminal {
+            self.sweep(cell);
+        }
+    }
+
+    fn is_interior(&self, phase: PhaseId, cell: ChunkPos) -> bool {
+        let Some(&reach) = self.reach.get(&phase) else { return false };
+        let radius = reach.ceil() as i32;
+        for dx in -radius..=radius {
+            for dz in -radius..=radius {
+                if ((dx * dx + dz * dz) as f64).sqrt() > reach {
+                    continue;
+                }
+                let around = ChunkPos::new(cell.x + dx, cell.z + dz);
+                let finished = match self.graph.index.get(&(self.terminal, around, 0)) {
+                    Some(&key) => matches!(self.graph.nodes[key].status, NodeStatus::Done(_)),
+                    None => self.completed.contains(&around),
+                };
+                if !finished {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    fn sweep(&mut self, around: ChunkPos) {
+        let phases: Vec<PhaseId> = self.graph.retained.keys().copied().collect();
+        for phase in phases {
+            let Some(&reach) = self.reach.get(&phase) else { continue };
+            let hops = self.hops.get(&phase).copied().unwrap_or(0);
+            let radius = reach.ceil() as i32;
+            for dx in -radius..=radius {
+                for dz in -radius..=radius {
+                    if ((dx * dx + dz * dz) as f64).sqrt() > reach {
+                        continue;
+                    }
+                    let cell = ChunkPos::new(around.x + dx, around.z + dz);
+                    for hop in 0..=hops {
+                        let Some(&key) = self.graph.index.get(&(phase, cell, hop)) else { continue };
+                        if self.graph.nodes[key].retained.is_some() && self.is_interior(phase, cell) {
+                            self.remove(key);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn try_evict(&mut self, key: NodeKey) {
@@ -355,13 +426,19 @@ impl<G: Generator> PhaseGraph<G> {
         if node.retained.is_some() {
             return;
         }
+        if self.is_interior(node.descriptor.phase, node.cell) {
+            self.remove(key);
+            return;
+        }
 
         let node = &mut self.graph.nodes[key];
         let phase = node.descriptor.phase;
-        let retention = self.graph.retained.entry(phase).or_insert_with(|| Retention::new(retain));
+        let name = node.descriptor.name;
+        let retention = self.graph.retained.entry(phase).or_insert_with(|| Retention::new(name, retain));
         let stamp = retention.pushes;
         retention.pushes += 1;
         retention.queue.push_back((key, stamp));
+        retention.stats.pushed += 1;
         node.retained = Some(stamp);
         node.dependents.clear();
 
@@ -376,6 +453,11 @@ impl<G: Generator> PhaseGraph<G> {
                 continue;
             };
 
+            if expired.reused {
+                retention.stats.evicted_after_reuse += 1;
+            } else {
+                retention.stats.evicted_unused += 1;
+            }
             let ghost = (expired.cell, expired.hop);
             if retention.ghost_set.insert(ghost) {
                 retention.ghosts.push_back(ghost);
@@ -456,6 +538,7 @@ impl<G: Generator> PhaseGraph<G> {
         self.graph.index.remove(&(node.descriptor.phase, node.cell, node.hop));
         if let Some(node) = self.graph.nodes.remove(key)
             && let NodeStatus::Done(outcome) = node.status
+            && node.descriptor.phase != self.terminal
         {
             self.discarded.push(outcome);
         }
@@ -532,6 +615,10 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
             self.handle(completion);
         }
         self.shrink_retention();
+        if self.last_report.elapsed() >= REPORT_INTERVAL {
+            self.last_report = Instant::now();
+            tracing::debug!(target: "generation", "{}", self.progress_report());
+        }
 
         let pool = AsyncComputeTaskPool::get();
         if pool.thread_num() == 0 {
@@ -570,14 +657,48 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
             .collect()
     }
 
+    fn retention_report(&self) -> String {
+        let mut live: FxHashMap<PhaseId, usize> = FxHashMap::default();
+        for node in self.graph.nodes.values() {
+            if node.retained.is_some() {
+                *live.entry(node.descriptor.phase).or_default() += 1;
+            }
+        }
+        let mut lines: Vec<String> = self
+            .graph
+            .retained
+            .iter()
+            .map(|(phase, retention)| {
+                let stats = retention.stats;
+                let reused = 100.0 * stats.nodes_reused as f64 / stats.pushed.max(1) as f64;
+                format!(
+                    "{:<12} pushed {:>7} reused {:>7} ({:>5.1}%) reuse events {:>7} evicted unused {:>7} evicted after reuse {:>7} ghost hits {:>6} capacity {:>6} live retained {:>6}",
+                    retention.name,
+                    stats.pushed,
+                    stats.nodes_reused,
+                    reused,
+                    stats.reuse_events,
+                    stats.evicted_unused,
+                    stats.evicted_after_reuse,
+                    stats.ghost_hits,
+                    retention.capacity,
+                    live.get(phase).copied().unwrap_or(0)
+                )
+            })
+            .collect();
+        lines.sort();
+        lines.join("\n")
+    }
+
     fn has_pending_work(&self) -> bool {
         !self.pending_dispatch.is_empty() || self.in_flight > 0
     }
 }
 
-fn phase_reach<G: Generator>() -> FxHashMap<PhaseId, f64> {
+fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u32>) {
     let step = |offsets: &[(i32, i32)]| offsets.iter().map(|&(dx, dz)| ((dx * dx + dz * dz) as f64).sqrt()).fold(0.0, f64::max);
     let mut reach = FxHashMap::default();
+    let mut hop_limits = FxHashMap::default();
     let mut stack = vec![(PhaseDescriptor::of::<G::Terminal>(), 0.0)];
     while let Some((descriptor, distance)) = stack.pop() {
         let requirements = (descriptor.requires)();
@@ -586,6 +707,13 @@ fn phase_reach<G: Generator>() -> FxHashMap<PhaseId, f64> {
             .filter(|requirement| requirement.descriptor.phase == descriptor.phase)
             .map(|requirement| step(requirement.offsets) * requirement.max_hops.unwrap_or(0) as f64)
             .fold(0.0, f64::max);
+        let hop_limit = requirements
+            .iter()
+            .filter(|requirement| requirement.descriptor.phase == descriptor.phase)
+            .map(|requirement| requirement.max_hops.unwrap_or(0))
+            .max()
+            .unwrap_or(0);
+        hop_limits.insert(descriptor.phase, hop_limit);
         let distance = distance + hops;
         if reach.get(&descriptor.phase).is_some_and(|&known| known >= distance) {
             continue;
@@ -595,7 +723,15 @@ fn phase_reach<G: Generator>() -> FxHashMap<PhaseId, f64> {
             stack.push((requirement.descriptor, distance + step(requirement.offsets)));
         }
     }
-    reach
+    (reach, hop_limits)
+}
+
+impl<G: Generator> PhaseGraph<G> {
+    fn progress_report(&self) -> String {
+        let mut started: Vec<String> = self.started.iter().map(|(name, count)| format!("{name}={count}")).collect();
+        started.sort();
+        format!("nodes {} chunks completed {} started {}", self.graph.nodes.len(), self.completed.len(), started.join(" "))
+    }
 }
 
 fn retention_ceiling(per_focus: usize, foci: usize) -> usize {

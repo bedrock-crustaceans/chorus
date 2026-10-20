@@ -21,6 +21,7 @@ pub(crate) enum NodeStatus {
 }
 
 pub(crate) struct Node<G: Generator> {
+    pub reused: bool,
     pub descriptor: PhaseDescriptor<G>,
     pub cell: ChunkPos,
     pub hop: u32,
@@ -33,7 +34,19 @@ pub(crate) struct Node<G: Generator> {
     pub status: NodeStatus,
 }
 
+#[derive(Clone, Copy, Default, Debug)]
+pub struct RetentionStats {
+    pub pushed: u64,
+    pub nodes_reused: u64,
+    pub reuse_events: u64,
+    pub evicted_unused: u64,
+    pub evicted_after_reuse: u64,
+    pub ghost_hits: u64,
+}
+
 pub(crate) struct Retention {
+    pub name: &'static str,
+    pub stats: RetentionStats,
     pub ceiling: usize,
     pub capacity: usize,
     pub pushes: u64,
@@ -45,8 +58,10 @@ pub(crate) struct Retention {
 }
 
 impl Retention {
-    pub fn new(ceiling: usize) -> Self {
+    pub fn new(name: &'static str, ceiling: usize) -> Self {
         Self {
+            name,
+            stats: RetentionStats::default(),
             ceiling,
             capacity: 0,
             pushes: 0,

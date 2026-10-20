@@ -15,10 +15,30 @@ use crate::overworld::shared::scratch::Scratch;
 use chorus_block::block_id::{VINE, WATER};
 use chorus_block::state::common::{PERSISTENT_BIT, PILLAR_AXIS};
 
-#[derive(Default)]
+thread_local! {
+    static SPARE_SETS: std::cell::RefCell<Vec<(Vec<IVec3>, HashSet<IVec3>)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
 pub struct PositionSet {
     order: Vec<IVec3>,
     seen: HashSet<IVec3>,
+}
+
+impl Default for PositionSet {
+    fn default() -> Self {
+        let (order, seen) = SPARE_SETS.try_with(|spare| spare.borrow_mut().pop()).ok().flatten().unwrap_or_default();
+        Self { order, seen }
+    }
+}
+
+impl Drop for PositionSet {
+    fn drop(&mut self) {
+        let mut order = std::mem::take(&mut self.order);
+        let mut seen = std::mem::take(&mut self.seen);
+        order.clear();
+        seen.clear();
+        let _ = SPARE_SETS.try_with(|spare| spare.borrow_mut().push((order, seen)));
+    }
 }
 
 fn java_hash(pos: IVec3) -> i32 {

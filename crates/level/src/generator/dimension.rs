@@ -22,6 +22,9 @@ pub trait WorldGenerator: Send + Sync {
     fn cancel_chunk(&mut self, x: i32, z: i32);
     fn tick(&mut self) -> Vec<(i32, i32, Result<Chunk, Arc<PhaseFailure>>)>;
     fn has_pending_work(&self) -> bool;
+    fn retention_report(&self) -> String {
+        String::new()
+    }
 }
 
 pub struct Dimension {
@@ -242,6 +245,10 @@ impl Dimension {
             storage.schedule_flush();
         }
         unloaded
+    }
+
+    pub fn retention_report(&self) -> String {
+        self.generator.retention_report()
     }
 
     pub fn has_pending_generation(&self) -> bool {
