@@ -48,6 +48,7 @@ pub struct PhaseGraph<G: Generator> {
     reach: FxHashMap<PhaseId, f64>,
     in_flight: usize,
     finished: Vec<(ChunkPos, Outcome)>,
+    discarded: Vec<Outcome>,
 }
 
 impl<G: Generator> PhaseGraph<G> {
@@ -66,6 +67,7 @@ impl<G: Generator> PhaseGraph<G> {
             reach: phase_reach::<G>(),
             in_flight: 0,
             finished: Vec::new(),
+            discarded: Vec::new(),
         }
     }
 
@@ -385,7 +387,11 @@ impl<G: Generator> PhaseGraph<G> {
 
             let expired = &self.graph.nodes[oldest];
             self.graph.index.remove(&(expired.descriptor.phase, expired.cell, expired.hop));
-            self.graph.nodes.remove(oldest);
+            if let Some(node) = self.graph.nodes.remove(oldest)
+                && let NodeStatus::Done(outcome) = node.status
+            {
+                self.discarded.push(outcome);
+            }
         }
     }
 
@@ -448,7 +454,23 @@ impl<G: Generator> PhaseGraph<G> {
     fn remove(&mut self, key: NodeKey) {
         let node = &self.graph.nodes[key];
         self.graph.index.remove(&(node.descriptor.phase, node.cell, node.hop));
-        self.graph.nodes.remove(key);
+        if let Some(node) = self.graph.nodes.remove(key)
+            && let NodeStatus::Done(outcome) = node.status
+        {
+            self.discarded.push(outcome);
+        }
+    }
+
+    fn release_discarded(&mut self, pool: &TaskPool) {
+        if self.discarded.is_empty() {
+            return;
+        }
+        let batch = std::mem::take(&mut self.discarded);
+        if pool.thread_num() == 0 {
+            drop(batch);
+        } else {
+            pool.spawn(async move { drop(batch) }).detach();
+        }
     }
 
     fn cancel(&mut self, cell: ChunkPos) {
@@ -533,6 +555,8 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
                 self.fill_pool(pool);
             }
         }
+
+        self.release_discarded(pool);
 
         std::mem::take(&mut self.finished)
             .into_iter()
