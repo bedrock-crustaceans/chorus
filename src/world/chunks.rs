@@ -61,6 +61,16 @@ impl ChunkPayload {
 
 type ChunkKey = (i32, i32, i32);
 
+#[derive(Default, Clone, Copy)]
+pub struct ViewStats {
+    pub wanted: usize,
+    pub generated: usize,
+    pub in_flight: usize,
+    pub ready: usize,
+    pub queued: usize,
+    pub sent: usize,
+}
+
 #[derive(Resource)]
 pub struct ChunkSerializer {
     sender: Sender<(ChunkKey, ChunkPayload)>,
@@ -105,6 +115,29 @@ impl ChunkSerializer {
             let _ = sender.send((key, build_payload(chunk)));
         })
         .detach();
+    }
+
+    pub fn view_stats(&self, view: &ChunkView, dimension: Option<&Dimension>) -> ViewStats {
+        let Some(center) = view.center else { return ViewStats::default() };
+        let mut stats = ViewStats::default();
+        for dx in -view.radius..=view.radius {
+            for dz in -view.radius..=view.radius {
+                if dx * dx + dz * dz > view.radius * view.radius {
+                    continue;
+                }
+                let position = (center.0 + dx, center.1 + dz);
+                stats.wanted += 1;
+                stats.generated += dimension.is_some_and(|dimension| dimension.get_chunk(position.0, position.1).is_some()) as usize;
+                stats.sent += view.sent.contains(&position) as usize;
+            }
+        }
+        for &(x, z) in &view.pending {
+            let key = (view.dimension, x, z);
+            stats.in_flight += self.in_flight.contains(&key) as usize;
+            stats.ready += self.ready.contains_key(&key) as usize;
+        }
+        stats.queued = view.pending.len();
+        stats
     }
 
     fn current(&self, key: &ChunkKey, dimension: &Dimension) -> bool {

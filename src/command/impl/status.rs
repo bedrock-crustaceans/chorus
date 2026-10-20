@@ -8,22 +8,25 @@ use crate::level::generator::dimension::Dimension;
 use crate::level::level::Level;
 use crate::network::bandwidth::BandwidthTracker;
 use crate::player::Player;
+use crate::player::chunk_view::ChunkView;
+use crate::world::chunks::ChunkSerializer;
 use crate::server::pregen::Pregen;
 use crate::server::{ServerMetrics, ServerState};
 use crate::utils::process::process_stats;
 use chorus_core::permission::PermissionLevel;
 use bevy_tasks::{AsyncComputeTaskPool, ComputeTaskPool, IoTaskPool};
 
-const SECTION: CommandEnum = CommandEnum::new("StatusSection", values!["performance", "network", "memory", "worlds", "storage", "all"]);
+const SECTION: CommandEnum = CommandEnum::new("StatusSection", values!["performance", "network", "memory", "worlds", "chunks", "storage", "all"]);
 
 pub const STATUS_COMMAND: CommandDefinition = CommandDefinition::new("status", "Shows how the server is doing", |context, args| {
     let sections: &[Section] = match args.string("section") {
         None => &[Section::Summary],
-        Some("all") => &[Section::Performance, Section::Network, Section::Memory, Section::Worlds, Section::Storage],
+        Some("all") => &[Section::Performance, Section::Network, Section::Memory, Section::Worlds, Section::Chunks, Section::Storage],
         Some("performance") => &[Section::Performance],
         Some("network") => &[Section::Network],
         Some("memory") => &[Section::Memory],
         Some("worlds") => &[Section::Worlds],
+        Some("chunks") => &[Section::Chunks],
         Some(_) => &[Section::Storage],
     };
 
@@ -49,6 +52,7 @@ enum Section {
     Network,
     Memory,
     Worlds,
+    Chunks,
     Storage,
 }
 
@@ -60,6 +64,7 @@ impl Section {
             Self::Network => network(context, report),
             Self::Memory => memory(report),
             Self::Worlds => worlds(context, report),
+            Self::Chunks => chunks(context, report),
             Self::Storage => storage(context, report),
         }
     }
@@ -77,6 +82,11 @@ impl Report {
 
     fn row(&mut self, label: &str, value: impl AsRef<str>) {
         self.lines.push(format!("  §7{label}§8: §f{}", value.as_ref()));
+    }
+
+    fn stacked(&mut self, label: &str, value: impl AsRef<str>) {
+        self.lines.push(format!("  §7{label}§8:"));
+        self.lines.push(format!("    §f{}", value.as_ref()));
     }
 
     fn hint(&mut self, text: impl AsRef<str>) {
@@ -174,6 +184,26 @@ fn worlds(context: &CommandContext, report: &mut Report) {
             ),
         );
     }
+}
+
+fn chunks(context: &CommandContext, report: &mut Report) {
+    let level = context.resource::<Level>();
+    let serializer = context.resource::<ChunkSerializer>();
+    report.header("Chunks");
+    let Some(view) = context.get::<ChunkView>() else {
+        report.hint("run this as a player to see the chunk view");
+        return;
+    };
+    let stats = serializer.view_stats(view, level.dimension(view.dimension));
+    report.stacked("View", format!("radius {} {}", view.radius, detail(format!("{} chunks", thousands(stats.wanted)))));
+    report.stacked("Generated", progress(stats.generated, stats.wanted));
+    report.stacked("Sent", progress(stats.sent, stats.wanted));
+    report.stacked("Waiting", format!("{} {}", thousands(stats.queued), detail(format!("{} serialized §8|§7 {} serializing", thousands(stats.ready), thousands(stats.in_flight)))));
+}
+
+fn progress(value: usize, total: usize) -> String {
+    let percent = if total == 0 { 100. } else { value as f64 * 100. / total as f64 };
+    format!("{}§8/§7{} {}", thousands(value), thousands(total), detail(format!("{}%", decimal(percent, 0))))
 }
 
 fn storage(context: &CommandContext, report: &mut Report) {
