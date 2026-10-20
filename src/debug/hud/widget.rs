@@ -84,8 +84,18 @@ impl Widget {
             Self::Usage => format!("§7Tick {}", usage(server.tick_usage)),
             Self::Memory => format!("§7Mem §f{}", server.memory.map_or_else(|| "-".to_owned(), |memory| megabytes(memory.resident_bytes))),
             Self::Players => format!("§7Players §f{}", server.players),
-            Self::Generated => format!("§7Gen §f{}§8/§f{}", thousands(player.view.generated), thousands(player.view.wanted)),
-            Self::Sent => format!("§7Sent §f{}§8/§f{}", thousands(player.view.sent), thousands(player.view.wanted)),
+            Self::Generated => format!(
+                "§7Gen §f{}§8/§f{} §8r§f{}",
+                thousands(player.view.generated),
+                thousands(player.view.wanted),
+                decimal(player.view.generated_radius as f64, 1)
+            ),
+            Self::Sent => format!(
+                "§7Sent §f{}§8/§f{} §8r§f{}",
+                thousands(player.view.sent),
+                thousands(player.view.wanted),
+                decimal(player.view.sent_radius as f64, 1)
+            ),
             Self::Position => {
                 let feet = player.position.y - PLAYER_EYE_HEIGHT;
                 format!("§7XYZ §f{} {} {}", decimal(player.position.x as f64, 1), decimal(feet as f64, 1), decimal(player.position.z as f64, 1))
@@ -134,6 +144,9 @@ mod tests {
                 position: Vec3::new(10.5, 64.0 + PLAYER_EYE_HEIGHT, -3.5),
                 rotation: Vec2::new(0.0, 90.0),
                 view: ViewStats {
+                    radius: 24.0,
+                    generated_radius: 21.5,
+                    sent_radius: 7.25,
                     wanted: 1500,
                     generated: 1200,
                     sent: 300,
@@ -170,8 +183,8 @@ mod tests {
 
     #[test]
     fn renders_chunk_counts_with_grouping() {
-        assert_eq!(Widget::Generated.render(&sample()), "§7Gen §f1,200§8/§f1,500");
-        assert_eq!(Widget::Sent.render(&sample()), "§7Sent §f300§8/§f1,500");
+        assert_eq!(Widget::Generated.render(&sample()), "§7Gen §f1,200§8/§f1,500 §8r§f21.5");
+        assert_eq!(Widget::Sent.render(&sample()), "§7Sent §f300§8/§f1,500 §8r§f7.2");
     }
 
     #[test]

@@ -64,6 +64,9 @@ type ChunkKey = (i32, i32, i32);
 
 #[derive(Default, Clone, Copy)]
 pub struct ViewStats {
+    pub radius: f32,
+    pub generated_radius: f32,
+    pub sent_radius: f32,
     pub wanted: usize,
     pub generated: usize,
     pub in_flight: usize,
@@ -121,17 +124,31 @@ impl ChunkSerializer {
     pub fn view_stats(&self, view: &ChunkView, dimension: Option<&Dimension>) -> ViewStats {
         let Some(center) = view.center else { return ViewStats::default() };
         let mut stats = ViewStats::default();
+        let (mut nearest_ungenerated, mut nearest_unsent) = (i32::MAX, i32::MAX);
         for dx in -view.radius..=view.radius {
             for dz in -view.radius..=view.radius {
-                if dx * dx + dz * dz > view.radius * view.radius {
+                let distance = dx * dx + dz * dz;
+                if distance > view.radius * view.radius {
                     continue;
                 }
                 let position = (center.0 + dx, center.1 + dz);
                 stats.wanted += 1;
-                stats.generated += dimension.is_some_and(|dimension| dimension.get_chunk(position.0, position.1).is_some()) as usize;
-                stats.sent += view.sent.contains(&position) as usize;
+                if dimension.is_some_and(|dimension| dimension.get_chunk(position.0, position.1).is_some()) {
+                    stats.generated += 1;
+                } else {
+                    nearest_ungenerated = nearest_ungenerated.min(distance);
+                }
+                if view.sent.contains(&position) {
+                    stats.sent += 1;
+                } else {
+                    nearest_unsent = nearest_unsent.min(distance);
+                }
             }
         }
+        let covered = |nearest_missing: i32| if nearest_missing == i32::MAX { view.radius as f32 } else { (nearest_missing as f32).sqrt() };
+        stats.radius = view.radius as f32;
+        stats.generated_radius = covered(nearest_ungenerated);
+        stats.sent_radius = covered(nearest_unsent);
         for &(x, z) in &view.pending {
             let key = (view.dimension, x, z);
             stats.in_flight += self.in_flight.contains(&key) as usize;
@@ -661,6 +678,28 @@ mod tests {
         assert_eq!(chunk_allowance(Some(10_500), 1000), 10);
         assert_eq!(chunk_allowance(Some(10), 1000), 1);
         assert_eq!(chunk_allowance(Some(5000), 0), 5000);
+    }
+
+    #[test]
+    fn the_sent_radius_stops_at_the_nearest_chunk_that_has_not_been_sent() {
+        let mut view = ChunkView {
+            radius: 6,
+            center: Some((0, 0)),
+            ..Default::default()
+        };
+        for x in -6..=6 {
+            for z in -6..=6 {
+                if x * x + z * z <= 36 && (x, z) != (3, 4) {
+                    view.sent.insert((x, z));
+                }
+            }
+        }
+        let stats = ChunkSerializer::default().view_stats(&view, None);
+        assert_eq!(stats.radius, 6.0);
+        assert_eq!(stats.sent_radius, 5.0);
+        assert_eq!(stats.generated_radius, 0.0);
+        view.sent.insert((3, 4));
+        assert_eq!(ChunkSerializer::default().view_stats(&view, None).sent_radius, 6.0);
     }
 
     #[test]

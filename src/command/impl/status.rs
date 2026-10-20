@@ -197,8 +197,8 @@ fn chunks(context: &CommandContext, report: &mut Report) {
     };
     let stats = serializer.view_stats(view, level.dimension(view.dimension));
     report.stacked("View", format!("radius {} {}", view.radius, detail(format!("{} chunks", thousands(stats.wanted)))));
-    report.stacked("Generated", progress(stats.generated, stats.wanted));
-    report.stacked("Sent", progress(stats.sent, stats.wanted));
+    report.stacked("Generated", format!("{} {}", progress(stats.generated, stats.wanted), detail(format!("radius {} of {}", decimal(stats.generated_radius as f64, 1), stats.radius))));
+    report.stacked("Sent", format!("{} {}", progress(stats.sent, stats.wanted), detail(format!("radius {} of {}", decimal(stats.sent_radius as f64, 1), stats.radius))));
     report.stacked("Waiting", format!("{} {}", thousands(stats.queued), detail(format!("{} serialized §8|§7 {} serializing", thousands(stats.ready), thousands(stats.in_flight)))));
 }
 

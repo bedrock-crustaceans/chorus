@@ -36,8 +36,8 @@ pub struct Sample {
     pub player: PlayerSample,
 }
 
-pub fn fraction(value: usize, total: usize) -> f32 {
-    if total == 0 { 1.0 } else { (value as f32 / total as f32).clamp(0.0, 1.0) }
+pub fn fraction(value: f32, total: f32) -> f32 {
+    if total <= 0.0 { 1.0 } else { (value / total).clamp(0.0, 1.0) }
 }
 
 #[cfg(test)]
@@ -46,13 +46,13 @@ mod tests {
 
     #[test]
     fn fraction_of_empty_total_is_complete() {
-        assert_eq!(fraction(0, 0), 1.0);
+        assert_eq!(fraction(0.0, 0.0), 1.0);
     }
 
     #[test]
     fn fraction_is_clamped() {
-        assert_eq!(fraction(5, 10), 0.5);
-        assert_eq!(fraction(20, 10), 1.0);
+        assert_eq!(fraction(5.0, 10.0), 0.5);
+        assert_eq!(fraction(20.0, 10.0), 1.0);
     }
 
     #[test]

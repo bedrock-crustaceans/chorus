@@ -93,26 +93,28 @@ impl Page {
         let (server, view) = (&sample.server, &sample.player.view);
         match self {
             Self::Generation => {
-                let progress = fraction(view.generated, view.wanted);
+                let progress = fraction(view.generated_radius, view.radius);
                 BossFrame {
                     title: format!(
-                        "§lChunks generated§r {}/{} §7({}%)",
+                        "§lChunks generated§r §7radius §f{}§8/§f{} §7({}/{})",
+                        decimal(view.generated_radius as f64, 1),
+                        decimal(view.radius as f64, 0),
                         thousands(view.generated),
-                        thousands(view.wanted),
-                        decimal((progress * PERCENT) as f64, 0)
+                        thousands(view.wanted)
                     ),
                     progress,
                     color: completion_color(progress, BossColor::Blue),
                 }
             }
             Self::Sending => {
-                let progress = fraction(view.sent, view.wanted);
+                let progress = fraction(view.sent_radius, view.radius);
                 BossFrame {
                     title: format!(
-                        "§lChunks sent§r {}/{} §7({}%) §8queued §7{}",
+                        "§lChunks sent§r §7radius §f{}§8/§f{} §7({}/{}) §8queued §7{}",
+                        decimal(view.sent_radius as f64, 1),
+                        decimal(view.radius as f64, 0),
                         thousands(view.sent),
                         thousands(view.wanted),
-                        decimal((progress * PERCENT) as f64, 0),
                         thousands(view.queued)
                     ),
                     progress,
@@ -131,7 +133,7 @@ impl Page {
                 let (title, progress) = match server.memory {
                     Some(memory) => (
                         format!("§lMemory§r {} §7of {} virtual", megabytes(memory.resident_bytes), megabytes(memory.virtual_bytes)),
-                        fraction(memory.resident_bytes as usize, memory.virtual_bytes as usize),
+                        fraction(memory.resident_bytes as f32, memory.virtual_bytes as f32),
                     ),
                     None => ("§lMemory§r §7unavailable".to_owned(), 0.0),
                 };
@@ -173,7 +175,7 @@ mod tests {
     use crate::debug::hud::sample::{Memory, PlayerSample, ServerSample};
     use crate::world::chunks::ViewStats;
 
-    fn sample(generated: usize, sent: usize, wanted: usize) -> Sample {
+    fn sample(generated_radius: f32, sent_radius: f32, radius: f32) -> Sample {
         Sample {
             server: ServerSample {
                 tps: 20.0,
@@ -187,9 +189,12 @@ mod tests {
             },
             player: PlayerSample {
                 view: ViewStats {
-                    wanted,
-                    generated,
-                    sent,
+                    radius,
+                    generated_radius,
+                    sent_radius,
+                    wanted: 1000,
+                    generated: 750,
+                    sent: 250,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -198,31 +203,31 @@ mod tests {
     }
 
     #[test]
-    fn generation_progress_is_generated_over_wanted() {
-        let frame = Page::Generation.frame(&sample(750, 0, 1000));
+    fn generation_progress_is_the_generated_radius_over_the_view_radius() {
+        let frame = Page::Generation.frame(&sample(12.0, 0.0, 16.0));
         assert_eq!(frame.progress, 0.75);
         assert_eq!(frame.color, BossColor::Blue);
-        assert!(frame.title.contains("750/1,000"));
+        assert!(frame.title.contains("§f12§8") && frame.title.contains("750/1,000"));
     }
 
     #[test]
-    fn sending_progress_is_sent_over_wanted_and_turns_green_when_done() {
-        let working = Page::Sending.frame(&sample(1000, 250, 1000));
+    fn sending_progress_is_the_sent_radius_over_the_view_radius_and_turns_green_when_done() {
+        let working = Page::Sending.frame(&sample(16.0, 4.0, 16.0));
         assert_eq!(working.progress, 0.25);
         assert_eq!(working.color, BossColor::Purple);
-        let done = Page::Sending.frame(&sample(1000, 1000, 1000));
+        let done = Page::Sending.frame(&sample(16.0, 16.0, 16.0));
         assert_eq!(done.progress, 1.0);
         assert_eq!(done.color, BossColor::Green);
     }
 
     #[test]
     fn empty_view_counts_as_complete() {
-        assert_eq!(Page::Generation.frame(&sample(0, 0, 0)).progress, 1.0);
+        assert_eq!(Page::Generation.frame(&sample(0.0, 0.0, 0.0)).progress, 1.0);
     }
 
     #[test]
     fn performance_progress_follows_tick_usage_and_color_follows_load() {
-        let mut busy = sample(0, 0, 0);
+        let mut busy = sample(0.0, 0.0, 0.0);
         busy.server.tick_usage = 90.0;
         let frame = Page::Performance.frame(&busy);
         assert_eq!(frame.progress, 0.9);
@@ -233,8 +238,8 @@ mod tests {
 
     #[test]
     fn memory_progress_is_resident_share_of_virtual() {
-        assert_eq!(Page::Memory.frame(&sample(0, 0, 0)).progress, 0.5);
-        let mut unavailable = sample(0, 0, 0);
+        assert_eq!(Page::Memory.frame(&sample(0.0, 0.0, 0.0)).progress, 0.5);
+        let mut unavailable = sample(0.0, 0.0, 0.0);
         unavailable.server.memory = None;
         assert_eq!(Page::Memory.frame(&unavailable).progress, 0.0);
     }
@@ -257,7 +262,7 @@ mod tests {
 
     #[test]
     fn frame_changes_ignore_tiny_progress_noise() {
-        let base = Page::Generation.frame(&sample(500, 0, 1000));
+        let base = Page::Generation.frame(&sample(8.0, 0.0, 16.0));
         let noise = BossFrame {
             progress: base.progress + 0.001,
             ..base.clone()
@@ -272,8 +277,8 @@ mod tests {
 
     #[test]
     fn frame_changes_report_title_and_color() {
-        let base = Page::Generation.frame(&sample(500, 0, 1000));
-        let other = Page::Performance.frame(&sample(500, 0, 1000));
+        let base = Page::Generation.frame(&sample(8.0, 0.0, 16.0));
+        let other = Page::Performance.frame(&sample(8.0, 0.0, 16.0));
         let changes = other.changes_from(&base);
         assert!(changes.title && changes.color);
     }
