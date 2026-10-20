@@ -16,14 +16,14 @@ use crate::network::session::state::SessionStateChangedMessage;
 use crate::network::session::{Batch, LoginConfig, Session};
 use crate::network::transport::{SessionId, Transports};
 use crate::world::block::{BlockBreakMessage, BlockPlaceMessage};
-use crate::{JobQueue, Tick, TickSet};
+use crate::{Budget, Priority, Scheduler, Tick, TickSet, Wake};
 use bedrock::network::info::MINECRAFT_EDITION_MOTD;
 use bedrock::network::motd::BedrockMOTD;
 use bedrock::network::nethernet::IdentityStore;
 use bedrock::protocol::ProtoVersion;
 use bevy_app::{App, Plugin, PostUpdate, PreUpdate, Startup};
 use bevy_ecs::prelude::*;
-use bevy_ecs::system::{SystemId, SystemParam};
+use bevy_ecs::system::SystemParam;
 use bevy_nethernet::prelude::*;
 use bevy_raknet::prelude::*;
 use bevy_tasks::ComputeTaskPool;
@@ -45,8 +45,7 @@ pub struct NetworkState {
     sessions: HashMap<SessionId, Entity>,
 }
 
-#[derive(Resource)]
-struct ReceiveJob(SystemId);
+struct ReceiveTask;
 
 #[derive(SystemParam)]
 pub struct ConnectionEvents<'w, 's> {
@@ -59,8 +58,7 @@ pub struct Network;
 
 impl Plugin for Network {
     fn build(&self, app: &mut App) {
-        let receive_job = app.world_mut().register_system(Network::receive);
-        app.insert_resource(ReceiveJob(receive_job));
+        Scheduler::register::<ReceiveTask, _>(app.world_mut(), Priority::Io, Network::receive);
 
         app.add_plugins((PacketHandlers, crate::world::WorldPlugin, crate::actor::ActorPlugin, crate::chat::ChatPlugin))
             .add_plugins(LoginAuthOIDC)
@@ -208,20 +206,19 @@ impl Network {
         }
     }
 
-    fn queue_receive(job: Res<ReceiveJob>, mut jobs: ResMut<JobQueue>) {
-        jobs.push(job.0);
+    fn queue_receive(mut scheduler: ResMut<Scheduler>) {
+        scheduler.wake::<ReceiveTask>();
     }
 
     fn receive(
+        _budget: In<Budget>,
         config: Res<Config>,
         mut transport: Transports,
         state: Res<NetworkState>,
         bandwidth: Res<BandwidthTracker>,
         mut query: Query<&mut Session>,
         mut events: MessageWriter<PacketReceivedMessage>,
-        job: Res<ReceiveJob>,
-        mut jobs: ResMut<JobQueue>,
-    ) {
+    ) -> Wake {
         let mut any = false;
         while let Some((id, data)) = transport.recv() {
             any = true;
@@ -239,9 +236,7 @@ impl Network {
             }
         }
 
-        if any {
-            jobs.push(job.0);
-        }
+        if any { Wake::Now } else { Wake::Done }
     }
 
     fn renew_identity(identity: Option<ResMut<NetherIdentity>>, http: Option<ResMut<NetherHttpServer>>) {

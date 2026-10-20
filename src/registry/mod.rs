@@ -3,12 +3,12 @@ use crate::config::Interval;
 use crate::level::Level;
 use crate::level::dimension_type::DimensionType;
 use crate::level::generator::r#impl::overworld::{Java, OverworldGenerator};
-use crate::level::level::PollGenerationJob;
+use crate::level::level::PollGenerationTask;
 use crate::registry::block_registry::BlockRegistry;
 use crate::resource::ResourcePacks;
 use bevy_app::{App, Plugin, Startup, Update};
 use bevy_ecs::prelude::{Commands, IntoScheduleConfigs, Local, Res, ResMut, SystemSet, World};
-use chorus_core::schedule::{Tick, TickSet};
+use chorus_core::schedule::{Priority, Scheduler, Tick, TickSet};
 use command_registry::CommandRegistry;
 use item_registry::ItemRegistry;
 use std::path::Path;
@@ -31,8 +31,7 @@ pub enum LevelStartup {
 
 impl Plugin for Registry {
     fn build(&self, app: &mut App) {
-        let poll_generation_job = app.world_mut().register_system(Level::poll_generation);
-        app.insert_resource(PollGenerationJob(poll_generation_job));
+        Scheduler::register::<PollGenerationTask, _>(app.world_mut(), Priority::Background, Level::poll_generation);
 
         app.add_systems(
             Startup,

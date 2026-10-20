@@ -7,9 +7,9 @@ use chorus_core::config::ChunkSaving;
 
 use bevy_ecs::message::MessageWriter;
 use bevy_ecs::prelude::Resource;
-use bevy_ecs::system::{Res, ResMut, SystemId};
+use bevy_ecs::system::{In, ResMut};
 
-use chorus_core::schedule::JobQueue;
+use chorus_core::schedule::{Budget, Scheduler, Wake};
 use glam::IVec3;
 use std::collections::HashMap;
 use std::path::Path;
@@ -19,8 +19,7 @@ use tracing::{error, info, warn};
 
 const IDLE_POLL_WAIT: Duration = Duration::from_micros(500);
 
-#[derive(Resource)]
-pub struct PollGenerationJob(pub SystemId);
+pub struct PollGenerationTask;
 
 #[derive(Resource)]
 pub struct Level {
@@ -138,11 +137,11 @@ impl Level {
         }
     }
 
-    pub fn queue_poll_generation(job: Res<PollGenerationJob>, mut jobs: ResMut<JobQueue>) {
-        jobs.push(job.0);
+    pub fn queue_poll_generation(mut scheduler: ResMut<Scheduler>) {
+        scheduler.wake::<PollGenerationTask>();
     }
 
-    pub fn poll_generation(mut level: ResMut<Level>, job: Res<PollGenerationJob>, mut jobs: ResMut<JobQueue>) {
+    pub fn poll_generation(_budget: In<Budget>, mut level: ResMut<Level>) -> Wake {
         let mut progressed = false;
         let mut pending = false;
         for dimension in level.dimensions.values_mut() {
@@ -150,11 +149,10 @@ impl Level {
             pending |= dimension.has_pending_generation();
         }
 
-        if !progressed && pending {
-            std::thread::sleep(IDLE_POLL_WAIT);
-        }
-        if progressed || pending {
-            jobs.push(job.0);
+        match (progressed, pending) {
+            (true, _) => Wake::Now,
+            (false, true) => Wake::after(IDLE_POLL_WAIT),
+            (false, false) => Wake::Done,
         }
     }
 

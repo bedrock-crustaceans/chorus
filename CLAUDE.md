@@ -45,7 +45,7 @@ Chorus is a Cargo workspace. The root package `chorus` (`src/`) is the server: n
 
 | Crate | Path | Contents |
 |---|---|---|
-| `chorus_core` | `crates/core` | config, math, utils, version info, the `BedrockProtocol` alias, tick schedule types (`Tick`, `TickSet`, `TickClock`, `JobQueue`, `TICK_RATE`). Error types live in the module that uses them. |
+| `chorus_core` | `crates/core` | config, math, utils, version info, the `BedrockProtocol` alias, tick schedule types (`Tick`, `TickSet`, `TickClock`, `Scheduler`, `TICK_RATE`). Error types live in the module that uses them. |
 | `chorus_block` | `crates/block` | block definitions, states, components, `block_registry`, block permutation hashing |
 | `chorus_entity` | `crates/entity` | entity components and NBT structs |
 | `chorus_item` | `crates/item` | item stacks, `item_registry` and its bundled JSON |
@@ -61,7 +61,7 @@ Dependencies only point downwards (core, then block, then item and level, then w
 `Chorus::init()` (`src/lib.rs`) builds a Bevy `App` with `ChorusPlugin` and a custom runner, `LoopRunner::run`. Game logic runs in a custom `Tick` schedule with three chained sets, `TickSet::First`, `TickSet::Update`, `TickSet::Last`. There is no Bevy `FixedUpdate`.
 
 - `run_fixed_tick` (added to `RunFixedMainLoop`) accumulates elapsed time in `TickClock` and runs the `Tick` schedule once per 50 ms (`TICK_RATE = 20.0` in `crates/core/src/schedule.rs`), catching up at most `MAX_TICKS_PER_UPDATE = 5` ticks per `app.update()`.
-- After each update, `LoopRunner` drains the `JobQueue` resource (a queue of registered `SystemId`s) until the tick deadline, then spin-sleeps the remainder. Use `JobQueue::push` for deferred work that should use spare time in the tick (e.g. `Level::queue_poll_generation`).
+- After each update, `LoopRunner` runs the `Scheduler`'s ready tasks until the tick deadline, then spin-sleeps until the earliest of the next task timer and the next tick. A task is a registered system `fn(In<Budget>, ..) -> Wake` (`Done`, `Now` to run again, `At(instant)` to run later) keyed by a marker type and registered with `Scheduler::register::<T, _>(world, Priority, system)`. Call `Scheduler::wake::<T>()` or `wake_at::<T>(instant)` to schedule it (e.g. `Level::queue_poll_generation`).
 - `Server::start_tick` / `Server::end_tick` run in `TickSet::First` / `TickSet::Last` and maintain `ServerState` (tick counter, runtime-ID generator) and `ServerMetrics` (TPS / MSPT).
 
 ### Plugin tree
@@ -124,7 +124,7 @@ Use the `const_block!` / `const_permutation!` macros for compile-time static def
 
 ### Level
 
-`Level` (`crates/level/src/level.rs`) is a single global resource. Chunk generation is polled through the `JobQueue`.
+`Level` (`crates/level/src/level.rs`) is a single global resource. Chunk generation is polled through a `Scheduler` task.
 
 Level startup runs in three chained `LevelStartup` sets (`src/registry/mod.rs`): `Open` opens the world with `Level::open` (seed and spawn come from `level.dat` when it exists, `Level::is_new` says when they don't), `Dimensions` is where downstream code adds or replaces dimensions with `Level::insert_dimension(type, generator)`, and `Defaults` adds the stock overworld only if nothing registered one, picks the spawn of a new level and writes `level.dat`. `insert_dimension` attaches the level's storage automatically and saves a dimension it replaces. Pyrite hooks in with `insert_level.in_set(LevelStartup::Dimensions)`.
 

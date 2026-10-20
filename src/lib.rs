@@ -3,7 +3,7 @@ use crate::logger::setup_logger;
 use crate::server::Server;
 use bevy_app::{App, AppExit, Plugin, PluginsState, PreStartup, RunFixedMainLoop, TaskPoolOptions, TaskPoolPlugin, TaskPoolThreadAssignmentPolicy};
 use bevy_ecs::schedule::{IntoScheduleConfigs, Schedule};
-use chorus_core::schedule::run_fixed_tick;
+use chorus_core::schedule::{run_fixed_tick, run_tasks};
 use std::time::Instant;
 use tracing::{info, warn};
 
@@ -22,7 +22,7 @@ pub mod server;
 pub mod world;
 
 pub use chorus_block as block;
-pub use chorus_core::schedule::{JobQueue, Tick, TickClock, TickSet};
+pub use chorus_core::schedule::{Budget, Priority, Scheduler, Tick, TickClock, TickSet, Wake};
 pub use chorus_core::{config, info, math};
 pub use chorus_entity as entity;
 pub use chorus_item as item;
@@ -77,17 +77,16 @@ impl LoopRunner {
 
             let deadline = Instant::now() + app.world().resource::<TickClock>().remaining();
 
-            while Instant::now() < deadline {
-                let Some(job) = app.world_mut().resource_mut::<JobQueue>().pop() else {
+            loop {
+                run_tasks(app.world_mut(), deadline);
+                let now = Instant::now();
+                if now >= deadline {
                     break;
-                };
-                if let Err(err) = app.world_mut().run_system(job) {
-                    warn!("job failed to run: {err}");
                 }
-            }
-
-            if let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
-                spin_sleep::sleep(remaining);
+                match app.world_mut().resource_mut::<Scheduler>().next_wake() {
+                    Some(wake) if wake < deadline => std::thread::sleep(wake.saturating_duration_since(now)),
+                    _ => spin_sleep::sleep(deadline.saturating_duration_since(now)),
+                }
             }
         }
     }
@@ -126,7 +125,7 @@ impl Plugin for ChorusPlugin {
                 .in_set(TickSet::Update),
         );
 
-        app.init_resource::<TickClock>().init_resource::<JobQueue>().add_systems(RunFixedMainLoop, run_fixed_tick);
+        app.init_resource::<TickClock>().init_resource::<Scheduler>().add_systems(RunFixedMainLoop, run_fixed_tick);
 
         if !app.is_plugin_added::<TaskPoolPlugin>() {
             app.add_plugins(TaskPoolPlugin {
