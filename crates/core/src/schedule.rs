@@ -94,6 +94,7 @@ const PRIORITIES: usize = 2;
 type TaskSystem = SystemId<In<Budget>, Wake>;
 
 struct Slot {
+    name: &'static str,
     system: TaskSystem,
     priority: Priority,
     queued: bool,
@@ -101,6 +102,15 @@ struct Slot {
     woken: u64,
     runtime: Duration,
     runs: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TaskInfo {
+    pub name: &'static str,
+    pub priority: Priority,
+    pub stats: TaskStats,
+    pub queued: bool,
+    pub next_run_in: Option<Duration>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -135,6 +145,7 @@ impl Scheduler {
         let previous = self.index.insert(TypeId::of::<T>(), self.slots.len());
         assert!(previous.is_none(), "task {} is already registered", std::any::type_name::<T>());
         self.slots.push(Slot {
+            name: std::any::type_name::<T>().rsplit("::").next().unwrap_or_default(),
             system,
             priority,
             queued: false,
@@ -143,6 +154,23 @@ impl Scheduler {
             runtime: Duration::ZERO,
             runs: 0,
         });
+    }
+
+    pub fn tasks(&self) -> Vec<TaskInfo> {
+        let now = Instant::now();
+        self.slots
+            .iter()
+            .map(|slot| TaskInfo {
+                name: slot.name,
+                priority: slot.priority,
+                stats: TaskStats {
+                    runs: slot.runs,
+                    runtime: slot.runtime,
+                },
+                queued: slot.queued,
+                next_run_in: slot.timer.map(|at| at.saturating_duration_since(now)),
+            })
+            .collect()
     }
 
     pub fn stats<T: 'static>(&self) -> TaskStats {
@@ -431,6 +459,20 @@ mod tests {
         let difference = long.runtime.abs_diff(short.runtime);
         assert!(difference < Duration::from_millis(10), "long ran {:?} and short {:?}", long.runtime, short.runtime);
         assert!(long.average() > short.average());
+    }
+
+    #[test]
+    fn task_info_lists_every_task_with_its_name_priority_and_run_time() {
+        let mut world = world_with_tasks();
+        world.resource_mut::<Scheduler>().wake::<Second>();
+        world.resource_mut::<Scheduler>().wake_at::<Background>(Instant::now() + Duration::from_secs(60));
+        run_tasks(&mut world, later());
+        let tasks = world.resource::<Scheduler>().tasks();
+        let find = |name: &str| *tasks.iter().find(|task| task.name == name).unwrap_or_else(|| panic!("no task named {name}"));
+        assert_eq!(tasks.len(), 3);
+        assert_eq!((find("Second").priority, find("Second").stats.runs, find("Second").queued), (Priority::Io, 1, false));
+        assert_eq!(find("First").stats.runs, 0);
+        assert!(find("Background").next_run_in.is_some_and(|wait| wait > Duration::from_secs(50)));
     }
 
     #[test]

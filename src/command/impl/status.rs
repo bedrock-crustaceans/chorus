@@ -8,6 +8,7 @@ use crate::level::generator::dimension::Dimension;
 use crate::level::level::Level;
 use crate::format::{decimal, megabytes, milliseconds, thousands, tps, usage};
 use crate::network::bandwidth::BandwidthTracker;
+use crate::Scheduler;
 use crate::player::Player;
 use crate::player::chunk_view::ChunkView;
 use crate::world::chunks::ChunkSerializer;
@@ -17,17 +18,18 @@ use crate::utils::process::process_stats;
 use chorus_core::permission::PermissionLevel;
 use bevy_tasks::{AsyncComputeTaskPool, ComputeTaskPool, IoTaskPool};
 
-const SECTION: CommandEnum = CommandEnum::new("StatusSection", values!["performance", "network", "memory", "worlds", "chunks", "storage", "all"]);
+const SECTION: CommandEnum = CommandEnum::new("StatusSection", values!["performance", "network", "memory", "worlds", "chunks", "tasks", "storage", "all"]);
 
 pub static STATUS_COMMAND: CommandDefinition = CommandDefinition::new("status", "Shows how the server is doing", |context, args| {
     let sections: &[Section] = match args.string("section") {
         None => &[Section::Summary],
-        Some("all") => &[Section::Performance, Section::Network, Section::Memory, Section::Worlds, Section::Chunks, Section::Storage],
+        Some("all") => &[Section::Performance, Section::Network, Section::Memory, Section::Worlds, Section::Chunks, Section::Tasks, Section::Storage],
         Some("performance") => &[Section::Performance],
         Some("network") => &[Section::Network],
         Some("memory") => &[Section::Memory],
         Some("worlds") => &[Section::Worlds],
         Some("chunks") => &[Section::Chunks],
+        Some("tasks") => &[Section::Tasks],
         Some(_) => &[Section::Storage],
     };
 
@@ -54,6 +56,7 @@ enum Section {
     Memory,
     Worlds,
     Chunks,
+    Tasks,
     Storage,
 }
 
@@ -66,6 +69,7 @@ impl Section {
             Self::Memory => memory(report),
             Self::Worlds => worlds(context, report),
             Self::Chunks => chunks(context, report),
+            Self::Tasks => tasks(context, report),
             Self::Storage => storage(context, report),
         }
     }
@@ -200,6 +204,34 @@ fn chunks(context: &CommandContext, report: &mut Report) {
     report.stacked("Generated", format!("{} {}", progress(stats.generated, stats.wanted), detail(format!("radius {} of {}", decimal(stats.generated_radius as f64, 1), stats.radius))));
     report.stacked("Sent", format!("{} {}", progress(stats.sent, stats.wanted), detail(format!("radius {} of {}", decimal(stats.sent_radius as f64, 1), stats.radius))));
     report.stacked("Waiting", format!("{} {}", thousands(stats.queued), detail(format!("{} serialized §8|§7 {} serializing", thousands(stats.ready), thousands(stats.in_flight)))));
+}
+
+fn tasks(context: &CommandContext, report: &mut Report) {
+    report.header("Tasks");
+    let mut tasks = context.resource::<Scheduler>().tasks();
+    tasks.sort_by_key(|task| (task.priority, std::cmp::Reverse(task.stats.runtime)));
+    for task in tasks {
+        let state = match (task.queued, task.next_run_in) {
+            (true, _) => "§aready".to_owned(),
+            (false, Some(wait)) => format!("§7next in {}", duration(wait)),
+            (false, None) => "§8idle".to_owned(),
+        };
+        report.stacked(
+            &format!("{} §8({:?})", task.name, task.priority),
+            format!("{} runs §8| §f{} total §8| §f{} avg §8| {state}", thousands(task.stats.runs as usize), duration(task.stats.runtime), duration(task.stats.average())),
+        );
+    }
+}
+
+fn duration(value: std::time::Duration) -> String {
+    let micros = value.as_micros();
+    if micros < 1_000 {
+        format!("{micros} µs")
+    } else if micros < 1_000_000 {
+        format!("{} ms", decimal(micros as f64 / 1_000.0, 1))
+    } else {
+        format!("{} s", decimal(micros as f64 / 1_000_000.0, 2))
+    }
 }
 
 fn progress(value: usize, total: usize) -> String {
