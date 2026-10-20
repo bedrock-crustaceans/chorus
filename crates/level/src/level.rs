@@ -21,6 +21,8 @@ const IDLE_POLL_WAIT: Duration = Duration::from_micros(500);
 
 pub struct PollGenerationTask;
 
+pub struct ReleaseGenerationTask;
+
 #[derive(Resource)]
 pub struct Level {
     pub name: String,
@@ -139,9 +141,19 @@ impl Level {
 
     pub fn queue_poll_generation(mut scheduler: ResMut<Scheduler>) {
         scheduler.wake::<PollGenerationTask>();
+        scheduler.wake::<ReleaseGenerationTask>();
     }
 
-    pub fn poll_generation(_budget: In<Budget>, mut level: ResMut<Level>) -> Wake {
+    pub fn release_generation(_budget: In<Budget>, mut level: ResMut<Level>) -> Wake {
+        let mut more = false;
+        for dimension in level.dimensions.values_mut() {
+            more |= dimension.release_generated();
+        }
+        if more { Wake::Now } else { Wake::Done }
+    }
+
+    pub fn poll_generation(_budget: In<Budget>, mut level: ResMut<Level>, mut scheduler: ResMut<Scheduler>) -> Wake {
+        scheduler.wake::<ReleaseGenerationTask>();
         let mut progressed = false;
         let mut pending = false;
         for dimension in level.dimensions.values_mut() {

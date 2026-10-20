@@ -544,16 +544,9 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn release_discarded(&mut self, pool: &TaskPool) {
-        if self.discarded.is_empty() {
-            return;
-        }
-        let batch = std::mem::take(&mut self.discarded);
-        if pool.thread_num() == 0 {
-            drop(batch);
-        } else {
-            pool.spawn(async move { drop(batch) }).detach();
-        }
+    fn release_one(&mut self) -> bool {
+        self.discarded.pop();
+        !self.discarded.is_empty()
     }
 
     fn cancel(&mut self, cell: ChunkPos) {
@@ -643,8 +636,6 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
             }
         }
 
-        self.release_discarded(pool);
-
         std::mem::take(&mut self.finished)
             .into_iter()
             .map(|(cell, outcome)| {
@@ -688,6 +679,10 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
             .collect();
         lines.sort();
         lines.join("\n")
+    }
+
+    fn release(&mut self) -> bool {
+        self.release_one()
     }
 
     fn has_pending_work(&self) -> bool {

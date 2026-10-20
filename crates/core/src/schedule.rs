@@ -4,7 +4,7 @@ use bevy_ecs::system::{In, IntoSystem, SystemId};
 use bevy_ecs::world::World;
 use std::any::TypeId;
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap, VecDeque};
+use std::collections::{BinaryHeap, HashMap};
 use std::time::{Duration, Instant};
 use tracing::warn;
 
@@ -98,13 +98,30 @@ struct Slot {
     priority: Priority,
     queued: bool,
     timer: Option<Instant>,
+    woken: u64,
+    runtime: Duration,
+    runs: u64,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TaskStats {
+    pub runs: u64,
+    pub runtime: Duration,
+}
+
+impl TaskStats {
+    pub fn average(&self) -> Duration {
+        self.runtime.checked_div(self.runs.try_into().unwrap_or(u32::MAX)).unwrap_or_default()
+    }
 }
 
 #[derive(Resource, Default)]
 pub struct Scheduler {
     slots: Vec<Slot>,
     index: HashMap<TypeId, usize>,
-    ready: [VecDeque<usize>; PRIORITIES],
+    ready: [Vec<usize>; PRIORITIES],
+    clock: [Duration; PRIORITIES],
+    sequence: u64,
     timers: BinaryHeap<Reverse<(Instant, usize)>>,
 }
 
@@ -122,7 +139,18 @@ impl Scheduler {
             priority,
             queued: false,
             timer: None,
+            woken: 0,
+            runtime: Duration::ZERO,
+            runs: 0,
         });
+    }
+
+    pub fn stats<T: 'static>(&self) -> TaskStats {
+        let slot = &self.slots[self.slot_of::<T>()];
+        TaskStats {
+            runs: slot.runs,
+            runtime: slot.runtime,
+        }
     }
 
     fn slot_of<T: 'static>(&self) -> usize {
@@ -142,8 +170,12 @@ impl Scheduler {
     fn enqueue(&mut self, slot: usize) {
         let state = &mut self.slots[slot];
         if !state.queued {
+            let class = state.priority as usize;
             state.queued = true;
-            self.ready[state.priority as usize].push_back(slot);
+            state.runtime = state.runtime.max(self.clock[class]);
+            state.woken = self.sequence;
+            self.sequence += 1;
+            self.ready[class].push(slot);
         }
     }
 
@@ -168,13 +200,23 @@ impl Scheduler {
         }
     }
 
-    fn pop_ready(&mut self) -> Option<(usize, TaskSystem)> {
-        let slot = self.ready.iter_mut().find_map(VecDeque::pop_front)?;
+    fn pop_ready(&mut self) -> Option<(usize, TaskSystem, u32)> {
+        let class = self.ready.iter().position(|queue| !queue.is_empty())?;
+        let sharers = self.ready[class].len() as u32;
+        let slots = &self.slots;
+        let position = (0..self.ready[class].len()).min_by_key(|&position| {
+            let state = &slots[self.ready[class][position]];
+            (state.runtime, state.woken)
+        })?;
+        let slot = self.ready[class].swap_remove(position);
         self.slots[slot].queued = false;
-        Some((slot, self.slots[slot].system))
+        self.clock[class] = self.clock[class].max(self.slots[slot].runtime);
+        Some((slot, self.slots[slot].system, sharers))
     }
 
-    fn finish(&mut self, slot: usize, wake: Wake) {
+    fn finish(&mut self, slot: usize, wake: Wake, elapsed: Duration) {
+        self.slots[slot].runtime += elapsed;
+        self.slots[slot].runs += 1;
         match wake {
             Wake::Done => {}
             Wake::Now => self.enqueue(slot),
@@ -203,12 +245,14 @@ pub fn run_tasks(world: &mut World, deadline: Instant) {
             scheduler.promote_due(Instant::now());
             scheduler.pop_ready()
         };
-        let Some((slot, system)) = next else { break };
-        let wake = world.run_system_with(system, Budget::until(deadline)).unwrap_or_else(|err| {
+        let Some((slot, system, sharers)) = next else { break };
+        let now = Instant::now();
+        let share = deadline.saturating_duration_since(now) / sharers;
+        let wake = world.run_system_with(system, Budget::until(now + share)).unwrap_or_else(|err| {
             warn!("task failed to run: {err}");
             Wake::Done
         });
-        world.resource_mut::<Scheduler>().finish(slot, wake);
+        world.resource_mut::<Scheduler>().finish(slot, wake, now.elapsed());
     }
 }
 
@@ -339,6 +383,54 @@ mod tests {
         let early = Instant::now() + Duration::from_millis(10);
         scheduler.wake_at::<First>(early);
         assert_eq!(scheduler.next_wake(), Some(early));
+    }
+
+    fn spinner() -> impl FnMut(In<Budget>) -> Wake {
+        move |budget| {
+            while !budget.is_exhausted() {}
+            Wake::Now
+        }
+    }
+
+    #[test]
+    fn tasks_that_use_their_whole_budget_end_up_with_equal_time() {
+        let mut world = World::new();
+        Scheduler::register::<First, _>(&mut world, Priority::Background, spinner());
+        Scheduler::register::<Second, _>(&mut world, Priority::Background, spinner());
+        let mut scheduler = world.resource_mut::<Scheduler>();
+        scheduler.wake::<First>();
+        scheduler.wake::<Second>();
+        run_tasks(&mut world, Instant::now() + Duration::from_millis(120));
+        let scheduler = world.resource::<Scheduler>();
+        let (first, second) = (scheduler.stats::<First>(), scheduler.stats::<Second>());
+        assert!(first.runs >= 1 && second.runs >= 1, "{first:?} {second:?}");
+        let larger = first.runtime.max(second.runtime);
+        assert!(first.runtime.abs_diff(second.runtime) < larger / 3, "{first:?} {second:?}");
+    }
+
+    fn busy_for(duration: Duration) -> impl FnMut(In<Budget>) -> Wake {
+        move |_| {
+            let start = Instant::now();
+            while start.elapsed() < duration {}
+            Wake::Now
+        }
+    }
+
+    #[test]
+    fn tasks_with_different_run_lengths_get_equal_time() {
+        let mut world = World::new();
+        Scheduler::register::<First, _>(&mut world, Priority::Background, busy_for(Duration::from_micros(1500)));
+        Scheduler::register::<Second, _>(&mut world, Priority::Background, busy_for(Duration::from_micros(100)));
+        let mut scheduler = world.resource_mut::<Scheduler>();
+        scheduler.wake::<First>();
+        scheduler.wake::<Second>();
+        run_tasks(&mut world, Instant::now() + Duration::from_millis(200));
+        let scheduler = world.resource::<Scheduler>();
+        let (long, short) = (scheduler.stats::<First>(), scheduler.stats::<Second>());
+        assert!(short.runs > long.runs * 5, "{short:?} {long:?}");
+        let difference = long.runtime.abs_diff(short.runtime);
+        assert!(difference < Duration::from_millis(10), "long ran {:?} and short {:?}", long.runtime, short.runtime);
+        assert!(long.average() > short.average());
     }
 
     #[test]

@@ -3,7 +3,7 @@ use crate::config::Interval;
 use crate::level::Level;
 use crate::level::dimension_type::DimensionType;
 use crate::level::generator::r#impl::overworld::{Java, OverworldGenerator};
-use crate::level::level::PollGenerationTask;
+use crate::level::level::{PollGenerationTask, ReleaseGenerationTask};
 use crate::registry::block_registry::BlockRegistry;
 use crate::resource::ResourcePacks;
 use bevy_app::{App, Plugin, Startup, Update};
@@ -32,6 +32,7 @@ pub enum LevelStartup {
 impl Plugin for Registry {
     fn build(&self, app: &mut App) {
         Scheduler::register::<PollGenerationTask, _>(app.world_mut(), Priority::Background, Level::poll_generation);
+        Scheduler::register::<ReleaseGenerationTask, _>(app.world_mut(), Priority::Background, Level::release_generation);
 
         app.add_systems(
             Startup,
