@@ -28,6 +28,7 @@ nbtx = { git = "https://github.com/bedrock-crustaceans/nbtx" }
 
 atomicow = "1.2.0"
 crossbeam-channel = "0.5.17"
+dhat = "0.3.3"
 indexmap = "2.14.2"
 rustc-hash = "2.1.3"
 slotmap = "1.1.1"

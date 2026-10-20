@@ -19,3 +19,9 @@ rand.workspace = true
 rustc-hash.workspace = true
 sha2.workspace = true
 tracing.workspace = true
+
+[features]
+dhat-heap = []
+
+[dev-dependencies]
+dhat.workspace = true
