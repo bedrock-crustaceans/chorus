@@ -125,10 +125,11 @@ impl ChunkSerializer {
         let Some(center) = view.center else { return ViewStats::default() };
         let mut stats = ViewStats::default();
         let (mut nearest_ungenerated, mut nearest_unsent) = (i32::MAX, i32::MAX);
-        for dx in -view.radius..=view.radius {
-            for dz in -view.radius..=view.radius {
+        let load_radius = view.load_radius();
+        for dx in -load_radius..=load_radius {
+            for dz in -load_radius..=load_radius {
                 let distance = dx * dx + dz * dz;
-                if distance > view.radius * view.radius {
+                if distance > load_radius * load_radius {
                     continue;
                 }
                 let position = (center.0 + dx, center.1 + dz);
@@ -145,8 +146,8 @@ impl ChunkSerializer {
                 }
             }
         }
-        let covered = |nearest_missing: i32| if nearest_missing == i32::MAX { view.radius as f32 } else { (nearest_missing as f32).sqrt() };
-        stats.radius = view.radius as f32;
+        let covered = |nearest_missing: i32| if nearest_missing == i32::MAX { load_radius as f32 } else { (nearest_missing as f32).sqrt() };
+        stats.radius = load_radius as f32;
         stats.generated_radius = covered(nearest_ungenerated);
         stats.sent_radius = covered(nearest_unsent);
         for &(x, z) in &view.pending {
@@ -186,7 +187,7 @@ pub fn update_chunk_order(mut query: Query<(&mut Session, &Transform, &mut Chunk
 
         view.center = Some(center);
 
-        let radius = view.radius;
+        let radius = view.load_radius();
         let mut wanted: Vec<(i32, i32)> = Vec::new();
 
         for dx in -radius..=radius {
@@ -277,7 +278,7 @@ pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>,
         let mut kept: HashSet<(i32, i32)> = HashSet::new();
         for view in views.iter().filter(|view| view.dimension == id) {
             let Some((center_x, center_z)) = view.center else { continue };
-            let radius = view.radius + UNLOAD_MARGIN;
+            let radius = view.load_radius() + UNLOAD_MARGIN;
             for dx in -radius..=radius {
                 for dz in -radius..=radius {
                     if dx * dx + dz * dz <= radius * radius {
@@ -314,7 +315,7 @@ pub fn request_view_chunks(
                 break;
             }
 
-            if (x - center.0).pow(2) + (z - center.1).pow(2) <= view.radius.pow(2) && !view.requested.contains(&(x, z)) {
+            if (x - center.0).pow(2) + (z - center.1).pow(2) <= view.load_radius().pow(2) && !view.requested.contains(&(x, z)) {
                 new_requests.push((x, z));
             }
         }
@@ -704,19 +705,19 @@ mod tests {
             center: Some((0, 0)),
             ..Default::default()
         };
-        for x in -6..=6 {
-            for z in -6..=6 {
-                if x * x + z * z <= 36 && (x, z) != (3, 4) {
+        for x in -7..=7 {
+            for z in -7..=7 {
+                if x * x + z * z <= 49 && (x, z) != (3, 4) {
                     view.sent.insert((x, z));
                 }
             }
         }
         let stats = ChunkSerializer::default().view_stats(&view, None);
-        assert_eq!(stats.radius, 6.0);
+        assert_eq!(stats.radius, 7.0);
         assert_eq!(stats.sent_radius, 5.0);
         assert_eq!(stats.generated_radius, 0.0);
         view.sent.insert((3, 4));
-        assert_eq!(ChunkSerializer::default().view_stats(&view, None).sent_radius, 6.0);
+        assert_eq!(ChunkSerializer::default().view_stats(&view, None).sent_radius, 7.0);
     }
 
     #[test]
