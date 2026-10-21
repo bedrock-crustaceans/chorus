@@ -1,11 +1,12 @@
 use crate::command::context::CommandContext;
 use crate::command::report::{Report, Value, duration_text};
 use crate::command::style::CommandStyle;
-use crate::format::{Tone, decimal, percent, thousands, usage_tone};
+use crate::format::{Tone, decimal, megabytes_parts, percent, thousands, usage_tone};
 use crate::level::generator::dimension::GenerationStats;
 use crate::level::level::Level;
 use crate::schedule::GameSet;
 use crate::server::{Server, ServerState};
+use crate::utils::process::process_stats;
 use crate::{Scheduler, Tick, TickClock, TickSet};
 use bevy_app::{App, Plugin};
 use bevy_ecs::prelude::*;
@@ -39,9 +40,26 @@ struct ProfileSession {
     started: Instant,
     ends: Instant,
     first_tick: i64,
+    before: Snapshot,
+    samples: Vec<TickSample>,
+}
+
+pub struct Snapshot {
     tasks: Vec<TaskInfo>,
     generation: Vec<(&'static str, GenerationStats)>,
-    samples: Vec<TickSample>,
+    memory: Option<(u64, u64)>,
+    loaded_chunks: usize,
+}
+
+impl Snapshot {
+    pub fn take(level: &Level, scheduler: &Scheduler) -> Self {
+        Self {
+            tasks: scheduler.tasks(),
+            generation: generation_stats(level),
+            memory: process_stats().map(|stats| (stats.resident_bytes, stats.virtual_bytes)),
+            loaded_chunks: level.dimensions().map(|dimension| dimension.chunk_count()).sum(),
+        }
+    }
 }
 
 #[derive(Resource)]
@@ -64,15 +82,14 @@ impl TickProfile {
         self.session.is_some()
     }
 
-    pub fn start(&mut self, requester: Entity, seconds: u32, tasks: Vec<TaskInfo>, generation: Vec<(&'static str, GenerationStats)>, current_tick: i64) {
+    pub fn start(&mut self, requester: Entity, seconds: u32, before: Snapshot, current_tick: i64) {
         let started = Instant::now();
         self.session = Some(ProfileSession {
             requester,
             started,
             ends: started + Duration::from_secs(profile_seconds(seconds) as u64),
             first_tick: current_tick,
-            tasks,
-            generation,
+            before,
             samples: Vec::new(),
         });
     }
@@ -123,8 +140,7 @@ pub fn finish_session(world: &mut World) {
         return;
     };
     let interval = world.resource::<TickClock>().interval;
-    let tasks = world.resource::<Scheduler>().tasks();
-    let generation = generation_stats(world.resource::<Level>());
+    let after = Snapshot::take(world.resource::<Level>(), world.resource::<Scheduler>());
 
     let mut context = CommandContext::new(world, session.requester);
     context.set_style(CommandStyle::Chorus);
@@ -132,8 +148,9 @@ pub fn finish_session(world: &mut World) {
     report.section("Profile", |report| {
         report.row("Duration", Value::duration(session.started.elapsed()));
         write_samples(report, &session.samples, interval);
-        write_task_deltas(report, &session.tasks, &tasks);
-        write_generation(report, &session.generation, &generation);
+        write_task_deltas(report, &session.before.tasks, &after.tasks);
+        write_generation(report, &session.before.generation, &after.generation);
+        write_memory(report, &session.before, &after);
     });
     context.reply_report(report);
 }
@@ -203,10 +220,33 @@ fn write_task_deltas(report: &mut Report, before: &[TaskInfo], after: &[TaskInfo
     });
 }
 
-pub fn generation_stats(level: &Level) -> Vec<(&'static str, GenerationStats)> {
+fn generation_stats(level: &Level) -> Vec<(&'static str, GenerationStats)> {
     let mut stats: Vec<(&'static str, GenerationStats)> = level.dimensions().map(|dimension| (dimension.name(), dimension.generation_stats())).collect();
     stats.sort_by_key(|(name, _)| *name);
     stats
+}
+
+fn write_memory(report: &mut Report, before: &Snapshot, after: &Snapshot) {
+    let Some((resident, virtual_bytes)) = after.memory else { return };
+    report.section("Memory", |report| {
+        let change = |now: u64, earlier: Option<u64>| {
+            earlier.map_or_else(String::new, |earlier| {
+                let (amount, unit) = megabytes_parts(now.abs_diff(earlier));
+                format!("{}{amount} {unit} during the profile", if now >= earlier { "+" } else { "-" })
+            })
+        };
+        report.row("Resident", Value::bytes(resident).note(change(resident, before.memory.map(|(resident, _)| resident))));
+        report.row(
+            "Virtual",
+            Value::bytes(virtual_bytes).note(change(virtual_bytes, before.memory.map(|(_, virtual_bytes)| virtual_bytes))),
+        );
+        let loaded = after.loaded_chunks;
+        let gained = loaded as i64 - before.loaded_chunks as i64;
+        report.row("Loaded chunks", Value::count(loaded).note(format!("{gained:+} during the profile")));
+        if loaded > 0 {
+            report.row("Resident per chunk", Value::new(thousands((resident / loaded as u64 / 1024) as usize)).unit("KB"));
+        }
+    });
 }
 
 fn write_generation(report: &mut Report, before: &[(&'static str, GenerationStats)], after: &[(&'static str, GenerationStats)]) {
@@ -274,6 +314,17 @@ mod tests {
     use super::*;
     use bevy_ecs::schedule::Schedule;
 
+    impl Snapshot {
+        fn empty() -> Self {
+            Self {
+                tasks: Vec::new(),
+                generation: Vec::new(),
+                memory: None,
+                loaded_chunks: 0,
+            }
+        }
+    }
+
     fn sample(total_ms: u64) -> TickSample {
         TickSample {
             total: Duration::from_millis(total_ms),
@@ -334,7 +385,7 @@ mod tests {
     #[test]
     fn every_tick_is_split_into_phases_that_add_up_to_its_total() {
         let mut app = profiling_app();
-        app.world_mut().resource_mut::<TickProfile>().start(Entity::PLACEHOLDER, 60, Vec::new(), Vec::new(), 0);
+        app.world_mut().resource_mut::<TickProfile>().start(Entity::PLACEHOLDER, 60, Snapshot::empty(), 0);
 
         app.world_mut().run_schedule(Tick);
 
@@ -349,7 +400,7 @@ mod tests {
     #[test]
     fn the_tick_a_session_starts_in_is_not_sampled() {
         let mut app = profiling_app();
-        app.world_mut().resource_mut::<TickProfile>().start(Entity::PLACEHOLDER, 60, Vec::new(), Vec::new(), 1);
+        app.world_mut().resource_mut::<TickProfile>().start(Entity::PLACEHOLDER, 60, Snapshot::empty(), 1);
 
         app.world_mut().run_schedule(Tick);
 
