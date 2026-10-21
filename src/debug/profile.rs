@@ -1,8 +1,9 @@
 use crate::Scheduler;
 use crate::command::args::CommandArgs;
 use crate::command::context::CommandContext;
+use crate::level::level::Level;
 use crate::server::ServerState;
-use crate::server::profile::{DEFAULT_PROFILE_SECONDS, TickProfile, finish_session, profile_seconds};
+use crate::server::profile::{DEFAULT_PROFILE_SECONDS, TickProfile, finish_session, generation_stats, profile_seconds};
 
 pub fn run(context: &mut CommandContext, args: &CommandArgs) -> Result<(), String> {
     let profiling = context.resource::<TickProfile>().is_profiling();
@@ -21,7 +22,8 @@ pub fn run(context: &mut CommandContext, args: &CommandArgs) -> Result<(), Strin
     let tasks = context.resource::<Scheduler>().tasks();
     let requester = context.sender();
     let tick = context.resource::<ServerState>().tick();
-    context.world_mut().resource_mut::<TickProfile>().start(requester, seconds, tasks, tick);
+    let generation = generation_stats(context.resource::<Level>());
+    context.world_mut().resource_mut::<TickProfile>().start(requester, seconds, tasks, generation, tick);
     context.reply(format!("Profiling for {seconds} s, the report follows"));
     Ok(())
 }

@@ -108,7 +108,7 @@ impl Value {
             text.push_str(joint);
             text.push_str(&self.segment(segment, style));
         }
-        if let Some(note) = &self.note {
+        if let Some(note) = self.note.as_ref().filter(|note| !note.is_empty()) {
             match style {
                 CommandStyle::Chorus => text.push_str(&format!(" §8- §7§o{note}§r")),
                 CommandStyle::Vanilla => text.push_str(&format!(" ({note})")),
@@ -291,6 +291,13 @@ mod tests {
         let mut report = chorus();
         report.row("Task", Value::new(12).unit("runs").and(Value::duration(Duration::from_micros(2_100))));
         assert_eq!(report.into_lines(), [" §8- §fTask§8: §f12§7 runs §8| §f2.1§7 ms"]);
+    }
+
+    #[test]
+    fn an_empty_note_renders_nothing() {
+        let mut report = chorus();
+        report.row("Retained", Value::new(0).note(""));
+        assert_eq!(report.into_lines(), [" §8- §fRetained§8: §f0"]);
     }
 
     #[test]

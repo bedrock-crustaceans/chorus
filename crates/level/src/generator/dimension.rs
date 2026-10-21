@@ -16,6 +16,16 @@ pub trait Generator: Send + Sync + Sized + 'static {
     type Terminal: Phase<Self, Output = Chunk>;
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct GenerationStats {
+    pub nodes: usize,
+    pub waiting: usize,
+    pub discarded: usize,
+    pub completed: usize,
+    pub retained: Vec<(&'static str, usize)>,
+    pub started: Vec<(&'static str, u64)>,
+}
+
 pub trait WorldGenerator: Send + Sync {
     fn request_chunk(&mut self, x: i32, z: i32);
     fn set_focus(&mut self, focus: &[(i32, i32)]);
@@ -27,6 +37,9 @@ pub trait WorldGenerator: Send + Sync {
     }
     fn retention_report(&self) -> String {
         String::new()
+    }
+    fn stats(&self) -> GenerationStats {
+        GenerationStats::default()
     }
 }
 
@@ -252,6 +265,10 @@ impl Dimension {
 
     pub fn retention_report(&self) -> String {
         self.generator.retention_report()
+    }
+
+    pub fn generation_stats(&self) -> GenerationStats {
+        self.generator.stats()
     }
 
     pub fn release_generated(&mut self) -> bool {

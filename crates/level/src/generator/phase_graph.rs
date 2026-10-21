@@ -9,7 +9,7 @@ use crossbeam_channel::{Receiver, Sender};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::chunk::Chunk;
-use crate::generator::dimension::{Generator, WorldGenerator};
+use crate::generator::dimension::{GenerationStats, Generator, WorldGenerator};
 use crate::generator::error::{PhaseError, PhaseFailure};
 use crate::generator::graph::{Graph, Node, NodeKey, NodeStatus, Outcome, Retention};
 use crate::generator::phase::{PhaseDescriptor, PhaseId, PhaseInputs};
@@ -688,6 +688,10 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
     fn has_pending_work(&self) -> bool {
         !self.pending_dispatch.is_empty() || self.in_flight > 0
     }
+
+    fn stats(&self) -> GenerationStats {
+        self.generation_stats()
+    }
 }
 
 fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u32>) {
@@ -722,10 +726,8 @@ fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u
 }
 
 impl<G: Generator> PhaseGraph<G> {
-    fn progress_report(&self) -> String {
-        let mut started: Vec<String> = self.started.iter().map(|(name, count)| format!("{name}={count}")).collect();
-        started.sort();
-        let mut live: FxHashMap<&str, usize> = FxHashMap::default();
+    fn generation_stats(&self) -> GenerationStats {
+        let mut live: FxHashMap<&'static str, usize> = FxHashMap::default();
         let mut waiting = 0;
         for node in self.graph.nodes.values() {
             if node.retained.is_some() {
@@ -735,16 +737,31 @@ impl<G: Generator> PhaseGraph<G> {
                 waiting += 1;
             }
         }
-        let mut retained: Vec<String> = live.iter().map(|(name, count)| format!("{name}={count}")).collect();
-        retained.sort();
+        let mut retained: Vec<(&'static str, usize)> = live.into_iter().collect();
+        retained.sort_unstable();
+        let mut started: Vec<(&'static str, u64)> = self.started.iter().map(|(&name, &count)| (name, count)).collect();
+        started.sort_unstable();
+        GenerationStats {
+            nodes: self.graph.nodes.len(),
+            waiting,
+            discarded: self.discarded.len(),
+            completed: self.completed.len(),
+            retained,
+            started,
+        }
+    }
+
+    fn progress_report(&self) -> String {
+        let stats = self.generation_stats();
+        let list = |items: Vec<String>| items.join(" ");
         format!(
             "nodes {} done-unretained {} discarded {} retained [{}] chunks completed {} started {}",
-            self.graph.nodes.len(),
-            waiting,
-            self.discarded.len(),
-            retained.join(" "),
-            self.completed.len(),
-            started.join(" ")
+            stats.nodes,
+            stats.waiting,
+            stats.discarded,
+            list(stats.retained.iter().map(|(name, count)| format!("{name}={count}")).collect()),
+            stats.completed,
+            list(stats.started.iter().map(|(name, count)| format!("{name}={count}")).collect())
         )
     }
 }

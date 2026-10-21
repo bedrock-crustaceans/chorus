@@ -1,7 +1,9 @@
 use crate::command::context::CommandContext;
 use crate::command::report::{Report, Value, duration_text};
 use crate::command::style::CommandStyle;
-use crate::format::{Tone, decimal, percent, usage_tone};
+use crate::format::{Tone, decimal, percent, thousands, usage_tone};
+use crate::level::generator::dimension::GenerationStats;
+use crate::level::level::Level;
 use crate::schedule::GameSet;
 use crate::server::{Server, ServerState};
 use crate::{Scheduler, Tick, TickClock, TickSet};
@@ -38,6 +40,7 @@ struct ProfileSession {
     ends: Instant,
     first_tick: i64,
     tasks: Vec<TaskInfo>,
+    generation: Vec<(&'static str, GenerationStats)>,
     samples: Vec<TickSample>,
 }
 
@@ -61,7 +64,7 @@ impl TickProfile {
         self.session.is_some()
     }
 
-    pub fn start(&mut self, requester: Entity, seconds: u32, tasks: Vec<TaskInfo>, current_tick: i64) {
+    pub fn start(&mut self, requester: Entity, seconds: u32, tasks: Vec<TaskInfo>, generation: Vec<(&'static str, GenerationStats)>, current_tick: i64) {
         let started = Instant::now();
         self.session = Some(ProfileSession {
             requester,
@@ -69,6 +72,7 @@ impl TickProfile {
             ends: started + Duration::from_secs(profile_seconds(seconds) as u64),
             first_tick: current_tick,
             tasks,
+            generation,
             samples: Vec::new(),
         });
     }
@@ -120,6 +124,7 @@ pub fn finish_session(world: &mut World) {
     };
     let interval = world.resource::<TickClock>().interval;
     let tasks = world.resource::<Scheduler>().tasks();
+    let generation = generation_stats(world.resource::<Level>());
 
     let mut context = CommandContext::new(world, session.requester);
     context.set_style(CommandStyle::Chorus);
@@ -128,6 +133,7 @@ pub fn finish_session(world: &mut World) {
         report.row("Duration", Value::duration(session.started.elapsed()));
         write_samples(report, &session.samples, interval);
         write_task_deltas(report, &session.tasks, &tasks);
+        write_generation(report, &session.generation, &generation);
     });
     context.reply_report(report);
 }
@@ -193,6 +199,42 @@ fn write_task_deltas(report: &mut Report, before: &[TaskInfo], after: &[TaskInfo
         }
         for (name, runs, runtime) in deltas {
             report.row(name, Value::count(runs as usize).unit("runs").and(Value::duration(runtime)));
+        }
+    });
+}
+
+pub fn generation_stats(level: &Level) -> Vec<(&'static str, GenerationStats)> {
+    let mut stats: Vec<(&'static str, GenerationStats)> = level.dimensions().map(|dimension| (dimension.name(), dimension.generation_stats())).collect();
+    stats.sort_by_key(|(name, _)| *name);
+    stats
+}
+
+fn write_generation(report: &mut Report, before: &[(&'static str, GenerationStats)], after: &[(&'static str, GenerationStats)]) {
+    report.section("Generation", |report| {
+        for (name, now) in after {
+            let earlier = before.iter().find(|(earlier, _)| earlier == name).map(|(_, stats)| stats);
+            report.section(name, |report| {
+                let retained: usize = now.retained.iter().map(|(_, count)| count).sum();
+                let per_phase: Vec<String> = now.retained.iter().map(|(phase, count)| format!("{} {}", phase.trim_end_matches("Phase"), thousands(*count))).collect();
+                report.row("Nodes", Value::count(now.nodes).note(format!("{} finished and waiting", thousands(now.waiting))));
+                report.row("Retained", Value::count(retained).note(per_phase.join(", ")));
+                report.row("Discarded", Value::count(now.discarded).note("waiting to be freed"));
+                let finished = now.completed.saturating_sub(earlier.map_or(0, |stats| stats.completed));
+                report.row("Chunks finished", Value::count(finished));
+                let ran: Vec<(&'static str, u64)> = now
+                    .started
+                    .iter()
+                    .map(|(phase, count)| {
+                        (
+                            *phase,
+                            count - earlier.and_then(|stats| stats.started.iter().find(|(earlier, _)| earlier == phase)).map_or(0, |(_, count)| *count),
+                        )
+                    })
+                    .collect();
+                let total: u64 = ran.iter().map(|(_, count)| count).sum();
+                let per_phase: Vec<String> = ran.iter().map(|(phase, count)| format!("{} {}", phase.trim_end_matches("Phase"), thousands(*count as usize))).collect();
+                report.row("Phases run", Value::count(total as usize).note(per_phase.join(", ")));
+            });
         }
     });
 }
@@ -292,7 +334,7 @@ mod tests {
     #[test]
     fn every_tick_is_split_into_phases_that_add_up_to_its_total() {
         let mut app = profiling_app();
-        app.world_mut().resource_mut::<TickProfile>().start(Entity::PLACEHOLDER, 60, Vec::new(), 0);
+        app.world_mut().resource_mut::<TickProfile>().start(Entity::PLACEHOLDER, 60, Vec::new(), Vec::new(), 0);
 
         app.world_mut().run_schedule(Tick);
 
@@ -307,7 +349,7 @@ mod tests {
     #[test]
     fn the_tick_a_session_starts_in_is_not_sampled() {
         let mut app = profiling_app();
-        app.world_mut().resource_mut::<TickProfile>().start(Entity::PLACEHOLDER, 60, Vec::new(), 1);
+        app.world_mut().resource_mut::<TickProfile>().start(Entity::PLACEHOLDER, 60, Vec::new(), Vec::new(), 1);
 
         app.world_mut().run_schedule(Tick);
 
