@@ -725,7 +725,27 @@ impl<G: Generator> PhaseGraph<G> {
     fn progress_report(&self) -> String {
         let mut started: Vec<String> = self.started.iter().map(|(name, count)| format!("{name}={count}")).collect();
         started.sort();
-        format!("nodes {} chunks completed {} started {}", self.graph.nodes.len(), self.completed.len(), started.join(" "))
+        let mut live: FxHashMap<&str, usize> = FxHashMap::default();
+        let mut waiting = 0;
+        for node in self.graph.nodes.values() {
+            if node.retained.is_some() {
+                *live.entry(node.descriptor.name).or_default() += 1;
+            }
+            if matches!(node.status, NodeStatus::Done(_)) && node.retained.is_none() {
+                waiting += 1;
+            }
+        }
+        let mut retained: Vec<String> = live.iter().map(|(name, count)| format!("{name}={count}")).collect();
+        retained.sort();
+        format!(
+            "nodes {} done-unretained {} discarded {} retained [{}] chunks completed {} started {}",
+            self.graph.nodes.len(),
+            waiting,
+            self.discarded.len(),
+            retained.join(" "),
+            self.completed.len(),
+            started.join(" ")
+        )
     }
 }
 

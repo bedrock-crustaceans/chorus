@@ -261,6 +261,8 @@ fn switch_dimension(session: &mut Session, transform: &Transform, view: &mut Chu
 
 const UNLOAD_MARGIN: i32 = 2;
 const MAX_NEW_REQUESTS_PER_TICK: usize = 256;
+const MAX_OUTSTANDING_REQUESTS: usize = 1024;
+const SCAN_WINDOW: usize = MAX_OUTSTANDING_REQUESTS * 2;
 const UNLOAD_INTERVAL_TICKS: u32 = 20;
 
 pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>, mut ticks: Local<u32>) {
@@ -272,12 +274,19 @@ pub fn unload_distant_chunks(views: Query<&ChunkView>, mut level: ResMut<Level>,
 
     for dimension in level.dimensions_mut() {
         let id = dimension.id();
-        let nearby: Vec<((i32, i32), i32)> = views
-            .iter()
-            .filter(|view| view.dimension == id)
-            .filter_map(|view| Some((view.center?, view.radius + UNLOAD_MARGIN)))
-            .collect();
-        let unloaded = dimension.unload_chunks(|x, z| nearby.iter().any(|&((center_x, center_z), radius)| (x - center_x).pow(2) + (z - center_z).pow(2) <= radius * radius));
+        let mut kept: HashSet<(i32, i32)> = HashSet::new();
+        for view in views.iter().filter(|view| view.dimension == id) {
+            let Some((center_x, center_z)) = view.center else { continue };
+            let radius = view.radius + UNLOAD_MARGIN;
+            for dx in -radius..=radius {
+                for dz in -radius..=radius {
+                    if dx * dx + dz * dz <= radius * radius {
+                        kept.insert((center_x + dx, center_z + dz));
+                    }
+                }
+            }
+        }
+        let unloaded = dimension.unload_chunks(|x, z| kept.contains(&(x, z)));
         if unloaded > 0 {
             debug!("unloaded {unloaded} chunks no player is near in {}", dimension.name());
         }
@@ -298,9 +307,10 @@ pub fn request_view_chunks(
 
         focus.entry(view.dimension).or_default().push(center);
 
+        let room = MAX_OUTSTANDING_REQUESTS.saturating_sub(view.requested.len()).min(MAX_NEW_REQUESTS_PER_TICK);
         let mut new_requests = Vec::new();
-        for &(x, z) in &view.pending {
-            if new_requests.len() >= MAX_NEW_REQUESTS_PER_TICK {
+        for &(x, z) in view.pending.iter().take(SCAN_WINDOW) {
+            if new_requests.len() >= room {
                 break;
             }
 
@@ -329,7 +339,7 @@ pub fn request_view_chunks(
             .iter()
             .flat_map(|(_, _, view, _)| {
                 let dimension_id = view.dimension;
-                view.pending.iter().map(move |&(x, z)| (dimension_id, x, z))
+                view.requested.iter().map(move |&(x, z)| (dimension_id, x, z))
             })
             .collect();
         serializer.retain_wanted(&wanted);
@@ -361,7 +371,7 @@ pub fn transmit_pending_chunks(
         let selection = take_ready(&view.pending, limit, |(x, z)| serializer.current(&(dimension_id, x, z), dimension));
 
         let mut lookahead = limit;
-        for &(x, z) in &view.pending {
+        for &(x, z) in view.pending.iter().take(SCAN_WINDOW) {
             if lookahead == 0 {
                 break;
             }
@@ -450,7 +460,7 @@ fn chunk_allowance(capacity: Option<usize>, average_chunk_bytes: usize) -> usize
 
 fn take_ready(pending: &VecDeque<(i32, i32)>, limit: usize, is_ready: impl Fn((i32, i32)) -> bool) -> Vec<(i32, i32)> {
     let mut taken = Vec::new();
-    for &position in pending {
+    for &position in pending.iter().take(SCAN_WINDOW) {
         if taken.len() >= limit {
             break;
         }
@@ -470,7 +480,7 @@ fn send_publisher_update(session: &mut Session, transform: &Transform, view: &Ch
                 z: transform.position.z.floor() as i32,
             },
             new_view_radius: (view.radius as u32) << 4,
-            server_built_chunks: view.sent.iter().map(|&(x, z)| ChunkPos { x, z }).collect(),
+            server_built_chunks: Vec::new(),
         }
         .into(),
     ));
@@ -606,6 +616,13 @@ mod tests {
             assert!(start.elapsed() < Duration::from_secs(20), "the payload never arrived");
             std::thread::yield_now();
         }
+    }
+
+    #[test]
+    fn take_ready_only_looks_at_the_scan_window() {
+        let pending: VecDeque<(i32, i32)> = (0..SCAN_WINDOW as i32 + 10).map(|x| (x, 0)).collect();
+        let ready = take_ready(&pending, usize::MAX, |_| true);
+        assert_eq!(ready.len(), SCAN_WINDOW);
     }
 
     #[test]

@@ -200,11 +200,10 @@ pub fn handle_setup(
         let Ok((mut view, actor, mut session)) = query.get_mut(ev.entity) else {
             continue;
         };
-        if session.get_state() != SessionState::Setup {
-            continue;
-        }
+        let in_setup = session.get_state() == SessionState::Setup;
         match &ev.packet {
             BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(&config, packet, &mut view, &mut session, &items),
+            _ if !in_setup => {}
             BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => handle_set_local_player_as_initialized(packet, actor, &mut session, &mut state_writer),
             packet => {
                 let count = session.unhandled_packets.entry(packet.as_ref().meta().name).or_insert(0);
@@ -223,6 +222,9 @@ fn handle_request_chunk_radius(config: &Config, packet: &<BedrockProtocol as Pro
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
 
     // the queue itself is filled by update_chunk_order, which also keeps it following the player
+    if view.radius != radius {
+        view.center = None;
+    }
     view.radius = radius;
 
     session.send(BedrockProtocol::ChunkRadiusUpdatedPacket(ChunkRadiusUpdatedPacket { chunk_radius: radius }.into()));
