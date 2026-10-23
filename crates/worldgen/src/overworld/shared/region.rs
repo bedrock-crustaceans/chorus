@@ -64,13 +64,13 @@ pub struct Region<'a> {
 }
 
 #[derive(Clone)]
-pub struct ChunkChanges {
+pub struct Changes {
     pub changes: Vec<(u8, i16, u8, BlockId)>,
     pub entities: Vec<PlacedEntity>,
     pub marks: Vec<(u8, i16, u8)>,
 }
 
-impl ChunkChanges {
+impl Changes {
     pub fn overlay_onto(&self, baseline: &ProtoChunk, target: &mut ProtoChunk) {
         for &(x, y, z, block) in &self.changes {
             let (x, y, z) = (x as i32, y as i32, z as i32);
@@ -279,10 +279,10 @@ impl<'a> Region<'a> {
         height
     }
 
-    pub fn into_changes(mut self) -> [ChunkChanges; 9] {
+    pub fn into_changes(mut self) -> [Changes; 9] {
         let chunks = std::array::from_fn(|slot| {
             let chunk = &self.chunks[slot];
-            ChunkChanges {
+            Changes {
                 changes: self.dirty[slot].iter().map(|&(x, y, z)| (x, y, z, chunk.get(x as i32, y as i32, z as i32))).collect(),
                 entities: std::mem::take(&mut self.entities[slot]),
                 marks: std::mem::take(&mut self.marks[slot]),

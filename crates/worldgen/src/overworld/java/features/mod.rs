@@ -28,7 +28,7 @@ pub use key::Key;
 use placement::Placed;
 
 use super::{region, shape};
-pub use region::{BlockView, ChunkChanges, Region};
+pub use region::{BlockView, Changes, Region};
 pub use shape::Shapes;
 
 pub const SEA_LEVEL: i32 = super::SEA_LEVEL;
@@ -211,7 +211,7 @@ impl Catalog {
         self.membership.get(&biome).is_some_and(|steps| steps.iter().any(|features| features.contains(&key)))
     }
 
-    pub fn decorate(&self, seed: i64, owner_x: i32, owner_z: i32, blocks: &Blocks, chunks: [ProtoChunk; 9]) -> [ChunkChanges; 9] {
+    pub fn decorate(&self, seed: i64, owner_x: i32, owner_z: i32, blocks: &Blocks, chunks: [ProtoChunk; 9]) -> [Changes; 9] {
         let mut region = Region::new(owner_x, owner_z, blocks, chunks);
         let possible = region.biomes();
         let origin = IVec3::new(owner_x << 4, region.min_y(), owner_z << 4);

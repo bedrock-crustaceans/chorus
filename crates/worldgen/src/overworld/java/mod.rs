@@ -16,7 +16,7 @@ use chorus_block::block_id::{LAVA, STONE, WATER};
 use features::Catalog;
 use proto::{ProtoChunk, QuartBiomes};
 use random::PositionalFactory;
-use region::ChunkChanges;
+use region::Changes;
 use shape::Shapes;
 use surface::{Floor, MaterialSystem};
 use terrain::{HEIGHT, MIN_Y, NoiseChunk};
@@ -113,7 +113,7 @@ impl Java {
         chunk.freeze_worldgen_heights(&generator.blocks);
     }
 
-    pub(crate) fn decorate<E: Edition>(&self, generator: &OverworldGenerator<E>, owner_x: i32, owner_z: i32, chunks: [ProtoChunk; 9]) -> [ChunkChanges; 9] {
+    pub(crate) fn decorate<E: Edition>(&self, generator: &OverworldGenerator<E>, owner_x: i32, owner_z: i32, chunks: [ProtoChunk; 9]) -> [Changes; 9] {
         self.catalog.decorate(generator.seed, owner_x, owner_z, &generator.blocks, chunks)
     }
 
@@ -152,7 +152,7 @@ impl Edition for Java {
         Java::apply_carvers(self, generator, noise, aquifer, chunk);
     }
 
-    fn decorate(&self, generator: &OverworldGenerator<Self>, owner_x: i32, owner_z: i32, chunks: [ProtoChunk; 9]) -> [ChunkChanges; 9] {
+    fn decorate(&self, generator: &OverworldGenerator<Self>, owner_x: i32, owner_z: i32, chunks: [ProtoChunk; 9]) -> [Changes; 9] {
         Java::decorate(self, generator, owner_x, owner_z, chunks)
     }
 

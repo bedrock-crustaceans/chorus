@@ -5,7 +5,7 @@ use glam::IVec3;
 use super::super::{Edition, OverworldGenerator};
 use super::blocks::{AIR, BlockId, Blocks};
 use super::proto::{ProtoChunk, QuartBiomes};
-use super::region::{BlockView, ChunkChanges};
+use super::region::{BlockView, Changes};
 use super::survival::Support;
 
 use super::terrain::{CornerColumns, NoiseChunk};
@@ -117,7 +117,7 @@ pub struct FeaturePhase;
 
 impl<E: Edition> Phase<OverworldGenerator<E>> for FeaturePhase {
     type Output = ();
-    type Mailbox = ChunkChanges;
+    type Mailbox = Changes;
 
     const RETAIN: usize = 1024;
 

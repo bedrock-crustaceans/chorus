@@ -4,7 +4,7 @@ use super::java::{Java, Rules};
 use super::shared::blocks::{BlockId, BlockTable};
 use super::shared::proto::{ProtoChunk, QuartBiomes};
 use super::shared::random::PositionalFactory;
-use super::shared::region::ChunkChanges;
+use super::shared::region::Changes;
 use super::shared::shape::Shapes;
 use super::shared::terrain::NoiseChunk;
 use super::{Edition, OverworldGenerator};
@@ -39,7 +39,7 @@ impl Edition for Bedrock {
         self.java.apply_carvers(generator, noise, aquifer, chunk);
     }
 
-    fn decorate(&self, generator: &OverworldGenerator<Self>, owner_x: i32, owner_z: i32, chunks: [ProtoChunk; 9]) -> [ChunkChanges; 9] {
+    fn decorate(&self, generator: &OverworldGenerator<Self>, owner_x: i32, owner_z: i32, chunks: [ProtoChunk; 9]) -> [Changes; 9] {
         self.java.decorate(generator, owner_x, owner_z, chunks)
     }
 
