@@ -1,3 +1,5 @@
+#[cfg(feature = "debug")]
+pub mod debug;
 pub mod dimension;
 pub mod error;
 pub mod graph;

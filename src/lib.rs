@@ -43,6 +43,69 @@ pub mod utils {
     pub use chorus_core::utils::*;
 }
 
+#[derive(bevy_ecs::prelude::Resource, Default)]
+pub struct ShutdownState {
+    pub done: bool,
+}
+
+pub fn shutdown(world: &mut bevy_ecs::prelude::World) {
+    let already = world
+        .get_resource::<ShutdownState>()
+        .map(|state| state.done)
+        .unwrap_or(false);
+    if already {
+        return;
+    }
+    if let Some(mut state) = world.get_resource_mut::<ShutdownState>() {
+        state.done = true;
+    } else {
+        world.insert_resource(ShutdownState { done: true });
+    }
+
+    let _tag = tracing::info_span!("shutdown").entered();
+    let compact = world.get_resource::<Config>().is_some_and(|config| config.level.database.shutdown_compaction);
+    actor::storage::save_all_actors(world);
+    if let Some(mut level) = world.get_resource_mut::<level::Level>() {
+        let saved = level.save_blocking();
+        info!("saved {saved} chunks before exiting");
+        if compact && let Some(storage) = level.storage() {
+            info!("compacting the level database before exiting");
+            if let Err(err) = storage.compact_blocking() {
+                warn!("failed to compact the level database: {err}");
+            }
+        }
+    }
+    console::shutdown();
+}
+
+pub struct ShutdownPlugin;
+
+impl Plugin for ShutdownPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(bevy_app::Last, save_on_exit);
+    }
+}
+
+fn save_on_exit(mut exits: bevy_ecs::prelude::MessageReader<AppExit>, mut commands: bevy_ecs::prelude::Commands) {
+    if exits.read().next().is_some() {
+        commands.queue(|world: &mut bevy_ecs::prelude::World| shutdown(world));
+    }
+}
+
+#[derive(bevy_ecs::prelude::Resource, Clone, Copy, Debug, Default)]
+pub struct Embedded;
+
+#[derive(bevy_ecs::prelude::Resource, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SchedulerAuthority {
+    LoopRunner,
+    Driver,
+}
+
+#[derive(bevy_ecs::prelude::Resource, Clone, Copy, Debug)]
+pub struct SchedulerControl {
+    pub authority: SchedulerAuthority,
+}
+
 pub struct LoopRunner;
 
 impl LoopRunner {
@@ -56,24 +119,17 @@ impl LoopRunner {
             app.cleanup();
         }
 
+        let external_scheduler = app
+            .world()
+            .get_resource::<SchedulerControl>()
+            .map(|control| control.authority == SchedulerAuthority::Driver)
+            .unwrap_or(false);
+
         loop {
             app.update();
 
             if let Some(exit) = app.should_exit() {
-                let _tag = tracing::info_span!("shutdown").entered();
-                let compact = app.world().get_resource::<Config>().is_some_and(|config| config.level.database.shutdown_compaction);
-                actor::storage::save_all_actors(app.world_mut());
-                if let Some(mut level) = app.world_mut().get_resource_mut::<level::Level>() {
-                    let saved = level.save_blocking();
-                    info!("saved {saved} chunks before exiting");
-                    if compact && let Some(storage) = level.storage() {
-                        info!("compacting the level database before exiting");
-                        if let Err(err) = storage.compact_blocking() {
-                            warn!("failed to compact the level database: {err}");
-                        }
-                    }
-                }
-                console::shutdown();
+                shutdown(app.world_mut());
                 return exit;
             }
 
@@ -81,17 +137,27 @@ impl LoopRunner {
             let deadline = gap_started + app.world().resource::<TickClock>().remaining();
             let mut slept = Duration::ZERO;
 
-            loop {
-                run_tasks(app.world_mut(), deadline);
+            if external_scheduler {
+                // Task driving is owned by the embedded scheduler driver.
+                // Only pace the loop to the tick deadline to avoid busy-waiting.
                 let now = Instant::now();
-                if now >= deadline {
-                    break;
+                if now < deadline {
+                    spin_sleep::sleep(deadline.saturating_duration_since(now));
+                    slept = deadline.saturating_duration_since(gap_started);
                 }
-                match app.world_mut().resource_mut::<Scheduler>().next_wake() {
-                    Some(wake) if wake < deadline => std::thread::sleep(wake.saturating_duration_since(now)),
-                    _ => spin_sleep::sleep(deadline.saturating_duration_since(now)),
+            } else {
+                loop {
+                    run_tasks(app.world_mut(), deadline);
+                    let now = Instant::now();
+                    if now >= deadline {
+                        break;
+                    }
+                    match app.world_mut().resource_mut::<Scheduler>().next_wake() {
+                        Some(wake) if wake < deadline => std::thread::sleep(wake.saturating_duration_since(now)),
+                        _ => spin_sleep::sleep(deadline.saturating_duration_since(now)),
+                    }
+                    slept += now.elapsed();
                 }
-                slept += now.elapsed();
             }
             app.world_mut().resource_mut::<Scheduler>().record_gap(gap_started.elapsed(), slept);
         }
@@ -108,11 +174,59 @@ fn thread_policy(max_threads: usize, percent: f32) -> TaskPoolThreadAssignmentPo
     }
 }
 
-pub struct ChorusPlugin;
+pub struct ChorusPlugin {
+    pub config: Option<Config>,
+    pub schedule_driver: bool,
+    pub console: bool,
+}
+
+impl Default for ChorusPlugin {
+    fn default() -> Self {
+        Self {
+            config: None,
+            schedule_driver: true,
+            console: true,
+        }
+    }
+}
+
+impl ChorusPlugin {
+    pub fn embedded() -> Self {
+        Self {
+            console: false,
+            ..Default::default()
+        }
+    }
+
+    pub fn headless() -> Self {
+        Self {
+            schedule_driver: false,
+            ..Default::default()
+        }
+    }
+
+    pub fn with_config(mut self, config: Config) -> Self {
+        self.config = Some(config);
+        self
+    }
+}
 
 impl Plugin for ChorusPlugin {
     fn build(&self, app: &mut App) {
-        let config = Config::setup();
+        let config = self.config.clone().unwrap_or_else(Config::setup);
+
+        app.init_resource::<ShutdownState>();
+
+        let authority = if self.schedule_driver {
+            SchedulerAuthority::Driver
+        } else {
+            SchedulerAuthority::LoopRunner
+        };
+        app.insert_resource(SchedulerControl { authority });
+
+        if self.schedule_driver {
+            app.insert_resource(Embedded);
+        }
 
         app.add_schedule(Schedule::new(Tick));
         app.configure_sets(Tick, (TickSet::First, TickSet::Update, TickSet::Last).chain());
@@ -146,7 +260,31 @@ impl Plugin for ChorusPlugin {
         }
 
         app.insert_resource(config).add_systems(PreStartup, setup_logger).add_plugins(Server);
+
+        if self.schedule_driver {
+            app.add_systems(bevy_app::Last, drive_scheduler);
+        }
+        // Shutdown handling is shared between headless and embedded runners.
+        app.add_plugins(ShutdownPlugin);
+        if self.console {
+            app.add_plugins(console::ConsolePlugin::default());
+        } else {
+            app.add_plugins(console::ConsolePlugin::embedded());
+        }
     }
+}
+
+fn drive_scheduler(world: &mut bevy_ecs::prelude::World) {
+    // Only the configured owner drives the scheduler; prevents double run_tasks.
+    let owner_is_driver = world
+        .get_resource::<SchedulerControl>()
+        .map(|control| control.authority == SchedulerAuthority::Driver)
+        .unwrap_or(true);
+    if !owner_is_driver {
+        return;
+    }
+    let deadline = Instant::now() + Duration::from_millis(10);
+    chorus_core::schedule::run_tasks(world, deadline);
 }
 
 pub struct Chorus;
@@ -154,7 +292,7 @@ pub struct Chorus;
 impl Chorus {
     pub fn init() -> App {
         let mut app = App::new();
-        app.add_plugins(ChorusPlugin).set_runner(LoopRunner::run);
+        app.add_plugins(ChorusPlugin::headless()).set_runner(LoopRunner::run);
         app
     }
 }

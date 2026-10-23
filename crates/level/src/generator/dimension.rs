@@ -41,6 +41,11 @@ pub trait WorldGenerator: Send + Sync {
     fn stats(&self) -> GenerationStats {
         GenerationStats::default()
     }
+
+    #[cfg(feature = "debug")]
+    fn debug_graph(&self) -> Option<&dyn crate::generator::debug::DebugGraph> {
+        None
+    }
 }
 
 pub struct Dimension {
@@ -269,6 +274,11 @@ impl Dimension {
 
     pub fn generation_stats(&self) -> GenerationStats {
         self.generator.stats()
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn debug_graph(&self) -> Option<&dyn crate::generator::debug::DebugGraph> {
+        self.generator.debug_graph()
     }
 
     pub fn release_generated(&mut self) -> bool {

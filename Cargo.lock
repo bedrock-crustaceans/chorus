@@ -829,6 +829,7 @@ dependencies = [
  "chorus_level",
  "chorus_worldgen",
  "chrono",
+ "crossbeam-channel",
  "crossterm",
  "facet 0.50.0-rc.7",
  "facet-json",

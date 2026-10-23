@@ -712,6 +712,127 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
     fn stats(&self) -> GenerationStats {
         self.generation_stats()
     }
+
+    #[cfg(feature = "debug")]
+    fn debug_graph(&self) -> Option<&dyn crate::generator::debug::DebugGraph> {
+        Some(self)
+    }
+}
+
+#[cfg(feature = "debug")]
+impl<G: Generator> crate::generator::debug::DebugGraph for PhaseGraph<G> {
+    fn terminal(&self) -> PhaseId {
+        self.terminal
+    }
+
+    fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    fn focus(&self) -> &[ChunkPos] {
+        &self.focus
+    }
+
+    fn completed(&self) -> &FxHashSet<ChunkPos> {
+        &self.completed
+    }
+
+    fn hops(&self) -> &FxHashMap<PhaseId, u32> {
+        &self.hops
+    }
+
+    fn in_flight(&self) -> usize {
+        self.in_flight
+    }
+
+    fn ready(&self) -> usize {
+        self.pending_dispatch.len()
+    }
+
+    fn phases(&self) -> Vec<crate::generator::debug::DebugPhase> {
+        use crate::generator::debug::{DebugPhase, DebugRequirement};
+
+        let mut phases = Vec::new();
+        let mut seen = FxHashSet::default();
+        let mut stack = vec![PhaseDescriptor::of::<G::Terminal>()];
+        while let Some(descriptor) = stack.pop() {
+            if !seen.insert(descriptor.phase) {
+                continue;
+            }
+            let requirements = (descriptor.requires)()
+                .into_iter()
+                .map(|requirement| {
+                    if requirement.descriptor.phase != descriptor.phase {
+                        stack.push(requirement.descriptor);
+                    }
+                    DebugRequirement {
+                        phase: requirement.descriptor.phase,
+                        max_hops: requirement.max_hops,
+                    }
+                })
+                .collect();
+            phases.push(DebugPhase {
+                id: descriptor.phase,
+                name: descriptor.name,
+                retain: descriptor.retain,
+                requirements,
+            });
+        }
+        phases
+    }
+
+    fn node(&self, phase: PhaseId, cell: ChunkPos, hop: u32) -> Option<crate::generator::debug::DebugNode> {
+        self.graph.index.get(&(phase, cell, hop)).and_then(|&key| {
+            self.graph.nodes.get(key).map(|node| crate::generator::debug::DebugNode {
+                phase: node.descriptor.phase,
+                phase_name: node.descriptor.name,
+                cell: node.cell,
+                hop: node.hop,
+                order: node.order,
+                status: crate::generator::debug::DebugStatus::of(&node.status),
+                duration: node.duration,
+                dependencies: node
+                    .deps
+                    .iter()
+                    .filter_map(|&dep| self.graph.nodes.get(dep))
+                    .map(|dep| (dep.descriptor.phase, dep.cell, dep.hop))
+                    .collect(),
+            })
+        })
+    }
+
+    fn for_each_node(&self, f: &mut dyn FnMut(crate::generator::debug::DebugNode)) {
+        for node in self.graph.nodes.values() {
+            f(crate::generator::debug::DebugNode {
+                phase: node.descriptor.phase,
+                phase_name: node.descriptor.name,
+                cell: node.cell,
+                hop: node.hop,
+                order: node.order,
+                status: crate::generator::debug::DebugStatus::of(&node.status),
+                duration: node.duration,
+                dependencies: node
+                    .deps
+                    .iter()
+                    .filter_map(|&dep| self.graph.nodes.get(dep))
+                    .map(|dep| (dep.descriptor.phase, dep.cell, dep.hop))
+                    .collect(),
+            });
+        }
+    }
+
+    fn nodes_at(&self, cell: ChunkPos) -> Vec<crate::generator::debug::DebugNode> {
+        let mut nodes = Vec::new();
+        for info in self.phases() {
+            let hops = self.hops.get(&info.id).copied().unwrap_or(0);
+            for hop in 0..=hops {
+                if let Some(node) = self.node(info.id, cell, hop) {
+                    nodes.push(node);
+                }
+            }
+        }
+        nodes
+    }
 }
 
 fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u32>) {

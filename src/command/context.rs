@@ -99,9 +99,13 @@ impl<'w> CommandContext<'w> {
     }
 
     pub fn reply(&mut self, message: impl Into<String>) {
+        let message = message.into();
         let Some(mut session) = self.get_mut::<Session>() else {
             if self.is_console() {
-                console::reply(&message.into());
+                console::reply(&message);
+                if let Some(output) = self.world.get_resource::<console::ConsoleOutput>() {
+                    output.push(message);
+                }
             }
             return;
         };
@@ -109,7 +113,7 @@ impl<'w> CommandContext<'w> {
         session.send(BedrockProtocol::TextPacket(
             TextPacket {
                 localize: false,
-                message_type: TextPacketType::SystemMessage(message.into()),
+                message_type: TextPacketType::SystemMessage(message),
                 sender_xuid: String::new(),
                 platform_id: String::new(),
                 filtered_message: None,

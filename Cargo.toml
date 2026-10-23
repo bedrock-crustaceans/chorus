@@ -92,6 +92,7 @@ bevy-nethernet.workspace = true
 bevy-raknet.workspace = true
 nbtx.workspace = true
 atomicow.workspace = true
+crossbeam-channel.workspace = true
 indexmap.workspace = true
 facet.workspace = true
 facet-json.workspace = true

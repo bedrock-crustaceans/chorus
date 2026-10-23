@@ -1,13 +1,18 @@
+use std::io::Write as _;
+
 use crate::config::Config;
 use bedrock::protocol::ProtoVersion;
+use bevy_ecs::prelude::Resource;
 use bevy_ecs::system::Res;
 use chrono::Local;
 
 use tracing::level_filters::LevelFilter;
 use tracing::{Event, Level, Subscriber};
 use tracing_appender::rolling;
+use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::fmt::format::Writer;
-use tracing_subscriber::registry::LookupSpan;
+use tracing_subscriber::layer::Layer;
+use tracing_subscriber::registry::{LookupSpan, Registry};
 use tracing_subscriber::{
     EnvFilter,
     fmt::{self, FmtContext, FormatEvent, FormatFields},
@@ -88,9 +93,78 @@ pub fn setup_logger(config: Res<Config>) {
         None
     };
 
-    tracing_subscriber::registry().with(filter).with(console_layer).with(file_layer).init();
+    let _ = tracing_subscriber::registry().with(filter).with(console_layer).with(file_layer).try_init();
     crate::console::banner(
         &format!("Chorus v{}", env!("CARGO_PKG_VERSION")),
         &format!("{} ({})", crate::network::BedrockProtocol::GAME_VERSION, crate::network::BedrockProtocol::PROTOCOL_VERSION),
     );
+}
+
+#[derive(Resource, Clone)]
+pub struct ConsoleLog {
+    sender: crossbeam_channel::Sender<String>,
+    receiver: crossbeam_channel::Receiver<String>,
+}
+
+impl Default for ConsoleLog {
+    fn default() -> Self {
+        let (sender, receiver) = crossbeam_channel::unbounded();
+        Self { sender, receiver }
+    }
+}
+
+impl ConsoleLog {
+    pub fn push(&self, line: String) {
+        let _ = self.sender.send(line);
+    }
+
+    pub fn drain(&self) -> impl Iterator<Item = String> + '_ {
+        self.receiver.try_iter()
+    }
+}
+
+pub struct SinkWriter {
+    sender: crossbeam_channel::Sender<String>,
+    pending: String,
+}
+
+impl std::io::Write for SinkWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.pending.push_str(&String::from_utf8_lossy(buf));
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Drop for SinkWriter {
+    fn drop(&mut self) {
+        if !self.pending.is_empty() {
+            let _ = self.sender.send(std::mem::take(&mut self.pending));
+        }
+    }
+}
+
+impl<'a> MakeWriter<'a> for ConsoleLog {
+    type Writer = SinkWriter;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        SinkWriter {
+            sender: self.sender.clone(),
+            pending: String::new(),
+        }
+    }
+}
+
+pub fn capture_layer(app: &mut bevy_app::App) -> Option<Box<dyn Layer<Registry> + Send + Sync + 'static>> {
+    app.init_resource::<ConsoleLog>();
+    let log = app.world().resource::<ConsoleLog>().clone();
+    Some(Box::new(
+        fmt::layer()
+            .event_format(PrettyFormatter { with_target: false })
+            .with_ansi(true)
+            .with_writer(log),
+    ))
 }

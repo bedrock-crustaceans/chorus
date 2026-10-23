@@ -39,6 +39,20 @@ pub struct Console;
 #[derive(Resource)]
 pub struct ConsoleSender(pub Entity);
 
+pub use crate::logger::{ConsoleLog as ConsoleOutput, capture_layer};
+
+#[derive(Resource, Clone)]
+pub struct ConsoleHandle {
+    pub entity: Entity,
+    pub output: ConsoleOutput,
+}
+
+impl ConsoleHandle {
+    pub fn drain(&self) -> impl Iterator<Item = String> + '_ {
+        self.output.drain()
+    }
+}
+
 #[derive(Resource, Default)]
 struct ConsoleInput {
     terminal: bool,
@@ -46,13 +60,35 @@ struct ConsoleInput {
     closed: bool,
 }
 
-pub struct ConsolePlugin;
+pub struct ConsolePlugin {
+    pub stdin: bool,
+}
+
+impl Default for ConsolePlugin {
+    fn default() -> Self {
+        Self { stdin: true }
+    }
+}
+
+impl ConsolePlugin {
+    pub fn embedded() -> Self {
+        Self { stdin: false }
+    }
+}
 
 impl Plugin for ConsolePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ConsoleInput>()
-            .add_systems(Startup, setup_console)
-            .add_systems(PreUpdate, (read_console, handle_interrupt, sync_completions));
+        app.init_resource::<ConsoleInput>().init_resource::<ConsoleOutput>();
+
+        let console = app.world_mut().spawn(Console).id();
+        let output = app.world().resource::<ConsoleOutput>().clone();
+        app.insert_resource(ConsoleSender(console))
+            .insert_resource(ConsoleHandle { entity: console, output });
+
+        if self.stdin {
+            app.add_systems(Startup, setup_console)
+                .add_systems(PreUpdate, (read_console, handle_interrupt, sync_completions));
+        }
     }
 }
 
@@ -75,9 +111,7 @@ pub fn shutdown() {
     prompt::stop();
 }
 
-fn setup_console(mut commands: Commands, mut input: ResMut<ConsoleInput>) {
-    let console = commands.spawn(Console).id();
-    commands.insert_resource(ConsoleSender(console));
+fn setup_console(mut input: ResMut<ConsoleInput>) {
     if std::io::stdin().is_terminal() {
         match prompt::start(std::io::stdout().is_terminal()) {
             Ok(()) => {

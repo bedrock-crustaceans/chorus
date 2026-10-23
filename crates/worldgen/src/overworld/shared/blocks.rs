@@ -114,6 +114,7 @@ pub struct Entry {
     pub flooded: bool,
     pub upper: Option<bool>,
     pub support: Support,
+    pub map_color: (u8, u8, u8, u8),
     flooded_id: BlockId,
     variants: Vec<(&'static str, BlockState, BlockId)>,
 }
@@ -203,6 +204,12 @@ impl<'a> BlockTable<'a> {
         let solid = !air && !liquid && tags & soft == 0 && !PASSABLE.contains(&name);
         let next_kind = self.kinds.len() as u16;
         let kind = *self.kinds.entry(name).or_insert(next_kind);
+        let map_color = self
+            .registry
+            .get_components(runtime)
+            .and_then(|components| components.get::<chorus_block::component::map_color_component::MapColorComponent>())
+            .map(|color| (color.r, color.g, color.b, color.a))
+            .unwrap_or((0, 0, 0, 255));
         self.entries.push(Entry {
             kind,
             runtime,
@@ -217,6 +224,7 @@ impl<'a> BlockTable<'a> {
             support: Support::of(name, |tag| tags & (1 << tag as u32) != 0),
             flooded_id: 0,
             variants: Vec::new(),
+            map_color,
         });
         let id = (self.entries.len() - 1) as BlockId;
         self.index.insert(index_key, id);
@@ -268,6 +276,10 @@ impl Blocks {
 
     pub fn runtime(&self, id: BlockId) -> i32 {
         self.entries[id as usize].runtime
+    }
+
+    pub fn map_color(&self, id: BlockId) -> (u8, u8, u8, u8) {
+        self.entries[id as usize].map_color
     }
 
     pub fn runtime_ids(&self) -> impl Iterator<Item = (i32, BlockId)> + '_ {
