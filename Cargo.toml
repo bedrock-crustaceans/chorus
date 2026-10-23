@@ -73,6 +73,9 @@ authors.workspace = true
 [lib]
 path = "src/lib.rs"
 
+[features]
+debug = ["chorus_level/debug", "chorus_worldgen/debug"]
+
 [dependencies]
 chorus_core.workspace = true
 chorus_block.workspace = true

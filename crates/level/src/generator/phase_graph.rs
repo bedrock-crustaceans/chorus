@@ -19,7 +19,7 @@ const RETENTION_WINDOW: Duration = Duration::from_secs(5);
 const REPORT_INTERVAL: Duration = Duration::from_secs(30);
 const COMPLETION_WAIT: Duration = Duration::from_millis(1);
 
-enum Completion {
+pub enum Completion {
     Finished(NodeKey, Outcome),
     Panicked(NodeKey),
 }
@@ -38,23 +38,24 @@ impl Drop for PanicReport {
 }
 
 pub struct PhaseGraph<G: Generator> {
-    generator: Arc<G>,
-    graph: Graph<G>,
-    completions_tx: Sender<Completion>,
-    completions_rx: Receiver<Completion>,
-    pending_dispatch: BinaryHeap<Reverse<(u64, NodeKey)>>,
-    next_order: u64,
-    focus: Vec<ChunkPos>,
-    focus_by_x: Vec<ChunkPos>,
-    reach: FxHashMap<PhaseId, f64>,
-    hops: FxHashMap<PhaseId, u32>,
-    terminal: PhaseId,
-    completed: FxHashSet<ChunkPos>,
-    started: FxHashMap<&'static str, u64>,
-    last_report: Instant,
-    in_flight: usize,
-    finished: Vec<(ChunkPos, Outcome)>,
-    discarded: Vec<Outcome>,
+    pub generator: Arc<G>,
+    pub graph: Graph<G>,
+    pub completions_tx: Sender<Completion>,
+    pub completions_rx: Receiver<Completion>,
+    pub pending_dispatch: BinaryHeap<Reverse<(u64, NodeKey)>>,
+    pub next_order: u64,
+    pub focus: Vec<ChunkPos>,
+    pub focus_by_x: Vec<ChunkPos>,
+    pub reach: FxHashMap<PhaseId, f64>,
+    pub hops: FxHashMap<PhaseId, u32>,
+    pub terminal: PhaseId,
+    pub completed: FxHashSet<ChunkPos>,
+    pub started: FxHashMap<&'static str, u64>,
+    pub last_report: Instant,
+    pub in_flight: usize,
+    pub finished: Vec<(ChunkPos, Outcome)>,
+    pub discarded: Vec<Outcome>,
+    pub revision: u64,
 }
 
 impl<G: Generator> PhaseGraph<G> {
@@ -80,10 +81,11 @@ impl<G: Generator> PhaseGraph<G> {
             in_flight: 0,
             finished: Vec::new(),
             discarded: Vec::new(),
+            revision: 0,
         }
     }
 
-    fn request(&mut self, cell: ChunkPos) {
+    pub fn request(&mut self, cell: ChunkPos) {
         let root = PhaseDescriptor::of::<G::Terminal>();
         let root_key = (root.phase, cell, 0);
 
@@ -111,7 +113,9 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn insert(&mut self, descriptor: PhaseDescriptor<G>, cell: ChunkPos, order: u64) {
+    pub fn insert(&mut self, descriptor: PhaseDescriptor<G>, cell: ChunkPos, order: u64) {
+        self.revision = self.revision.wrapping_add(1);
+
         enum Step<G: Generator> {
             Enter {
                 descriptor: PhaseDescriptor<G>,
@@ -154,6 +158,10 @@ impl<G: Generator> PhaseGraph<G> {
                         deps: Vec::new(),
                         dependents: Vec::new(),
                         status: NodeStatus::Pending { remaining: 0 },
+                        #[cfg(feature = "debug")]
+                        started_at: None,
+                        #[cfg(feature = "debug")]
+                        duration: None,
                     });
                     self.graph.index.insert(map_key, key);
 
@@ -239,29 +247,29 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn nearest_focus(&self, cell: ChunkPos) -> Option<f64> {
+    pub fn nearest_focus(&self, cell: ChunkPos) -> Option<f64> {
         nearest_distance(&self.focus_by_x, cell)
     }
 
-    fn rank_at(&self, node: &Node<G>, distance: Option<f64>) -> u64 {
+    pub fn rank_at(&self, node: &Node<G>, distance: Option<f64>) -> u64 {
         let Some(distance) = distance else { return 0 };
         let reach = self.reach.get(&node.descriptor.phase).copied().unwrap_or(0.0);
         ((distance - reach).max(0.0) * 16.0).min(u32::MAX as f64) as u64
     }
 
-    fn push_ready(&mut self, key: NodeKey) {
+    pub fn push_ready(&mut self, key: NodeKey) {
         let distance = self.nearest_focus(self.graph.nodes[key].cell);
         self.enqueue(key, distance);
     }
 
-    fn enqueue(&mut self, key: NodeKey, distance: Option<f64>) {
+    pub fn enqueue(&mut self, key: NodeKey, distance: Option<f64>) {
         let node = &self.graph.nodes[key];
         let priority = (self.rank_at(node, distance) << 32) | (node.order & u32::MAX as u64);
         self.graph.nodes[key].priority = priority;
         self.pending_dispatch.push(Reverse((priority, key)));
     }
 
-    fn set_focus(&mut self, focus: &[(i32, i32)]) {
+    pub fn set_focus(&mut self, focus: &[(i32, i32)]) {
         let focus: Vec<ChunkPos> = focus.iter().map(|&(x, z)| ChunkPos::new(x, z)).collect();
         if focus == self.focus {
             return;
@@ -286,9 +294,11 @@ impl<G: Generator> PhaseGraph<G> {
             }
         }
         self.pending_dispatch = BinaryHeap::from(ranked);
+        self.revision = self.revision.wrapping_add(1);
     }
 
-    fn start(&mut self, key: NodeKey) -> Result<(PhaseDescriptor<G>, ChunkPos, PhaseInputs<G>), Arc<PhaseFailure>> {
+    pub fn start(&mut self, key: NodeKey) -> Result<(PhaseDescriptor<G>, ChunkPos, PhaseInputs<G>), Arc<PhaseFailure>> {
+        self.revision = self.revision.wrapping_add(1);
         let node = &self.graph.nodes[key];
         let descriptor = node.descriptor;
         let cell = node.cell;
@@ -308,6 +318,10 @@ impl<G: Generator> PhaseGraph<G> {
         }
 
         self.graph.nodes[key].status = NodeStatus::Running;
+        #[cfg(feature = "debug")]
+        {
+            self.graph.nodes[key].started_at = Some(Instant::now());
+        }
 
         // evicted before running, so a dependency nothing else holds can be moved out by take()
         for i in 0..self.graph.nodes[key].deps.len() {
@@ -324,12 +338,17 @@ impl<G: Generator> PhaseGraph<G> {
         Ok((descriptor, cell, inputs))
     }
 
-    fn execute(descriptor: PhaseDescriptor<G>, generator: &G, cell: ChunkPos, mut inputs: PhaseInputs<G>) -> Outcome {
+    pub fn execute(descriptor: PhaseDescriptor<G>, generator: &G, cell: ChunkPos, mut inputs: PhaseInputs<G>) -> Outcome {
         (descriptor.run)(generator, cell, &mut inputs).map_err(|error| Arc::new(PhaseFailure { phase: descriptor.name, cell, error }))
     }
 
-    fn complete(&mut self, key: NodeKey, outcome: Outcome) {
+    pub fn complete(&mut self, key: NodeKey, outcome: Outcome) {
+        self.revision = self.revision.wrapping_add(1);
         let node = &mut self.graph.nodes[key];
+        #[cfg(feature = "debug")]
+        {
+            node.duration = node.started_at.map(|started| started.elapsed());
+        }
         if node.requested {
             node.requested = false;
             self.finished.push((node.cell, outcome.clone()));
@@ -360,7 +379,7 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn is_interior(&self, phase: PhaseId, cell: ChunkPos) -> bool {
+    pub fn is_interior(&self, phase: PhaseId, cell: ChunkPos) -> bool {
         let Some(&reach) = self.reach.get(&phase) else { return false };
         let radius = reach.ceil() as i32;
         for dx in -radius..=radius {
@@ -381,7 +400,7 @@ impl<G: Generator> PhaseGraph<G> {
         true
     }
 
-    fn sweep(&mut self, around: ChunkPos) {
+    pub fn sweep(&mut self, around: ChunkPos) {
         let phases: Vec<PhaseId> = self.graph.retained.keys().copied().collect();
         for phase in phases {
             let Some(&reach) = self.reach.get(&phase) else { continue };
@@ -404,7 +423,7 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn try_evict(&mut self, key: NodeKey) {
+    pub fn try_evict(&mut self, key: NodeKey) {
         let Some(node) = self.graph.nodes.get(key) else { return };
         if !matches!(node.status, NodeStatus::Done(_)) {
             return;
@@ -445,7 +464,7 @@ impl<G: Generator> PhaseGraph<G> {
         self.trim(phase);
     }
 
-    fn trim(&mut self, phase: PhaseId) {
+    pub fn trim(&mut self, phase: PhaseId) {
         let Some(retention) = self.graph.retained.get_mut(&phase) else { return };
         while retention.queue.len() > retention.capacity {
             let (oldest, oldest_stamp) = retention.queue.pop_front().expect("queue is longer than capacity");
@@ -477,7 +496,7 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn shrink_retention(&mut self) {
+    pub fn shrink_retention(&mut self) {
         let mut shrunk = Vec::new();
         for (&phase, retention) in &mut self.graph.retained {
             if retention.window_start.elapsed() < RETENTION_WINDOW {
@@ -498,7 +517,7 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn handle(&mut self, completion: Completion) {
+    pub fn handle(&mut self, completion: Completion) {
         match completion {
             Completion::Finished(key, outcome) => {
                 self.in_flight -= 1;
@@ -511,7 +530,7 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn fill_pool(&mut self, pool: &TaskPool) {
+    pub fn fill_pool(&mut self, pool: &TaskPool) {
         while self.in_flight < pool.thread_num() * 2 {
             let Some(key) = self.pop_ready() else { break };
             let (descriptor, cell, inputs) = match self.start(key) {
@@ -533,7 +552,8 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn remove(&mut self, key: NodeKey) {
+    pub fn remove(&mut self, key: NodeKey) {
+        self.revision = self.revision.wrapping_add(1);
         let node = &self.graph.nodes[key];
         self.graph.index.remove(&(node.descriptor.phase, node.cell, node.hop));
         if let Some(node) = self.graph.nodes.remove(key)
@@ -544,12 +564,12 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn release_one(&mut self) -> bool {
+    pub fn release_one(&mut self) -> bool {
         self.discarded.pop();
         !self.discarded.is_empty()
     }
 
-    fn cancel(&mut self, cell: ChunkPos) {
+    pub fn cancel(&mut self, cell: ChunkPos) {
         let root = PhaseDescriptor::of::<G::Terminal>();
         let Some(&key) = self.graph.index.get(&(root.phase, cell, 0)) else { return };
         self.graph.nodes[key].requested = false;
@@ -575,7 +595,7 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    fn pop_ready(&mut self) -> Option<NodeKey> {
+    pub fn pop_ready(&mut self) -> Option<NodeKey> {
         while let Some(Reverse((priority, key))) = self.pending_dispatch.pop() {
             if self
                 .graph
@@ -648,6 +668,14 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
             .collect()
     }
 
+    fn has_pending_work(&self) -> bool {
+        !self.pending_dispatch.is_empty() || self.in_flight > 0
+    }
+
+    fn release(&mut self) -> bool {
+        self.release_one()
+    }
+
     fn retention_report(&self) -> String {
         let mut live: FxHashMap<PhaseId, usize> = FxHashMap::default();
         for node in self.graph.nodes.values() {
@@ -679,14 +707,6 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
             .collect();
         lines.sort();
         lines.join("\n")
-    }
-
-    fn release(&mut self) -> bool {
-        self.release_one()
-    }
-
-    fn has_pending_work(&self) -> bool {
-        !self.pending_dispatch.is_empty() || self.in_flight > 0
     }
 
     fn stats(&self) -> GenerationStats {

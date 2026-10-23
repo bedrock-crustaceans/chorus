@@ -5,7 +5,7 @@ use crate::generator::dimension::Generator;
 use crate::generator::error::PhaseError;
 use crate::generator::pos::ChunkPos;
 
-pub(crate) type ErasedOutput = Arc<dyn Any + Send + Sync>;
+pub type ErasedOutput = Arc<dyn Any + Send + Sync>;
 
 pub const SAME_CELL: &[(i32, i32)] = &[(0, 0)];
 
@@ -42,9 +42,9 @@ pub trait Phase<G: Generator>: 'static {
 }
 
 pub struct Requirement<G: Generator> {
-    pub(crate) descriptor: PhaseDescriptor<G>,
-    pub(crate) offsets: &'static [(i32, i32)],
-    pub(crate) max_hops: Option<u32>,
+    pub descriptor: PhaseDescriptor<G>,
+    pub offsets: &'static [(i32, i32)],
+    pub max_hops: Option<u32>,
 }
 
 impl<G: Generator> Requirement<G> {
@@ -54,12 +54,12 @@ impl<G: Generator> Requirement<G> {
     }
 }
 
-pub(crate) struct PhaseDescriptor<G: Generator> {
-    pub(crate) phase: PhaseId,
-    pub(crate) name: &'static str,
-    pub(crate) retain: usize,
-    pub(crate) requires: fn() -> Vec<Requirement<G>>,
-    pub(crate) run: fn(&G, ChunkPos, &mut PhaseInputs<G>) -> Result<ErasedOutput, PhaseError>,
+pub struct PhaseDescriptor<G: Generator> {
+    pub phase: PhaseId,
+    pub name: &'static str,
+    pub retain: usize,
+    pub requires: fn() -> Vec<Requirement<G>>,
+    pub run: fn(&G, ChunkPos, &mut PhaseInputs<G>) -> Result<ErasedOutput, PhaseError>,
 }
 
 impl<G: Generator> Clone for PhaseDescriptor<G> {
@@ -71,7 +71,7 @@ impl<G: Generator> Clone for PhaseDescriptor<G> {
 impl<G: Generator> Copy for PhaseDescriptor<G> {}
 
 impl<G: Generator> PhaseDescriptor<G> {
-    pub(crate) fn of<P: Phase<G>>() -> Self {
+    pub fn of<P: Phase<G>>() -> Self {
         Self {
             phase: PhaseId::of::<P>(),
             name: short_type_name::<P>(),
@@ -83,8 +83,8 @@ impl<G: Generator> PhaseDescriptor<G> {
 }
 
 pub struct PhaseInputs<G: Generator> {
-    pub(crate) resolved: Vec<(PhaseId, ChunkPos, ErasedOutput)>,
-    pub(crate) generator: std::marker::PhantomData<fn() -> G>,
+    pub resolved: Vec<(PhaseId, ChunkPos, ErasedOutput)>,
+    pub generator: std::marker::PhantomData<fn() -> G>,
 }
 
 impl<G: Generator> PhaseInputs<G> {

@@ -286,6 +286,14 @@ impl<'a> Region<'a> {
 }
 
 impl Changes {
+    pub fn owner(&self) -> (i32, i32) {
+        (self.owner_x, self.owner_z)
+    }
+
+    pub fn entity_count(&self) -> usize {
+        self.entities.iter().map(Vec::len).sum()
+    }
+
     pub fn placed(&self, chunk_x: i32, chunk_z: i32) -> &[(u8, i16, u8, BlockId)] {
         slot(chunk_x - self.owner_x, chunk_z - self.owner_z).map_or(&[], |index| &self.changes[index])
     }

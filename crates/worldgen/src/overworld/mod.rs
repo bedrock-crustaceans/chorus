@@ -5,16 +5,21 @@ mod shared;
 use chorus_block::block_id::{LAVA, STONE, WATER};
 use chorus_block::block_registry::BlockRegistry;
 use glam::IVec3;
-use shared::biome::{Biome, BiomeSource};
-use shared::blocks::{BlockId, BlockTable, Blocks};
-use shared::proto::{self, ProtoChunk, QuartBiomes};
+use shared::biome::BiomeSource;
+use shared::blocks::BlockTable;
+use shared::proto;
 use shared::random::{PositionalFactory, Xoroshiro};
-use shared::region::Changes;
 use shared::shape::Shapes;
-use shared::terrain::{HEIGHT, MIN_Y, NoiseChunk, Terrain};
+use shared::terrain::Terrain;
 
 pub use bedrock::Bedrock;
+pub use java::aquifer::Aquifer as JavaAquifer;
 pub use java::Java;
+pub use shared::biome::Biome;
+pub use shared::blocks::{AIR, BlockId, Blocks, Entry};
+pub use shared::proto::{ProtoChunk, QuartBiomes};
+pub use shared::region::Changes;
+pub use shared::terrain::{HEIGHT, MIN_Y, CornerColumns, Densities, NoiseChunk};
 
 pub(crate) const SEA_LEVEL: i32 = 63;
 
@@ -47,6 +52,10 @@ pub struct OverworldGenerator<E: Edition> {
 }
 
 impl<E: Edition> OverworldGenerator<E> {
+    pub fn blocks(&self) -> &Blocks {
+        &self.blocks
+    }
+
     pub fn new(seed: i64, registry: &BlockRegistry) -> Self {
         let random = Xoroshiro::new(seed).fork_positional();
         let mut table = BlockTable::new(registry);

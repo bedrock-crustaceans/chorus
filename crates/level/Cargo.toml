@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 
+[features]
+debug = []
+
 [dependencies]
 chorus_core.workspace = true
 chorus_block.workspace = true

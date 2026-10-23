@@ -270,6 +270,14 @@ impl Blocks {
         self.entries[id as usize].runtime
     }
 
+    pub fn runtime_ids(&self) -> impl Iterator<Item = (i32, BlockId)> + '_ {
+        self.entries.iter().enumerate().map(|(id, entry)| (entry.runtime, id as BlockId))
+    }
+
+    pub fn runtime_name(&self, runtime: i32) -> Option<&'static str> {
+        self.entries.iter().find(|entry| entry.runtime == runtime).map(|entry| entry.name)
+    }
+
     pub fn is(&self, id: BlockId, tag: Tag) -> bool {
         self.entries[id as usize].tags & (1 << tag as u32) != 0
     }

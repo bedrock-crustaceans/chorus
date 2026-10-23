@@ -645,9 +645,24 @@ const CORNER_LEVELS: i32 = HEIGHT / CELL_HEIGHT + 1;
 pub struct CornerColumns(Vec<Corner>);
 
 impl CornerColumns {
+    pub const COLUMNS: i32 = CELLS;
+    pub const LEVELS: i32 = CORNER_LEVELS;
+
     fn column(&self, cx: i32, cz: i32) -> &[Corner] {
         let start = ((cz * CELLS + cx) * CORNER_LEVELS) as usize;
         &self.0[start..start + CORNER_LEVELS as usize]
+    }
+
+    pub fn main_at(&self, cx: i32, cz: i32, cy: i32) -> f32 {
+        self.column(cx, cz)[cy as usize].main
+    }
+
+    pub fn noodle_at(&self, cx: i32, cz: i32, cy: i32) -> f32 {
+        self.column(cx, cz)[cy as usize].noodle
+    }
+
+    pub fn vein_toggle_at(&self, cx: i32, cz: i32, cy: i32) -> f32 {
+        self.column(cx, cz)[cy as usize].vein_toggle
     }
 }
 

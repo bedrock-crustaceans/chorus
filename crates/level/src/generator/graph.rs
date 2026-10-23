@@ -1,4 +1,6 @@
 use std::collections::VecDeque;
+#[cfg(feature = "debug")]
+use std::time::Duration;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -10,17 +12,17 @@ use crate::generator::error::PhaseFailure;
 use crate::generator::phase::{ErasedOutput, PhaseDescriptor, PhaseId};
 use crate::generator::pos::ChunkPos;
 
-new_key_type! { pub(crate) struct NodeKey; }
+new_key_type! { pub struct NodeKey; }
 
-pub(crate) type Outcome = Result<ErasedOutput, Arc<PhaseFailure>>;
+pub type Outcome = Result<ErasedOutput, Arc<PhaseFailure>>;
 
-pub(crate) enum NodeStatus {
+pub enum NodeStatus {
     Pending { remaining: usize },
     Running,
     Done(Outcome),
 }
 
-pub(crate) struct Node<G: Generator> {
+pub struct Node<G: Generator> {
     pub reused: bool,
     pub descriptor: PhaseDescriptor<G>,
     pub cell: ChunkPos,
@@ -32,6 +34,10 @@ pub(crate) struct Node<G: Generator> {
     pub deps: Vec<NodeKey>,
     pub dependents: Vec<NodeKey>,
     pub status: NodeStatus,
+    #[cfg(feature = "debug")]
+    pub started_at: Option<Instant>,
+    #[cfg(feature = "debug")]
+    pub duration: Option<Duration>,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -44,7 +50,7 @@ pub struct RetentionStats {
     pub ghost_hits: u64,
 }
 
-pub(crate) struct Retention {
+pub struct Retention {
     pub name: &'static str,
     pub stats: RetentionStats,
     pub ceiling: usize,
@@ -74,7 +80,7 @@ impl Retention {
     }
 }
 
-pub(crate) struct Graph<G: Generator> {
+pub struct Graph<G: Generator> {
     pub nodes: SlotMap<NodeKey, Node<G>>,
     pub index: FxHashMap<(PhaseId, ChunkPos, u32), NodeKey>,
     pub retained: FxHashMap<PhaseId, Retention>,

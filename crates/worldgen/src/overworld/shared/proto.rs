@@ -576,6 +576,10 @@ impl QuartBiomes {
         self.biomes[((qy + 1) * 16 + qz * 4 + qx) as usize]
     }
 
+    pub fn surface_levels_raw(&self) -> &[i32; 16] {
+        &self.surface_levels
+    }
+
     pub fn surface_levels(&self, chunk_x: i32, chunk_z: i32) -> impl Iterator<Item = ((i32, i32), i32)> + '_ {
         self.surface_levels
             .iter()
