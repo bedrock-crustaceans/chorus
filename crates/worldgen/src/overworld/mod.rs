@@ -18,7 +18,7 @@ pub use java::Java;
 pub use shared::biome::Biome;
 pub use shared::blocks::{AIR, BlockId, Blocks, Entry};
 pub use shared::proto::{ProtoChunk, QuartBiomes};
-pub use shared::region::Changes;
+pub use shared::region::{Changes, ChunkChanges};
 pub use shared::terrain::{HEIGHT, MIN_Y, CornerColumns, Densities, NoiseChunk};
 
 pub(crate) const SEA_LEVEL: i32 = 63;

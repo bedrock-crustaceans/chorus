@@ -5,8 +5,9 @@ use glam::IVec3;
 use super::super::{Edition, OverworldGenerator};
 use super::blocks::{AIR, BlockId, Blocks};
 use super::proto::{ProtoChunk, QuartBiomes};
-use super::region::{BlockView, Changes};
+use super::region::{BlockView, ChunkChanges};
 use super::survival::Support;
+
 use super::terrain::{CornerColumns, NoiseChunk};
 use chorus_block::block_id::{COCOA, GLOW_LICHEN, SCULK_VEIN, VINE};
 use chorus_level::chunk::Chunk;
@@ -23,6 +24,7 @@ pub struct BiomePhase;
 
 impl<E: Edition> Phase<OverworldGenerator<E>> for BiomePhase {
     type Output = QuartBiomes;
+    type Mailbox = ();
 
     const RETAIN: usize = 1024;
 
@@ -35,6 +37,7 @@ pub struct CornerPhase;
 
 impl<E: Edition> Phase<OverworldGenerator<E>> for CornerPhase {
     type Output = CornerColumns;
+    type Mailbox = ();
 
     const RETAIN: usize = 1024;
 
@@ -49,6 +52,7 @@ pub struct NoisePhase;
 
 impl<E: Edition> Phase<OverworldGenerator<E>> for NoisePhase {
     type Output = (ProtoChunk, NoiseChunk, E::Aquifer);
+    type Mailbox = ();
 
     fn requires() -> Vec<Requirement<OverworldGenerator<E>>> {
         vec![BiomePhase::at(NEIGHBORHOOD), CornerPhase::at(SHARED_CORNERS)]
@@ -72,6 +76,7 @@ pub struct SurfacePhase;
 
 impl<E: Edition> Phase<OverworldGenerator<E>> for SurfacePhase {
     type Output = (ProtoChunk, NoiseChunk, E::Aquifer);
+    type Mailbox = ();
 
     fn requires() -> Vec<Requirement<OverworldGenerator<E>>> {
         vec![NoisePhase::at(SAME_CELL)]
@@ -92,6 +97,7 @@ pub struct CarverPhase;
 
 impl<E: Edition> Phase<OverworldGenerator<E>> for CarverPhase {
     type Output = ProtoChunk;
+    type Mailbox = ();
 
     const RETAIN: usize = 1024;
 
@@ -110,7 +116,8 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for CarverPhase {
 pub struct FeaturePhase;
 
 impl<E: Edition> Phase<OverworldGenerator<E>> for FeaturePhase {
-    type Output = Changes;
+    type Output = ();
+    type Mailbox = ChunkChanges;
 
     const RETAIN: usize = 1024;
 
@@ -118,11 +125,7 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for FeaturePhase {
         vec![CarverPhase::at(NEIGHBORHOOD), FeaturePhase::at(EARLIER_OVERLAPPING).max_hops(1)]
     }
 
-    fn run(generator: &OverworldGenerator<E>, cell: ChunkPos, inputs: &mut PhaseInputs<OverworldGenerator<E>>) -> Result<Changes, PhaseError> {
-        let earlier: Vec<_> = EARLIER_OVERLAPPING
-            .iter()
-            .filter_map(|&(dx, dz)| inputs.try_get::<FeaturePhase>(ChunkPos::new(cell.x + dx, cell.z + dz)))
-            .collect();
+    fn run(generator: &OverworldGenerator<E>, cell: ChunkPos, inputs: &mut PhaseInputs<OverworldGenerator<E>>) -> Result<(), PhaseError> {
         let mut chunks = Vec::with_capacity(9);
         for &(dx, dz) in NEIGHBORHOOD {
             let (x, z) = (cell.x + dx, cell.z + dz);
@@ -130,14 +133,34 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for FeaturePhase {
             let mut chunk = (*baseline).clone();
             {
                 let mut edit = chunk.edit();
-                for changes in &earlier {
-                    changes.overlay_onto(x, z, &baseline, &mut edit);
+                let mut entries = inputs.inbox::<FeaturePhase>(ChunkPos::new(x, z), 1);
+                entries.retain(|e| earlier_index(cell, e.0) != usize::MAX);
+                entries.sort_by_key(|e| earlier_index(cell, e.0));
+                for entry in &entries {
+                    let cc = &*entry.1;
+                    for &(bx, by, bz, block) in &cc.changes {
+                        let (bx, by, bz) = (bx as i32, by as i32, bz as i32);
+                        if block != baseline.get(bx, by, bz) {
+                            edit.set(bx, by, bz, block);
+                        }
+                    }
+                    for entity in &cc.entities {
+                        edit.add_entity(entity.clone());
+                    }
+                    for &(bx, by, bz) in &cc.marks {
+                        edit.mark_post_process(bx, by, bz);
+                    }
                 }
             }
             chunks.push(chunk);
         }
         let chunks: [ProtoChunk; 9] = chunks.try_into().unwrap_or_else(|_| unreachable!());
-        Ok(generator.decorate(cell.x, cell.z, chunks))
+        let changes = generator.decorate(cell.x, cell.z, chunks);
+        let slots = changes.into_chunks();
+        for (i, &(dx, dz)) in NEIGHBORHOOD.iter().enumerate() {
+            inputs.mail::<FeaturePhase>(ChunkPos::new(cell.x + dx, cell.z + dz), slots[i].clone());
+        }
+        Ok(())
     }
 }
 
@@ -145,6 +168,7 @@ pub struct ColumnPhase;
 
 impl<E: Edition> Phase<OverworldGenerator<E>> for ColumnPhase {
     type Output = ProtoChunk;
+    type Mailbox = ();
 
     const RETAIN: usize = 1024;
 
@@ -157,10 +181,24 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for ColumnPhase {
         let mut column = (*baseline).clone();
         {
             let mut edit = column.edit();
-            for &(dx, dz) in OWNERS {
-                let owner = inputs.get::<FeaturePhase>(ChunkPos::new(cell.x + dx, cell.z + dz))?;
-                owner.overlay_onto(cell.x, cell.z, &baseline, &mut edit);
-                for &(x, y, z, block) in owner.placed(cell.x, cell.z) {
+            let mut entries = inputs.inbox::<FeaturePhase>(cell, 0);
+            entries.retain(|e| owner_index(cell, e.0) != usize::MAX);
+            entries.sort_by_key(|e| owner_index(cell, e.0));
+            for entry in &entries {
+                let cc = &*entry.1;
+                for &(x, y, z, block) in &cc.changes {
+                    let (x, y, z) = (x as i32, y as i32, z as i32);
+                    if block != baseline.get(x, y, z) {
+                        edit.set(x, y, z, block);
+                    }
+                }
+                for entity in &cc.entities {
+                    edit.add_entity(entity.clone());
+                }
+                for &(x, y, z) in &cc.marks {
+                    edit.mark_post_process(x, y, z);
+                }
+                for &(x, y, z, block) in &cc.changes {
                     if needs_support(&generator.blocks, block) {
                         edit.mark_settle(x, y, z);
                     }
@@ -169,6 +207,16 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for ColumnPhase {
         }
         Ok(column)
     }
+}
+
+fn earlier_index(cell: ChunkPos, source: ChunkPos) -> usize {
+    let off = (source.x - cell.x, source.z - cell.z);
+    EARLIER_OVERLAPPING.iter().position(|&o| o == off).unwrap_or(usize::MAX)
+}
+
+fn owner_index(cell: ChunkPos, source: ChunkPos) -> usize {
+    let off = (source.x - cell.x, source.z - cell.z);
+    OWNERS.iter().position(|&o| o == off).unwrap_or(usize::MAX)
 }
 
 fn needs_support(blocks: &Blocks, block: BlockId) -> bool {
@@ -200,6 +248,7 @@ pub struct PostProcessPhase;
 
 impl<E: Edition> Phase<OverworldGenerator<E>> for PostProcessPhase {
     type Output = ProtoChunk;
+    type Mailbox = ();
 
     fn requires() -> Vec<Requirement<OverworldGenerator<E>>> {
         vec![ColumnPhase::at(NEIGHBORHOOD)]
@@ -272,6 +321,7 @@ pub struct ChunkPhase;
 
 impl<E: Edition> Phase<OverworldGenerator<E>> for ChunkPhase {
     type Output = Chunk;
+    type Mailbox = ();
 
     fn requires() -> Vec<Requirement<OverworldGenerator<E>>> {
         vec![PostProcessPhase::at(SAME_CELL)]

@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::marker::PhantomData;
@@ -12,7 +13,7 @@ use crate::chunk::Chunk;
 use crate::generator::dimension::{GenerationStats, Generator, WorldGenerator};
 use crate::generator::error::{PhaseError, PhaseFailure};
 use crate::generator::graph::{Graph, Node, NodeKey, NodeStatus, Outcome, Retention};
-use crate::generator::phase::{PhaseDescriptor, PhaseId, PhaseInputs};
+use crate::generator::phase::{ErasedOutput, MailboxEntry, MailboxPush, PhaseDescriptor, PhaseId, PhaseInputs};
 use crate::generator::pos::ChunkPos;
 
 const RETENTION_WINDOW: Duration = Duration::from_secs(5);
@@ -20,7 +21,7 @@ const REPORT_INTERVAL: Duration = Duration::from_secs(30);
 const COMPLETION_WAIT: Duration = Duration::from_millis(1);
 
 pub enum Completion {
-    Finished(NodeKey, Outcome),
+    Finished(NodeKey, Outcome, Vec<MailboxPush>),
     Panicked(NodeKey),
 }
 
@@ -158,6 +159,7 @@ impl<G: Generator> PhaseGraph<G> {
                         deps: Vec::new(),
                         dependents: Vec::new(),
                         status: NodeStatus::Pending { remaining: 0 },
+                        mailbox_out: Vec::new(),
                         #[cfg(feature = "debug")]
                         started_at: None,
                         #[cfg(feature = "debug")]
@@ -277,6 +279,7 @@ impl<G: Generator> PhaseGraph<G> {
         self.focus_by_x = focus.clone();
         self.focus_by_x.sort_unstable_by_key(|focus| focus.x);
         self.focus = focus;
+
         let entries = std::mem::take(&mut self.pending_dispatch).into_vec();
         let mut ranked = Vec::with_capacity(entries.len());
         for Reverse((priority, key)) in entries {
@@ -302,6 +305,7 @@ impl<G: Generator> PhaseGraph<G> {
         let node = &self.graph.nodes[key];
         let descriptor = node.descriptor;
         let cell = node.cell;
+        let hop = node.hop;
         *self.started.entry(descriptor.name).or_default() += 1;
         let mut resolved = Vec::with_capacity(node.deps.len());
         let mut failed = None;
@@ -314,6 +318,20 @@ impl<G: Generator> PhaseGraph<G> {
                     break;
                 }
                 _ => unreachable!("dependency dispatched before it completed"),
+            }
+        }
+
+        // collect mailbox entries from deps
+        let mut inbox: FxHashMap<(TypeId, ChunkPos, u32), Vec<MailboxEntry>> = FxHashMap::default();
+        for dependency_key in &node.deps {
+            let dependency = &self.graph.nodes[*dependency_key];
+
+            for (target, value) in &dependency.mailbox_out {
+                let mb_key = (dependency.descriptor.phase.type_id(), *target, dependency.hop);
+                inbox.entry(mb_key).or_default().push(MailboxEntry {
+                    source: dependency.cell,
+                    value: value.clone(),
+                });
             }
         }
 
@@ -334,12 +352,14 @@ impl<G: Generator> PhaseGraph<G> {
             return Err(Arc::new(PhaseFailure { phase: descriptor.name, cell, error }));
         }
 
-        let inputs = PhaseInputs { resolved, generator: PhantomData };
+        let inputs = PhaseInputs { resolved, generator: PhantomData, cell, hop, inbox, mailbox_out: Vec::new() };
         Ok((descriptor, cell, inputs))
     }
 
-    pub fn execute(descriptor: PhaseDescriptor<G>, generator: &G, cell: ChunkPos, mut inputs: PhaseInputs<G>) -> Outcome {
-        (descriptor.run)(generator, cell, &mut inputs).map_err(|error| Arc::new(PhaseFailure { phase: descriptor.name, cell, error }))
+    pub fn execute(descriptor: PhaseDescriptor<G>, generator: &G, cell: ChunkPos, mut inputs: PhaseInputs<G>) -> (Outcome, Vec<MailboxPush>) {
+        let outcome = (descriptor.run)(generator, cell, &mut inputs).map_err(|error| Arc::new(PhaseFailure { phase: descriptor.name, cell, error }));
+        let pushes = std::mem::take(&mut inputs.mailbox_out);
+        (outcome, pushes)
     }
 
     pub fn complete(&mut self, key: NodeKey, outcome: Outcome) {
@@ -519,8 +539,18 @@ impl<G: Generator> PhaseGraph<G> {
 
     pub fn handle(&mut self, completion: Completion) {
         match completion {
-            Completion::Finished(key, outcome) => {
+            Completion::Finished(key, outcome, pushes) => {
                 self.in_flight -= 1;
+
+                if outcome.is_ok() {
+                    let stored: Vec<(ChunkPos, ErasedOutput)> = pushes
+                        .into_iter()
+                        .map(|p| (p.target, p.value))
+                        .collect();
+                    if let Some(node) = self.graph.nodes.get_mut(key) {
+                        node.mailbox_out = stored;
+                    }
+                }
                 self.complete(key, outcome);
             }
             Completion::Panicked(key) => {
@@ -545,8 +575,8 @@ impl<G: Generator> PhaseGraph<G> {
             self.in_flight += 1;
             pool.spawn(async move {
                 let report = PanicReport { key, completions };
-                let outcome = Self::execute(descriptor, &generator, cell, inputs);
-                let _ = report.completions.send(Completion::Finished(key, outcome));
+                let (outcome, pushes) = Self::execute(descriptor, &generator, cell, inputs);
+                let _ = report.completions.send(Completion::Finished(key, outcome, pushes));
             })
             .detach();
         }
@@ -637,8 +667,17 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
         if pool.thread_num() == 0 {
             // one node per call, so the caller keeps control of how long it spends generating
             if let Some(key) = self.pop_ready() {
-                let outcome = self.start(key).and_then(|(descriptor, cell, inputs)| Self::execute(descriptor, &self.generator, cell, inputs));
-                self.complete(key, outcome);
+                let result = self.start(key).and_then(|(descriptor, cell, inputs)| {
+                    let (outcome, pushes) = Self::execute(descriptor, &self.generator, cell, inputs);
+                    if outcome.is_ok() {
+                        let stored: Vec<(ChunkPos, ErasedOutput)> = pushes.into_iter().map(|p| (p.target, p.value)).collect();
+                        if let Some(node) = self.graph.nodes.get_mut(key) {
+                            node.mailbox_out = stored;
+                        }
+                    }
+                    outcome
+                });
+                self.complete(key, result);
             }
         } else {
             self.fill_pool(pool);

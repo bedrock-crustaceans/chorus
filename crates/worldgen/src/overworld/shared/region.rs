@@ -63,12 +63,18 @@ pub struct Region<'a> {
     heights: Scratch<Option<i32>>,
 }
 
+#[derive(Clone)]
+pub struct ChunkChanges {
+    pub changes: Vec<(u8, i16, u8, BlockId)>,
+    pub entities: Vec<PlacedEntity>,
+    pub marks: Vec<(u8, i16, u8)>,
+}
+
+#[derive(Clone)]
 pub struct Changes {
     owner_x: i32,
     owner_z: i32,
-    changes: [Vec<(u8, i16, u8, BlockId)>; 9],
-    entities: [Vec<PlacedEntity>; 9],
-    marks: [Vec<(u8, i16, u8)>; 9],
+    chunks: [ChunkChanges; 9],
 }
 
 pub trait BlockView {
@@ -264,9 +270,13 @@ impl<'a> Region<'a> {
     }
 
     pub fn into_changes(mut self) -> Changes {
-        let changes = std::array::from_fn(|slot| {
+        let chunks = std::array::from_fn(|slot| {
             let chunk = &self.chunks[slot];
-            self.dirty[slot].iter().map(|&(x, y, z)| (x, y, z, chunk.get(x as i32, y as i32, z as i32))).collect()
+            ChunkChanges {
+                changes: self.dirty[slot].iter().map(|&(x, y, z)| (x, y, z, chunk.get(x as i32, y as i32, z as i32))).collect(),
+                entities: std::mem::take(&mut self.entities[slot]),
+                marks: std::mem::take(&mut self.marks[slot]),
+            }
         });
         for chunk in &mut self.chunks {
             chunk.release_dense();
@@ -278,9 +288,7 @@ impl<'a> Region<'a> {
         Changes {
             owner_x: self.owner_x,
             owner_z: self.owner_z,
-            changes,
-            entities: self.entities,
-            marks: self.marks,
+            chunks,
         }
     }
 }
@@ -291,25 +299,30 @@ impl Changes {
     }
 
     pub fn entity_count(&self) -> usize {
-        self.entities.iter().map(Vec::len).sum()
+        self.chunks.iter().map(|c| c.entities.len()).sum()
+    }
+
+    pub fn into_chunks(self) -> [ChunkChanges; 9] {
+        self.chunks
     }
 
     pub fn placed(&self, chunk_x: i32, chunk_z: i32) -> &[(u8, i16, u8, BlockId)] {
-        slot(chunk_x - self.owner_x, chunk_z - self.owner_z).map_or(&[], |index| &self.changes[index])
+        slot(chunk_x - self.owner_x, chunk_z - self.owner_z).map_or(&[], |index| &self.chunks[index].changes)
     }
 
     pub fn overlay_onto(&self, chunk_x: i32, chunk_z: i32, baseline: &ProtoChunk, target: &mut ProtoChunk) {
         let Some(index) = slot(chunk_x - self.owner_x, chunk_z - self.owner_z) else { return };
-        for &(x, y, z, block) in &self.changes[index] {
+        let cc = &self.chunks[index];
+        for &(x, y, z, block) in &cc.changes {
             let (x, y, z) = (x as i32, y as i32, z as i32);
             if block != baseline.get(x, y, z) {
                 target.set(x, y, z, block);
             }
         }
-        for entity in &self.entities[index] {
+        for entity in &cc.entities {
             target.add_entity(entity.clone());
         }
-        for &(x, y, z) in &self.marks[index] {
+        for &(x, y, z) in &cc.marks {
             target.mark_post_process(x, y, z);
         }
     }
