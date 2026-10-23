@@ -594,13 +594,14 @@ impl<G: Generator> PhaseGraph<G> {
                 None => continue,
             };
             if let Some(node) = self.graph.nodes.get(key)
-                && let Some(retention) = self.graph.retained.get_mut(&phase) {
-                    if node.reused {
-                        retention.stats.evicted_after_reuse += 1;
-                    } else {
-                        retention.stats.evicted_unused += 1;
-                    }
+                && let Some(retention) = self.graph.retained.get_mut(&phase)
+            {
+                if node.reused {
+                    retention.stats.evicted_after_reuse += 1;
+                } else {
+                    retention.stats.evicted_unused += 1;
                 }
+            }
             if let Some(retention) = self.graph.retained.get_mut(&phase) {
                 retention.queue.retain(|&(k, _)| k != key);
                 if let Some(n) = self.graph.nodes.get(key) {
