@@ -82,12 +82,10 @@ impl Plugin for ConsolePlugin {
 
         let console = app.world_mut().spawn(Console).id();
         let output = app.world().resource::<ConsoleOutput>().clone();
-        app.insert_resource(ConsoleSender(console))
-            .insert_resource(ConsoleHandle { entity: console, output });
+        app.insert_resource(ConsoleSender(console)).insert_resource(ConsoleHandle { entity: console, output });
 
         if self.stdin {
-            app.add_systems(Startup, setup_console)
-                .add_systems(PreUpdate, (read_console, handle_interrupt, sync_completions));
+            app.add_systems(Startup, setup_console).add_systems(PreUpdate, (read_console, handle_interrupt, sync_completions));
         }
     }
 }

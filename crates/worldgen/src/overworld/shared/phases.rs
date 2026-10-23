@@ -159,8 +159,7 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for FeaturePhase {
             chunks.push(chunk);
         }
         let chunks: [ProtoChunk; 9] = chunks.try_into().unwrap_or_else(|_| unreachable!());
-        let changes = generator.decorate(cell.x, cell.z, chunks);
-        let slots = changes.into_chunks();
+        let slots = generator.decorate(cell.x, cell.z, chunks);
         for (i, &(dx, dz)) in NEIGHBORHOOD.iter().enumerate() {
             inputs.mail::<FeaturePhase>(ChunkPos::new(cell.x + dx, cell.z + dz), slots[i].clone());
         }
@@ -177,11 +176,7 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for ColumnPhase {
     const RETAIN: usize = 1024;
 
     fn requires() -> Vec<Requirement<OverworldGenerator<E>>> {
-        vec![
-            CarverPhase::at(SAME_CELL),
-            FeaturePhase::at(OWNERS),
-            FeaturePhase::mailbox_at::<FeaturePhase>(SAME_CELL, 0),
-        ]
+        vec![CarverPhase::at(SAME_CELL), FeaturePhase::at(OWNERS), FeaturePhase::mailbox_at::<FeaturePhase>(SAME_CELL, 0)]
     }
 
     fn run(generator: &OverworldGenerator<E>, cell: ChunkPos, inputs: &mut PhaseInputs<OverworldGenerator<E>>) -> Result<ProtoChunk, PhaseError> {

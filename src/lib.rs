@@ -49,10 +49,7 @@ pub struct ShutdownState {
 }
 
 pub fn shutdown(world: &mut bevy_ecs::prelude::World) {
-    let already = world
-        .get_resource::<ShutdownState>()
-        .map(|state| state.done)
-        .unwrap_or(false);
+    let already = world.get_resource::<ShutdownState>().map(|state| state.done).unwrap_or(false);
     if already {
         return;
     }
@@ -192,10 +189,7 @@ impl Default for ChorusPlugin {
 
 impl ChorusPlugin {
     pub fn embedded() -> Self {
-        Self {
-            console: false,
-            ..Default::default()
-        }
+        Self { console: false, ..Default::default() }
     }
 
     pub fn headless() -> Self {
@@ -217,11 +211,7 @@ impl Plugin for ChorusPlugin {
 
         app.init_resource::<ShutdownState>();
 
-        let authority = if self.schedule_driver {
-            SchedulerAuthority::Driver
-        } else {
-            SchedulerAuthority::LoopRunner
-        };
+        let authority = if self.schedule_driver { SchedulerAuthority::Driver } else { SchedulerAuthority::LoopRunner };
         app.insert_resource(SchedulerControl { authority });
 
         if self.schedule_driver {
@@ -276,10 +266,7 @@ impl Plugin for ChorusPlugin {
 
 fn drive_scheduler(world: &mut bevy_ecs::prelude::World) {
     // Only the configured owner drives the scheduler; prevents double run_tasks.
-    let owner_is_driver = world
-        .get_resource::<SchedulerControl>()
-        .map(|control| control.authority == SchedulerAuthority::Driver)
-        .unwrap_or(true);
+    let owner_is_driver = world.get_resource::<SchedulerControl>().map(|control| control.authority == SchedulerAuthority::Driver).unwrap_or(true);
     if !owner_is_driver {
         return;
     }

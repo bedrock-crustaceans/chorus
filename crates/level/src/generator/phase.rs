@@ -137,14 +137,11 @@ pub struct MailboxEntry {
     pub value: ErasedOutput,
 }
 
-
-
 impl<G: Generator> PhaseInputs<G> {
     pub fn inbox<M: Phase<G>>(&self, cell: ChunkPos, hop: u32) -> Vec<(ChunkPos, Arc<M::Mailbox>)> {
-        self.inbox.get(&(TypeId::of::<M>(), cell, hop))
-            .map(|v| v.iter().filter_map(|e| {
-                e.value.clone().downcast::<M::Mailbox>().ok().map(|v| (e.source, v))
-            }).collect())
+        self.inbox
+            .get(&(TypeId::of::<M>(), cell, hop))
+            .map(|v| v.iter().filter_map(|e| e.value.clone().downcast::<M::Mailbox>().ok().map(|v| (e.source, v))).collect())
             .unwrap_or_default()
     }
 

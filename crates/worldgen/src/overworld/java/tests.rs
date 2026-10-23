@@ -145,7 +145,7 @@ fn stage_timings() {
             let after_decorate = Instant::now();
             let chunk = carved[&(x, z)].clone();
             let mut column = chunk.clone();
-            changes.overlay_onto(x, z, &chunk, &mut column);
+            changes[4].overlay_onto(&chunk, &mut column);
             let after_overlay = Instant::now();
             let _ = column.into_chunk(&generator.blocks);
             totals[3] += after_clone - start;
@@ -302,7 +302,7 @@ fn feature_counts() {
             let baseline = carved(ox, oz);
             let changes = generator.decorate(ox, oz, region);
             let mut column = baseline.clone();
-            changes.overlay_onto(ox, oz, &baseline, &mut column);
+            changes[4].overlay_onto(&baseline, &mut column);
             for y in column.min_y..=column.max_y() {
                 for z in 0..16 {
                     for x in 0..16 {
@@ -390,7 +390,7 @@ fn block_entities() {
             let baseline = carved(ox, oz);
             let changes = generator.decorate(ox, oz, region);
             let mut column = baseline.clone();
-            changes.overlay_onto(ox, oz, &baseline, &mut column);
+            changes[4].overlay_onto(&baseline, &mut column);
             let data = column.into_chunk(&generator.blocks).serialize_block_entities(None);
             let text = String::from_utf8_lossy(&data);
             for id in ["MobSpawner", "Chest", "Beehive"] {

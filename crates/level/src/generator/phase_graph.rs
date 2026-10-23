@@ -173,7 +173,11 @@ impl<G: Generator> PhaseGraph<G> {
                     let mut invalid = None;
                     for requirement in (descriptor.requires)() {
                         match requirement {
-                            Requirement::Phase { descriptor: req_desc, offsets, max_hops } => {
+                            Requirement::Phase {
+                                descriptor: req_desc,
+                                offsets,
+                                max_hops,
+                            } => {
                                 let requires_itself = req_desc.phase == descriptor.phase;
                                 let dependency_hop = match (requires_itself, max_hops) {
                                     (false, None) => 0,
@@ -184,9 +188,7 @@ impl<G: Generator> PhaseGraph<G> {
                                         break;
                                     }
                                     (false, Some(_)) => {
-                                        invalid = Some(PhaseError::MaxHopsOnOtherPhase {
-                                            requirement: req_desc.name,
-                                        });
+                                        invalid = Some(PhaseError::MaxHopsOnOtherPhase { requirement: req_desc.name });
                                         break;
                                     }
                                 };
@@ -338,9 +340,7 @@ impl<G: Generator> PhaseGraph<G> {
                 Requirement::Mailbox { offsets, hop, .. } => Some((offsets, hop)),
                 _ => None,
             })
-            .flat_map(|(offsets, hop)| {
-                offsets.iter().map(move |&(dx, dz)| (ChunkPos::new(cell.x + dx, cell.z + dz), hop))
-            })
+            .flat_map(|(offsets, hop)| offsets.iter().map(move |&(dx, dz)| (ChunkPos::new(cell.x + dx, cell.z + dz), hop)))
             .collect();
         let mut inbox: FxHashMap<(TypeId, ChunkPos, u32), Vec<MailboxEntry>> = FxHashMap::default();
         for dependency_key in &node.deps {
@@ -375,7 +375,14 @@ impl<G: Generator> PhaseGraph<G> {
             return Err(Arc::new(PhaseFailure { phase: descriptor.name, cell, error }));
         }
 
-        let inputs = PhaseInputs { resolved, generator: PhantomData, cell, hop, inbox, mailbox_out: Vec::new() };
+        let inputs = PhaseInputs {
+            resolved,
+            generator: PhantomData,
+            cell,
+            hop,
+            inbox,
+            mailbox_out: Vec::new(),
+        };
         Ok((descriptor, cell, inputs))
     }
 
@@ -517,7 +524,9 @@ impl<G: Generator> PhaseGraph<G> {
                 let mut farthest_dist: f64 = -1.0;
                 for (i, &(key, _)) in retention.queue.iter().enumerate() {
                     let Some(node) = self.graph.nodes.get(key) else { continue };
-                    if node.retained.is_none() { continue; }
+                    if node.retained.is_none() {
+                        continue;
+                    }
                     let dist = self.nearest_focus(node.cell).unwrap_or(f64::MAX);
                     if dist > farthest_dist {
                         farthest_dist = dist;
@@ -584,15 +593,14 @@ impl<G: Generator> PhaseGraph<G> {
                 Some(n) => n.descriptor.phase,
                 None => continue,
             };
-            if let Some(node) = self.graph.nodes.get(key) {
-                if let Some(retention) = self.graph.retained.get_mut(&phase) {
+            if let Some(node) = self.graph.nodes.get(key)
+                && let Some(retention) = self.graph.retained.get_mut(&phase) {
                     if node.reused {
                         retention.stats.evicted_after_reuse += 1;
                     } else {
                         retention.stats.evicted_unused += 1;
                     }
                 }
-            }
             if let Some(retention) = self.graph.retained.get_mut(&phase) {
                 retention.queue.retain(|&(k, _)| k != key);
                 if let Some(n) = self.graph.nodes.get(key) {
@@ -618,10 +626,7 @@ impl<G: Generator> PhaseGraph<G> {
                 self.in_flight -= 1;
 
                 if outcome.is_ok() {
-                    let stored: Vec<(ChunkPos, ErasedOutput)> = pushes
-                        .into_iter()
-                        .map(|p| (p.target, p.value))
-                        .collect();
+                    let stored: Vec<(ChunkPos, ErasedOutput)> = pushes.into_iter().map(|p| (p.target, p.value)).collect();
                     if let Some(node) = self.graph.nodes.get_mut(key) {
                         node.mailbox_out = stored;
                     }
@@ -975,18 +980,14 @@ fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u
         let hops = requirements
             .iter()
             .filter_map(|requirement| match requirement {
-                Requirement::Phase { descriptor: d, offsets, max_hops } if d.phase == descriptor.phase => {
-                    Some(step(offsets) * max_hops.unwrap_or(0) as f64)
-                }
+                Requirement::Phase { descriptor: d, offsets, max_hops } if d.phase == descriptor.phase => Some(step(offsets) * max_hops.unwrap_or(0) as f64),
                 _ => None,
             })
             .fold(0.0, f64::max);
         let hop_limit = requirements
             .iter()
             .filter_map(|requirement| match requirement {
-                Requirement::Phase { descriptor: d, max_hops, .. } if d.phase == descriptor.phase => {
-                    Some(max_hops.unwrap_or(0))
-                }
+                Requirement::Phase { descriptor: d, max_hops, .. } if d.phase == descriptor.phase => Some(max_hops.unwrap_or(0)),
                 _ => None,
             })
             .max()
@@ -998,9 +999,7 @@ fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u
         }
         reach.insert(descriptor.phase, distance);
         for requirement in requirements.iter().filter_map(|requirement| match requirement {
-            Requirement::Phase { descriptor: d, offsets, .. } if d.phase != descriptor.phase => {
-                Some((*d, distance + step(offsets)))
-            }
+            Requirement::Phase { descriptor: d, offsets, .. } if d.phase != descriptor.phase => Some((*d, distance + step(offsets))),
             _ => None,
         }) {
             stack.push(requirement);

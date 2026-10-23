@@ -70,11 +70,21 @@ pub struct ChunkChanges {
     pub marks: Vec<(u8, i16, u8)>,
 }
 
-#[derive(Clone)]
-pub struct Changes {
-    owner_x: i32,
-    owner_z: i32,
-    chunks: [ChunkChanges; 9],
+impl ChunkChanges {
+    pub fn overlay_onto(&self, baseline: &ProtoChunk, target: &mut ProtoChunk) {
+        for &(x, y, z, block) in &self.changes {
+            let (x, y, z) = (x as i32, y as i32, z as i32);
+            if block != baseline.get(x, y, z) {
+                target.set(x, y, z, block);
+            }
+        }
+        for entity in &self.entities {
+            target.add_entity(entity.clone());
+        }
+        for &(x, y, z) in &self.marks {
+            target.mark_post_process(x, y, z);
+        }
+    }
 }
 
 pub trait BlockView {
@@ -269,7 +279,7 @@ impl<'a> Region<'a> {
         height
     }
 
-    pub fn into_changes(mut self) -> Changes {
+    pub fn into_changes(mut self) -> [ChunkChanges; 9] {
         let chunks = std::array::from_fn(|slot| {
             let chunk = &self.chunks[slot];
             ChunkChanges {
@@ -285,45 +295,6 @@ impl<'a> Region<'a> {
             dirty.clear();
             let _ = SPARE_DIRTY.try_with(|spare| spare.borrow_mut().push(dirty));
         }
-        Changes {
-            owner_x: self.owner_x,
-            owner_z: self.owner_z,
-            chunks,
-        }
-    }
-}
-
-impl Changes {
-    pub fn owner(&self) -> (i32, i32) {
-        (self.owner_x, self.owner_z)
-    }
-
-    pub fn entity_count(&self) -> usize {
-        self.chunks.iter().map(|c| c.entities.len()).sum()
-    }
-
-    pub fn into_chunks(self) -> [ChunkChanges; 9] {
-        self.chunks
-    }
-
-    pub fn placed(&self, chunk_x: i32, chunk_z: i32) -> &[(u8, i16, u8, BlockId)] {
-        slot(chunk_x - self.owner_x, chunk_z - self.owner_z).map_or(&[], |index| &self.chunks[index].changes)
-    }
-
-    pub fn overlay_onto(&self, chunk_x: i32, chunk_z: i32, baseline: &ProtoChunk, target: &mut ProtoChunk) {
-        let Some(index) = slot(chunk_x - self.owner_x, chunk_z - self.owner_z) else { return };
-        let cc = &self.chunks[index];
-        for &(x, y, z, block) in &cc.changes {
-            let (x, y, z) = (x as i32, y as i32, z as i32);
-            if block != baseline.get(x, y, z) {
-                target.set(x, y, z, block);
-            }
-        }
-        for entity in &cc.entities {
-            target.add_entity(entity.clone());
-        }
-        for &(x, y, z) in &cc.marks {
-            target.mark_post_process(x, y, z);
-        }
+        chunks
     }
 }

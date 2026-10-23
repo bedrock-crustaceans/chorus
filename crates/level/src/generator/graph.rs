@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
+use std::sync::Arc;
 #[cfg(feature = "debug")]
 use std::time::Duration;
-use std::sync::Arc;
 use std::time::Instant;
 
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -94,5 +94,11 @@ impl<G: Generator> Graph<G> {
             index: FxHashMap::default(),
             retained: FxHashMap::default(),
         }
+    }
+}
+
+impl<G: Generator> Default for Graph<G> {
+    fn default() -> Self {
+        Self::new()
     }
 }

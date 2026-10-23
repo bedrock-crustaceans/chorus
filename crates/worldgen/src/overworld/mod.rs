@@ -13,13 +13,13 @@ use shared::shape::Shapes;
 use shared::terrain::Terrain;
 
 pub use bedrock::Bedrock;
-pub use java::aquifer::Aquifer as JavaAquifer;
 pub use java::Java;
+pub use java::aquifer::Aquifer as JavaAquifer;
 pub use shared::biome::Biome;
 pub use shared::blocks::{AIR, BlockId, Blocks, Entry};
 pub use shared::proto::{ProtoChunk, QuartBiomes};
-pub use shared::region::{Changes, ChunkChanges};
-pub use shared::terrain::{HEIGHT, MIN_Y, CornerColumns, Densities, NoiseChunk};
+pub use shared::region::ChunkChanges;
+pub use shared::terrain::{CornerColumns, Densities, HEIGHT, MIN_Y, NoiseChunk};
 
 pub(crate) const SEA_LEVEL: i32 = 63;
 
@@ -34,7 +34,7 @@ pub trait Edition: Send + Sync + Sized + 'static {
 
     fn apply_carvers(&self, generator: &OverworldGenerator<Self>, noise: &NoiseChunk, aquifer: &mut Self::Aquifer, chunk: &mut ProtoChunk);
 
-    fn decorate(&self, generator: &OverworldGenerator<Self>, owner_x: i32, owner_z: i32, chunks: [ProtoChunk; 9]) -> Changes;
+    fn decorate(&self, generator: &OverworldGenerator<Self>, owner_x: i32, owner_z: i32, chunks: [ProtoChunk; 9]) -> [ChunkChanges; 9];
 
     fn shapes(&self, water: BlockId) -> Shapes<'_>;
 }
@@ -113,7 +113,7 @@ impl<E: Edition> OverworldGenerator<E> {
         self.edition.apply_carvers(self, noise, aquifer, chunk);
     }
 
-    fn decorate(&self, owner_x: i32, owner_z: i32, chunks: [ProtoChunk; 9]) -> Changes {
+    fn decorate(&self, owner_x: i32, owner_z: i32, chunks: [ProtoChunk; 9]) -> [ChunkChanges; 9] {
         self.edition.decorate(self, owner_x, owner_z, chunks)
     }
 

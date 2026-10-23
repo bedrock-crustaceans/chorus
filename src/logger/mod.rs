@@ -161,10 +161,5 @@ impl<'a> MakeWriter<'a> for ConsoleLog {
 pub fn capture_layer(app: &mut bevy_app::App) -> Option<Box<dyn Layer<Registry> + Send + Sync + 'static>> {
     app.init_resource::<ConsoleLog>();
     let log = app.world().resource::<ConsoleLog>().clone();
-    Some(Box::new(
-        fmt::layer()
-            .event_format(PrettyFormatter { with_target: false })
-            .with_ansi(true)
-            .with_writer(log),
-    ))
+    Some(Box::new(fmt::layer().event_format(PrettyFormatter { with_target: false }).with_ansi(true).with_writer(log)))
 }
