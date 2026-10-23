@@ -49,24 +49,48 @@ pub trait Phase<G: Generator>: 'static {
     where
         Self: Sized,
     {
-        Requirement {
+        Requirement::Phase {
             descriptor: PhaseDescriptor::of::<Self>(),
             offsets,
             max_hops: None,
         }
     }
+
+    fn mailbox_at<P: Phase<G>>(offsets: &'static [(i32, i32)], hop: u32) -> Requirement<G>
+    where
+        Self: Sized,
+    {
+        Requirement::Mailbox {
+            producer: PhaseId::of::<P>(),
+            offsets,
+            hop,
+        }
+    }
 }
 
-pub struct Requirement<G: Generator> {
-    pub descriptor: PhaseDescriptor<G>,
-    pub offsets: &'static [(i32, i32)],
-    pub max_hops: Option<u32>,
+pub enum Requirement<G: Generator> {
+    Phase {
+        descriptor: PhaseDescriptor<G>,
+        offsets: &'static [(i32, i32)],
+        max_hops: Option<u32>,
+    },
+    Mailbox {
+        producer: PhaseId,
+        offsets: &'static [(i32, i32)],
+        hop: u32,
+    },
 }
 
 impl<G: Generator> Requirement<G> {
-    pub fn max_hops(mut self, max_hops: u32) -> Self {
-        self.max_hops = Some(max_hops);
-        self
+    pub fn max_hops(self, max_hops: u32) -> Self {
+        match self {
+            Requirement::Phase { descriptor, offsets, .. } => Requirement::Phase {
+                descriptor,
+                offsets,
+                max_hops: Some(max_hops),
+            },
+            other => other,
+        }
     }
 }
 

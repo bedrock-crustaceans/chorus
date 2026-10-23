@@ -13,7 +13,7 @@ use crate::chunk::Chunk;
 use crate::generator::dimension::{GenerationStats, Generator, WorldGenerator};
 use crate::generator::error::{PhaseError, PhaseFailure};
 use crate::generator::graph::{Graph, Node, NodeKey, NodeStatus, Outcome, Retention};
-use crate::generator::phase::{ErasedOutput, MailboxEntry, MailboxPush, PhaseDescriptor, PhaseId, PhaseInputs};
+use crate::generator::phase::{ErasedOutput, MailboxEntry, MailboxPush, PhaseDescriptor, PhaseId, PhaseInputs, Requirement};
 use crate::generator::pos::ChunkPos;
 
 const REPORT_INTERVAL: Duration = Duration::from_secs(30);
@@ -172,31 +172,38 @@ impl<G: Generator> PhaseGraph<G> {
                     let mut child_enters = Vec::new();
                     let mut invalid = None;
                     for requirement in (descriptor.requires)() {
-                        let requires_itself = requirement.descriptor.phase == descriptor.phase;
-                        let dependency_hop = match (requires_itself, requirement.max_hops) {
-                            (false, None) => 0,
-                            (true, Some(max_hops)) if hop < max_hops => hop + 1,
-                            (true, Some(_)) => continue,
-                            (true, None) => {
-                                invalid = Some(PhaseError::UnboundedSelfRequirement);
-                                break;
-                            }
-                            (false, Some(_)) => {
-                                invalid = Some(PhaseError::MaxHopsOnOtherPhase {
-                                    requirement: requirement.descriptor.name,
-                                });
-                                break;
-                            }
-                        };
+                        match requirement {
+                            Requirement::Phase { descriptor: req_desc, offsets, max_hops } => {
+                                let requires_itself = req_desc.phase == descriptor.phase;
+                                let dependency_hop = match (requires_itself, max_hops) {
+                                    (false, None) => 0,
+                                    (true, Some(max_hops)) if hop < max_hops => hop + 1,
+                                    (true, Some(_)) => continue,
+                                    (true, None) => {
+                                        invalid = Some(PhaseError::UnboundedSelfRequirement);
+                                        break;
+                                    }
+                                    (false, Some(_)) => {
+                                        invalid = Some(PhaseError::MaxHopsOnOtherPhase {
+                                            requirement: req_desc.name,
+                                        });
+                                        break;
+                                    }
+                                };
 
-                        for &(dx, dz) in requirement.offsets {
-                            let dependency_cell = ChunkPos::new(cell.x + dx, cell.z + dz);
-                            dep_keys.push((requirement.descriptor.phase, dependency_cell, dependency_hop));
-                            child_enters.push(Step::Enter {
-                                descriptor: requirement.descriptor,
-                                cell: dependency_cell,
-                                hop: dependency_hop,
-                            });
+                                for &(dx, dz) in offsets {
+                                    let dependency_cell = ChunkPos::new(cell.x + dx, cell.z + dz);
+                                    dep_keys.push((req_desc.phase, dependency_cell, dependency_hop));
+                                    child_enters.push(Step::Enter {
+                                        descriptor: req_desc,
+                                        cell: dependency_cell,
+                                        hop: dependency_hop,
+                                    });
+                                }
+                            }
+                            Requirement::Mailbox { .. } => {
+                                // mailbox declarations don't create dependencies
+                            }
                         }
                     }
 
@@ -324,12 +331,25 @@ impl<G: Generator> PhaseGraph<G> {
             }
         }
 
-        // collect mailbox entries from deps
+        // collect mailbox entries from deps, filtered by this phase's declared mailbox reads
+        let needed: std::collections::HashSet<(ChunkPos, u32)> = (descriptor.requires)()
+            .into_iter()
+            .filter_map(|r| match r {
+                Requirement::Mailbox { offsets, hop, .. } => Some((offsets, hop)),
+                _ => None,
+            })
+            .flat_map(|(offsets, hop)| {
+                offsets.iter().map(move |&(dx, dz)| (ChunkPos::new(cell.x + dx, cell.z + dz), hop))
+            })
+            .collect();
         let mut inbox: FxHashMap<(TypeId, ChunkPos, u32), Vec<MailboxEntry>> = FxHashMap::default();
         for dependency_key in &node.deps {
             let dependency = &self.graph.nodes[*dependency_key];
 
             for (target, value) in &dependency.mailbox_out {
+                if !needed.contains(&(*target, dependency.hop)) {
+                    continue;
+                }
                 let mb_key = (dependency.descriptor.phase.type_id(), *target, dependency.hop);
                 inbox.entry(mb_key).or_default().push(MailboxEntry {
                     source: dependency.cell,
@@ -863,12 +883,21 @@ impl<G: Generator> crate::generator::debug::DebugGraph for PhaseGraph<G> {
             let requirements = (descriptor.requires)()
                 .into_iter()
                 .map(|requirement| {
-                    if requirement.descriptor.phase != descriptor.phase {
-                        stack.push(requirement.descriptor);
+                    match &requirement {
+                        Requirement::Phase { descriptor: d, .. } if d.phase != descriptor.phase => {
+                            stack.push(*d);
+                        }
+                        _ => {}
                     }
                     DebugRequirement {
-                        phase: requirement.descriptor.phase,
-                        max_hops: requirement.max_hops,
+                        phase: match &requirement {
+                            Requirement::Phase { descriptor: d, .. } => d.phase,
+                            Requirement::Mailbox { producer, .. } => *producer,
+                        },
+                        max_hops: match &requirement {
+                            Requirement::Phase { max_hops, .. } => *max_hops,
+                            Requirement::Mailbox { .. } => None,
+                        },
                     }
                 })
                 .collect();
@@ -945,13 +974,21 @@ fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u
         let requirements = (descriptor.requires)();
         let hops = requirements
             .iter()
-            .filter(|requirement| requirement.descriptor.phase == descriptor.phase)
-            .map(|requirement| step(requirement.offsets) * requirement.max_hops.unwrap_or(0) as f64)
+            .filter_map(|requirement| match requirement {
+                Requirement::Phase { descriptor: d, offsets, max_hops } if d.phase == descriptor.phase => {
+                    Some(step(offsets) * max_hops.unwrap_or(0) as f64)
+                }
+                _ => None,
+            })
             .fold(0.0, f64::max);
         let hop_limit = requirements
             .iter()
-            .filter(|requirement| requirement.descriptor.phase == descriptor.phase)
-            .map(|requirement| requirement.max_hops.unwrap_or(0))
+            .filter_map(|requirement| match requirement {
+                Requirement::Phase { descriptor: d, max_hops, .. } if d.phase == descriptor.phase => {
+                    Some(max_hops.unwrap_or(0))
+                }
+                _ => None,
+            })
             .max()
             .unwrap_or(0);
         hop_limits.insert(descriptor.phase, hop_limit);
@@ -960,8 +997,13 @@ fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u
             continue;
         }
         reach.insert(descriptor.phase, distance);
-        for requirement in requirements.iter().filter(|requirement| requirement.descriptor.phase != descriptor.phase) {
-            stack.push((requirement.descriptor, distance + step(requirement.offsets)));
+        for requirement in requirements.iter().filter_map(|requirement| match requirement {
+            Requirement::Phase { descriptor: d, offsets, .. } if d.phase != descriptor.phase => {
+                Some((*d, distance + step(offsets)))
+            }
+            _ => None,
+        }) {
+            stack.push(requirement);
         }
     }
     (reach, hop_limits)

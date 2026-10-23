@@ -122,7 +122,11 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for FeaturePhase {
     const RETAIN: usize = 1024;
 
     fn requires() -> Vec<Requirement<OverworldGenerator<E>>> {
-        vec![CarverPhase::at(NEIGHBORHOOD), FeaturePhase::at(EARLIER_OVERLAPPING).max_hops(1)]
+        vec![
+            CarverPhase::at(NEIGHBORHOOD),
+            FeaturePhase::at(EARLIER_OVERLAPPING).max_hops(1),
+            FeaturePhase::mailbox_at::<FeaturePhase>(NEIGHBORHOOD, 1),
+        ]
     }
 
     fn run(generator: &OverworldGenerator<E>, cell: ChunkPos, inputs: &mut PhaseInputs<OverworldGenerator<E>>) -> Result<(), PhaseError> {
@@ -173,7 +177,11 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for ColumnPhase {
     const RETAIN: usize = 1024;
 
     fn requires() -> Vec<Requirement<OverworldGenerator<E>>> {
-        vec![CarverPhase::at(SAME_CELL), FeaturePhase::at(OWNERS)]
+        vec![
+            CarverPhase::at(SAME_CELL),
+            FeaturePhase::at(OWNERS),
+            FeaturePhase::mailbox_at::<FeaturePhase>(SAME_CELL, 0),
+        ]
     }
 
     fn run(generator: &OverworldGenerator<E>, cell: ChunkPos, inputs: &mut PhaseInputs<OverworldGenerator<E>>) -> Result<ProtoChunk, PhaseError> {
