@@ -37,7 +37,7 @@ pub struct CornerPhase;
 impl<E: Edition> Phase<OverworldGenerator<E>> for CornerPhase {
     type Output = CornerColumns;
 
-    const RETAIN: usize = 1024;
+    const RETAIN: usize = 0;
 
     fn run(generator: &OverworldGenerator<E>, cell: ChunkPos, _inputs: &mut PhaseInputs<OverworldGenerator<E>>) -> Result<CornerColumns, PhaseError> {
         Ok(generator.terrain.corner_columns(cell.x, cell.z))

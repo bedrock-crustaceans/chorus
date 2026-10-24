@@ -49,10 +49,12 @@ pub struct PhaseGraph<G: Generator> {
     pub focus_by_x: Vec<ChunkPos>,
     pub radius: i32,
     pub sweep_at: usize,
+    pub retention_budget: f64,
     pub mail_reads: FxHashMap<PhaseId, Vec<MailRead>>,
     pub mail_readers: FxHashMap<PhaseId, Vec<MailReader>>,
     pub reach: FxHashMap<PhaseId, f64>,
     pub hops: FxHashMap<PhaseId, u32>,
+    pub self_step: FxHashMap<PhaseId, f64>,
     pub terminal: PhaseId,
     pub completed: FxHashSet<ChunkPos>,
     pub started: FxHashMap<&'static str, u64>,
@@ -67,7 +69,7 @@ pub struct PhaseGraph<G: Generator> {
 impl<G: Generator> PhaseGraph<G> {
     pub fn new(generator: G) -> Self {
         let (completions_tx, completions_rx) = crossbeam_channel::unbounded();
-        let (reach, hops) = phase_shape::<G>();
+        let (reach, hops, self_step) = phase_shape::<G>();
         let (mail_reads, mail_readers) = phase_mail::<G>();
 
         Self {
@@ -81,10 +83,12 @@ impl<G: Generator> PhaseGraph<G> {
             focus_by_x: Vec::new(),
             radius: 0,
             sweep_at: 1,
+            retention_budget: 1.0,
             mail_reads,
             mail_readers,
             reach,
             hops,
+            self_step,
             terminal: PhaseId::of::<G::Terminal>(),
             completed: FxHashSet::default(),
             started: FxHashMap::default(),
@@ -402,8 +406,17 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    pub fn is_interior(&self, phase: PhaseId, cell: ChunkPos) -> bool {
-        let Some(&reach) = self.reach.get(&phase) else { return false };
+    /// How far from a requested cell a node of `phase` at `hop` can still be needed. Only the nodes at the last hop reach as far as the phase does,
+    /// a node at an earlier hop is only needed by nodes of its own phase one hop closer.
+    pub fn reach_at(&self, phase: PhaseId, hop: u32) -> Option<f64> {
+        let full = *self.reach.get(&phase)?;
+        let limit = self.hops.get(&phase).copied().unwrap_or(0);
+        let step = self.self_step.get(&phase).copied().unwrap_or(0.0);
+        Some((full - step * limit.saturating_sub(hop) as f64).max(0.0))
+    }
+
+    pub fn is_interior(&self, phase: PhaseId, hop: u32, cell: ChunkPos) -> bool {
+        let Some(reach) = self.reach_at(phase, hop) else { return false };
         self.finished_within(cell, reach)
     }
 
@@ -441,7 +454,7 @@ impl<G: Generator> PhaseGraph<G> {
                     let cell = ChunkPos::new(around.x + dx, around.z + dz);
                     for hop in 0..=hops {
                         let Some(&key) = self.graph.index.get(&(phase, cell, hop)) else { continue };
-                        if self.graph.nodes[key].retained.is_some() && self.is_interior(phase, cell) {
+                        if self.graph.nodes[key].retained.is_some() && self.is_interior(phase, hop, cell) {
                             self.remove(key);
                         }
                     }
@@ -472,7 +485,7 @@ impl<G: Generator> PhaseGraph<G> {
         if node.retained.is_some() {
             return;
         }
-        if self.is_interior(node.descriptor.phase, node.cell) || !self.in_region(node.descriptor.phase, node.cell) {
+        if self.is_interior(node.descriptor.phase, node.hop, node.cell) || !self.in_region(node.descriptor.phase, node.hop, node.cell) {
             self.remove(key);
             return;
         }
@@ -484,10 +497,12 @@ impl<G: Generator> PhaseGraph<G> {
         let stamp = retention.pushes;
         retention.pushes += 1;
         retention.nodes.insert(key);
+        retention.queue.push_back((key, stamp));
         retention.stats.pushed += 1;
         node.retained = Some(stamp);
         node.dependents.clear();
         self.prune_mail(key);
+        self.enforce_cap(phase);
 
         if self.retained_count() >= self.sweep_at {
             self.sweep_retained();
@@ -554,13 +569,36 @@ impl<G: Generator> PhaseGraph<G> {
         self.graph.nodes[key].mailbox_out.retain(|_| keep.next().unwrap_or(true));
     }
 
+    /// The most nodes of one phase to keep: the budget times the chunks in view, for every focus.
+    fn retention_cap(&self) -> usize {
+        let view_chunks = std::f64::consts::PI * (self.radius as f64).powi(2);
+        (self.retention_budget * view_chunks) as usize * self.focus.len()
+    }
+
+    fn enforce_cap(&mut self, phase: PhaseId) {
+        if self.focus.is_empty() {
+            return;
+        }
+        let cap = self.retention_cap();
+        loop {
+            let Some(retention) = self.graph.retained.get_mut(&phase) else { return };
+            if retention.nodes.len() <= cap {
+                return;
+            }
+            let Some((key, stamp)) = retention.queue.pop_front() else { return };
+            if self.graph.nodes.get(key).is_some_and(|node| node.retained == Some(stamp)) {
+                self.evict_retained(key);
+            }
+        }
+    }
+
     pub fn retained_count(&self) -> usize {
         self.graph.retained.values().map(|retention| retention.nodes.len()).sum()
     }
 
-    pub fn in_region(&self, phase: PhaseId, cell: ChunkPos) -> bool {
+    pub fn in_region(&self, phase: PhaseId, hop: u32, cell: ChunkPos) -> bool {
         let Some(distance) = self.nearest_focus(cell) else { return true };
-        let reach = self.reach.get(&phase).copied().unwrap_or(0.0);
+        let reach = self.reach_at(phase, hop).unwrap_or(0.0);
         distance <= self.radius as f64 + reach
     }
 
@@ -570,7 +608,7 @@ impl<G: Generator> PhaseGraph<G> {
             .retained
             .values()
             .flat_map(|retention| retention.nodes.iter().copied())
-            .filter(|&key| self.graph.nodes.get(key).is_none_or(|node| !self.in_region(node.descriptor.phase, node.cell)))
+            .filter(|&key| self.graph.nodes.get(key).is_none_or(|node| !self.in_region(node.descriptor.phase, node.hop, node.cell)))
             .collect();
         for key in outside {
             self.evict_retained(key);
@@ -578,6 +616,10 @@ impl<G: Generator> PhaseGraph<G> {
         let remaining: Vec<NodeKey> = self.graph.retained.values().flat_map(|retention| retention.nodes.iter().copied()).collect();
         for key in remaining {
             self.prune_mail(key);
+        }
+        let nodes = &self.graph.nodes;
+        for retention in self.graph.retained.values_mut() {
+            retention.queue.retain(|&(key, stamp)| nodes.get(key).is_some_and(|node| node.retained == Some(stamp)));
         }
         self.sweep_at = self.retained_count() * SWEEP_GROWTH + 1;
     }
@@ -711,6 +753,10 @@ impl<G: Generator> PhaseGraph<G> {
 impl<G: Generator> WorldGenerator for PhaseGraph<G> {
     fn request_chunk(&mut self, x: i32, z: i32) {
         self.request(ChunkPos::new(x, z));
+    }
+
+    fn set_retention_budget(&mut self, budget: f64) {
+        self.retention_budget = budget.max(0.0);
     }
 
     fn set_focus(&mut self, focus: &[(i32, i32)], radius: i32) {
@@ -940,9 +986,10 @@ fn offsets_step(offsets: &[(i32, i32)]) -> f64 {
     offsets.iter().map(|&(dx, dz)| ((dx * dx + dz * dz) as f64).sqrt()).fold(0.0, f64::max)
 }
 
-fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u32>) {
+fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u32>, FxHashMap<PhaseId, f64>) {
     let mut reach = FxHashMap::default();
     let mut hop_limits = FxHashMap::default();
+    let mut self_steps = FxHashMap::default();
     let mut stack = vec![(PhaseDescriptor::of::<G::Terminal>(), 0.0)];
     while let Some((descriptor, distance)) = stack.pop() {
         let requirements = (descriptor.requires)();
@@ -958,6 +1005,12 @@ fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u
             .max()
             .unwrap_or(0);
         hop_limits.insert(descriptor.phase, hop_limit);
+        let self_step = requirements
+            .iter()
+            .filter(|requirement| requirement.descriptor.phase == descriptor.phase)
+            .map(|requirement| offsets_step(requirement.offsets))
+            .fold(0.0, f64::max);
+        self_steps.insert(descriptor.phase, self_step);
         let distance = distance + hops;
         if reach.get(&descriptor.phase).is_some_and(|&known| known >= distance) {
             continue;
@@ -967,7 +1020,7 @@ fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u
             stack.push((requirement.descriptor, distance + offsets_step(requirement.offsets)));
         }
     }
-    (reach, hop_limits)
+    (reach, hop_limits, self_steps)
 }
 
 /// One mail declaration of a phase: it reads what the producer cells at `offsets` addressed to the cells at `targets`.
@@ -1193,6 +1246,22 @@ mod tests {
                     "retained nodes keep only mail somebody can still read"
                 );
             }
+        }
+
+        #[test]
+        fn the_retention_budget_caps_how_many_nodes_of_a_phase_are_kept() {
+            let mut graph = PhaseGraph::new(Toy);
+            graph.set_focus(&[(10, 10)], 20);
+            graph.set_retention_budget(0.01);
+            let cells: Vec<ChunkPos> = (0..20).flat_map(|x| (0..20).map(move |z| ChunkPos::new(x, z))).collect();
+            finish(&mut graph, &cells);
+            assert!(
+                graph.retained_count() <= graph.retention_cap(),
+                "kept {} against a cap of {}",
+                graph.retained_count(),
+                graph.retention_cap()
+            );
+            assert!(graph.retention_cap() < 40, "the cap has to be below the 40 edge nodes for this to test anything");
         }
 
         #[test]

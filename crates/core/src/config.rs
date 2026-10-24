@@ -317,6 +317,9 @@ pub struct LevelConfig {
     pub seed: LevelSeed,
     pub chunk_saving: ChunkSaving,
     pub max_view_distance: i32,
+    /// How many generated pieces of each kind to keep per player for neighbouring chunks, as a multiple of the chunks in the player's view.
+    /// A lower value uses less memory and regenerates more, 0 keeps nothing.
+    pub retention_budget: f64,
     pub autosave: Interval,
     pub database: DatabaseConfig,
 }
@@ -328,6 +331,7 @@ impl Default for LevelConfig {
             seed: LevelSeed::default(),
             chunk_saving: ChunkSaving::default(),
             max_view_distance: 32,
+            retention_budget: 1.0,
             autosave: Interval::every(Duration::from_secs(60)),
             database: DatabaseConfig::default(),
         }
@@ -548,6 +552,14 @@ mod tests {
         let config: NetworkConfig = toml::from_str("port = 25565").unwrap();
 
         assert_eq!(config.max_batch_size, NetworkConfig::default().max_batch_size);
+    }
+
+    #[test]
+    fn the_retention_budget_defaults_to_one_view_and_is_read_from_the_config() {
+        assert_eq!(LevelConfig::default().retention_budget, 1.0);
+        let config: LevelConfig = toml::from_str("retention_budget = 0.5").unwrap();
+
+        assert_eq!(config.retention_budget, 0.5);
     }
 
     #[test]

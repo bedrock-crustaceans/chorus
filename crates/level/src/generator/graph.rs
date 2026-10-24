@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::sync::Arc;
 #[cfg(feature = "debug")]
 use std::time::{Duration, Instant};
@@ -53,6 +54,7 @@ pub struct Retention {
     pub stats: RetentionStats,
     pub pushes: u64,
     pub nodes: FxHashSet<NodeKey>,
+    pub queue: VecDeque<(NodeKey, u64)>,
 }
 
 impl Retention {
@@ -62,6 +64,7 @@ impl Retention {
             stats: RetentionStats::default(),
             pushes: 0,
             nodes: FxHashSet::default(),
+            queue: VecDeque::new(),
         }
     }
 }

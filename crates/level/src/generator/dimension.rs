@@ -41,6 +41,7 @@ pub trait WorldGenerator: Send + Sync {
     fn stats(&self) -> GenerationStats {
         GenerationStats::default()
     }
+    fn set_retention_budget(&mut self, _budget: f64) {}
 
     #[cfg(feature = "debug")]
     fn debug_graph(&self) -> Option<&dyn crate::generator::debug::DebugGraph> {
@@ -270,6 +271,10 @@ impl Dimension {
 
     pub fn retention_report(&self) -> String {
         self.generator.retention_report()
+    }
+
+    pub fn set_retention_budget(&mut self, budget: f64) {
+        self.generator.set_retention_budget(budget);
     }
 
     pub fn generation_stats(&self) -> GenerationStats {

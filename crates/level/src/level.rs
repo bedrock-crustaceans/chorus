@@ -32,6 +32,7 @@ pub struct Level {
     dimensions: HashMap<i32, Dimension>,
     storage: Option<Arc<LevelStorage>>,
     chunk_saving: ChunkSaving,
+    retention_budget: f64,
     is_new: bool,
 }
 
@@ -78,6 +79,7 @@ impl Level {
             dimensions: HashMap::new(),
             storage: None,
             chunk_saving: ChunkSaving::default(),
+            retention_budget: 1.0,
             is_new: true,
         }
     }
@@ -93,6 +95,13 @@ impl Level {
         }
     }
 
+    pub fn set_retention_budget(&mut self, budget: f64) {
+        self.retention_budget = budget;
+        for dimension in self.dimensions.values_mut() {
+            dimension.set_retention_budget(budget);
+        }
+    }
+
     pub fn storage(&self) -> Option<&Arc<LevelStorage>> {
         self.storage.as_ref()
     }
@@ -103,6 +112,7 @@ impl Level {
             dimension = dimension.with_storage(storage.clone());
         }
         dimension.set_chunk_saving(self.chunk_saving);
+        dimension.set_retention_budget(self.retention_budget);
         self.remove_dimension(dimension_type.id());
         self.dimensions.entry(dimension_type.id()).or_insert(dimension)
     }
