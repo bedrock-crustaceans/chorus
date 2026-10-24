@@ -42,6 +42,7 @@ pub trait WorldGenerator: Send + Sync {
         GenerationStats::default()
     }
     fn set_retention_budget(&mut self, _budget: f64) {}
+    fn set_lookahead(&mut self, _lookahead: i32) {}
 
     #[cfg(feature = "debug")]
     fn debug_graph(&self) -> Option<&dyn crate::generator::debug::DebugGraph> {
@@ -318,6 +319,10 @@ impl Dimension {
 
     pub fn set_retention_budget(&mut self, budget: f64) {
         self.generator.set_retention_budget(budget);
+    }
+
+    pub fn set_lookahead(&mut self, lookahead: i32) {
+        self.generator.set_lookahead(lookahead);
     }
 
     pub fn generation_stats(&self) -> GenerationStats {

@@ -320,6 +320,9 @@ pub struct LevelConfig {
     /// How many generated pieces of each kind to keep per player for neighbouring chunks, as a multiple of the chunks in the player's view.
     /// A lower value uses less memory and regenerates more, 0 keeps nothing.
     pub retention_budget: f64,
+    /// How many chunks beyond the loaded area a player is assumed to be able to walk before the generator has to be ready, which is how far outside
+    /// the view generated pieces are kept for. A higher value uses more memory and regenerates less for a player on the move.
+    pub lookahead: i32,
     /// How many chunks to keep after they leave every player's view, as a multiple of the chunks in a view. A player who walks back to them does not wait for
     /// them to generate again. 0 drops them at once.
     pub chunk_cache: f64,
@@ -335,6 +338,7 @@ impl Default for LevelConfig {
             chunk_saving: ChunkSaving::default(),
             max_view_distance: 32,
             retention_budget: 1.0,
+            lookahead: 0,
             chunk_cache: 0.5,
             autosave: Interval::every(Duration::from_secs(60)),
             database: DatabaseConfig::default(),
@@ -556,6 +560,14 @@ mod tests {
         let config: NetworkConfig = toml::from_str("port = 25565").unwrap();
 
         assert_eq!(config.max_batch_size, NetworkConfig::default().max_batch_size);
+    }
+
+    #[test]
+    fn the_lookahead_defaults_to_none_and_is_read_from_the_config() {
+        assert_eq!(LevelConfig::default().lookahead, 0);
+        let config: LevelConfig = toml::from_str("lookahead = 4").unwrap();
+
+        assert_eq!(config.lookahead, 4);
     }
 
     #[test]

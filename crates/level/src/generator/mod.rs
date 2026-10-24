@@ -2,6 +2,7 @@
 pub mod debug;
 pub mod dimension;
 pub mod error;
+pub mod footprint;
 pub mod graph;
 pub mod phase;
 pub mod phase_graph;

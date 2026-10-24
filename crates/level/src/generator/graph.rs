@@ -1,10 +1,10 @@
-use std::collections::VecDeque;
+use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 #[cfg(feature = "debug")]
 use std::time::{Duration, Instant};
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use slotmap::{SlotMap, new_key_type};
 
 use crate::generator::dimension::Generator;
@@ -54,8 +54,7 @@ pub struct Retention {
     pub name: &'static str,
     pub stats: RetentionStats,
     pub pushes: u64,
-    pub nodes: FxHashSet<NodeKey>,
-    pub queue: VecDeque<(NodeKey, u64)>,
+    pub entries: BTreeMap<u64, NodeKey>,
 }
 
 impl Retention {
@@ -64,8 +63,7 @@ impl Retention {
             name,
             stats: RetentionStats::default(),
             pushes: 0,
-            nodes: FxHashSet::default(),
-            queue: VecDeque::new(),
+            entries: BTreeMap::new(),
         }
     }
 }

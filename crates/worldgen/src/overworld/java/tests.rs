@@ -823,6 +823,7 @@ fn retention_usefulness_walking() {
     bevy_tasks::AsyncComputeTaskPool::get_or_init(bevy_tasks::TaskPool::default);
     let (generator, _) = generator(0);
     let mut dimension = Dimension::new(DimensionType::Overworld, generator);
+    dimension.set_lookahead(std::env::var("LOOKAHEAD").ok().and_then(|v| v.parse().ok()).unwrap_or(0));
     let origins: Vec<(i32, i32)> = (0..walkers).map(|i| (i * radius * 6, 0)).collect();
     let mut requested: HashSet<(i32, i32)> = HashSet::new();
     let mut total = 0;
@@ -866,6 +867,7 @@ fn retention_usefulness_circling() {
     let (generator, _) = generator(0);
     let mut dimension = Dimension::new(DimensionType::Overworld, generator);
     dimension.set_retention_budget(budget);
+    dimension.set_lookahead(std::env::var("LOOKAHEAD").ok().and_then(|v| v.parse().ok()).unwrap_or(0));
     dimension.set_chunk_cache(std::env::var("CACHE").ok().and_then(|v| v.parse().ok()).unwrap_or(0.5));
     let spacing = (radius * 6) as f64 * 16.0;
     let circle_radius = 21.58f64;
@@ -979,6 +981,7 @@ fn load_spread() {
     let (generator, _) = generator(0);
     let mut dimension = Dimension::new(DimensionType::Overworld, generator);
     dimension.set_retention_budget(budget);
+    dimension.set_lookahead(std::env::var("LOOKAHEAD").ok().and_then(|v| v.parse().ok()).unwrap_or(0));
     dimension.set_chunk_cache(cache);
     #[cfg(feature = "count-alloc")]
     let baseline = counting::LIVE.load(std::sync::atomic::Ordering::Relaxed);
@@ -1108,6 +1111,7 @@ fn chunks_are_the_same_after_walking_away_and_coming_back() {
     let mut walked = Dimension::new(DimensionType::Overworld, second);
     walked.set_chunk_cache(0.0);
     walked.set_retention_budget(budget);
+    walked.set_lookahead(std::env::var("LOOKAHEAD").ok().and_then(|v| v.parse().ok()).unwrap_or(0));
     for center in [(0, 0), (radius, 0), (2 * radius, 0), (radius, 0), (0, 0)] {
         walked.set_focus(&[center], radius);
         finish_cells(&mut walked, &disc(center, radius));

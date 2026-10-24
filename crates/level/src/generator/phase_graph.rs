@@ -11,12 +11,12 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::chunk::Chunk;
 use crate::generator::dimension::{GenerationStats, Generator, WorldGenerator};
 use crate::generator::error::{PhaseError, PhaseFailure};
+use crate::generator::footprint::{self, Footprints, Region, footprints};
 use crate::generator::graph::{Graph, Node, NodeKey, NodeMail, NodeStatus, Outcome, Retention};
 use crate::generator::phase::{InboxEntry, Outbox, PhaseDescriptor, PhaseId, PhaseInputs};
 use crate::generator::pos::ChunkPos;
 
 /// Sweep the retained nodes once their number has grown by this factor since the last sweep.
-const SWEEP_GROWTH: usize = 2;
 const REPORT_INTERVAL: Duration = Duration::from_secs(30);
 const COMPLETION_WAIT: Duration = Duration::from_millis(1);
 
@@ -48,14 +48,16 @@ pub struct PhaseGraph<G: Generator> {
     pub focus: Vec<ChunkPos>,
     pub focus_by_x: Vec<ChunkPos>,
     pub radius: i32,
-    pub sweep_at: usize,
     pub retention_budget: f64,
+    pub lookahead: i32,
     pub abandoned: FxHashSet<NodeKey>,
     pub mail_reads: FxHashMap<PhaseId, Vec<MailRead>>,
     pub mail_consumers: FxHashMap<PhaseId, Vec<MailConsumer>>,
     pub reach: FxHashMap<PhaseId, f64>,
     pub hops: FxHashMap<PhaseId, u32>,
-    pub self_step: FxHashMap<PhaseId, f64>,
+    pub footprints: Footprints,
+    pub regions: FxHashMap<(PhaseId, u32), Region>,
+    pub extent: f64,
     pub terminal: PhaseId,
     pub completed: FxHashSet<ChunkPos>,
     pub started: FxHashMap<&'static str, u64>,
@@ -70,7 +72,10 @@ pub struct PhaseGraph<G: Generator> {
 impl<G: Generator> PhaseGraph<G> {
     pub fn new(generator: G) -> Self {
         let (completions_tx, completions_rx) = crossbeam_channel::unbounded();
-        let (reach, hops, self_step) = phase_shape::<G>();
+        let (reach, hops) = phase_shape::<G>();
+        let footprints = footprints::<G>();
+        let extent = footprint::extent(&footprints);
+        let regions = footprints.iter().map(|(&key, cells)| (key, Region::new(cells, 0))).collect();
         let (mail_reads, mail_consumers) = phase_mail::<G>();
 
         Self {
@@ -83,14 +88,16 @@ impl<G: Generator> PhaseGraph<G> {
             focus: Vec::new(),
             focus_by_x: Vec::new(),
             radius: 0,
-            sweep_at: 1,
             retention_budget: 1.0,
+            lookahead: 0,
             abandoned: FxHashSet::default(),
             mail_reads,
             mail_consumers,
             reach,
             hops,
-            self_step,
+            footprints,
+            regions,
+            extent,
             terminal: PhaseId::of::<G::Terminal>(),
             completed: FxHashSet::default(),
             started: FxHashMap::default(),
@@ -248,10 +255,10 @@ impl<G: Generator> PhaseGraph<G> {
                         deps.push(dependency_key);
                         let dependency = &mut self.graph.nodes[dependency_key];
                         dependency.dependents.push(key);
-                        if dependency.retained.take().is_some()
+                        if let Some(stamp) = dependency.retained.take()
                             && let Some(retention) = self.graph.retained.get_mut(&self.graph.phases.id(dependency))
                         {
-                            retention.nodes.remove(&dependency_key);
+                            retention.entries.remove(&stamp);
                             retention.stats.reuse_events += 1;
                             if !dependency.reused {
                                 dependency.reused = true;
@@ -301,14 +308,23 @@ impl<G: Generator> PhaseGraph<G> {
             return;
         }
         let jumped = focus.len() != self.focus.len() || radius < self.radius || focus.iter().zip(&self.focus).any(|(now, before)| now.x.abs_diff(before.x).max(now.z.abs_diff(before.z)) > 1);
+        let steps: Vec<(ChunkPos, ChunkPos)> = self.focus.iter().copied().zip(focus.iter().copied()).filter(|(before, now)| before != now).collect();
         self.focus_by_x = focus.clone();
         self.focus_by_x.sort_unstable_by_key(|focus| focus.x);
         self.focus = focus;
+        let radius_changed = radius != self.radius;
         self.radius = radius;
+        if radius_changed {
+            self.rebuild_regions();
+        }
         self.abandon_unwanted();
 
         if jumped {
             self.sweep_retained();
+        } else {
+            for (from, to) in steps {
+                self.release_left_behind(from, to);
+            }
         }
 
         let entries = std::mem::take(&mut self.pending_dispatch).into_vec();
@@ -448,58 +464,27 @@ impl<G: Generator> PhaseGraph<G> {
         }
     }
 
-    /// How far from a requested cell a node of `phase` at `hop` can still be needed. Only the nodes at the last hop reach as far as the phase does,
-    /// a node at an earlier hop is only needed by nodes of its own phase one hop closer.
-    pub fn reach_at(&self, phase: PhaseId, hop: u32) -> Option<f64> {
-        let full = *self.reach.get(&phase)?;
-        let limit = self.hops.get(&phase).copied().unwrap_or(0);
-        let step = self.self_step.get(&phase).copied().unwrap_or(0.0);
-        Some((full - step * limit.saturating_sub(hop) as f64).max(0.0))
-    }
-
     pub fn is_interior(&self, phase: PhaseId, hop: u32, cell: ChunkPos) -> bool {
-        let Some(reach) = self.reach_at(phase, hop) else { return false };
-        self.finished_within(cell, reach)
-    }
-
-    fn finished_within(&self, cell: ChunkPos, reach: f64) -> bool {
-        let radius = reach.ceil() as i32;
-        for dx in -radius..=radius {
-            for dz in -radius..=radius {
-                if ((dx * dx + dz * dz) as f64).sqrt() > reach {
-                    continue;
-                }
-                let around = ChunkPos::new(cell.x + dx, cell.z + dz);
-                let finished = match self.graph.index.get(&(self.terminal, around, 0)) {
-                    Some(&key) => matches!(self.graph.nodes[key].status, NodeStatus::Done(_)),
-                    None => self.completed.contains(&around),
-                };
-                if !finished {
-                    return false;
-                }
-            }
-        }
-        true
+        let Some(footprint) = self.footprints.get(&(phase, hop)) else { return false };
+        footprint.iter().all(|&(dx, dz)| self.cell_finished(ChunkPos::new(cell.x + dx, cell.z + dz)))
     }
 
     pub fn sweep(&mut self, around: ChunkPos) {
         let phases: Vec<PhaseId> = self.graph.retained.keys().copied().collect();
         for phase in phases {
-            let Some(&reach) = self.reach.get(&phase) else { continue };
             let hops = self.hops.get(&phase).copied().unwrap_or(0);
-            let radius = reach.ceil() as i32;
-            for dx in -radius..=radius {
-                for dz in -radius..=radius {
-                    if ((dx * dx + dz * dz) as f64).sqrt() > reach {
-                        continue;
-                    }
-                    let cell = ChunkPos::new(around.x + dx, around.z + dz);
-                    for hop in 0..=hops {
-                        let Some(&key) = self.graph.index.get(&(phase, cell, hop)) else { continue };
-                        if self.graph.nodes[key].retained.is_some() && self.is_interior(phase, hop, cell) {
-                            self.remove(key);
-                        }
-                    }
+            for hop in 0..=hops {
+                let Some(footprint) = self.footprints.get(&(phase, hop)) else { continue };
+                let interior: Vec<NodeKey> = footprint
+                    .iter()
+                    .filter_map(|&(dx, dz)| {
+                        let cell = ChunkPos::new(around.x - dx, around.z - dz);
+                        let &key = self.graph.index.get(&(phase, cell, hop))?;
+                        (self.graph.nodes[key].retained.is_some() && self.is_interior(phase, hop, cell)).then_some(key)
+                    })
+                    .collect();
+                for key in interior {
+                    self.remove(key);
                 }
             }
         }
@@ -538,17 +523,12 @@ impl<G: Generator> PhaseGraph<G> {
         let retention = self.graph.retained.entry(phase).or_insert_with(|| Retention::new(name));
         let stamp = retention.pushes;
         retention.pushes += 1;
-        retention.nodes.insert(key);
-        retention.queue.push_back((key, stamp));
+        retention.entries.insert(stamp, key);
         retention.stats.pushed += 1;
         node.retained = Some(stamp);
         node.dependents.clear();
         self.prune_mail(key);
         self.enforce_cap(phase);
-
-        if self.retained_count() >= self.sweep_at {
-            self.sweep_retained();
-        }
     }
 
     fn collect_mail(&self, phase: PhaseId, cell: ChunkPos, hop: u32) -> Vec<InboxEntry> {
@@ -692,24 +672,33 @@ impl<G: Generator> PhaseGraph<G> {
         let cap = self.retention_cap();
         loop {
             let Some(retention) = self.graph.retained.get_mut(&phase) else { return };
-            if retention.nodes.len() <= cap {
+            if retention.entries.len() <= cap {
                 return;
             }
-            let Some((key, stamp)) = retention.queue.pop_front() else { return };
-            if self.graph.nodes.get(key).is_some_and(|node| node.retained == Some(stamp)) {
-                self.evict_retained(key);
-            }
+            let Some((_, key)) = retention.entries.pop_first() else { return };
+            self.evict_retained(key);
         }
     }
 
     pub fn retained_count(&self) -> usize {
-        self.graph.retained.values().map(|retention| retention.nodes.len()).sum()
+        self.graph.retained.values().map(|retention| retention.entries.len()).sum()
+    }
+
+    fn rebuild_regions(&mut self) {
+        let demand = self.radius + self.lookahead;
+        self.regions = self.footprints.iter().map(|(&key, cells)| (key, Region::new(cells, demand))).collect();
     }
 
     pub fn in_region(&self, phase: PhaseId, hop: u32, cell: ChunkPos) -> bool {
-        let Some(distance) = self.nearest_focus(cell) else { return true };
-        let reach = self.reach_at(phase, hop).unwrap_or(0.0);
-        distance <= self.radius as f64 + reach
+        if self.focus.is_empty() {
+            return true;
+        }
+        let Some(region) = self.regions.get(&(phase, hop)) else { return false };
+        let from = self.focus_by_x.partition_point(|focus| focus.x < cell.x - region.half());
+        self.focus_by_x[from..]
+            .iter()
+            .take_while(|focus| focus.x <= cell.x + region.half())
+            .any(|focus| region.contains(focus.x - cell.x, focus.z - cell.z))
     }
 
     pub fn sweep_retained(&mut self) {
@@ -718,29 +707,87 @@ impl<G: Generator> PhaseGraph<G> {
             .graph
             .retained
             .values()
-            .flat_map(|retention| retention.nodes.iter().copied())
+            .flat_map(|retention| retention.entries.values().copied())
             .filter(|&key| self.graph.nodes.get(key).is_none_or(|node| !self.in_region(self.graph.phases.id(node), node.hop, node.cell)))
             .collect();
         for key in outside {
             self.evict_retained(key);
         }
-        let remaining: Vec<NodeKey> = self.graph.retained.values().flat_map(|retention| retention.nodes.iter().copied()).collect();
+        let remaining: Vec<NodeKey> = self.graph.retained.values().flat_map(|retention| retention.entries.values().copied()).collect();
         for key in remaining {
             self.prune_mail(key);
         }
-        let nodes = &self.graph.nodes;
-        for retention in self.graph.retained.values_mut() {
-            retention.queue.retain(|&(key, stamp)| nodes.get(key).is_some_and(|node| node.retained == Some(stamp)));
+    }
+
+    /// The cells whose nodes of `phase` at `hop` were in the region of a focus at `from` and are not in the region of the same focus at `to`.
+    fn cells_left_behind(&self, phase: PhaseId, hop: u32, from: ChunkPos, to: ChunkPos) -> Vec<ChunkPos> {
+        let Some(region) = self.regions.get(&(phase, hop)) else { return Vec::new() };
+        let half = region.half();
+        let (dx, dz) = (to.x - from.x, to.z - from.z);
+        let mut left = Vec::new();
+        for ox in -half..=half {
+            for oz in -half..=half {
+                if region.contains(ox, oz) && !region.contains(ox + dx, oz + dz) {
+                    left.push(ChunkPos::new(from.x - ox, from.z - oz));
+                }
+            }
         }
-        self.sweep_at = self.retained_count() * SWEEP_GROWTH + 1;
+        left
+    }
+
+    /// Frees what a focus stepping from `from` to `to` left behind, looking only at the cells it stopped covering.
+    fn release_left_behind(&mut self, from: ChunkPos, to: ChunkPos) {
+        let retained_phases: Vec<PhaseId> = self.graph.retained.keys().copied().collect();
+        for phase in retained_phases {
+            let hops = self.hops.get(&phase).copied().unwrap_or(0);
+            for hop in 0..=hops {
+                let outside: Vec<NodeKey> = self
+                    .cells_left_behind(phase, hop, from, to)
+                    .into_iter()
+                    .filter(|&cell| !self.in_region(phase, hop, cell))
+                    .filter_map(|cell| self.graph.index.get(&(phase, cell, hop)).copied())
+                    .filter(|&key| self.graph.nodes[key].retained.is_some())
+                    .collect();
+                for key in outside {
+                    self.evict_retained(key);
+                }
+            }
+        }
+
+        let mut producers = Vec::new();
+        for (&producer_phase, consumers) in &self.mail_consumers {
+            let producer_hops = self.hops.get(&producer_phase).copied().unwrap_or(0);
+            for consumer in consumers {
+                let consumer_hops = self.hops.get(&consumer.phase).copied().unwrap_or(0);
+                for reader_hop in 0..=consumer_hops {
+                    for reader in self.cells_left_behind(consumer.phase, reader_hop, from, to) {
+                        for &(ox, oz) in consumer.offsets {
+                            let cell = ChunkPos::new(reader.x + ox, reader.z + oz);
+                            for hop in 0..=producer_hops {
+                                if let Some(&key) = self.graph.index.get(&(producer_phase, cell, hop)) {
+                                    producers.push(key);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for key in producers {
+            if self.graph.nodes[key].retained.is_some() {
+                self.prune_mail(key);
+            }
+        }
     }
 
     fn evict_retained(&mut self, key: NodeKey) {
         let Some(node) = self.graph.nodes.get_mut(key) else { return };
-        node.retained = None;
+        let stamp = node.retained.take();
         let (phase, reused) = (self.graph.phases.id(node), node.reused);
         if let Some(retention) = self.graph.retained.get_mut(&phase) {
-            retention.nodes.remove(&key);
+            if let Some(stamp) = stamp {
+                retention.entries.remove(&stamp);
+            }
             if reused {
                 retention.stats.evicted_after_reuse += 1;
             } else {
@@ -794,10 +841,10 @@ impl<G: Generator> PhaseGraph<G> {
         self.revision = self.revision.wrapping_add(1);
         self.abandoned.remove(&key);
         let node = &self.graph.nodes[key];
-        if node.retained.is_some()
+        if let Some(stamp) = node.retained
             && let Some(retention) = self.graph.retained.get_mut(&self.graph.phases.id(node))
         {
-            retention.nodes.remove(&key);
+            retention.entries.remove(&stamp);
         }
         self.unindex(key);
         if let Some(node) = self.graph.remove_node(key)
@@ -838,7 +885,7 @@ impl<G: Generator> PhaseGraph<G> {
     /// Releases the pipelines of chunks nobody asks for any more and that no focus can reach: further out than the view plus
     /// the longest dependency chain, so nothing a requested chunk could need depends on them.
     pub fn abandon_unwanted(&mut self) {
-        let furthest = self.reach.values().copied().fold(0.0, f64::max) + self.radius as f64;
+        let furthest = self.extent + (self.radius + self.lookahead) as f64;
         let doomed: Vec<NodeKey> = self
             .abandoned
             .iter()
@@ -902,6 +949,15 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
 
     fn set_retention_budget(&mut self, budget: f64) {
         self.retention_budget = budget.max(0.0);
+    }
+
+    fn set_lookahead(&mut self, lookahead: i32) {
+        let shrank = lookahead.max(0) < self.lookahead;
+        self.lookahead = lookahead.max(0);
+        self.rebuild_regions();
+        if shrank {
+            self.sweep_retained();
+        }
     }
 
     fn set_focus(&mut self, focus: &[(i32, i32)], radius: i32) {
@@ -1131,10 +1187,9 @@ fn offsets_step(offsets: &[(i32, i32)]) -> f64 {
     offsets.iter().map(|&(dx, dz)| ((dx * dx + dz * dz) as f64).sqrt()).fold(0.0, f64::max)
 }
 
-fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u32>, FxHashMap<PhaseId, f64>) {
+fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u32>) {
     let mut reach = FxHashMap::default();
     let mut hop_limits = FxHashMap::default();
-    let mut self_steps = FxHashMap::default();
     let mut stack = vec![(PhaseDescriptor::of::<G::Terminal>(), 0.0)];
     while let Some((descriptor, distance)) = stack.pop() {
         let requirements = (descriptor.requires)();
@@ -1150,12 +1205,6 @@ fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u
             .max()
             .unwrap_or(0);
         hop_limits.insert(descriptor.phase, hop_limit);
-        let self_step = requirements
-            .iter()
-            .filter(|requirement| requirement.descriptor.phase == descriptor.phase)
-            .map(|requirement| offsets_step(requirement.offsets))
-            .fold(0.0, f64::max);
-        self_steps.insert(descriptor.phase, self_step);
         let distance = distance + hops;
         if reach.get(&descriptor.phase).is_some_and(|&known| known >= distance) {
             continue;
@@ -1165,7 +1214,7 @@ fn phase_shape<G: Generator>() -> (FxHashMap<PhaseId, f64>, FxHashMap<PhaseId, u
             stack.push((requirement.descriptor, distance + offsets_step(requirement.offsets)));
         }
     }
-    (reach, hop_limits, self_steps)
+    (reach, hop_limits)
 }
 
 /// One mail declaration of a phase: it reads what the producer cells at `offsets` addressed to the cells at `targets`.
@@ -1432,6 +1481,13 @@ mod tests {
                 graph.retention_cap()
             );
             assert!(graph.retention_cap() < 40, "the cap has to be below the 40 edge nodes for this to test anything");
+        }
+
+        #[test]
+        fn footprints_follow_the_declared_offsets() {
+            let footprints = footprints::<Toy>();
+            assert_eq!(footprints[&(PhaseId::of::<SinkPhase>(), 0)], vec![(0, 0)]);
+            assert_eq!(footprints[&(PhaseId::of::<SourcePhase>(), 0)], vec![(-1, 0), (0, 0), (1, 0)]);
         }
 
         #[test]
