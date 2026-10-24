@@ -11,7 +11,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::chunk::Chunk;
 use crate::generator::dimension::{GenerationStats, Generator, WorldGenerator};
 use crate::generator::error::{PhaseError, PhaseFailure};
-use crate::generator::graph::{Graph, Node, NodeKey, NodeStatus, Outcome, Retention};
+use crate::generator::graph::{Graph, Node, NodeKey, NodeMail, NodeStatus, Outcome, Retention};
 use crate::generator::phase::{InboxEntry, Outbox, PhaseDescriptor, PhaseId, PhaseInputs};
 use crate::generator::pos::ChunkPos;
 
@@ -169,9 +169,11 @@ impl<G: Generator> PhaseGraph<G> {
                         self.close(existing);
                     }
 
+                    let phase = self.graph.phases.slot(descriptor);
                     let key = self.graph.nodes.insert(Node {
                         reused: false,
-                        descriptor,
+                        phase,
+                        generator: PhantomData,
                         cell,
                         hop,
                         order,
@@ -181,8 +183,6 @@ impl<G: Generator> PhaseGraph<G> {
                         deps: Vec::new(),
                         dependents: Vec::new(),
                         status: NodeStatus::Pending { remaining: 0 },
-                        mailbox_out: Vec::new(),
-                        pruned: Vec::new(),
                         #[cfg(feature = "debug")]
                         started_at: None,
                         #[cfg(feature = "debug")]
@@ -234,7 +234,7 @@ impl<G: Generator> PhaseGraph<G> {
                     if let Some(error) = invalid {
                         let node = &mut self.graph.nodes[key];
                         let failure = PhaseFailure {
-                            phase: node.descriptor.name,
+                            phase: self.graph.phases.name(node),
                             cell: node.cell,
                             error,
                         };
@@ -249,7 +249,7 @@ impl<G: Generator> PhaseGraph<G> {
                         let dependency = &mut self.graph.nodes[dependency_key];
                         dependency.dependents.push(key);
                         if dependency.retained.take().is_some()
-                            && let Some(retention) = self.graph.retained.get_mut(&dependency.descriptor.phase)
+                            && let Some(retention) = self.graph.retained.get_mut(&self.graph.phases.id(dependency))
                         {
                             retention.nodes.remove(&dependency_key);
                             retention.stats.reuse_events += 1;
@@ -279,7 +279,7 @@ impl<G: Generator> PhaseGraph<G> {
 
     pub fn rank_at(&self, node: &Node<G>, distance: Option<f64>) -> u64 {
         let Some(distance) = distance else { return 0 };
-        let reach = self.reach.get(&node.descriptor.phase).copied().unwrap_or(0.0);
+        let reach = self.reach.get(&self.graph.phases.id(node)).copied().unwrap_or(0.0);
         ((distance - reach).max(0.0) * 16.0).min(u32::MAX as f64) as u64
     }
 
@@ -334,7 +334,7 @@ impl<G: Generator> PhaseGraph<G> {
     pub fn start(&mut self, key: NodeKey) -> Result<(PhaseDescriptor<G>, ChunkPos, PhaseInputs<G>), Arc<PhaseFailure>> {
         self.revision = self.revision.wrapping_add(1);
         let node = &self.graph.nodes[key];
-        let descriptor = node.descriptor;
+        let descriptor = self.graph.phases.descriptor(node);
         let cell = node.cell;
         let hop = node.hop;
         *self.started.entry(descriptor.name).or_default() += 1;
@@ -343,7 +343,7 @@ impl<G: Generator> PhaseGraph<G> {
         for dependency_key in &node.deps {
             let dependency = &self.graph.nodes[*dependency_key];
             match &dependency.status {
-                NodeStatus::Done(Ok(output)) => resolved.push((dependency.descriptor.phase, dependency.cell, output.clone())),
+                NodeStatus::Done(Ok(output)) => resolved.push((self.graph.phases.id(dependency), dependency.cell, output.clone())),
                 NodeStatus::Done(Err(failure)) => {
                     failed = Some(failure.clone());
                     break;
@@ -398,7 +398,7 @@ impl<G: Generator> PhaseGraph<G> {
             node.requested = false;
             self.finished.push((node.cell, outcome.clone()));
         }
-        let finished_terminal = (node.descriptor.phase == self.terminal).then_some(node.cell);
+        let finished_terminal = (self.graph.phases.id(node) == self.terminal).then_some(node.cell);
         node.status = NodeStatus::Done(outcome);
         if let Some(cell) = finished_terminal {
             self.completed.insert(cell);
@@ -427,7 +427,7 @@ impl<G: Generator> PhaseGraph<G> {
 
     fn release_mail_read_by(&mut self, key: NodeKey) {
         let node = &self.graph.nodes[key];
-        let (phase, cell, hop) = (node.descriptor.phase, node.cell, node.hop);
+        let (phase, cell, hop) = (self.graph.phases.id(node), node.cell, node.hop);
         let Some(reads) = self.mail_reads.get(&phase) else { return };
         let mut producers = Vec::new();
         for read in reads {
@@ -519,7 +519,7 @@ impl<G: Generator> PhaseGraph<G> {
             return;
         }
 
-        let retain = node.descriptor.retain;
+        let retain = self.graph.phases.retain(node);
         if retain == 0 {
             self.remove(key);
             return;
@@ -527,14 +527,14 @@ impl<G: Generator> PhaseGraph<G> {
         if node.retained.is_some() {
             return;
         }
-        if self.is_interior(node.descriptor.phase, node.hop, node.cell) || !self.in_region(node.descriptor.phase, node.hop, node.cell) {
+        if self.is_interior(self.graph.phases.id(node), node.hop, node.cell) || !self.in_region(self.graph.phases.id(node), node.hop, node.cell) {
             self.remove(key);
             return;
         }
 
         let node = &mut self.graph.nodes[key];
-        let phase = node.descriptor.phase;
-        let name = node.descriptor.name;
+        let phase = self.graph.phases.id(node);
+        let name = self.graph.phases.name(node);
         let retention = self.graph.retained.entry(phase).or_insert_with(|| Retention::new(name));
         let stamp = retention.pushes;
         retention.pushes += 1;
@@ -565,7 +565,8 @@ impl<G: Generator> PhaseGraph<G> {
                 let Some(&producer) = self.graph.index.get(&(read.producer, source, dependency_hop)) else {
                     continue;
                 };
-                for (target, value) in &self.graph.nodes[producer].mailbox_out {
+                let Some(mail) = self.graph.mail.get(&producer) else { continue };
+                for (target, value) in &mail.out {
                     if read.targets.iter().any(|&(tx, tz)| ChunkPos::new(cell.x + tx, cell.z + tz) == *target) {
                         inbox.push(InboxEntry {
                             producer: read.producer,
@@ -581,16 +582,17 @@ impl<G: Generator> PhaseGraph<G> {
     }
 
     fn store_mail(&mut self, key: NodeKey, mail: Outbox) {
-        if let Some(node) = self.graph.nodes.get_mut(key) {
-            node.mailbox_out = mail;
+        if mail.is_empty() || !self.graph.nodes.contains_key(key) {
+            return;
         }
+        self.graph.mail.insert(key, NodeMail { out: mail, pruned: Vec::new() });
     }
 
     /// Whether the cell `reader` asks about could still be consumed by nothing but a node that has had mail pruned for it.
     fn lacks_mail_for(&self, key: NodeKey, reader: Option<(ChunkPos, &'static [(i32, i32)])>) -> bool {
         let Some((consumer, targets)) = reader else { return false };
-        let node = &self.graph.nodes[key];
-        node.pruned
+        let Some(mail) = self.graph.mail.get(&key) else { return false };
+        mail.pruned
             .iter()
             .any(|pruned| targets.iter().any(|&(dx, dz)| ChunkPos::new(consumer.x + dx, consumer.z + dz) == *pruned))
     }
@@ -606,7 +608,7 @@ impl<G: Generator> PhaseGraph<G> {
 
     fn unindex(&mut self, key: NodeKey) {
         let Some(node) = self.graph.nodes.get(key) else { return };
-        let id = (node.descriptor.phase, node.cell, node.hop);
+        let id = (self.graph.phases.id(node), node.cell, node.hop);
         if self.graph.index.get(&id) == Some(&key) {
             self.graph.index.remove(&id);
         }
@@ -655,25 +657,26 @@ impl<G: Generator> PhaseGraph<G> {
 
     fn prune_mail(&mut self, key: NodeKey) {
         let Some(node) = self.graph.nodes.get(key) else { return };
-        if node.mailbox_out.is_empty() {
+        let Some(mail) = self.graph.mail.get(&key) else { return };
+        if mail.out.is_empty() {
             return;
         }
-        let (phase, cell, hop) = (node.descriptor.phase, node.cell, node.hop);
-        let keep: Vec<bool> = node.mailbox_out.iter().map(|(target, _)| self.mail_alive(phase, cell, hop, *target)).collect();
+        let (phase, cell, hop) = (self.graph.phases.id(node), node.cell, node.hop);
+        let keep: Vec<bool> = mail.out.iter().map(|(target, _)| self.mail_alive(phase, cell, hop, *target)).collect();
         if keep.iter().all(|&kept| kept) {
             return;
         }
-        let node = &mut self.graph.nodes[key];
+        let mail = self.graph.mail.get_mut(&key).expect("mail was just read");
         let mut keep = keep.into_iter();
         let mut dropped = Vec::new();
-        node.mailbox_out.retain(|(target, _)| {
+        mail.out.retain(|(target, _)| {
             let kept = keep.next().unwrap_or(true);
             if !kept {
                 dropped.push(*target);
             }
             kept
         });
-        node.pruned.extend(dropped);
+        mail.pruned.extend(dropped);
     }
 
     /// The most nodes of one phase to keep: the budget times the chunks in view, for every focus.
@@ -716,7 +719,7 @@ impl<G: Generator> PhaseGraph<G> {
             .retained
             .values()
             .flat_map(|retention| retention.nodes.iter().copied())
-            .filter(|&key| self.graph.nodes.get(key).is_none_or(|node| !self.in_region(node.descriptor.phase, node.hop, node.cell)))
+            .filter(|&key| self.graph.nodes.get(key).is_none_or(|node| !self.in_region(self.graph.phases.id(node), node.hop, node.cell)))
             .collect();
         for key in outside {
             self.evict_retained(key);
@@ -735,7 +738,7 @@ impl<G: Generator> PhaseGraph<G> {
     fn evict_retained(&mut self, key: NodeKey) {
         let Some(node) = self.graph.nodes.get_mut(key) else { return };
         node.retained = None;
-        let (phase, reused) = (node.descriptor.phase, node.reused);
+        let (phase, reused) = (self.graph.phases.id(node), node.reused);
         if let Some(retention) = self.graph.retained.get_mut(&phase) {
             retention.nodes.remove(&key);
             if reused {
@@ -760,7 +763,7 @@ impl<G: Generator> PhaseGraph<G> {
             }
             Completion::Panicked(key) => {
                 let node = &self.graph.nodes[key];
-                panic!("{} at ({}, {}) panicked on a worker thread", node.descriptor.name, node.cell.x, node.cell.z);
+                panic!("{} at ({}, {}) panicked on a worker thread", self.graph.phases.name(node), node.cell.x, node.cell.z);
             }
         }
     }
@@ -792,14 +795,14 @@ impl<G: Generator> PhaseGraph<G> {
         self.abandoned.remove(&key);
         let node = &self.graph.nodes[key];
         if node.retained.is_some()
-            && let Some(retention) = self.graph.retained.get_mut(&node.descriptor.phase)
+            && let Some(retention) = self.graph.retained.get_mut(&self.graph.phases.id(node))
         {
             retention.nodes.remove(&key);
         }
         self.unindex(key);
-        if let Some(node) = self.graph.nodes.remove(key)
+        if let Some(node) = self.graph.remove_node(key)
             && let NodeStatus::Done(outcome) = node.status
-            && node.descriptor.phase != self.terminal
+            && self.graph.phases.id_at(node.phase) != self.terminal
         {
             self.discarded.push(outcome);
         }
@@ -807,7 +810,7 @@ impl<G: Generator> PhaseGraph<G> {
 
     pub fn release_one(&mut self) -> bool {
         if let Some(key) = self.to_release.pop() {
-            if let Some(node) = self.graph.nodes.remove(key)
+            if let Some(node) = self.graph.remove_node(key)
                 && let NodeStatus::Done(outcome) = node.status
             {
                 self.discarded.push(outcome);
@@ -971,7 +974,7 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
         let mut live: FxHashMap<PhaseId, usize> = FxHashMap::default();
         for node in self.graph.nodes.values() {
             if node.retained.is_some() {
-                *live.entry(node.descriptor.phase).or_default() += 1;
+                *live.entry(self.graph.phases.id(node)).or_default() += 1;
             }
         }
         let mut lines: Vec<String> = self
@@ -1073,8 +1076,8 @@ impl<G: Generator> crate::generator::debug::DebugGraph for PhaseGraph<G> {
     fn node(&self, phase: PhaseId, cell: ChunkPos, hop: u32) -> Option<crate::generator::debug::DebugNode> {
         self.graph.index.get(&(phase, cell, hop)).and_then(|&key| {
             self.graph.nodes.get(key).map(|node| crate::generator::debug::DebugNode {
-                phase: node.descriptor.phase,
-                phase_name: node.descriptor.name,
+                phase: self.graph.phases.id(node),
+                phase_name: self.graph.phases.name(node),
                 cell: node.cell,
                 hop: node.hop,
                 order: node.order,
@@ -1084,7 +1087,7 @@ impl<G: Generator> crate::generator::debug::DebugGraph for PhaseGraph<G> {
                     .deps
                     .iter()
                     .filter_map(|&dep| self.graph.nodes.get(dep))
-                    .map(|dep| (dep.descriptor.phase, dep.cell, dep.hop))
+                    .map(|dep| (self.graph.phases.id(dep), dep.cell, dep.hop))
                     .collect(),
             })
         })
@@ -1093,8 +1096,8 @@ impl<G: Generator> crate::generator::debug::DebugGraph for PhaseGraph<G> {
     fn for_each_node(&self, f: &mut dyn FnMut(crate::generator::debug::DebugNode)) {
         for node in self.graph.nodes.values() {
             f(crate::generator::debug::DebugNode {
-                phase: node.descriptor.phase,
-                phase_name: node.descriptor.name,
+                phase: self.graph.phases.id(node),
+                phase_name: self.graph.phases.name(node),
                 cell: node.cell,
                 hop: node.hop,
                 order: node.order,
@@ -1104,7 +1107,7 @@ impl<G: Generator> crate::generator::debug::DebugGraph for PhaseGraph<G> {
                     .deps
                     .iter()
                     .filter_map(|&dep| self.graph.nodes.get(dep))
-                    .map(|dep| (dep.descriptor.phase, dep.cell, dep.hop))
+                    .map(|dep| (self.graph.phases.id(dep), dep.cell, dep.hop))
                     .collect(),
             });
         }
@@ -1218,7 +1221,7 @@ impl<G: Generator> PhaseGraph<G> {
         let mut waiting = 0;
         for node in self.graph.nodes.values() {
             if node.retained.is_some() {
-                *live.entry(node.descriptor.name).or_default() += 1;
+                *live.entry(self.graph.phases.name(node)).or_default() += 1;
             }
             if matches!(node.status, NodeStatus::Done(_)) && node.retained.is_none() {
                 waiting += 1;
@@ -1390,9 +1393,9 @@ mod tests {
             assert!(!graph.mail_alive(source, cell(22), 0, cell(72)), "no cell lists that target");
 
             graph.sweep_retained();
-            for node in graph.graph.nodes.values().filter(|node| node.retained.is_some()) {
+            for (key, node) in graph.graph.nodes.iter().filter(|(_, node)| node.retained.is_some()) {
                 assert!(
-                    node.mailbox_out.iter().all(|(target, _)| graph.mail_alive(source, node.cell, node.hop, *target)),
+                    graph.graph.mail.get(&key).is_none_or(|mail| mail.out.iter().all(|(target, _)| graph.mail_alive(source, node.cell, node.hop, *target))),
                     "retained nodes keep only mail somebody can still read"
                 );
             }
