@@ -22,7 +22,6 @@ pub struct RandomPhase;
 
 impl Phase<RandomGenerator> for RandomPhase {
     type Output = Chunk;
-    type Mailbox = ();
 
     fn run(generator: &RandomGenerator, cell: ChunkPos, _inputs: &mut PhaseInputs<RandomGenerator>) -> Result<Self::Output, PhaseError> {
         let mut chunk = Chunk::new(cell.x, cell.z, generator.min_sub_chunk_y, generator.sub_chunk_count, generator.air_id, generator.biome);

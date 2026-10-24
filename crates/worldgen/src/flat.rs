@@ -25,7 +25,6 @@ pub struct FlatPhase;
 
 impl Phase<FlatGenerator> for FlatPhase {
     type Output = Chunk;
-    type Mailbox = ();
 
     fn run(generator: &FlatGenerator, cell: ChunkPos, _inputs: &mut PhaseInputs<FlatGenerator>) -> Result<Chunk, PhaseError> {
         let mut chunk = Chunk::new(cell.x, cell.z, generator.min_sub_chunk_y, generator.sub_chunk_count, generator.air_id, generator.biome);

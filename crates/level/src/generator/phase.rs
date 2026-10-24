@@ -1,8 +1,6 @@
 use std::any::{Any, TypeId};
 use std::sync::Arc;
 
-use rustc_hash::FxHashMap;
-
 use crate::generator::dimension::Generator;
 use crate::generator::error::PhaseError;
 use crate::generator::pos::ChunkPos;
@@ -10,15 +8,6 @@ use crate::generator::pos::ChunkPos;
 pub type ErasedOutput = Arc<dyn Any + Send + Sync>;
 
 pub const SAME_CELL: &[(i32, i32)] = &[(0, 0)];
-
-#[derive(Clone, Debug)]
-pub struct MailboxPush {
-    pub mailbox_type: TypeId,
-    pub target: ChunkPos,
-    pub source: ChunkPos,
-    pub hop: u32,
-    pub value: ErasedOutput,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PhaseId(TypeId);
@@ -35,7 +24,6 @@ impl PhaseId {
 
 pub trait Phase<G: Generator>: 'static {
     type Output: Send + Sync + 'static;
-    type Mailbox: Send + Sync + 'static;
 
     const RETAIN: usize = 0;
 
@@ -49,48 +37,44 @@ pub trait Phase<G: Generator>: 'static {
     where
         Self: Sized,
     {
-        Requirement::Phase {
+        Requirement {
             descriptor: PhaseDescriptor::of::<Self>(),
             offsets,
             max_hops: None,
+            mail_for: None,
         }
     }
+}
 
-    fn mailbox_at<P: Phase<G>>(offsets: &'static [(i32, i32)], hop: u32) -> Requirement<G>
+/// A phase that sends a value to other cells besides its own output. The value is addressed to a target cell, and a
+/// consumer that depends on this phase with [`Mailing::at_with_mail`] receives the values addressed to the cells it asks for.
+pub trait Mailing<G: Generator>: Phase<G> {
+    type Mail: Send + Sync + 'static;
+
+    /// Depends on this phase at `offsets` like [`Phase::at`], and also receives what those cells addressed to the cells at `targets`
+    /// (offsets from the consumer), in the order of `offsets`.
+    fn at_with_mail(offsets: &'static [(i32, i32)], targets: &'static [(i32, i32)]) -> Requirement<G>
     where
         Self: Sized,
     {
-        Requirement::Mailbox {
-            producer: PhaseId::of::<P>(),
-            offsets,
-            hop,
+        Requirement {
+            mail_for: Some(targets),
+            ..Self::at(offsets)
         }
     }
 }
 
-pub enum Requirement<G: Generator> {
-    Phase {
-        descriptor: PhaseDescriptor<G>,
-        offsets: &'static [(i32, i32)],
-        max_hops: Option<u32>,
-    },
-    Mailbox {
-        producer: PhaseId,
-        offsets: &'static [(i32, i32)],
-        hop: u32,
-    },
+pub struct Requirement<G: Generator> {
+    pub descriptor: PhaseDescriptor<G>,
+    pub offsets: &'static [(i32, i32)],
+    pub max_hops: Option<u32>,
+    pub mail_for: Option<&'static [(i32, i32)]>,
 }
 
 impl<G: Generator> Requirement<G> {
-    pub fn max_hops(self, max_hops: u32) -> Self {
-        match self {
-            Requirement::Phase { descriptor, offsets, .. } => Requirement::Phase {
-                descriptor,
-                offsets,
-                max_hops: Some(max_hops),
-            },
-            other => other,
-        }
+    pub fn max_hops(mut self, max_hops: u32) -> Self {
+        self.max_hops = Some(max_hops);
+        self
     }
 }
 
@@ -122,37 +106,37 @@ impl<G: Generator> PhaseDescriptor<G> {
     }
 }
 
-pub struct PhaseInputs<G: Generator> {
-    pub resolved: Vec<(PhaseId, ChunkPos, ErasedOutput)>,
-    pub generator: std::marker::PhantomData<fn() -> G>,
-    pub cell: ChunkPos,
-    pub hop: u32,
-    pub inbox: FxHashMap<(TypeId, ChunkPos, u32), Vec<MailboxEntry>>,
-    pub mailbox_out: Vec<MailboxPush>,
-}
+pub type Outbox = Vec<(ChunkPos, ErasedOutput)>;
 
-#[derive(Clone)]
-pub struct MailboxEntry {
+pub struct InboxEntry {
+    pub producer: PhaseId,
+    pub target: ChunkPos,
     pub source: ChunkPos,
     pub value: ErasedOutput,
 }
 
+pub struct PhaseInputs<G: Generator> {
+    pub resolved: Vec<(PhaseId, ChunkPos, ErasedOutput)>,
+    pub generator: std::marker::PhantomData<fn() -> G>,
+    pub phase: PhaseId,
+    pub inbox: Vec<InboxEntry>,
+    pub outbox: Outbox,
+}
+
 impl<G: Generator> PhaseInputs<G> {
-    pub fn inbox<M: Phase<G>>(&self, cell: ChunkPos, hop: u32) -> Vec<(ChunkPos, Arc<M::Mailbox>)> {
+    /// What the cells this phase depends on with mail addressed to `target`, as `(source cell, mail)` in the order the requirement lists them.
+    pub fn mail<P: Mailing<G>>(&self, target: ChunkPos) -> impl Iterator<Item = (ChunkPos, &P::Mail)> {
+        let producer = PhaseId::of::<P>();
         self.inbox
-            .get(&(TypeId::of::<M>(), cell, hop))
-            .map(|v| v.iter().filter_map(|e| e.value.clone().downcast::<M::Mailbox>().ok().map(|v| (e.source, v))).collect())
-            .unwrap_or_default()
+            .iter()
+            .filter(move |entry| entry.producer == producer && entry.target == target)
+            .filter_map(|entry| entry.value.downcast_ref::<P::Mail>().map(|mail| (entry.source, mail)))
     }
 
-    pub fn mail<M: Phase<G>>(&mut self, target: ChunkPos, value: M::Mailbox) {
-        self.mailbox_out.push(MailboxPush {
-            mailbox_type: TypeId::of::<M>(),
-            target,
-            source: self.cell,
-            hop: self.hop,
-            value: Arc::new(value) as ErasedOutput,
-        });
+    /// Addresses `value` to `target`. Only the phase that is running may send, as itself.
+    pub fn send<P: Mailing<G>>(&mut self, target: ChunkPos, value: P::Mail) {
+        assert_eq!(PhaseId::of::<P>(), self.phase, "a phase can only send mail as itself");
+        self.outbox.push((target, Arc::new(value) as ErasedOutput));
     }
 
     pub fn get<Q: Phase<G>>(&self, cell: ChunkPos) -> Result<Arc<Q::Output>, PhaseError> {

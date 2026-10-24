@@ -19,7 +19,6 @@ pub struct VoidPhase;
 
 impl Phase<VoidGenerator> for VoidPhase {
     type Output = Chunk;
-    type Mailbox = ();
 
     fn run(generator: &VoidGenerator, cell: ChunkPos, _inputs: &mut PhaseInputs<VoidGenerator>) -> Result<Self::Output, PhaseError> {
         Ok(Chunk::new(cell.x, cell.z, generator.min_sub_chunk_y, generator.sub_chunk_count, generator.air_id, generator.biome))
