@@ -16,6 +16,8 @@ use crate::generator::graph::{Graph, Node, NodeKey, NodeStatus, Outcome, Retenti
 use crate::generator::phase::{ErasedOutput, MailboxEntry, MailboxPush, PhaseDescriptor, PhaseId, PhaseInputs, Requirement};
 use crate::generator::pos::ChunkPos;
 
+/// Sweep the retained nodes once their number has grown by this factor since the last sweep.
+const SWEEP_GROWTH: usize = 2;
 const REPORT_INTERVAL: Duration = Duration::from_secs(30);
 const COMPLETION_WAIT: Duration = Duration::from_millis(1);
 
@@ -46,6 +48,8 @@ pub struct PhaseGraph<G: Generator> {
     pub next_order: u64,
     pub focus: Vec<ChunkPos>,
     pub focus_by_x: Vec<ChunkPos>,
+    pub radius: i32,
+    pub sweep_at: usize,
     pub reach: FxHashMap<PhaseId, f64>,
     pub hops: FxHashMap<PhaseId, u32>,
     pub terminal: PhaseId,
@@ -73,6 +77,8 @@ impl<G: Generator> PhaseGraph<G> {
             next_order: 0,
             focus: Vec::new(),
             focus_by_x: Vec::new(),
+            radius: 0,
+            sweep_at: 1,
             reach,
             hops,
             terminal: PhaseId::of::<G::Terminal>(),
@@ -139,13 +145,6 @@ impl<G: Generator> PhaseGraph<G> {
                     let map_key = (descriptor.phase, cell, hop);
                     if self.graph.index.contains_key(&map_key) {
                         continue;
-                    }
-
-                    if let Some(retention) = self.graph.retained.get_mut(&descriptor.phase)
-                        && retention.ghost_set.remove(&(cell, hop))
-                    {
-                        retention.capacity = (retention.capacity + 1).min(retention_ceiling(descriptor.retain, self.focus.len()));
-                        retention.stats.ghost_hits += 1;
                     }
 
                     let key = self.graph.nodes.insert(Node {
@@ -234,10 +233,10 @@ impl<G: Generator> PhaseGraph<G> {
                         deps.push(dependency_key);
                         let dependency = &mut self.graph.nodes[dependency_key];
                         dependency.dependents.push(key);
-                        if let Some(stamp) = dependency.retained.take()
+                        if dependency.retained.take().is_some()
                             && let Some(retention) = self.graph.retained.get_mut(&dependency.descriptor.phase)
                         {
-                            retention.window_max_depth = retention.window_max_depth.max(retention.pushes - stamp);
+                            retention.nodes.remove(&dependency_key);
                             retention.stats.reuse_events += 1;
                             if !dependency.reused {
                                 dependency.reused = true;
@@ -281,16 +280,20 @@ impl<G: Generator> PhaseGraph<G> {
         self.pending_dispatch.push(Reverse((priority, key)));
     }
 
-    pub fn set_focus(&mut self, focus: &[(i32, i32)]) {
+    pub fn set_focus(&mut self, focus: &[(i32, i32)], radius: i32) {
         let focus: Vec<ChunkPos> = focus.iter().map(|&(x, z)| ChunkPos::new(x, z)).collect();
-        if focus == self.focus {
+        if focus == self.focus && radius == self.radius {
             return;
         }
+        let jumped = focus.len() != self.focus.len() || radius < self.radius || focus.iter().zip(&self.focus).any(|(now, before)| now.x.abs_diff(before.x).max(now.z.abs_diff(before.z)) > 1);
         self.focus_by_x = focus.clone();
         self.focus_by_x.sort_unstable_by_key(|focus| focus.x);
         self.focus = focus;
+        self.radius = radius;
 
-        self.free_unreachable();
+        if jumped {
+            self.sweep_retained();
+        }
 
         let entries = std::mem::take(&mut self.pending_dispatch).into_vec();
         let mut ranked = Vec::with_capacity(entries.len());
@@ -495,7 +498,7 @@ impl<G: Generator> PhaseGraph<G> {
         if node.retained.is_some() {
             return;
         }
-        if self.is_interior(node.descriptor.phase, node.cell) {
+        if self.is_interior(node.descriptor.phase, node.cell) || !self.in_region(node.descriptor.phase, node.cell) {
             self.remove(key);
             return;
         }
@@ -503,122 +506,57 @@ impl<G: Generator> PhaseGraph<G> {
         let node = &mut self.graph.nodes[key];
         let phase = node.descriptor.phase;
         let name = node.descriptor.name;
-        let retention = self.graph.retained.entry(phase).or_insert_with(|| Retention::new(name, retain));
+        let retention = self.graph.retained.entry(phase).or_insert_with(|| Retention::new(name));
         let stamp = retention.pushes;
         retention.pushes += 1;
-        retention.queue.push_back((key, stamp));
+        retention.nodes.insert(key);
         retention.stats.pushed += 1;
         node.retained = Some(stamp);
         node.dependents.clear();
 
-        self.trim(phase);
+        if self.retained_count() >= self.sweep_at {
+            self.sweep_retained();
+        }
     }
 
-    pub fn trim(&mut self, phase: PhaseId) {
-        let capacity = self.graph.retained.get(&phase).map(|r| r.capacity).unwrap_or(0);
-        while self.graph.retained.get(&phase).map(|r| r.queue.len()).unwrap_or(0) > capacity {
-            // find farthest index (immutable)
-            let farthest_idx = {
-                let retention = self.graph.retained.get(&phase).unwrap();
-                let mut farthest_idx: Option<usize> = None;
-                let mut farthest_dist: f64 = -1.0;
-                for (i, &(key, _)) in retention.queue.iter().enumerate() {
-                    let Some(node) = self.graph.nodes.get(key) else { continue };
-                    if node.retained.is_none() {
-                        continue;
-                    }
-                    let dist = self.nearest_focus(node.cell).unwrap_or(f64::MAX);
-                    if dist > farthest_dist {
-                        farthest_dist = dist;
-                        farthest_idx = Some(i);
-                    }
-                }
-                farthest_idx
-            };
-            let Some(idx) = farthest_idx else { break };
-            let Some(retention) = self.graph.retained.get_mut(&phase) else { break };
-            let (oldest, _) = retention.queue.remove(idx).expect("index valid");
-            let oldest_stamp = self.graph.nodes.get(oldest).and_then(|n| n.retained).unwrap_or(0);
-            let Some(expired) = self.graph.nodes.get(oldest).filter(|node| node.retained == Some(oldest_stamp)) else {
-                continue;
-            };
+    pub fn retained_count(&self) -> usize {
+        self.graph.retained.values().map(|retention| retention.nodes.len()).sum()
+    }
 
-            if expired.reused {
+    pub fn in_region(&self, phase: PhaseId, cell: ChunkPos) -> bool {
+        let Some(distance) = self.nearest_focus(cell) else { return true };
+        let reach = self.reach.get(&phase).copied().unwrap_or(0.0);
+        distance <= self.radius as f64 + reach
+    }
+
+    pub fn sweep_retained(&mut self) {
+        let outside: Vec<NodeKey> = self
+            .graph
+            .retained
+            .values()
+            .flat_map(|retention| retention.nodes.iter().copied())
+            .filter(|&key| self.graph.nodes.get(key).is_none_or(|node| !self.in_region(node.descriptor.phase, node.cell)))
+            .collect();
+        for key in outside {
+            self.evict_retained(key);
+        }
+        self.sweep_at = self.retained_count() * SWEEP_GROWTH + 1;
+    }
+
+    fn evict_retained(&mut self, key: NodeKey) {
+        let Some(node) = self.graph.nodes.get_mut(key) else { return };
+        node.retained = None;
+        let (phase, cell, hop, reused) = (node.descriptor.phase, node.cell, node.hop, node.reused);
+        if let Some(retention) = self.graph.retained.get_mut(&phase) {
+            retention.nodes.remove(&key);
+            if reused {
                 retention.stats.evicted_after_reuse += 1;
             } else {
                 retention.stats.evicted_unused += 1;
             }
-            let ghost = (expired.cell, expired.hop);
-            if retention.ghost_set.insert(ghost) {
-                retention.ghosts.push_back(ghost);
-            }
-            if retention.ghosts.len() > retention_ceiling(retention.ceiling, self.focus.len()) {
-                let forgotten = retention.ghosts.pop_front().expect("ghosts is longer than the ceiling");
-                retention.ghost_set.remove(&forgotten);
-            }
-
-            let expired = &self.graph.nodes[oldest];
-            self.graph.index.remove(&(expired.descriptor.phase, expired.cell, expired.hop));
-            self.to_release.push(oldest);
         }
-    }
-
-    pub fn free_unreachable(&mut self) {
-        // compute max reach across phases
-        let max_reach = self.reach.values().copied().fold(0.0_f64, f64::max);
-        let radius = (max_reach.ceil() as i32) + 2;
-        // build reachable set
-        let mut reachable: FxHashSet<ChunkPos> = FxHashSet::default();
-        for f in &self.focus {
-            for dx in -radius..=radius {
-                for dz in -radius..=radius {
-                    reachable.insert(ChunkPos::new(f.x + dx, f.z + dz));
-                }
-            }
-        }
-        // collect retained nodes outside reachable set
-        let mut to_free: Vec<NodeKey> = Vec::new();
-        for retention in self.graph.retained.values() {
-            for &(key, _) in &retention.queue {
-                if let Some(node) = self.graph.nodes.get(key)
-                    && node.retained.is_some()
-                    && !reachable.contains(&node.cell)
-                {
-                    to_free.push(key);
-                }
-            }
-        }
-        for key in to_free {
-            let phase = match self.graph.nodes.get(key) {
-                Some(n) => n.descriptor.phase,
-                None => continue,
-            };
-            if let Some(node) = self.graph.nodes.get(key)
-                && let Some(retention) = self.graph.retained.get_mut(&phase)
-            {
-                if node.reused {
-                    retention.stats.evicted_after_reuse += 1;
-                } else {
-                    retention.stats.evicted_unused += 1;
-                }
-            }
-            if let Some(retention) = self.graph.retained.get_mut(&phase) {
-                retention.queue.retain(|&(k, _)| k != key);
-                if let Some(n) = self.graph.nodes.get(key) {
-                    let ghost = (n.cell, n.hop);
-                    if retention.ghost_set.insert(ghost) {
-                        retention.ghosts.push_back(ghost);
-                    }
-                }
-            }
-            if let Some(node) = self.graph.nodes.get(key) {
-                let expired_phase = node.descriptor.phase;
-                let expired_cell = node.cell;
-                let expired_hop = node.hop;
-                self.graph.index.remove(&(expired_phase, expired_cell, expired_hop));
-            }
-            self.to_release.push(key);
-        }
+        self.graph.index.remove(&(phase, cell, hop));
+        self.to_release.push(key);
     }
 
     pub fn handle(&mut self, completion: Completion) {
@@ -666,6 +604,11 @@ impl<G: Generator> PhaseGraph<G> {
     pub fn remove(&mut self, key: NodeKey) {
         self.revision = self.revision.wrapping_add(1);
         let node = &self.graph.nodes[key];
+        if node.retained.is_some()
+            && let Some(retention) = self.graph.retained.get_mut(&node.descriptor.phase)
+        {
+            retention.nodes.remove(&key);
+        }
         self.graph.index.remove(&(node.descriptor.phase, node.cell, node.hop));
         if let Some(node) = self.graph.nodes.remove(key)
             && let NodeStatus::Done(outcome) = node.status
@@ -734,8 +677,8 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
         self.request(ChunkPos::new(x, z));
     }
 
-    fn set_focus(&mut self, focus: &[(i32, i32)]) {
-        PhaseGraph::set_focus(self, focus);
+    fn set_focus(&mut self, focus: &[(i32, i32)], radius: i32) {
+        PhaseGraph::set_focus(self, focus, radius);
     }
 
     fn cancel_chunk(&mut self, x: i32, z: i32) {
@@ -818,7 +761,7 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
                 let stats = retention.stats;
                 let reused = 100.0 * stats.nodes_reused as f64 / stats.pushed.max(1) as f64;
                 format!(
-                    "{:<12} pushed {:>7} reused {:>7} ({:>5.1}%) reuse events {:>7} evicted unused {:>7} evicted after reuse {:>7} ghost hits {:>6} capacity {:>6} live retained {:>6}",
+                    "{:<12} pushed {:>7} reused {:>7} ({:>5.1}%) reuse events {:>7} evicted unused {:>7} evicted after reuse {:>7} live retained {:>6}",
                     retention.name,
                     stats.pushed,
                     stats.nodes_reused,
@@ -826,8 +769,6 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
                     stats.reuse_events,
                     stats.evicted_unused,
                     stats.evicted_after_reuse,
-                    stats.ghost_hits,
-                    retention.capacity,
                     live.get(phase).copied().unwrap_or(0)
                 )
             })
@@ -1050,10 +991,6 @@ impl<G: Generator> PhaseGraph<G> {
     }
 }
 
-fn retention_ceiling(per_focus: usize, foci: usize) -> usize {
-    per_focus.saturating_mul(foci.max(1))
-}
-
 fn nearest_distance(by_x: &[ChunkPos], cell: ChunkPos) -> Option<f64> {
     let split = by_x.partition_point(|focus| focus.x < cell.x);
     let mut best: Option<f64> = None;
@@ -1080,14 +1017,6 @@ mod tests {
         foci.iter()
             .map(|focus| (((cell.x - focus.x) as f64).powi(2) + ((cell.z - focus.z) as f64).powi(2)).sqrt())
             .reduce(f64::min)
-    }
-
-    #[test]
-    fn the_retention_ceiling_scales_with_the_number_of_foci() {
-        assert_eq!(retention_ceiling(1024, 0), 1024);
-        assert_eq!(retention_ceiling(1024, 1), 1024);
-        assert_eq!(retention_ceiling(1024, 100), 102_400);
-        assert_eq!(retention_ceiling(usize::MAX, 4), usize::MAX);
     }
 
     #[test]

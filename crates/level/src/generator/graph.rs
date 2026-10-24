@@ -1,8 +1,6 @@
-use std::collections::VecDeque;
 use std::sync::Arc;
 #[cfg(feature = "debug")]
-use std::time::Duration;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use slotmap::{SlotMap, new_key_type};
@@ -48,35 +46,22 @@ pub struct RetentionStats {
     pub reuse_events: u64,
     pub evicted_unused: u64,
     pub evicted_after_reuse: u64,
-    pub ghost_hits: u64,
 }
 
 pub struct Retention {
     pub name: &'static str,
     pub stats: RetentionStats,
-    pub ceiling: usize,
-    pub capacity: usize,
     pub pushes: u64,
-    pub queue: VecDeque<(NodeKey, u64)>,
-    pub ghosts: VecDeque<(ChunkPos, u32)>,
-    pub ghost_set: FxHashSet<(ChunkPos, u32)>,
-    pub window_start: Instant,
-    pub window_max_depth: u64,
+    pub nodes: FxHashSet<NodeKey>,
 }
 
 impl Retention {
-    pub fn new(name: &'static str, ceiling: usize) -> Self {
+    pub fn new(name: &'static str) -> Self {
         Self {
             name,
             stats: RetentionStats::default(),
-            ceiling,
-            capacity: 0,
             pushes: 0,
-            queue: VecDeque::new(),
-            ghosts: VecDeque::new(),
-            ghost_set: FxHashSet::default(),
-            window_start: Instant::now(),
-            window_max_depth: 0,
+            nodes: FxHashSet::default(),
         }
     }
 }

@@ -300,13 +300,15 @@ pub fn request_view_chunks(
     mut serializer: ResMut<ChunkSerializer>,
     mut scheduler: ResMut<Scheduler>,
 ) {
-    let mut focus: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
+    let mut focus: HashMap<i32, (Vec<(i32, i32)>, i32)> = HashMap::new();
     let mut to_request: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
 
     for (_, _, mut view, _) in query.iter_mut() {
         let Some(center) = view.center else { continue };
 
-        focus.entry(view.dimension).or_default().push(center);
+        let (centers, radius) = focus.entry(view.dimension).or_default();
+        centers.push(center);
+        *radius = (*radius).max(view.load_radius());
 
         let room = MAX_OUTSTANDING_REQUESTS.saturating_sub(view.requested.len()).min(MAX_NEW_REQUESTS_PER_TICK);
         let mut new_requests = Vec::new();
@@ -323,9 +325,9 @@ pub fn request_view_chunks(
         to_request.entry(view.dimension).or_default().extend(new_requests);
     }
 
-    for (id, centers) in focus {
+    for (id, (centers, radius)) in focus {
         if let Some(dimension) = level.dimension_mut(id) {
-            dimension.set_focus(&centers);
+            dimension.set_focus(&centers, radius);
         }
     }
 

@@ -28,7 +28,7 @@ pub struct GenerationStats {
 
 pub trait WorldGenerator: Send + Sync {
     fn request_chunk(&mut self, x: i32, z: i32);
-    fn set_focus(&mut self, focus: &[(i32, i32)]);
+    fn set_focus(&mut self, focus: &[(i32, i32)], radius: i32);
     fn cancel_chunk(&mut self, x: i32, z: i32);
     fn tick(&mut self) -> Vec<(i32, i32, Result<Chunk, Arc<PhaseFailure>>)>;
     fn has_pending_work(&self) -> bool;
@@ -189,8 +189,8 @@ impl Dimension {
         }
     }
 
-    pub fn set_focus(&mut self, focus: &[(i32, i32)]) {
-        self.generator.set_focus(focus);
+    pub fn set_focus(&mut self, focus: &[(i32, i32)], radius: i32) {
+        self.generator.set_focus(focus, radius);
     }
 
     pub fn cancel_chunks(&mut self, positions: &[(i32, i32)]) {

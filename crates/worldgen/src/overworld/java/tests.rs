@@ -414,7 +414,7 @@ fn moving_center_generates_nearest_first() {
     let mut dimension = Dimension::new(DimensionType::Overworld, generator);
     let positions: Vec<(i32, i32)> = (-8..=16).flat_map(|x| (-8..=8).map(move |z| (x, z))).collect();
     let request_around = |dimension: &mut Dimension, center: (i32, i32)| {
-        dimension.set_focus(&[center]);
+        dimension.set_focus(&[center], 16);
         dimension.request_chunks(&positions);
     };
     request_around(&mut dimension, (0, 0));
@@ -605,7 +605,7 @@ fn request_main_thread_cost() {
             .map(|(dx, dz)| (center.0 + dx, center.1 + dz))
             .collect();
         let start = Instant::now();
-        dimension.set_focus(&[center]);
+        dimension.set_focus(&[center], radius);
         dimension.request_chunks(&positions);
         (positions.len(), start.elapsed())
     };
@@ -755,7 +755,7 @@ fn heap_profile() {
     }
 
     let profiler = dhat::Profiler::builder().file_name("dhat-heap.json").build();
-    dimension.set_focus(&centers);
+    dimension.set_focus(&centers, radius);
     dimension.request_chunks(&positions);
     let mut done = 0;
     while done < positions.len() {
@@ -799,7 +799,7 @@ fn retention_usefulness() {
             }
         }
     }
-    dimension.set_focus(&centers);
+    dimension.set_focus(&centers, radius);
     dimension.request_chunks(&positions);
     let mut done = 0;
     while done < positions.len() {
@@ -838,7 +838,7 @@ fn retention_usefulness_walking() {
                 }
             }
         }
-        dimension.set_focus(&centers);
+        dimension.set_focus(&centers, radius);
         dimension.request_chunks(&fresh);
         let mut done = 0;
         while done < fresh.len() {
