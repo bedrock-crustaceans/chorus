@@ -49,6 +49,7 @@ pub struct Snapshot {
     generation: Vec<(&'static str, GenerationStats)>,
     memory: Option<(u64, u64)>,
     loaded_chunks: usize,
+    cached_chunks: usize,
 }
 
 impl Snapshot {
@@ -58,6 +59,7 @@ impl Snapshot {
             generation: generation_stats(level),
             memory: process_stats().map(|stats| (stats.resident_bytes, stats.virtual_bytes)),
             loaded_chunks: level.dimensions().map(|dimension| dimension.chunk_count()).sum(),
+            cached_chunks: level.dimensions().map(|dimension| dimension.cached_count()).sum(),
         }
     }
 }
@@ -243,6 +245,8 @@ fn write_memory(report: &mut Report, before: &Snapshot, after: &Snapshot) {
         let loaded = after.loaded_chunks;
         let gained = loaded as i64 - before.loaded_chunks as i64;
         report.row("Loaded chunks", Value::count(loaded).note(format!("{gained:+} during the profile")));
+        let cached = after.cached_chunks;
+        report.row("Cached chunks", Value::count(cached).note(format!("{:+} during the profile", cached as i64 - before.cached_chunks as i64)));
         if loaded > 0 {
             report.row("Resident per chunk", Value::new(thousands((resident / loaded as u64 / 1024) as usize)).unit("KB"));
         }
@@ -321,6 +325,7 @@ mod tests {
                 generation: Vec::new(),
                 memory: None,
                 loaded_chunks: 0,
+                cached_chunks: 0,
             }
         }
     }
