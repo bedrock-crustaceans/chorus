@@ -164,7 +164,7 @@ impl<E: Edition> Phase<OverworldGenerator<E>> for ColumnPhase {
             let mut edit = column.edit();
             for (_, changes) in inputs.mail::<FeaturePhase>(cell) {
                 changes.overlay_onto(&baseline, &mut edit);
-                for &(x, y, z, block) in &changes.changes {
+                for (x, y, z, block) in changes.changes() {
                     if needs_support(&generator.blocks, block) {
                         edit.mark_settle(x, y, z);
                     }

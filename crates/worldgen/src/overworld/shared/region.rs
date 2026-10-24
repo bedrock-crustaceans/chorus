@@ -2,6 +2,7 @@ use glam::IVec3;
 
 use super::biome::Biome;
 use super::blocks::{AIR, BlockId, Blocks};
+use super::packed::Packed;
 use super::proto::{BlockEntity, PlacedEntity, ProtoChunk};
 use super::scratch::Scratch;
 use super::tags::Tag;
@@ -63,16 +64,84 @@ pub struct Region<'a> {
     heights: Scratch<Option<i32>>,
 }
 
+fn section_position(x: u8, y: i16, z: u8) -> (i8, u16) {
+    (y.div_euclid(16) as i8, ((y.rem_euclid(16) as u16) << 8) | ((z as u16) << 4) | x as u16)
+}
+
+#[derive(Clone)]
+struct Sectioned {
+    sections: Box<[(i8, u16)]>,
+    positions: Box<[u16]>,
+}
+
+impl Sectioned {
+    fn new(dirty: &mut Vec<(u8, i16, u8)>) -> Self {
+        dirty.sort_unstable_by_key(|&(x, y, z)| section_position(x, y, z));
+        dirty.dedup();
+        let mut sections: Vec<(i8, u16)> = Vec::new();
+        let mut positions = Vec::with_capacity(dirty.len());
+        for &(x, y, z) in dirty.iter() {
+            let (section, position) = section_position(x, y, z);
+            match sections.last_mut() {
+                Some((last, count)) if *last == section => *count += 1,
+                _ => sections.push((section, 1)),
+            }
+            positions.push(position);
+        }
+        Self {
+            sections: sections.into_boxed_slice(),
+            positions: positions.into_boxed_slice(),
+        }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (u8, i16, u8)> + '_ {
+        let mut rest = &self.positions[..];
+        self.sections.iter().flat_map(move |&(section, count)| {
+            let (head, tail) = rest.split_at(count as usize);
+            rest = tail;
+            head.iter().map(move |&position| ((position & 15) as u8, section as i16 * 16 + (position >> 8) as i16, ((position >> 4) & 15) as u8))
+        })
+    }
+}
+
 #[derive(Clone)]
 pub struct Changes {
-    pub changes: Vec<(u8, i16, u8, BlockId)>,
+    positions: Sectioned,
+    palette: Box<[BlockId]>,
+    indices: Packed,
+    marks: Sectioned,
     pub entities: Vec<PlacedEntity>,
-    pub marks: Vec<(u8, i16, u8)>,
 }
 
 impl Changes {
+    fn new(dirty: &mut Vec<(u8, i16, u8)>, chunk: &ProtoChunk, entities: Vec<PlacedEntity>, mut marks: Vec<(u8, i16, u8)>) -> Self {
+        let positions = Sectioned::new(dirty);
+        let mut palette: Vec<BlockId> = Vec::new();
+        let indices: Vec<u16> = positions
+            .iter()
+            .map(|(x, y, z)| {
+                let block = chunk.get(x as i32, y as i32, z as i32);
+                palette.iter().position(|&known| known == block).unwrap_or_else(|| {
+                    palette.push(block);
+                    palette.len() - 1
+                }) as u16
+            })
+            .collect();
+        Self {
+            indices: Packed::new(palette.len().saturating_sub(1), &indices),
+            palette: palette.into_boxed_slice(),
+            positions,
+            marks: Sectioned::new(&mut marks),
+            entities,
+        }
+    }
+
+    pub fn changes(&self) -> impl Iterator<Item = (u8, i16, u8, BlockId)> + '_ {
+        self.positions.iter().enumerate().map(|(index, (x, y, z))| (x, y, z, self.palette[self.indices.get(index) as usize]))
+    }
+
     pub fn overlay_onto(&self, baseline: &ProtoChunk, target: &mut ProtoChunk) {
-        for &(x, y, z, block) in &self.changes {
+        for (x, y, z, block) in self.changes() {
             let (x, y, z) = (x as i32, y as i32, z as i32);
             if block != baseline.get(x, y, z) {
                 target.set(x, y, z, block);
@@ -81,7 +150,7 @@ impl Changes {
         for entity in &self.entities {
             target.add_entity(entity.clone());
         }
-        for &(x, y, z) in &self.marks {
+        for (x, y, z) in self.marks.iter() {
             target.mark_post_process(x, y, z);
         }
     }
@@ -281,12 +350,12 @@ impl<'a> Region<'a> {
 
     pub fn into_changes(mut self) -> [Changes; 9] {
         let chunks = std::array::from_fn(|slot| {
-            let chunk = &self.chunks[slot];
-            Changes {
-                changes: self.dirty[slot].iter().map(|&(x, y, z)| (x, y, z, chunk.get(x as i32, y as i32, z as i32))).collect(),
-                entities: std::mem::take(&mut self.entities[slot]),
-                marks: std::mem::take(&mut self.marks[slot]),
-            }
+            Changes::new(
+                &mut self.dirty[slot],
+                &self.chunks[slot],
+                std::mem::take(&mut self.entities[slot]),
+                std::mem::take(&mut self.marks[slot]),
+            )
         });
         for chunk in &mut self.chunks {
             chunk.release_dense();

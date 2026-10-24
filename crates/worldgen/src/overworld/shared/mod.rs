@@ -3,6 +3,7 @@ pub mod biome_builder;
 pub mod blocks;
 pub mod moss_carpet;
 pub mod noise;
+pub mod packed;
 pub mod phases;
 pub mod proto;
 pub mod random;
