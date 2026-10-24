@@ -22,6 +22,7 @@ tracing.workspace = true
 
 [features]
 dhat-heap = []
+count-alloc = []
 debug = ["chorus_level/debug"]
 
 [dev-dependencies]

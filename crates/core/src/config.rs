@@ -320,6 +320,9 @@ pub struct LevelConfig {
     /// How many generated pieces of each kind to keep per player for neighbouring chunks, as a multiple of the chunks in the player's view.
     /// A lower value uses less memory and regenerates more, 0 keeps nothing.
     pub retention_budget: f64,
+    /// How many chunks to keep after they leave every player's view, as a multiple of the chunks in a view. A player who walks back to them does not wait for
+    /// them to generate again. 0 drops them at once.
+    pub chunk_cache: f64,
     pub autosave: Interval,
     pub database: DatabaseConfig,
 }
@@ -332,6 +335,7 @@ impl Default for LevelConfig {
             chunk_saving: ChunkSaving::default(),
             max_view_distance: 32,
             retention_budget: 1.0,
+            chunk_cache: 0.5,
             autosave: Interval::every(Duration::from_secs(60)),
             database: DatabaseConfig::default(),
         }
@@ -560,6 +564,14 @@ mod tests {
         let config: LevelConfig = toml::from_str("retention_budget = 0.5").unwrap();
 
         assert_eq!(config.retention_budget, 0.5);
+    }
+
+    #[test]
+    fn the_chunk_cache_defaults_to_half_a_view_and_is_read_from_the_config() {
+        assert_eq!(LevelConfig::default().chunk_cache, 0.5);
+        let config: LevelConfig = toml::from_str("chunk_cache = 0").unwrap();
+
+        assert_eq!(config.chunk_cache, 0.0);
     }
 
     #[test]

@@ -207,9 +207,11 @@ pub fn update_chunk_order(mut query: Query<(&mut Session, &Transform, &mut Chunk
         // if the player ever comes back
         let in_view: HashSet<(i32, i32)> = wanted.iter().copied().collect();
         view.sent.retain(|position| in_view.contains(position));
-        let left = view.requested.iter().copied().filter(|position| !in_view.contains(position));
+        let keep_radius = radius + UNLOAD_MARGIN;
+        let kept = |&(x, z): &(i32, i32)| (x - center.0).pow(2) + (z - center.1).pow(2) <= keep_radius * keep_radius;
+        let left = view.requested.iter().copied().filter(|position| !kept(position));
         left_view.entry(view.dimension).or_default().extend(left);
-        view.requested.retain(|position| in_view.contains(position));
+        view.requested.retain(kept);
 
         let pending: VecDeque<(i32, i32)> = wanted.into_iter().filter(|position| !view.sent.contains(position)).collect();
         view.pending = pending;

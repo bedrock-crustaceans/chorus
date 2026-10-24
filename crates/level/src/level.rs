@@ -33,6 +33,7 @@ pub struct Level {
     storage: Option<Arc<LevelStorage>>,
     chunk_saving: ChunkSaving,
     retention_budget: f64,
+    chunk_cache: f64,
     is_new: bool,
 }
 
@@ -80,6 +81,7 @@ impl Level {
             storage: None,
             chunk_saving: ChunkSaving::default(),
             retention_budget: 1.0,
+            chunk_cache: 0.0,
             is_new: true,
         }
     }
@@ -102,6 +104,13 @@ impl Level {
         }
     }
 
+    pub fn set_chunk_cache(&mut self, chunk_cache: f64) {
+        self.chunk_cache = chunk_cache;
+        for dimension in self.dimensions.values_mut() {
+            dimension.set_chunk_cache(chunk_cache);
+        }
+    }
+
     pub fn storage(&self) -> Option<&Arc<LevelStorage>> {
         self.storage.as_ref()
     }
@@ -113,6 +122,7 @@ impl Level {
         }
         dimension.set_chunk_saving(self.chunk_saving);
         dimension.set_retention_budget(self.retention_budget);
+        dimension.set_chunk_cache(self.chunk_cache);
         self.remove_dimension(dimension_type.id());
         self.dimensions.entry(dimension_type.id()).or_insert(dimension)
     }

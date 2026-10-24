@@ -50,6 +50,7 @@ pub struct PhaseGraph<G: Generator> {
     pub radius: i32,
     pub sweep_at: usize,
     pub retention_budget: f64,
+    pub abandoned: FxHashSet<NodeKey>,
     pub mail_reads: FxHashMap<PhaseId, Vec<MailRead>>,
     pub mail_readers: FxHashMap<PhaseId, Vec<MailReader>>,
     pub reach: FxHashMap<PhaseId, f64>,
@@ -84,6 +85,7 @@ impl<G: Generator> PhaseGraph<G> {
             radius: 0,
             sweep_at: 1,
             retention_budget: 1.0,
+            abandoned: FxHashSet::default(),
             mail_reads,
             mail_readers,
             reach,
@@ -109,7 +111,10 @@ impl<G: Generator> PhaseGraph<G> {
             let node = &mut self.graph.nodes[key];
             match &node.status {
                 NodeStatus::Done(outcome) => self.finished.push((cell, outcome.clone())),
-                _ => node.requested = true,
+                _ => {
+                    node.requested = true;
+                    self.abandoned.remove(&key);
+                }
             }
             return;
         }
@@ -289,6 +294,7 @@ impl<G: Generator> PhaseGraph<G> {
         self.focus_by_x.sort_unstable_by_key(|focus| focus.x);
         self.focus = focus;
         self.radius = radius;
+        self.abandon_unwanted();
 
         if jumped {
             self.sweep_retained();
@@ -371,6 +377,7 @@ impl<G: Generator> PhaseGraph<G> {
 
     pub fn complete(&mut self, key: NodeKey, outcome: Outcome) {
         self.revision = self.revision.wrapping_add(1);
+        self.abandoned.remove(&key);
         let node = &mut self.graph.nodes[key];
         #[cfg(feature = "debug")]
         {
@@ -603,6 +610,7 @@ impl<G: Generator> PhaseGraph<G> {
     }
 
     pub fn sweep_retained(&mut self) {
+        self.abandon_unwanted();
         let outside: Vec<NodeKey> = self
             .graph
             .retained
@@ -681,6 +689,7 @@ impl<G: Generator> PhaseGraph<G> {
 
     pub fn remove(&mut self, key: NodeKey) {
         self.revision = self.revision.wrapping_add(1);
+        self.abandoned.remove(&key);
         let node = &self.graph.nodes[key];
         if node.retained.is_some()
             && let Some(retention) = self.graph.retained.get_mut(&node.descriptor.phase)
@@ -709,11 +718,44 @@ impl<G: Generator> PhaseGraph<G> {
         !self.discarded.is_empty()
     }
 
+    /// Drops the request for a chunk. A pipeline that is still running is not torn down: a request that comes back reuses it,
+    /// and it is released only once the chunk is out of every focus's demand region.
     pub fn cancel(&mut self, cell: ChunkPos) {
         let root = PhaseDescriptor::of::<G::Terminal>();
         let Some(&key) = self.graph.index.get(&(root.phase, cell, 0)) else { return };
-        self.graph.nodes[key].requested = false;
+        let node = &mut self.graph.nodes[key];
+        node.requested = false;
+        if matches!(node.status, NodeStatus::Done(_)) {
+            self.try_evict(key);
+        } else {
+            self.abandoned.insert(key);
+        }
+    }
 
+    /// Releases the pipelines of chunks nobody asks for any more and that no focus can reach: further out than the view plus
+    /// the longest dependency chain, so nothing a requested chunk could need depends on them.
+    pub fn abandon_unwanted(&mut self) {
+        let furthest = self.reach.values().copied().fold(0.0, f64::max) + self.radius as f64;
+        let doomed: Vec<NodeKey> = self
+            .abandoned
+            .iter()
+            .copied()
+            .filter(|&key| {
+                self.graph
+                    .nodes
+                    .get(key)
+                    .is_none_or(|node| node.requested || self.nearest_focus(node.cell).is_none_or(|distance| distance > furthest))
+            })
+            .collect();
+        for key in doomed {
+            self.abandoned.remove(&key);
+            if self.graph.nodes.get(key).is_some_and(|node| !node.requested) {
+                self.release_pipeline(key);
+            }
+        }
+    }
+
+    fn release_pipeline(&mut self, key: NodeKey) {
         let mut unneeded = vec![key];
         while let Some(key) = unneeded.pop() {
             let Some(node) = self.graph.nodes.get(key) else { continue };
@@ -1262,6 +1304,35 @@ mod tests {
                 graph.retention_cap()
             );
             assert!(graph.retention_cap() < 40, "the cap has to be below the 40 edge nodes for this to test anything");
+        }
+
+        #[test]
+        fn a_cancelled_request_keeps_its_pipeline_and_a_new_request_reuses_it() {
+            let mut graph = PhaseGraph::new(Toy);
+            let cell = ChunkPos::new(7, 0);
+            graph.request(cell);
+            let nodes = graph.graph.nodes.len();
+            graph.cancel(cell);
+            assert_eq!(graph.abandoned.len(), 1);
+            assert_eq!(graph.graph.nodes.len(), nodes, "nothing was torn down");
+
+            graph.request(cell);
+            assert!(graph.abandoned.is_empty());
+            assert_eq!(graph.graph.nodes.len(), nodes, "the request found the pipeline again");
+        }
+
+        #[test]
+        fn an_abandoned_pipeline_is_released_once_no_focus_can_reach_it() {
+            let mut graph = PhaseGraph::new(Toy);
+            graph.set_focus(&[(7, 0)], 4);
+            graph.request(ChunkPos::new(7, 0));
+            graph.cancel(ChunkPos::new(7, 0));
+            graph.set_focus(&[(8, 0)], 4);
+            assert_eq!(graph.abandoned.len(), 1, "still within reach of the focus");
+
+            graph.set_focus(&[(500, 500)], 4);
+            assert!(graph.abandoned.is_empty());
+            assert_eq!(graph.graph.nodes.len(), 0, "the whole pipeline is gone");
         }
 
         #[test]

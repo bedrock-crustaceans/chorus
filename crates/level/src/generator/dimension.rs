@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use tracing::{error, warn};
@@ -61,6 +61,10 @@ pub struct Dimension {
     loading: HashSet<(i32, i32)>,
     cancelled: HashSet<(i32, i32)>,
     loads: (Sender<LoadResult>, Receiver<LoadResult>),
+    cold: HashMap<(i32, i32), Arc<Chunk>>,
+    cold_order: VecDeque<(i32, i32)>,
+    cold_capacity: usize,
+    chunk_cache: f64,
 }
 
 type LoadResult = (i32, i32, StorageResult<Option<Chunk>>);
@@ -79,6 +83,10 @@ impl Dimension {
             loading: HashSet::new(),
             cancelled: HashSet::new(),
             loads: crossbeam_channel::unbounded(),
+            cold: HashMap::new(),
+            cold_order: VecDeque::new(),
+            cold_capacity: 0,
+            chunk_cache: 0.0,
         }
     }
 
@@ -89,6 +97,29 @@ impl Dimension {
 
     pub fn set_chunk_saving(&mut self, chunk_saving: ChunkSaving) {
         self.chunk_saving = chunk_saving;
+    }
+
+    /// Keeps chunks that left every focus's view for a while, up to this multiple of the chunks in view, so one that is walked back to does not generate again.
+    pub fn set_chunk_cache(&mut self, chunk_cache: f64) {
+        self.chunk_cache = chunk_cache.max(0.0);
+    }
+
+    pub fn cached_count(&self) -> usize {
+        self.cold.len()
+    }
+
+    fn keep_cold(&mut self, position: (i32, i32), chunk: Arc<Chunk>) {
+        if self.cold.insert(position, chunk).is_none() {
+            self.cold_order.push_back(position);
+        }
+        self.trim_cold();
+    }
+
+    fn trim_cold(&mut self) {
+        while self.cold.len() > self.cold_capacity {
+            let Some(oldest) = self.cold_order.pop_front() else { break };
+            self.cold.remove(&oldest);
+        }
     }
 
     pub fn persist_chunk(&mut self, x: i32, z: i32) {
@@ -170,6 +201,13 @@ impl Dimension {
         if self.chunks.contains_key(&(x, z)) {
             return;
         }
+        if let Some(chunk) = self.cold.remove(&(x, z)) {
+            self.cold_order.retain(|&position| position != (x, z));
+            if self.loading.insert((x, z)) {
+                let _ = self.loads.0.send((x, z, Ok(Some(Arc::unwrap_or_clone(chunk)))));
+            }
+            return;
+        }
         let Some(storage) = &self.storage else {
             self.generator.request_chunk(x, z);
             return;
@@ -191,6 +229,9 @@ impl Dimension {
     }
 
     pub fn set_focus(&mut self, focus: &[(i32, i32)], radius: i32) {
+        let view_chunks = std::f64::consts::PI * (radius as f64).powi(2);
+        self.cold_capacity = (self.chunk_cache * view_chunks) as usize * focus.len();
+        self.trim_cold();
         self.generator.set_focus(focus, radius);
     }
 
@@ -259,7 +300,9 @@ impl Dimension {
                 }
                 staged = true;
             }
-            self.chunks.remove(&position);
+            if let Some(chunk) = self.chunks.remove(&position) {
+                self.keep_cold(position, chunk);
+            }
             self.unloaded.push(position);
             unloaded += 1;
         }
@@ -314,5 +357,83 @@ impl Dimension {
         let position = (x >> 4, z >> 4);
         let Some(chunk) = self.chunks.get_mut(&position) else { return false };
         Arc::make_mut(chunk).set_block((x & 0xF) as u8, y, (z & 0xF) as u8, layer, block_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::generator::error::PhaseError;
+    use crate::generator::phase::{Phase, PhaseInputs};
+    use crate::generator::pos::ChunkPos;
+    use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::{Duration, Instant};
+
+    static GENERATED: AtomicUsize = AtomicUsize::new(0);
+    const WATCHED: i32 = 1000;
+
+    struct Toy;
+
+    impl Generator for Toy {
+        type Terminal = ChunkPhase;
+    }
+
+    struct ChunkPhase;
+
+    impl Phase<Toy> for ChunkPhase {
+        type Output = Chunk;
+
+        fn run(_: &Toy, cell: ChunkPos, _: &mut PhaseInputs<Toy>) -> Result<Chunk, PhaseError> {
+            if cell.x == WATCHED {
+                GENERATED.fetch_add(1, Ordering::Relaxed);
+            }
+            Ok(Chunk::new(cell.x, cell.z, -4, 24, 0, 1))
+        }
+    }
+
+    fn load(dimension: &mut Dimension, x: i32, z: i32) {
+        dimension.request_chunk(x, z);
+        let start = Instant::now();
+        while dimension.get_chunk(x, z).is_none() {
+            dimension.tick();
+            assert!(start.elapsed() < Duration::from_secs(30), "the chunk never loaded");
+        }
+    }
+
+    #[test]
+    fn a_chunk_that_just_left_the_view_comes_back_without_generating_again() {
+        AsyncComputeTaskPool::get_or_init(TaskPool::default);
+        let mut dimension = Dimension::new(DimensionType::Overworld, Toy);
+        dimension.set_chunk_cache(1.0);
+        dimension.set_focus(&[(WATCHED, 0)], 4);
+        load(&mut dimension, WATCHED, 0);
+        dimension.take_available();
+        let generated = GENERATED.load(Ordering::Relaxed);
+
+        assert_eq!(dimension.unload_chunks(|_, _| false), 1);
+        assert_eq!((dimension.chunk_count(), dimension.cached_count()), (0, 1));
+        assert_eq!(dimension.take_unloaded(), vec![(WATCHED, 0)]);
+
+        load(&mut dimension, WATCHED, 0);
+        assert_eq!(GENERATED.load(Ordering::Relaxed), generated, "it came from the cache");
+        assert_eq!(dimension.cached_count(), 0);
+        assert_eq!(dimension.take_available(), vec![(WATCHED, 0)], "actors are loaded for it again");
+    }
+
+    #[test]
+    fn the_cache_is_bounded_and_empties_when_nobody_is_in_view() {
+        AsyncComputeTaskPool::get_or_init(TaskPool::default);
+        let mut dimension = Dimension::new(DimensionType::Overworld, Toy);
+        dimension.set_chunk_cache(0.1);
+        dimension.set_focus(&[(0, 0)], 10);
+        for x in 0..40 {
+            load(&mut dimension, x, 0);
+        }
+        dimension.unload_chunks(|_, _| false);
+        assert_eq!(dimension.cached_count(), (0.1 * std::f64::consts::PI * 100.0) as usize);
+
+        dimension.set_focus(&[], 10);
+        assert_eq!(dimension.cached_count(), 0);
     }
 }

@@ -850,3 +850,206 @@ fn retention_usefulness_walking() {
     println!("RETENTION walkers={walkers} steps={steps} chunks={total}");
     println!("{}", dimension.retention_report());
 }
+
+#[test]
+#[ignore]
+fn retention_usefulness_circling() {
+    use chorus_level::dimension_type::DimensionType;
+    use chorus_level::generator::dimension::Dimension;
+
+    let walkers: i32 = std::env::var("WALKERS").ok().and_then(|v| v.parse().ok()).unwrap_or(4);
+    let radius: i32 = std::env::var("SCALE_RADIUS").ok().and_then(|v| v.parse().ok()).unwrap_or(11);
+    let margin: i32 = std::env::var("UNLOAD_MARGIN").ok().and_then(|v| v.parse().ok()).unwrap_or(2);
+    let budget: f64 = std::env::var("BUDGET").ok().and_then(|v| v.parse().ok()).unwrap_or(1.0);
+    let laps: i32 = std::env::var("LAPS").ok().and_then(|v| v.parse().ok()).unwrap_or(3);
+    bevy_tasks::AsyncComputeTaskPool::get_or_init(bevy_tasks::TaskPool::default);
+    let (generator, _) = generator(0);
+    let mut dimension = Dimension::new(DimensionType::Overworld, generator);
+    dimension.set_retention_budget(budget);
+    dimension.set_chunk_cache(std::env::var("CACHE").ok().and_then(|v| v.parse().ok()).unwrap_or(0.5));
+    let spacing = (radius * 6) as f64 * 16.0;
+    let circle_radius = 21.58f64;
+    let within = |center: (i32, i32), x: i32, z: i32, r: i32| (x - center.0).pow(2) + (z - center.1).pow(2) <= r * r;
+    let mut last: Vec<(i32, i32)> = Vec::new();
+    let mut ran_before = 0;
+    let mut generated_total = 0usize;
+    let started_at = Instant::now();
+    for lap in 0..laps {
+        let mut generated = 0usize;
+        for step in (0..628).step_by(4) {
+            let yaw = step as f64 * 0.01;
+            let centers: Vec<(i32, i32)> = (0..walkers)
+                .map(|i| {
+                    let (x, z) = (i as f64 * spacing + circle_radius * yaw.cos(), circle_radius * yaw.sin());
+                    ((x / 16.0).floor() as i32, (z / 16.0).floor() as i32)
+                })
+                .collect();
+            if centers == last {
+                continue;
+            }
+            last = centers.clone();
+            dimension.set_focus(&centers, radius);
+            let wanted: Vec<(i32, i32)> = centers
+                .iter()
+                .flat_map(|&c| {
+                    (-radius..=radius)
+                        .flat_map(move |dx| (-radius..=radius).map(move |dz| (c.0 + dx, c.1 + dz)))
+                        .filter(move |&(x, z)| within(c, x, z, radius))
+                })
+                .collect();
+            dimension.request_chunks(&wanted);
+            let begin = Instant::now();
+            while wanted.iter().any(|&(x, z)| dimension.get_chunk(x, z).is_none()) {
+                generated += dimension.tick().len();
+                while dimension.release_generated() {}
+                std::thread::yield_now();
+                assert!(begin.elapsed().as_secs() < 120, "generation stalled");
+            }
+            dimension.unload_chunks(|x, z| centers.iter().any(|&c| within(c, x, z, radius + margin)));
+            while dimension.release_generated() {}
+        }
+        let stats = dimension.generation_stats();
+        let ran: u64 = stats.started.iter().map(|(_, count)| count).sum();
+        generated_total += generated;
+        println!(
+            "LAP {lap} chunks_generated={generated} phases_run={} phases_per_generated={:.1} retained_now={} elapsed={:?}",
+            ran - ran_before,
+            (ran - ran_before) as f64 / generated.max(1) as f64,
+            stats.retained.iter().map(|(_, c)| c).sum::<usize>(),
+            started_at.elapsed()
+        );
+        ran_before = ran;
+    }
+    println!(
+        "CIRCLING walkers={walkers} radius={radius} margin={margin} budget={budget} total_generated={generated_total} cached_now={}",
+        dimension.cached_count()
+    );
+}
+
+#[cfg(feature = "count-alloc")]
+mod counting {
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    pub static LIVE: AtomicUsize = AtomicUsize::new(0);
+    pub static PEAK: AtomicUsize = AtomicUsize::new(0);
+
+    pub struct Counting;
+
+    unsafe impl GlobalAlloc for Counting {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            let now = LIVE.fetch_add(layout.size(), Ordering::Relaxed) + layout.size();
+            PEAK.fetch_max(now, Ordering::Relaxed);
+            unsafe { System.alloc(layout) }
+        }
+
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            LIVE.fetch_sub(layout.size(), Ordering::Relaxed);
+            unsafe { System.dealloc(ptr, layout) }
+        }
+
+        unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+            let now = LIVE.fetch_add(new_size, Ordering::Relaxed) + new_size - layout.size();
+            LIVE.fetch_sub(layout.size(), Ordering::Relaxed);
+            PEAK.fetch_max(now, Ordering::Relaxed);
+            unsafe { System.realloc(ptr, layout, new_size) }
+        }
+    }
+}
+
+#[cfg(feature = "count-alloc")]
+#[global_allocator]
+static COUNTING: counting::Counting = counting::Counting;
+
+#[test]
+#[ignore]
+fn load_spread() {
+    use chorus_level::dimension_type::DimensionType;
+    use chorus_level::generator::dimension::Dimension;
+    use std::collections::HashMap;
+
+    const PER_TICK: usize = 256;
+    let outstanding_limit: usize = std::env::var("OUTSTANDING").ok().and_then(|v| v.parse().ok()).unwrap_or(1024);
+    let side: i32 = std::env::var("FOCI_SIDE").ok().and_then(|v| v.parse().ok()).unwrap_or(4);
+    let radius: i32 = std::env::var("SCALE_RADIUS").ok().and_then(|v| v.parse().ok()).unwrap_or(11);
+    let budget: f64 = std::env::var("BUDGET").ok().and_then(|v| v.parse().ok()).unwrap_or(1.0);
+    let cache: f64 = std::env::var("CACHE").ok().and_then(|v| v.parse().ok()).unwrap_or(0.5);
+    let limit: u64 = std::env::var("TIMEOUT_S").ok().and_then(|v| v.parse().ok()).unwrap_or(300);
+    bevy_tasks::AsyncComputeTaskPool::get_or_init(bevy_tasks::TaskPool::default);
+    let (generator, _) = generator(0);
+    let mut dimension = Dimension::new(DimensionType::Overworld, generator);
+    dimension.set_retention_budget(budget);
+    dimension.set_chunk_cache(cache);
+    #[cfg(feature = "count-alloc")]
+    let baseline = counting::LIVE.load(std::sync::atomic::Ordering::Relaxed);
+
+    let centers: Vec<(i32, i32)> = (0..side).flat_map(|i| (0..side).map(move |j| (i * 40, j * 40))).collect();
+    let mut wanted: Vec<Vec<(i32, i32)>> = Vec::new();
+    let mut owner: HashMap<(i32, i32), usize> = HashMap::new();
+    for (index, &(cx, cz)) in centers.iter().enumerate() {
+        let mut cells: Vec<(i32, i32)> = (-radius..=radius)
+            .flat_map(|dx| (-radius..=radius).map(move |dz| (dx, dz)))
+            .filter(|&(dx, dz)| dx * dx + dz * dz <= radius * radius)
+            .collect();
+        cells.sort_by_key(|&(dx, dz)| dx * dx + dz * dz);
+        let cells: Vec<(i32, i32)> = cells.into_iter().map(|(dx, dz)| (cx + dx, cz + dz)).collect();
+        for &cell in &cells {
+            owner.insert(cell, index);
+        }
+        wanted.push(cells);
+    }
+    let total = owner.len();
+    dimension.set_focus(&centers, radius);
+    let mut next = vec![0usize; centers.len()];
+    let mut outstanding = vec![0usize; centers.len()];
+    let mut completed = 0usize;
+    let started_at = Instant::now();
+    let mut timed_out = false;
+    while completed < total {
+        for focus in 0..centers.len() {
+            let mut sent = 0;
+            while next[focus] < wanted[focus].len() && sent < PER_TICK && outstanding[focus] < outstanding_limit {
+                let (x, z) = wanted[focus][next[focus]];
+                dimension.request_chunk(x, z);
+                next[focus] += 1;
+                outstanding[focus] += 1;
+                sent += 1;
+            }
+        }
+        for (x, z) in dimension.tick() {
+            if let Some(&focus) = owner.get(&(x, z)) {
+                outstanding[focus] = outstanding[focus].saturating_sub(1);
+            }
+            completed += 1;
+        }
+        while dimension.release_generated() {}
+        if started_at.elapsed().as_secs() >= limit {
+            timed_out = true;
+            break;
+        }
+        std::thread::yield_now();
+    }
+    let stats = dimension.generation_stats();
+    let ran: u64 = stats.started.iter().map(|(_, count)| count).sum();
+    #[cfg(feature = "count-alloc")]
+    let (live, peak) = (
+        (counting::LIVE.load(std::sync::atomic::Ordering::Relaxed).saturating_sub(baseline)) >> 20,
+        (counting::PEAK.load(std::sync::atomic::Ordering::Relaxed).saturating_sub(baseline)) >> 20,
+    );
+    #[cfg(not(feature = "count-alloc"))]
+    let (live, peak) = (0usize, 0usize);
+    println!(
+        "LOAD foci={} chunks={} completed={} timed_out={} elapsed={:?} phases_run={} per_chunk={:.1} live_mib={} peak_mib={} mib_per_chunk={:.2} retained={:?}",
+        centers.len(),
+        total,
+        completed,
+        timed_out,
+        started_at.elapsed(),
+        ran,
+        ran as f64 / completed.max(1) as f64,
+        live,
+        peak,
+        live as f64 / completed.max(1) as f64,
+        stats.retained
+    );
+}

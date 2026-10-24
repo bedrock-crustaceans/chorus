@@ -89,6 +89,7 @@ pub fn open_level(mut commands: Commands, registry: Res<BlockRegistry>, config: 
     let mut level = Level::open(path, &config.level.name, config.level.seed.value(), &registry, config.level.database.compression);
     level.set_chunk_saving(config.level.chunk_saving);
     level.set_retention_budget(config.level.retention_budget);
+    level.set_chunk_cache(config.level.chunk_cache);
     commands.insert_resource(level);
 }
 
