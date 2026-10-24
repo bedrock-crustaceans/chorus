@@ -52,7 +52,7 @@ pub struct PhaseGraph<G: Generator> {
     pub retention_budget: f64,
     pub abandoned: FxHashSet<NodeKey>,
     pub mail_reads: FxHashMap<PhaseId, Vec<MailRead>>,
-    pub mail_readers: FxHashMap<PhaseId, Vec<MailReader>>,
+    pub mail_consumers: FxHashMap<PhaseId, Vec<MailConsumer>>,
     pub reach: FxHashMap<PhaseId, f64>,
     pub hops: FxHashMap<PhaseId, u32>,
     pub self_step: FxHashMap<PhaseId, f64>,
@@ -71,7 +71,7 @@ impl<G: Generator> PhaseGraph<G> {
     pub fn new(generator: G) -> Self {
         let (completions_tx, completions_rx) = crossbeam_channel::unbounded();
         let (reach, hops, self_step) = phase_shape::<G>();
-        let (mail_reads, mail_readers) = phase_mail::<G>();
+        let (mail_reads, mail_consumers) = phase_mail::<G>();
 
         Self {
             generator: Arc::new(generator),
@@ -87,7 +87,7 @@ impl<G: Generator> PhaseGraph<G> {
             retention_budget: 1.0,
             abandoned: FxHashSet::default(),
             mail_reads,
-            mail_readers,
+            mail_consumers,
             reach,
             hops,
             self_step,
@@ -142,6 +142,7 @@ impl<G: Generator> PhaseGraph<G> {
                 descriptor: PhaseDescriptor<G>,
                 cell: ChunkPos,
                 hop: u32,
+                reader: Option<(ChunkPos, &'static [(i32, i32)])>,
             },
             Finalize {
                 key: NodeKey,
@@ -150,14 +151,22 @@ impl<G: Generator> PhaseGraph<G> {
             },
         }
 
-        let mut work = vec![Step::Enter { descriptor, cell, hop: 0 }];
+        let mut work = vec![Step::Enter {
+            descriptor,
+            cell,
+            hop: 0,
+            reader: None,
+        }];
 
         while let Some(step) = work.pop() {
             match step {
-                Step::Enter { descriptor, cell, hop } => {
+                Step::Enter { descriptor, cell, hop, reader } => {
                     let map_key = (descriptor.phase, cell, hop);
-                    if self.graph.index.contains_key(&map_key) {
-                        continue;
+                    if let Some(&existing) = self.graph.index.get(&map_key) {
+                        if !self.lacks_mail_for(existing, reader) {
+                            continue;
+                        }
+                        self.close(existing);
                     }
 
                     let key = self.graph.nodes.insert(Node {
@@ -173,6 +182,7 @@ impl<G: Generator> PhaseGraph<G> {
                         dependents: Vec::new(),
                         status: NodeStatus::Pending { remaining: 0 },
                         mailbox_out: Vec::new(),
+                        pruned: Vec::new(),
                         #[cfg(feature = "debug")]
                         started_at: None,
                         #[cfg(feature = "debug")]
@@ -208,6 +218,7 @@ impl<G: Generator> PhaseGraph<G> {
                                 descriptor: requirement.descriptor,
                                 cell: dependency_cell,
                                 hop: dependency_hop,
+                                reader: requirement.mail_for.map(|targets| (cell, targets)),
                             });
                         }
                     }
@@ -407,9 +418,33 @@ impl<G: Generator> PhaseGraph<G> {
             }
         }
 
+        self.release_mail_read_by(key);
         self.try_evict(key);
         if let Some(cell) = finished_terminal {
             self.sweep(cell);
+        }
+    }
+
+    fn release_mail_read_by(&mut self, key: NodeKey) {
+        let node = &self.graph.nodes[key];
+        let (phase, cell, hop) = (node.descriptor.phase, node.cell, node.hop);
+        let Some(reads) = self.mail_reads.get(&phase) else { return };
+        let mut producers = Vec::new();
+        for read in reads {
+            let producer_hop = match (read.producer == phase, read.max_hops) {
+                (false, _) => 0,
+                (true, Some(max_hops)) if hop < max_hops => hop + 1,
+                _ => continue,
+            };
+            for &(dx, dz) in read.offsets {
+                let source = ChunkPos::new(cell.x + dx, cell.z + dz);
+                if let Some(&producer) = self.graph.index.get(&(read.producer, source, producer_hop)) {
+                    producers.push(producer);
+                }
+            }
+        }
+        for producer in producers {
+            self.prune_mail(producer);
         }
     }
 
@@ -546,20 +581,76 @@ impl<G: Generator> PhaseGraph<G> {
     }
 
     fn store_mail(&mut self, key: NodeKey, mail: Outbox) {
-        let Some(phase) = self.graph.nodes.get(key).map(|node| node.descriptor.phase) else { return };
-        let alive: Outbox = mail.into_iter().filter(|(target, _)| self.mail_alive(phase, *target)).collect();
-        self.graph.nodes[key].mailbox_out = alive;
+        if let Some(node) = self.graph.nodes.get_mut(key) {
+            node.mailbox_out = mail;
+        }
     }
 
-    /// Whether any phase that reads this phase's mail could still read what is addressed to `target`: it is inside
-    /// the region of some focus and the cells around it have not all finished.
-    fn mail_alive(&self, producer: PhaseId, target: ChunkPos) -> bool {
-        let Some(readers) = self.mail_readers.get(&producer) else { return true };
-        readers.iter().any(|reader| {
-            let reach = self.reach.get(&reader.phase).copied().unwrap_or(0.0);
-            let in_region = self.nearest_focus(target).is_none_or(|distance| distance <= self.radius as f64 + reach + reader.step);
-            in_region && !self.finished_within(target, reach.max(reader.step))
-        })
+    /// Whether the cell `reader` asks about could still be consumed by nothing but a node that has had mail pruned for it.
+    fn lacks_mail_for(&self, key: NodeKey, reader: Option<(ChunkPos, &'static [(i32, i32)])>) -> bool {
+        let Some((consumer, targets)) = reader else { return false };
+        let node = &self.graph.nodes[key];
+        node.pruned
+            .iter()
+            .any(|pruned| targets.iter().any(|&(dx, dz)| ChunkPos::new(consumer.x + dx, consumer.z + dz) == *pruned))
+    }
+
+    /// Takes a node out of the index so the next request builds a fresh one. Whatever already depends on it still finishes with it.
+    fn close(&mut self, key: NodeKey) {
+        if self.graph.nodes[key].retained.is_some() {
+            self.evict_retained(key);
+        } else {
+            self.unindex(key);
+        }
+    }
+
+    fn unindex(&mut self, key: NodeKey) {
+        let Some(node) = self.graph.nodes.get(key) else { return };
+        let id = (node.descriptor.phase, node.cell, node.hop);
+        if self.graph.index.get(&id) == Some(&key) {
+            self.graph.index.remove(&id);
+        }
+    }
+
+    /// Whether some phase could still read what the node at `cell` and `hop` addressed to `target`. A reader is a cell that lists this node among its
+    /// sources and `target` among its targets. It is done reading when its node has run, and it cannot read later if the cell is finished or out of demand.
+    fn mail_alive(&self, phase: PhaseId, cell: ChunkPos, hop: u32, target: ChunkPos) -> bool {
+        let Some(consumers) = self.mail_consumers.get(&phase) else { return true };
+        for consumer in consumers {
+            let hops = if consumer.phase == phase {
+                match (hop.checked_sub(1), consumer.max_hops) {
+                    (Some(reader_hop), Some(max_hops)) if reader_hop < max_hops => reader_hop..=reader_hop,
+                    _ => continue,
+                }
+            } else {
+                0..=self.hops.get(&consumer.phase).copied().unwrap_or(0)
+            };
+            for &(ox, oz) in consumer.offsets {
+                let reader = ChunkPos::new(cell.x - ox, cell.z - oz);
+                if !consumer.targets.iter().any(|&(tx, tz)| ChunkPos::new(reader.x + tx, reader.z + tz) == target) {
+                    continue;
+                }
+                for reader_hop in hops.clone() {
+                    match self.graph.index.get(&(consumer.phase, reader, reader_hop)).map(|&key| &self.graph.nodes[key].status) {
+                        Some(NodeStatus::Done(_)) => {}
+                        Some(_) => return true,
+                        None => {
+                            if !self.cell_finished(reader) && self.in_region(consumer.phase, reader_hop, reader) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn cell_finished(&self, cell: ChunkPos) -> bool {
+        match self.graph.index.get(&(self.terminal, cell, 0)) {
+            Some(&key) => matches!(self.graph.nodes[key].status, NodeStatus::Done(_)),
+            None => self.completed.contains(&cell),
+        }
     }
 
     fn prune_mail(&mut self, key: NodeKey) {
@@ -567,13 +658,22 @@ impl<G: Generator> PhaseGraph<G> {
         if node.mailbox_out.is_empty() {
             return;
         }
-        let phase = node.descriptor.phase;
-        let keep: Vec<bool> = node.mailbox_out.iter().map(|(target, _)| self.mail_alive(phase, *target)).collect();
+        let (phase, cell, hop) = (node.descriptor.phase, node.cell, node.hop);
+        let keep: Vec<bool> = node.mailbox_out.iter().map(|(target, _)| self.mail_alive(phase, cell, hop, *target)).collect();
         if keep.iter().all(|&kept| kept) {
             return;
         }
+        let node = &mut self.graph.nodes[key];
         let mut keep = keep.into_iter();
-        self.graph.nodes[key].mailbox_out.retain(|_| keep.next().unwrap_or(true));
+        let mut dropped = Vec::new();
+        node.mailbox_out.retain(|(target, _)| {
+            let kept = keep.next().unwrap_or(true);
+            if !kept {
+                dropped.push(*target);
+            }
+            kept
+        });
+        node.pruned.extend(dropped);
     }
 
     /// The most nodes of one phase to keep: the budget times the chunks in view, for every focus.
@@ -635,7 +735,7 @@ impl<G: Generator> PhaseGraph<G> {
     fn evict_retained(&mut self, key: NodeKey) {
         let Some(node) = self.graph.nodes.get_mut(key) else { return };
         node.retained = None;
-        let (phase, cell, hop, reused) = (node.descriptor.phase, node.cell, node.hop, node.reused);
+        let (phase, reused) = (node.descriptor.phase, node.reused);
         if let Some(retention) = self.graph.retained.get_mut(&phase) {
             retention.nodes.remove(&key);
             if reused {
@@ -644,7 +744,7 @@ impl<G: Generator> PhaseGraph<G> {
                 retention.stats.evicted_unused += 1;
             }
         }
-        self.graph.index.remove(&(phase, cell, hop));
+        self.unindex(key);
         self.to_release.push(key);
     }
 
@@ -696,7 +796,7 @@ impl<G: Generator> PhaseGraph<G> {
         {
             retention.nodes.remove(&key);
         }
-        self.graph.index.remove(&(node.descriptor.phase, node.cell, node.hop));
+        self.unindex(key);
         if let Some(node) = self.graph.nodes.remove(key)
             && let NodeStatus::Done(outcome) = node.status
             && node.descriptor.phase != self.terminal
@@ -1073,15 +1173,17 @@ pub struct MailRead {
     pub max_hops: Option<u32>,
 }
 
-/// A phase that reads some producer's mail, and how far its cells can be from the cell the mail is addressed to.
-pub struct MailReader {
+/// A phase that reads some producer's mail, and which cells of the producer it reads from and for.
+pub struct MailConsumer {
     pub phase: PhaseId,
-    pub step: f64,
+    pub offsets: &'static [(i32, i32)],
+    pub targets: &'static [(i32, i32)],
+    pub max_hops: Option<u32>,
 }
 
-fn phase_mail<G: Generator>() -> (FxHashMap<PhaseId, Vec<MailRead>>, FxHashMap<PhaseId, Vec<MailReader>>) {
+fn phase_mail<G: Generator>() -> (FxHashMap<PhaseId, Vec<MailRead>>, FxHashMap<PhaseId, Vec<MailConsumer>>) {
     let mut reads: FxHashMap<PhaseId, Vec<MailRead>> = FxHashMap::default();
-    let mut readers: FxHashMap<PhaseId, Vec<MailReader>> = FxHashMap::default();
+    let mut consumers: FxHashMap<PhaseId, Vec<MailConsumer>> = FxHashMap::default();
     let mut seen = FxHashSet::default();
     let mut stack = vec![PhaseDescriptor::of::<G::Terminal>()];
     while let Some(descriptor) = stack.pop() {
@@ -1099,13 +1201,15 @@ fn phase_mail<G: Generator>() -> (FxHashMap<PhaseId, Vec<MailRead>>, FxHashMap<P
                 targets,
                 max_hops: requirement.max_hops,
             });
-            readers.entry(requirement.descriptor.phase).or_default().push(MailReader {
+            consumers.entry(requirement.descriptor.phase).or_default().push(MailConsumer {
                 phase: descriptor.phase,
-                step: offsets_step(targets),
+                offsets: requirement.offsets,
+                targets,
+                max_hops: requirement.max_hops,
             });
         }
     }
-    (reads, readers)
+    (reads, consumers)
 }
 
 impl<G: Generator> PhaseGraph<G> {
@@ -1220,6 +1324,7 @@ mod tests {
             const RETAIN: usize = 16;
 
             fn run(_: &Toy, cell: ChunkPos, inputs: &mut PhaseInputs<Toy>) -> Result<(), PhaseError> {
+                SOURCE_RUNS.lock().unwrap().push(cell);
                 inputs.send::<SourcePhase>(cell, 100 + cell.x);
                 inputs.send::<SourcePhase>(ChunkPos::new(cell.x + 1, cell.z), 200 + cell.x);
                 inputs.send::<SourcePhase>(ChunkPos::new(cell.x + 50, cell.z), 999);
@@ -1233,6 +1338,7 @@ mod tests {
 
         const READ_FROM: &[(i32, i32)] = &[(-1, 0), (0, 0), (1, 0)];
         static SEEN: Mutex<Vec<(ChunkPos, Vec<(ChunkPos, i32)>)>> = Mutex::new(Vec::new());
+        static SOURCE_RUNS: Mutex<Vec<ChunkPos>> = Mutex::new(Vec::new());
 
         struct SinkPhase;
 
@@ -1278,16 +1384,35 @@ mod tests {
             let row: Vec<ChunkPos> = (20..24).map(|x| ChunkPos::new(x, 0)).collect();
             finish(&mut graph, &row);
             let source = PhaseId::of::<SourcePhase>();
-            assert!(!graph.mail_alive(source, ChunkPos::new(21, 0)), "its reader finished");
-            assert!(graph.mail_alive(source, ChunkPos::new(24, 0)), "nothing finished there yet");
+            let cell = |x| ChunkPos::new(x, 0);
+            assert!(!graph.mail_alive(source, cell(21), 0, cell(21)), "its reader finished");
+            assert!(graph.mail_alive(source, cell(23), 0, cell(24)), "nothing finished there yet");
+            assert!(!graph.mail_alive(source, cell(22), 0, cell(72)), "no cell lists that target");
 
             graph.sweep_retained();
             for node in graph.graph.nodes.values().filter(|node| node.retained.is_some()) {
                 assert!(
-                    node.mailbox_out.iter().all(|(target, _)| graph.mail_alive(source, *target)),
+                    node.mailbox_out.iter().all(|(target, _)| graph.mail_alive(source, node.cell, node.hop, *target)),
                     "retained nodes keep only mail somebody can still read"
                 );
             }
+        }
+
+        #[test]
+        fn a_node_with_pruned_mail_is_rebuilt_for_a_cell_that_needs_it_again() {
+            let mut graph = PhaseGraph::new(Toy);
+            let row: Vec<ChunkPos> = (300..304).map(|x| ChunkPos::new(x, 0)).collect();
+            finish(&mut graph, &row);
+            let first = SEEN.lock().unwrap().iter().find(|(cell, _)| *cell == ChunkPos::new(300, 0)).cloned().expect("the sink ran");
+            let runs = |x: i32| SOURCE_RUNS.lock().unwrap().iter().filter(|cell| cell.x == x).count();
+            let before = runs(299);
+
+            graph.sweep_retained();
+            finish(&mut graph, &[ChunkPos::new(300, 0)]);
+
+            assert!(runs(299) > before, "the retained source had pruned the mail for that cell, so it was built again");
+            let again = SEEN.lock().unwrap().iter().rev().find(|(cell, _)| *cell == ChunkPos::new(300, 0)).cloned().expect("the sink ran again");
+            assert_eq!(again, first, "the cell sees exactly what it saw the first time");
         }
 
         #[test]
@@ -1340,8 +1465,8 @@ mod tests {
             let mut graph = PhaseGraph::new(Toy);
             graph.set_focus(&[(0, 0)], 3);
             let source = PhaseId::of::<SourcePhase>();
-            assert!(graph.mail_alive(source, ChunkPos::new(2, 0)));
-            assert!(!graph.mail_alive(source, ChunkPos::new(60, 0)));
+            assert!(graph.mail_alive(source, ChunkPos::new(2, 0), 0, ChunkPos::new(2, 0)));
+            assert!(!graph.mail_alive(source, ChunkPos::new(60, 0), 0, ChunkPos::new(60, 0)));
         }
     }
 }

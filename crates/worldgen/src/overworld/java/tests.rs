@@ -1053,3 +1053,74 @@ fn load_spread() {
         stats.retained
     );
 }
+
+fn disc(center: (i32, i32), radius: i32) -> Vec<(i32, i32)> {
+    (-radius..=radius)
+        .flat_map(|dx| (-radius..=radius).map(move |dz| (dx, dz)))
+        .filter(|&(dx, dz)| dx * dx + dz * dz <= radius * radius)
+        .map(|(dx, dz)| (center.0 + dx, center.1 + dz))
+        .collect()
+}
+
+fn finish_cells(dimension: &mut chorus_level::generator::dimension::Dimension, cells: &[(i32, i32)]) {
+    dimension.request_chunks(cells);
+    let start = Instant::now();
+    while cells.iter().any(|&(x, z)| dimension.get_chunk(x, z).is_none()) {
+        dimension.tick();
+        while dimension.release_generated() {}
+        std::thread::yield_now();
+        assert!(start.elapsed().as_secs() < 120, "generation stalled");
+    }
+}
+
+fn fingerprint(dimension: &chorus_level::generator::dimension::Dimension, cells: &[(i32, i32)]) -> Vec<u64> {
+    cells
+        .iter()
+        .map(|&(x, z)| {
+            let mut hash: u64 = 0xcbf29ce484222325;
+            for byte in dimension.get_chunk(x, z).expect("generated").serialize() {
+                hash = (hash ^ byte as u64).wrapping_mul(0x100000001b3);
+            }
+            hash
+        })
+        .collect()
+}
+
+#[test]
+#[ignore]
+fn chunks_are_the_same_after_walking_away_and_coming_back() {
+    use chorus_level::dimension_type::DimensionType;
+    use chorus_level::generator::dimension::Dimension;
+
+    let radius: i32 = std::env::var("SCALE_RADIUS").ok().and_then(|v| v.parse().ok()).unwrap_or(6);
+    let budget: f64 = std::env::var("BUDGET").ok().and_then(|v| v.parse().ok()).unwrap_or(1.0);
+    bevy_tasks::AsyncComputeTaskPool::get_or_init(bevy_tasks::TaskPool::default);
+
+    let (first, _) = generator(0);
+    let mut fresh = Dimension::new(DimensionType::Overworld, first);
+    fresh.set_chunk_cache(0.0);
+    fresh.set_focus(&[(0, 0)], radius);
+    let home = disc((0, 0), radius);
+    finish_cells(&mut fresh, &home);
+    let expected = fingerprint(&fresh, &home);
+
+    let (second, _) = generator(0);
+    let mut walked = Dimension::new(DimensionType::Overworld, second);
+    walked.set_chunk_cache(0.0);
+    walked.set_retention_budget(budget);
+    for center in [(0, 0), (radius, 0), (2 * radius, 0), (radius, 0), (0, 0)] {
+        walked.set_focus(&[center], radius);
+        finish_cells(&mut walked, &disc(center, radius));
+        walked.unload_chunks(|x, z| (x - center.0).pow(2) + (z - center.1).pow(2) <= (radius + 2) * (radius + 2));
+        while walked.release_generated() {}
+    }
+    let actual = fingerprint(&walked, &home);
+    let different: Vec<_> = home.iter().zip(expected.iter().zip(&actual)).filter(|(_, (a, b))| a != b).map(|(cell, _)| *cell).collect();
+    assert!(
+        different.is_empty(),
+        "{} of {} chunks differ after walking away and back, for example {:?}",
+        different.len(),
+        home.len(),
+        &different[..different.len().min(5)]
+    );
+}

@@ -34,6 +34,7 @@ pub struct Node<G: Generator> {
     pub dependents: Vec<NodeKey>,
     pub status: NodeStatus,
     pub mailbox_out: Vec<(ChunkPos, ErasedOutput)>,
+    pub pruned: Vec<ChunkPos>,
     #[cfg(feature = "debug")]
     pub started_at: Option<Instant>,
     #[cfg(feature = "debug")]
