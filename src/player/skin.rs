@@ -4,7 +4,7 @@ use base64::prelude::BASE64_STANDARD;
 use bedrock::auth::ClientData;
 use bedrock::auth::client_data::SkinAnimation;
 use bedrock::protocol::v2168::enums::{AnimatedTextureType, AnimationExpression, ArmSizeType};
-use bedrock::protocol::v2168::types::{SerializedSkin, SerializedSkinAnimationFrame};
+use bedrock::protocol::v2225::types::{SerializedSkin, SerializedSkinAnimationFrame};
 use bevy_ecs::prelude::Component;
 use uuid::Uuid;
 
@@ -12,6 +12,7 @@ use uuid::Uuid;
 pub struct PlayerAppearance {
     pub uuid: Uuid,
     pub skin: SerializedSkin<BedrockProtocol>,
+    pub play_fab_id: String,
     pub device_id: String,
 }
 
@@ -50,7 +51,6 @@ impl PlayerAppearance {
         let skin = SerializedSkin {
             full_id: format!("{skin_id}{cape_id}"),
             skin_id,
-            play_fab_id: claims.play_fab_id.clone(),
             skin_resource_patch: claims.skin_resource_patch.clone(),
             skin_image_width: claims.skin_image_width as u32,
             skin_image_height: claims.skin_image_height as u32,
@@ -78,6 +78,7 @@ impl PlayerAppearance {
         Self {
             uuid: Uuid::new_v4(),
             skin,
+            play_fab_id: claims.play_fab_id.clone(),
             device_id: claims.device_id.clone(),
         }
     }

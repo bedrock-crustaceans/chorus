@@ -8,7 +8,7 @@ use bedrock::network::encryption::Encryption;
 use bedrock::protocol::v662::enums::PlayStatus;
 use bedrock::protocol::v662::packets::PlayStatusPacket;
 use bedrock::protocol::v712::packets::{DisconnectMessage, DisconnectPacket};
-use bedrock::protocol::v2193::enums::ConnectionFailReason;
+use bedrock::protocol::v2225::enums::ConnectionFailReason;
 use bevy_ecs::prelude::{Component, Entity, MessageWriter};
 use std::collections::HashMap;
 use std::mem::take;

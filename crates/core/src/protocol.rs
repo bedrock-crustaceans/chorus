@@ -1,3 +1,3 @@
-use bedrock::protocol::V2193;
+use bedrock::protocol::V2225;
 
-pub type BedrockProtocol = V2193;
+pub type BedrockProtocol = V2225;

@@ -22,7 +22,7 @@ use bedrock::protocol::v944::packets::VoxelShapesPacket;
 use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bedrock::protocol::v2168::enums::EducationEditionOffer;
 use bedrock::protocol::v2168::packets::StartGamePacket;
-use bedrock::protocol::v2168::types::{GameRuleLegacyData, LevelSettings};
+use bedrock::protocol::v2225::types::{EditorLevelMigrationVersion, GameRuleLegacyData, LevelSettings};
 use bedrock::protocol::{ProtoVersion, ProtoVersionPackets};
 use bevy_ecs::message::{MessageReader, MessageWriter};
 use bevy_ecs::prelude::{Commands, Query};
@@ -113,6 +113,7 @@ fn send_start_game(actor: &ActorId, gamemode: Gamemode, position: Vec3, spawn: I
                 editor_world_type: EditorWorldType::NonEditor,
                 is_created_in_editor: false,
                 is_exported_from_editor: false,
+                editor_level_migration_version: EditorLevelMigrationVersion::Legacy,
                 day_cycle_stop_time: 0,
                 education_edition_offer: EducationEditionOffer::None,
                 education_features_enabled: false,

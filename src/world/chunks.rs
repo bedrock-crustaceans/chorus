@@ -15,9 +15,9 @@ use bedrock::protocol::v662::packets::{NetworkChunkPublisherUpdatePacket, Player
 use bedrock::protocol::v662::types::{ActorRuntimeID, BlockPos, ChunkPos};
 use bedrock::protocol::v712::packets::ChangeDimensionPacket;
 use bedrock::protocol::v944::types::NetworkBlockPosition;
-use bedrock::protocol::v2168::packets::LevelChunkPacket;
 use bedrock::protocol::v2168::types::SubChunkPos;
 use bedrock::protocol::v2193::packets::{HeightMapDataType, SubChunkDataEntry, SubChunkPacket, SubChunkRequestResult};
+use bedrock::protocol::v2225::packets::LevelChunkPacket;
 use bevy_ecs::change_detection::ResMut;
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::{Local, Query, Resource};
@@ -425,6 +425,7 @@ pub fn transmit_pending_chunks(
                     cache_enabled: !cache_blobs.is_empty(),
                     cache_blobs,
                     serialized_chunk_data,
+                    is_client_biome_update: false,
                 }
                 .into(),
             ));

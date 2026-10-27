@@ -152,4 +152,4 @@ A config in an older layout is migrated on startup (`MOVED_KEYS` and `REMOVED_KE
 
 ### Protocol version
 
-`BedrockProtocol` is a type alias for `V2193` from `bedrock-rs` (`crates/core/src/protocol.rs`, re-exported from `chorus::network`). The matching `protocol-v2193` feature is enabled on the workspace `bedrock` dependency in the root `Cargo.toml`. To change the protocol version, update the alias, the Cargo feature, and any version-specific packet imports (handlers import packet types from the specific `bedrock::protocol::vNNN` module where they were introduced).
+`BedrockProtocol` is a type alias for `V2225` from `bedrock-rs` (`crates/core/src/protocol.rs`, re-exported from `chorus::network`). The matching `protocol-v2225` feature is enabled on the workspace `bedrock` dependency in the root `Cargo.toml`. To change the protocol version, update the alias, the Cargo feature, and any version-specific packet imports (handlers import packet types from the specific `bedrock::protocol::vNNN` module where they were introduced).

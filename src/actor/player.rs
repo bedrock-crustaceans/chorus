@@ -12,12 +12,12 @@ use crate::player::inventory::PlayerInventory;
 use crate::player::skin::PlayerAppearance;
 use bedrock::protocol::ProtoCodec;
 use bedrock::protocol::v662::enums::BuildPlatform;
-use bedrock::protocol::v662::packets::{AddPlayerPacket, RemoveActorPacket};
+use bedrock::protocol::v662::packets::RemoveActorPacket;
 use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID, PropertySyncData};
 use bedrock::protocol::v671::packets::UpdatePlayerGameTypePacket;
 use bedrock::protocol::v776::types::{SerializedAbilitiesData, SerializedAbilitiesLayer, SerializedLayer};
 use bedrock::protocol::v800::types::Color;
-use bedrock::protocol::v2168::packets::{AddPlayerListEntry, PlayerListEntry, PlayerListPacket};
+use bedrock::protocol::v2225::packets::{AddPlayerListEntry, AddPlayerPacket, PlayerListEntry, PlayerListPacket};
 use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::{Changed, Commands, Entity, Query, With};
 
@@ -27,6 +27,7 @@ fn list_entry(identity: &PlayerIdentity, actor: &ActorId, appearance: &PlayerApp
         target_actor_id: ActorUniqueID(actor.unique_id),
         player_name: identity.name().to_owned(),
         xbl_xuid: identity.xuid().to_owned(),
+        play_fab_id: appearance.play_fab_id.clone(),
         platform_chat_id: String::new(),
         build_platform: BuildPlatform::Unknown(-1),
         serialized_skin: appearance.skin.clone(),
@@ -111,6 +112,7 @@ pub fn send_player_spawns(
                     }],
                 },
                 actor_links: vec![],
+                passenger_of_block_data: None,
                 device_id: appearance.device_id.clone(),
                 build_platform: BuildPlatform::Unknown(-1),
             }
