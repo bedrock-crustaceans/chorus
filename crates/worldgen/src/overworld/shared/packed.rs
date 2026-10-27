@@ -19,7 +19,10 @@ impl Packed {
         for (index, &value) in values.iter().enumerate() {
             words[index / per_word] |= (value as u32) << ((index % per_word) as u32 * bits);
         }
-        Self { bits, words: words.into_boxed_slice() }
+        Self {
+            bits,
+            words: words.into_boxed_slice(),
+        }
     }
 
     pub fn get(&self, index: usize) -> u16 {

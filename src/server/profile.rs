@@ -246,7 +246,10 @@ fn write_memory(report: &mut Report, before: &Snapshot, after: &Snapshot) {
         let gained = loaded as i64 - before.loaded_chunks as i64;
         report.row("Loaded chunks", Value::count(loaded).note(format!("{gained:+} during the profile")));
         let cached = after.cached_chunks;
-        report.row("Cached chunks", Value::count(cached).note(format!("{:+} during the profile", cached as i64 - before.cached_chunks as i64)));
+        report.row(
+            "Cached chunks",
+            Value::count(cached).note(format!("{:+} during the profile", cached as i64 - before.cached_chunks as i64)),
+        );
         if loaded > 0 {
             report.row("Resident per chunk", Value::new(thousands((resident / loaded as u64 / 1024) as usize)).unit("KB"));
         }

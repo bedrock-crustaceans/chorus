@@ -1444,7 +1444,11 @@ mod tests {
             graph.sweep_retained();
             for (key, node) in graph.graph.nodes.iter().filter(|(_, node)| node.retained.is_some()) {
                 assert!(
-                    graph.graph.mail.get(&key).is_none_or(|mail| mail.out.iter().all(|(target, _)| graph.mail_alive(source, node.cell, node.hop, *target))),
+                    graph
+                        .graph
+                        .mail
+                        .get(&key)
+                        .is_none_or(|mail| mail.out.iter().all(|(target, _)| graph.mail_alive(source, node.cell, node.hop, *target))),
                     "retained nodes keep only mail somebody can still read"
                 );
             }

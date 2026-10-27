@@ -99,7 +99,8 @@ impl Sectioned {
         self.sections.iter().flat_map(move |&(section, count)| {
             let (head, tail) = rest.split_at(count as usize);
             rest = tail;
-            head.iter().map(move |&position| ((position & 15) as u8, section as i16 * 16 + (position >> 8) as i16, ((position >> 4) & 15) as u8))
+            head.iter()
+                .map(move |&position| ((position & 15) as u8, section as i16 * 16 + (position >> 8) as i16, ((position >> 4) & 15) as u8))
         })
     }
 }
