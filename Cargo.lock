@@ -397,7 +397,7 @@ dependencies = [
 [[package]]
 name = "bevy-nethernet"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/nethernet?branch=main#4fa192c1bd33884e5ab7714080932d850cdc5158"
+source = "git+https://github.com/bedrock-crustaceans/nethernet?branch=main#8a96675d186ec01a62b94ce35546fdc03200e843"
 dependencies = [
  "async-channel",
  "bevy_app",
@@ -1488,7 +1488,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2456,7 +2456,7 @@ dependencies = [
 [[package]]
 name = "nethernet"
 version = "0.0.1"
-source = "git+https://github.com/bedrock-crustaceans/nethernet?branch=main#4fa192c1bd33884e5ab7714080932d850cdc5158"
+source = "git+https://github.com/bedrock-crustaceans/nethernet?branch=main#8a96675d186ec01a62b94ce35546fdc03200e843"
 dependencies = [
  "aes 0.9.3",
  "base64 0.23.1",
@@ -3344,7 +3344,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
