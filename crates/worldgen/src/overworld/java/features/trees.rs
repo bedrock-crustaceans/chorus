@@ -9,7 +9,7 @@ use super::tree::{Decorator, FallenTree, FeatureSize, FoliageKind, FoliagePlacer
 use super::{Feature, vegetation};
 use chorus_block::block_id::*;
 use chorus_block::state::common::{
-    AGE_3, CREAKING_HEART_STATE, DIRECTION, GROWTH, HANGING, HUGE_MUSHROOM_BITS, MINECRAFT_CARDINAL_DIRECTION, NATURAL, PILLAR_AXIS, PROPAGULE_STAGE, TIP, VINE_DIRECTION_BITS,
+    AGE_3, CREAKING_HEART_STATE, DIRECTION, GROWTH_8, HANGING, HUGE_MUSHROOM_BITS, MINECRAFT_CARDINAL_DIRECTION, NATURAL, PILLAR_AXIS, PROPAGULE_STAGE, TIP, VINE_DIRECTION_BITS,
 };
 
 pub fn log(table: &mut BlockTable, name: &'static str) -> BlockId {
@@ -200,7 +200,7 @@ fn shelf_mushroom(table: &mut BlockTable, probability: f32) -> Decorator {
     let mut states = Vec::new();
     for age in 0..=1 {
         for direction in Direction::HORIZONTAL {
-            states.push(table.get(SHELF_MUSHROOM, &[state(&GROWTH, int(age)), state(&MINECRAFT_CARDINAL_DIRECTION, text(direction.name()))]));
+            states.push(table.get(SHELF_MUSHROOM, &[state(&GROWTH_8, int(age)), state(&MINECRAFT_CARDINAL_DIRECTION, text(direction.name()))]));
         }
     }
     Decorator::ShelfMushroom { probability, states }

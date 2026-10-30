@@ -9,11 +9,11 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
-use crate::state::common::{GROWTH, UPPER_BLOCK_BIT};
+use crate::state::common::{GROWTH_8, UPPER_BLOCK_BIT};
 
 pub static PITCHER_CROP: BlockDefinition = const_block! {
     identifier: block_id::PITCHER_CROP,
-    states: [GROWTH, UPPER_BLOCK_BIT],
+    states: [GROWTH_8, UPPER_BLOCK_BIT],
     components: [
         SolidComponent { solid: false },
         TransparentComponent { transparent: true },

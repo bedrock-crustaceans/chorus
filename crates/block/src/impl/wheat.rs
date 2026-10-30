@@ -9,11 +9,11 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
-use crate::state::common::GROWTH;
+use crate::state::common::GROWTH_8;
 
 pub static WHEAT: BlockDefinition = const_block! {
     identifier: block_id::WHEAT,
-    states: [GROWTH],
+    states: [GROWTH_8],
     components: [
         SolidComponent { solid: false },
         TransparentComponent { transparent: true },

@@ -14,7 +14,7 @@ use super::tree::PositionSet;
 use super::trees::{self, Fallen, Species, TreeFeature};
 use super::{Context, Feature};
 use chorus_block::block_id::*;
-use chorus_block::state::common::{AGE_BIT, BAMBOO_LEAF_SIZE, BAMBOO_STALK_THICKNESS, GROWTH, MINECRAFT_CARDINAL_DIRECTION, UPPER_BLOCK_BIT, VINE_DIRECTION_BITS};
+use chorus_block::state::common::{AGE_BIT, BAMBOO_LEAF_SIZE, BAMBOO_STALK_THICKNESS, GROWTH_8, MINECRAFT_CARDINAL_DIRECTION, UPPER_BLOCK_BIT, VINE_DIRECTION_BITS};
 
 pub struct BlockColumn {
     pub layers: Vec<(IntProvider, StateProvider)>,
@@ -241,7 +241,7 @@ pub fn segmented(table: &mut BlockTable, name: &'static str, min: i32, max: i32)
     for amount in min..=max {
         for direction in Direction::HORIZONTAL {
             let facing = state(&MINECRAFT_CARDINAL_DIRECTION, text(direction.name()));
-            states.push((table.get(name, &[state(&GROWTH, int(amount - 1)), facing]), 1));
+            states.push((table.get(name, &[state(&GROWTH_8, int(amount - 1)), facing]), 1));
         }
     }
     states
@@ -598,7 +598,7 @@ pub fn define(key: Key, table: &mut BlockTable) -> Option<Placed> {
         Key::PatchBerryCommon | Key::PatchBerryRare => {
             let rarity = if key == Key::PatchBerryCommon { 32 } else { 384 };
             (
-                simple(table.get(SWEET_BERRY_BUSH, &[state(&GROWTH, int(3))])),
+                simple(table.get(SWEET_BERRY_BUSH, &[state(&GROWTH_8, int(3))])),
                 with(surface(rarity, WorldSurfaceWg), patch(96, 7, 3, on_grass(table))),
             )
         }

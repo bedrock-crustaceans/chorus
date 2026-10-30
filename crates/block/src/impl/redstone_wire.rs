@@ -8,11 +8,11 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
-use crate::state::common::REDSTONE_SIGNAL;
+use crate::state::common::{REDSTONE_EAST, REDSTONE_NORTH, REDSTONE_SIGNAL, REDSTONE_SOUTH, REDSTONE_WEST};
 
 pub static REDSTONE_WIRE: BlockDefinition = const_block! {
     identifier: block_id::REDSTONE_WIRE,
-    states: [REDSTONE_SIGNAL],
+    states: [REDSTONE_SIGNAL, REDSTONE_EAST, REDSTONE_NORTH, REDSTONE_SOUTH, REDSTONE_WEST],
     components: [
         SolidComponent { solid: false },
         TransparentComponent { transparent: true },

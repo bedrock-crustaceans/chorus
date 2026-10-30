@@ -10,11 +10,11 @@ use crate::component::replaceable_component::ReplaceableComponent;
 use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
-use crate::state::common::AGE_16;
+use crate::state::common::{AGE_16, MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_UP, MINECRAFT_CONNECTION_WEST};
 
 pub static FIRE: BlockDefinition = const_block! {
     identifier: block_id::FIRE,
-    states: [AGE_16],
+    states: [AGE_16, MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_UP, MINECRAFT_CONNECTION_WEST],
     components: [
         SolidComponent { solid: false },
         TransparentComponent { transparent: true },

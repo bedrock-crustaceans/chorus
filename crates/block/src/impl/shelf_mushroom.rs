@@ -9,11 +9,11 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
-use crate::state::common::{GROWTH, MINECRAFT_CARDINAL_DIRECTION};
+use crate::state::common::{GROWTH_2, MINECRAFT_CARDINAL_DIRECTION};
 
 pub static SHELF_MUSHROOM: BlockDefinition = const_block! {
     identifier: block_id::SHELF_MUSHROOM,
-    states: [GROWTH, MINECRAFT_CARDINAL_DIRECTION],
+    states: [GROWTH_2, MINECRAFT_CARDINAL_DIRECTION],
     components: [
         SolidComponent { solid: false },
         TransparentComponent { transparent: true },

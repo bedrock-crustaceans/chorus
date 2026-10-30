@@ -9,11 +9,11 @@ use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
-use crate::state::common::{FACING_DIRECTION, GROWTH};
+use crate::state::common::{FACING_DIRECTION, GROWTH_8};
 
 pub static MELON_STEM: BlockDefinition = const_block! {
     identifier: block_id::MELON_STEM,
-    states: [FACING_DIRECTION, GROWTH],
+    states: [FACING_DIRECTION, GROWTH_8],
     components: [
         SolidComponent { solid: false },
         TransparentComponent { transparent: true },

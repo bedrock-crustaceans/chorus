@@ -6,10 +6,11 @@ use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
+use crate::state::common::{MINECRAFT_CONNECTION_DOWN, MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_UP, MINECRAFT_CONNECTION_WEST};
 
 pub static CHORUS_PLANT: BlockDefinition = const_block! {
     identifier: block_id::CHORUS_PLANT,
-    states: [],
+    states: [MINECRAFT_CONNECTION_DOWN, MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_UP, MINECRAFT_CONNECTION_WEST],
     components: [
         TransparentComponent { transparent: true },
         MapColorComponent { r: 153, g: 90, b: 205, a: 255 },

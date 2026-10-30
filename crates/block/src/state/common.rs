@@ -94,7 +94,8 @@ pub static FLOWER_TYPE: BlockStateDefinition = const_enum!(
 );
 pub static GROUND_SIGN_DIRECTION: BlockStateDefinition = const_int!("ground_sign_direction", 0, 15);
 pub static GROWING_PLANT_AGE: BlockStateDefinition = const_int!("growing_plant_age", 0, 25);
-pub static GROWTH: BlockStateDefinition = const_int!("growth", 0, 7);
+pub static GROWTH_2: BlockStateDefinition = const_int!("growth", 0, 1);
+pub static GROWTH_8: BlockStateDefinition = const_int!("growth", 0, 7);
 pub static HANGING: BlockStateDefinition = const_bool!("hanging", false);
 pub static HEAD_PIECE_BIT: BlockStateDefinition = const_bool!("head_piece_bit", false);
 pub static HEIGHT: BlockStateDefinition = const_int!("height", 0, 7);
@@ -105,7 +106,10 @@ pub static IN_WALL_BIT: BlockStateDefinition = const_bool!("in_wall_bit", false)
 pub static ITEM_FRAME_MAP_BIT: BlockStateDefinition = const_bool!("item_frame_map_bit", false);
 pub static ITEM_FRAME_PHOTO_BIT: BlockStateDefinition = const_bool!("item_frame_photo_bit", false);
 pub static KELP_AGE: BlockStateDefinition = const_int!("kelp_age", 0, 25);
-pub static LEVER_DIRECTION: BlockStateDefinition = const_enum!("lever_direction", ["down_x", "down_z", "east", "north", "south", "up_x", "up_z", "west"]);
+pub static LEVER_DIRECTION: BlockStateDefinition = const_enum!(
+    "lever_direction",
+    ["down_east_west", "down_north_south", "east", "north", "south", "up_east_west", "up_north_south", "west"]
+);
 pub static LIQUID_DEPTH: BlockStateDefinition = const_int!("liquid_depth", 0, 15);
 pub static LIT: BlockStateDefinition = const_bool!("lit", false);
 pub static MINECRAFT_BLOCK_FACE: BlockStateDefinition = const_enum!("minecraft:block_face", ["down", "up", "north", "south", "west", "east"]);
@@ -162,6 +166,10 @@ pub static RAIL_DATA_BIT: BlockStateDefinition = const_bool!("rail_data_bit", fa
 pub static RAIL_DIRECTION_10: BlockStateDefinition = const_int!("rail_direction", 0, 9);
 pub static RAIL_DIRECTION_6: BlockStateDefinition = const_int!("rail_direction", 0, 5);
 pub static REDSTONE_SIGNAL: BlockStateDefinition = const_int!("redstone_signal", 0, 15);
+pub static REDSTONE_EAST: BlockStateDefinition = const_enum!("redstone_east", ["none", "side", "up"]);
+pub static REDSTONE_NORTH: BlockStateDefinition = const_enum!("redstone_north", ["none", "side", "up"]);
+pub static REDSTONE_SOUTH: BlockStateDefinition = const_enum!("redstone_south", ["none", "side", "up"]);
+pub static REDSTONE_WEST: BlockStateDefinition = const_enum!("redstone_west", ["none", "side", "up"]);
 pub static REHYDRATION_LEVEL: BlockStateDefinition = const_int!("rehydration_level", 0, 3);
 pub static REPEATER_DELAY: BlockStateDefinition = const_int!("repeater_delay", 0, 3);
 pub static RESPAWN_ANCHOR_CHARGE: BlockStateDefinition = const_int!("respawn_anchor_charge", 0, 4);
