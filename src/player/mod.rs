@@ -14,7 +14,7 @@ use bedrock::protocol::v2168::enums::PlayerPositionMode;
 use bedrock::protocol::v2168::packets::MovePlayerPacket;
 use bedrock::protocol::v2168::types::MovePlayerTeleportData;
 use bevy_ecs::prelude::*;
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 
 pub mod block_break;
 pub mod chunk_view;
@@ -48,17 +48,27 @@ impl PendingTeleport {
     }
 }
 
-pub fn teleport(session: &mut Session, actor: &ActorId, transform: &mut Transform, pending: &mut PendingTeleport, feet: Vec3) {
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TeleportOptions {
+    pub rotation: Option<Vec2>,
+}
+
+pub fn teleport(session: &mut Session, actor: &ActorId, transform: &mut Transform, pending: &mut PendingTeleport, feet: Vec3, options: Option<TeleportOptions>) {
+    let options = options.unwrap_or_default();
     let eye = feet + Vec3::new(0.0, PLAYER_EYE_HEIGHT, 0.0);
     transform.position = eye;
+    if let Some(rotation) = options.rotation {
+        transform.rotation = rotation;
+    }
     pending.0 = Some(eye);
 
+    let rotation = options.rotation.unwrap_or_default();
     session.send(BedrockProtocol::MovePlayerPacket(
         MovePlayerPacket {
             player_runtime_id: ActorRuntimeID(actor.runtime_id),
             position: (eye.x, eye.y, eye.z),
-            rotation: (0.0, 0.0),
-            y_head_rotation: 0.0,
+            rotation: (rotation.x, rotation.y),
+            y_head_rotation: rotation.y,
             position_mode: PlayerPositionMode::Teleport,
             on_ground: false,
             riding_runtime_id: ActorRuntimeID(0),
