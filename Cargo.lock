@@ -397,7 +397,7 @@ dependencies = [
 [[package]]
 name = "bevy-nethernet"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/nethernet?branch=main#8a96675d186ec01a62b94ce35546fdc03200e843"
+source = "git+https://github.com/bedrock-crustaceans/nethernet?branch=main#1963dbaf172c8823617d28598a08b99d2d539e56"
 dependencies = [
  "async-channel",
  "bevy_app",
@@ -405,6 +405,7 @@ dependencies = [
  "bevy_platform",
  "http",
  "httparse",
+ "if-addrs",
  "libc",
  "nethernet",
  "rand",
@@ -2152,6 +2153,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "if-addrs"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0a05c691e1fae256cf7013d99dad472dc52d5543322761f83ec8d47eab40d2b"
+dependencies = [
+ "libc",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "impls"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2456,7 +2467,7 @@ dependencies = [
 [[package]]
 name = "nethernet"
 version = "0.0.1"
-source = "git+https://github.com/bedrock-crustaceans/nethernet?branch=main#8a96675d186ec01a62b94ce35546fdc03200e843"
+source = "git+https://github.com/bedrock-crustaceans/nethernet?branch=main#1963dbaf172c8823617d28598a08b99d2d539e56"
 dependencies = [
  "aes 0.9.3",
  "base64 0.23.1",
