@@ -58,7 +58,7 @@ indicatif = "0.18"
 humantime = "2"
 strum = "0.28.0"
 strum_macros = "0.28.0"
-sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
 uuid = { version = "1.26.1", features = ["v4"] }
 xxhash-rust = { version = "0.8.18", features = ["xxh64"] }
 zip = "9.0.1"
