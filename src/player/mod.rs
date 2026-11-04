@@ -22,6 +22,7 @@ pub mod forms;
 pub mod gamemode;
 pub mod identity;
 pub mod inventory;
+pub mod inventory_moves;
 pub mod skin;
 
 pub const PLAYER_EYE_HEIGHT: f32 = 1.62;
@@ -36,6 +37,10 @@ pub struct Player;
 pub struct PendingTeleport(Option<Vec3>);
 
 impl PendingTeleport {
+    pub fn is_pending(&self) -> bool {
+        self.0.is_some()
+    }
+
     pub(crate) fn accepts(&mut self, reported: Vec3) -> bool {
         match self.0 {
             Some(destination) if reported.distance_squared(destination) > TELEPORT_ARRIVAL_DISTANCE * TELEPORT_ARRIVAL_DISTANCE => false,

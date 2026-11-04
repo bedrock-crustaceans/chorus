@@ -1,5 +1,5 @@
 use crate::entity::components::actor_id::ActorId;
-use crate::item::item_stack::ItemStack;
+use crate::item::item_stack::{ItemStack, user_data_of};
 use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
@@ -7,12 +7,13 @@ use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::player::chunk_view::ChunkView;
 use crate::player::gamemode::Gamemode;
-use crate::player::inventory::{HOTBAR_SIZE, Inventory, MAIN_SIZE, PlayerInventory};
+use crate::player::inventory::{ARMOR_SIZE, HOTBAR_SIZE, Inventory, InventorySlot, MAIN_SIZE, OFFHAND_SIZE, PlayerInventory};
+use crate::player::inventory_moves::{LegacyAction, LegacyEndpoint, LegacyOutcome, MoveRules, apply_legacy_actions, armor_slot_accepts, move_items, swap_slots, take_items};
 use crate::registry::block_registry::BlockRegistry;
 use crate::registry::item_registry::ItemRegistry;
 use bedrock::protocol::v662::enums::ContainerID;
 use bedrock::protocol::v662::packets::{ContainerOpenPacket, ItemStackResponsePacket, RequestsEntry};
-use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID};
+use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID, InventoryTransactionData};
 use bedrock::protocol::v685::packets::ContainerClosePacket;
 use bedrock::protocol::v712::types::ItemStackResponseContainerInfo;
 use bedrock::protocol::v729::types::FullContainerName;
@@ -20,8 +21,9 @@ use bedrock::protocol::v898::packets::InteractPacketAction;
 use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bedrock::protocol::v975::packets::MobEquipmentPacket;
 use bedrock::protocol::v1001::packets::InventoryContentPacket;
+use bedrock::protocol::v1001::types::{InventoryAction, InventorySourceKind};
 use bedrock::protocol::v2168::enums::ItemStackNetResult;
-use bedrock::protocol::v2168::types::RedactableString;
+use bedrock::protocol::v2168::types::{NetworkItemStackDescriptorV2, RedactableString};
 use bedrock::protocol::v2193::types::{ItemStackResponseInfo, ItemStackResponseSlotInfo};
 use bedrock::protocol::v2225::enums::{ContainerEnumName, ContainerType, ItemStackRequestActionType};
 use bevy_ecs::message::{Message, MessageReader, MessageWriter};
@@ -149,6 +151,10 @@ pub fn handle_inventory_packets(
 
                 held_writer.write(PlayerItemHeldMessage { entity: ev.entity, slot });
 
+                if *gamemode != Gamemode::Creative {
+                    continue;
+                }
+
                 // creative picks are the only way items enter an inventory right now, and they
                 // arrive as item stack requests chorus cannot read yet
                 let item = ItemStack {
@@ -166,6 +172,7 @@ pub fn handle_inventory_packets(
                 }
 
                 inventory.main_mut().set(slot as usize, item);
+                inventory.set_main_user_data(slot as usize, Vec::new());
             }
             // middle click - the client asks the server to hand it the block it is looking at
             BedrockProtocol::BlockPickRequestPacket(packet) => {
@@ -197,25 +204,35 @@ pub fn handle_inventory_packets(
             }
             BedrockProtocol::ItemStackRequestPacket(packet) => {
                 let mut responses = Vec::new();
+                let rules = StackRules { items: &items };
 
                 for request in &packet.requests {
-                    // only drops for now. anything else stays unanswered so the client keeps its own
-                    // prediction, creative picking still leans on that
-                    let only_drops = !request.actions.is_empty() && request.actions.iter().all(|action| matches!(action, ItemStackRequestActionType::Drop { .. }));
-                    if !only_drops {
-                        continue;
-                    }
-
-                    let dropped = if gamemode.allows_interaction() { drop_items(&mut inventory, request) } else { None };
-                    let response = match dropped {
-                        Some(dropped) => {
+                    let outcome = if gamemode.allows_interaction() {
+                        apply_stack_request(&mut inventory, request, &rules, *gamemode == Gamemode::Creative)
+                    } else {
+                        RequestOutcome::Rejected
+                    };
+                    debug!(
+                        "stack request {} from {}: {:?} -> {}",
+                        request.client_request_id,
+                        actor.unique_id,
+                        request.actions,
+                        match &outcome {
+                            RequestOutcome::Unsupported => "left to the client",
+                            RequestOutcome::Rejected => "rejected",
+                            RequestOutcome::Applied { .. } => "applied",
+                        }
+                    );
+                    let response = match outcome {
+                        RequestOutcome::Unsupported => continue,
+                        RequestOutcome::Applied { dropped, touched } => {
                             for (stack, randomly) in dropped {
                                 drop_writer.write(ItemDropMessage { entity: ev.entity, stack, randomly });
                             }
-                            dropped_response(&mut inventory, request)
+                            applied_response(&mut inventory, request.client_request_id, &touched)
                         }
-                        None => {
-                            debug!("rejecting drop request {} from {}", request.client_request_id, actor.unique_id);
+                        RequestOutcome::Rejected => {
+                            debug!("rejecting stack request {} from {}", request.client_request_id, actor.unique_id);
                             ItemStackResponseInfo {
                                 result: ItemStackNetResult::Error,
                                 client_request_id: request.client_request_id,
@@ -230,56 +247,217 @@ pub fn handle_inventory_packets(
                     session.send(BedrockProtocol::ItemStackResponsePacket(ItemStackResponsePacket { responses }.into()));
                 }
             }
+            BedrockProtocol::InventoryTransactionPacket(packet) => match &packet.data {
+                InventoryTransactionData::Normal => {
+                    let window_id = inventory.window_id();
+                    let Some(actions) = packet.actions.iter().map(|action| legacy_action(action, window_id)).collect::<Option<Vec<_>>>() else {
+                        continue;
+                    };
+                    if actions.is_empty() {
+                        continue;
+                    }
+                    let outcome = if gamemode.allows_interaction() {
+                        apply_legacy_actions(&mut inventory, &actions, &StackRules { items: &items }, *gamemode == Gamemode::Creative)
+                    } else {
+                        LegacyOutcome::Rejected
+                    };
+                    debug!("inventory transaction from {}: {:?} -> {:?}", actor.unique_id, actions, outcome);
+                    match outcome {
+                        LegacyOutcome::Applied { dropped } => {
+                            for stack in dropped {
+                                drop_writer.write(ItemDropMessage { entity: ev.entity, stack, randomly: false });
+                            }
+                        }
+                        LegacyOutcome::Rejected => resync_inventory(&mut session, &mut inventory),
+                    }
+                }
+                InventoryTransactionData::InventoryMismatch => {
+                    debug!("{} reported an inventory mismatch", actor.unique_id);
+                    resync_inventory(&mut session, &mut inventory);
+                }
+                _ => {}
+            },
             _ => {}
         }
     }
 }
 
-/// Takes every dropped stack out of the main inventory. It is all or nothing: if one action points
-/// at an empty slot or asks for more than the slot holds, nothing changes and `None` comes back.
-fn drop_items(inventory: &mut PlayerInventory, request: &RequestsEntry<BedrockProtocol>) -> Option<Vec<(ItemStack, bool)>> {
-    let mut slots = inventory.main().slots().to_vec();
-    let mut dropped = Vec::with_capacity(request.actions.len());
-
-    for action in &request.actions {
-        let ItemStackRequestActionType::Drop { amount, source, randomly } = action else {
-            return None;
-        };
-        let slot = main_slot(&source.container_name, source.slot)?;
-        let amount = u16::try_from(*amount).ok().filter(|amount| *amount > 0)?;
-        let stack = &mut slots[slot];
-        if stack.is_empty() || stack.count < amount {
-            return None;
-        }
-
-        stack.count -= amount;
-        dropped.push((ItemStack { count: amount, ..*stack }, *randomly));
-        if stack.count == 0 {
-            *stack = ItemStack::air();
-        }
+fn resync_inventory(session: &mut Session, inventory: &mut PlayerInventory) {
+    for container in [ContainerID::INVENTORY, ContainerID::ARMOR, ContainerID::OFFHAND] {
+        send_content(session, inventory, container);
     }
-
-    for (slot, stack) in slots.into_iter().enumerate() {
-        inventory.main_mut().set(slot, stack);
+    if let Some(id) = inventory.window_id() {
+        send_content(session, inventory, ContainerID(id));
     }
-    Some(dropped)
 }
 
-/// Tells the client what is left in each slot it dropped from, with fresh stack ids.
-fn dropped_response(inventory: &mut PlayerInventory, request: &RequestsEntry<BedrockProtocol>) -> ItemStackResponseInfo<BedrockProtocol> {
-    let mut containers = Vec::with_capacity(request.actions.len());
+fn stack_of(descriptor: &NetworkItemStackDescriptorV2) -> ItemStack {
+    if descriptor.id == 0 || descriptor.stack_size == 0 {
+        return ItemStack::air();
+    }
+    ItemStack {
+        id: descriptor.id,
+        count: descriptor.stack_size,
+        meta: descriptor.aux_value,
+        block_runtime_id: descriptor.block_runtime_id as i32,
+    }
+}
+
+fn legacy_action(action: &InventoryAction<BedrockProtocol>, window_id: Option<i8>) -> Option<LegacyAction> {
+    let slot = usize::try_from(action.slot).ok()?;
+    let endpoint = match action.source.source_type {
+        InventorySourceKind::Container => match action.source.container_id? {
+            id if Some(id) == window_id => LegacyEndpoint::Slot(InventorySlot::Window(slot)),
+            id if id == ContainerID::INVENTORY.0 => LegacyEndpoint::Slot(InventorySlot::Main(slot)),
+            id if id == ContainerID::ARMOR.0 => LegacyEndpoint::Slot(InventorySlot::Armor(slot)),
+            id if id == ContainerID::OFFHAND.0 => LegacyEndpoint::Slot(InventorySlot::Offhand(slot)),
+            id if id == ContainerID::PLAYER_ONLY_UI.0 && slot == 0 => LegacyEndpoint::Slot(InventorySlot::Cursor),
+            _ => return None,
+        },
+        InventorySourceKind::WorldInteraction if action.source.flags.is_none_or(|flags| flags == 0) => LegacyEndpoint::Drop,
+        InventorySourceKind::Creative => LegacyEndpoint::Creative,
+        _ => return None,
+    };
+    Some(LegacyAction {
+        endpoint,
+        from: stack_of(&action.from_item_descriptor),
+        to: stack_of(&action.to_item_descriptor),
+        to_data: user_data_of(&action.to_item_descriptor.user_data_buffer),
+    })
+}
+
+struct StackRules<'a> {
+    items: &'a ItemRegistry,
+}
+
+impl MoveRules for StackRules<'_> {
+    fn max_stack(&self, item: &ItemStack) -> u16 {
+        self.items.max_stack_size(item.id)
+    }
+
+    fn accepts(&self, slot: InventorySlot, item: &ItemStack) -> bool {
+        match slot {
+            InventorySlot::Armor(index) => self.items.identifier(item.id).is_some_and(|identifier| armor_slot_accepts(index, identifier)),
+            _ => true,
+        }
+    }
+}
+
+struct TouchedSlot {
+    container: FullContainerName<BedrockProtocol>,
+    slot: i8,
+}
+
+enum RequestOutcome {
+    Unsupported,
+    Rejected,
+    Applied {
+        dropped: Vec<(ItemStack, bool)>,
+        touched: Vec<TouchedSlot>,
+    },
+}
+
+fn is_tracked(container: &FullContainerName<BedrockProtocol>) -> bool {
+    matches!(
+        container.container,
+        ContainerEnumName::HotbarContainer
+            | ContainerEnumName::InventoryContainer
+            | ContainerEnumName::CombinedHotbarAndInventoryContainer
+            | ContainerEnumName::ArmorContainer
+            | ContainerEnumName::OffhandContainer
+            | ContainerEnumName::CursorContainer
+    )
+}
+
+fn resolve_slot(container: &FullContainerName<BedrockProtocol>, slot: i8) -> Option<InventorySlot> {
+    let index = usize::try_from(slot).ok()?;
+    match container.container {
+        ContainerEnumName::ArmorContainer => (index < ARMOR_SIZE).then_some(InventorySlot::Armor(index)),
+        ContainerEnumName::OffhandContainer => (index < OFFHAND_SIZE).then_some(InventorySlot::Offhand(index)),
+        ContainerEnumName::CursorContainer => (index == 0).then_some(InventorySlot::Cursor),
+        _ => main_slot(container, slot).map(InventorySlot::Main),
+    }
+}
+
+fn apply_stack_request(inventory: &mut PlayerInventory, request: &RequestsEntry<BedrockProtocol>, rules: &dyn MoveRules, may_destroy: bool) -> RequestOutcome {
+    let tracked = |action: &ItemStackRequestActionType<BedrockProtocol>| match action {
+        ItemStackRequestActionType::Take { source, destination, .. }
+        | ItemStackRequestActionType::Place { source, destination, .. }
+        | ItemStackRequestActionType::Swap { source, destination } => is_tracked(&source.container_name) && is_tracked(&destination.container_name),
+        ItemStackRequestActionType::Drop { source, .. } | ItemStackRequestActionType::Destroy { source, .. } => is_tracked(&source.container_name),
+        _ => false,
+    };
+    if request.actions.is_empty() || !request.actions.iter().all(tracked) {
+        return RequestOutcome::Unsupported;
+    }
+
+    let backup = inventory.clone();
+    let mut dropped = Vec::new();
+    let mut touched = Vec::new();
+    let mut touch = |container: &FullContainerName<BedrockProtocol>, slot: i8| touched.push(TouchedSlot { container: container.clone(), slot });
 
     for action in &request.actions {
-        let ItemStackRequestActionType::Drop { source, .. } = action else { continue };
-        let Some(slot) = main_slot(&source.container_name, source.slot) else { continue };
-        let stack = inventory.main().get(slot).copied().unwrap_or_else(ItemStack::air);
+        let done = match action {
+            ItemStackRequestActionType::Take { amount, source, destination } | ItemStackRequestActionType::Place { amount, source, destination } => {
+                touch(&source.container_name, source.slot);
+                touch(&destination.container_name, destination.slot);
+                match (resolve_slot(&source.container_name, source.slot), resolve_slot(&destination.container_name, destination.slot), u16::try_from(*amount)) {
+                    (Some(from), Some(to), Ok(amount)) => move_items(inventory, from, to, amount, rules),
+                    _ => false,
+                }
+            }
+            ItemStackRequestActionType::Swap { source, destination } => {
+                touch(&source.container_name, source.slot);
+                touch(&destination.container_name, destination.slot);
+                match (resolve_slot(&source.container_name, source.slot), resolve_slot(&destination.container_name, destination.slot)) {
+                    (Some(first), Some(second)) => swap_slots(inventory, first, second, rules),
+                    _ => false,
+                }
+            }
+            ItemStackRequestActionType::Drop { amount, source, randomly } => {
+                touch(&source.container_name, source.slot);
+                match (resolve_slot(&source.container_name, source.slot), u16::try_from(*amount)) {
+                    (Some(from), Ok(amount)) => take_items(inventory, from, amount).map(|(stack, _)| dropped.push((stack, *randomly))).is_some(),
+                    _ => false,
+                }
+            }
+            ItemStackRequestActionType::Destroy { amount, source } => {
+                touch(&source.container_name, source.slot);
+                match (resolve_slot(&source.container_name, source.slot), u16::try_from(*amount)) {
+                    (Some(from), Ok(amount)) if may_destroy => take_items(inventory, from, amount).is_some(),
+                    _ => false,
+                }
+            }
+            _ => false,
+        };
+        if !done {
+            *inventory = backup;
+            return RequestOutcome::Rejected;
+        }
+    }
+
+    RequestOutcome::Applied { dropped, touched }
+}
+
+fn applied_response(inventory: &mut PlayerInventory, client_request_id: i32, touched: &[TouchedSlot]) -> ItemStackResponseInfo<BedrockProtocol> {
+    let mut containers: Vec<ItemStackResponseContainerInfo<BedrockProtocol>> = Vec::new();
+    let mut seen: Vec<(std::mem::Discriminant<ContainerEnumName>, i8)> = Vec::new();
+
+    for touched in touched {
+        let key = (std::mem::discriminant(&touched.container.container), touched.slot);
+        if seen.contains(&key) {
+            continue;
+        }
+        seen.push(key);
+        let Some(slot) = resolve_slot(&touched.container, touched.slot) else { continue };
+        let stack = inventory.stack_at(slot).unwrap_or_else(ItemStack::air);
         let net_id = (!stack.is_empty()).then(|| inventory.next_stack_id());
 
         containers.push(ItemStackResponseContainerInfo {
-            container_name: source.container_name.clone(),
+            container_name: touched.container.clone(),
             slots: vec![ItemStackResponseSlotInfo {
-                requested_slot: source.slot,
-                slot: source.slot,
+                requested_slot: touched.slot,
+                slot: touched.slot,
                 amount: stack.count.min(i8::MAX as u16) as i8,
                 item_stack_net_id: net_id,
                 custom_name: RedactableString {
@@ -293,7 +471,7 @@ fn dropped_response(inventory: &mut PlayerInventory, request: &RequestsEntry<Bed
 
     ItemStackResponseInfo {
         result: ItemStackNetResult::Success,
-        client_request_id: request.client_request_id,
+        client_request_id,
         containers: Some(containers),
     }
 }
@@ -332,8 +510,9 @@ pub(crate) fn send_content(session: &mut Session, inventory: &mut PlayerInventor
     for slot in 0..size {
         let item = container_of(inventory, &container).get(slot).copied().unwrap_or_else(ItemStack::air);
         let net_id = (!item.is_empty()).then(|| inventory.next_stack_id());
+        let user_data = inventory.user_data(container, slot).unwrap_or_default();
 
-        slots.push(item.to_descriptor(net_id));
+        slots.push(item.to_descriptor_with_user_data(net_id, user_data));
     }
 
     session.send(BedrockProtocol::InventoryContentPacket(
@@ -352,11 +531,12 @@ pub(crate) fn send_content(session: &mut Session, inventory: &mut PlayerInventor
 
 fn send_held_item(session: &mut Session, inventory: &PlayerInventory, actor: &ActorId) {
     let held_slot = inventory.held_slot() as i8;
+    let user_data = inventory.main_user_data(held_slot as usize).unwrap_or_default();
 
     session.send(BedrockProtocol::MobEquipmentPacket(
         MobEquipmentPacket {
             target_runtime_id: ActorRuntimeID(actor.runtime_id),
-            item: inventory.held_item().to_descriptor(None),
+            item: inventory.held_item().to_descriptor_with_user_data(None, user_data),
             slot: held_slot,
             selected_slot: held_slot,
             container_id: ContainerID::INVENTORY,
@@ -369,6 +549,7 @@ fn container_of<'a>(inventory: &'a PlayerInventory, container: &ContainerID) -> 
     match *container {
         ContainerID::OFFHAND => inventory.offhand(),
         ContainerID::ARMOR => inventory.armor(),
+        ContainerID(id) if inventory.window_id() == Some(id) => inventory.window().unwrap_or(inventory.main()),
         _ => inventory.main(),
     }
 }
@@ -404,13 +585,154 @@ mod tests {
         ItemStack { id: 1, count, ..ItemStack::default() }
     }
 
+    fn slot_info(container: ContainerEnumName, slot: i8) -> ItemStackRequestSlotInfo<BedrockProtocol> {
+        ItemStackRequestSlotInfo {
+            container_name: FullContainerName { container, dynamic_id: None },
+            slot,
+            raw_id: 0,
+        }
+    }
+
+    fn move_action(container_from: ContainerEnumName, from: i8, container_to: ContainerEnumName, to: i8, amount: i8) -> ItemStackRequestActionType<BedrockProtocol> {
+        ItemStackRequestActionType::Take {
+            amount,
+            source: slot_info(container_from, from),
+            destination: slot_info(container_to, to),
+        }
+    }
+
+    fn dropped_by(inventory: &mut PlayerInventory, request: &RequestsEntry<BedrockProtocol>) -> Option<Vec<(ItemStack, bool)>> {
+        let items = ItemRegistry::new();
+        match apply_stack_request(inventory, request, &StackRules { items: &items }, false) {
+            RequestOutcome::Applied { dropped, .. } => Some(dropped),
+            _ => None,
+        }
+    }
+
+    fn outcome(inventory: &mut PlayerInventory, request: &RequestsEntry<BedrockProtocol>) -> &'static str {
+        let items = ItemRegistry::new();
+        match apply_stack_request(inventory, request, &StackRules { items: &items }, false) {
+            RequestOutcome::Applied { .. } => "applied",
+            RequestOutcome::Rejected => "rejected",
+            RequestOutcome::Unsupported => "unsupported",
+        }
+    }
+
+    fn descriptor(id: i16, count: u16) -> NetworkItemStackDescriptorV2 {
+        stack(count).to_descriptor_with_user_data(None, &[]).tap_id(id)
+    }
+
+    trait TapId {
+        fn tap_id(self, id: i16) -> Self;
+    }
+
+    impl TapId for NetworkItemStackDescriptorV2 {
+        fn tap_id(mut self, id: i16) -> Self {
+            if self.id != 0 {
+                self.id = id;
+            }
+            self
+        }
+    }
+
+    fn transaction_action(source_type: InventorySourceKind, container_id: Option<i8>, slot: u32) -> InventoryAction<BedrockProtocol> {
+        InventoryAction {
+            source: bedrock::protocol::v2193::types::InventorySource { source_type, container_id, flags: None },
+            slot,
+            from_item_descriptor: descriptor(1, 0),
+            to_item_descriptor: descriptor(1, 3),
+        }
+    }
+
+    #[test]
+    fn legacy_actions_map_onto_the_players_containers() {
+        let main = legacy_action(&transaction_action(InventorySourceKind::Container, Some(ContainerID::INVENTORY.0), 5), None).unwrap();
+        assert_eq!(main.endpoint, LegacyEndpoint::Slot(InventorySlot::Main(5)));
+        assert_eq!(main.to.count, 3);
+        assert!(main.from.is_empty());
+        let armor = legacy_action(&transaction_action(InventorySourceKind::Container, Some(ContainerID::ARMOR.0), 2), None).unwrap();
+        assert_eq!(armor.endpoint, LegacyEndpoint::Slot(InventorySlot::Armor(2)));
+        let offhand = legacy_action(&transaction_action(InventorySourceKind::Container, Some(ContainerID::OFFHAND.0), 0), None).unwrap();
+        assert_eq!(offhand.endpoint, LegacyEndpoint::Slot(InventorySlot::Offhand(0)));
+        let cursor = legacy_action(&transaction_action(InventorySourceKind::Container, Some(ContainerID::PLAYER_ONLY_UI.0), 0), None).unwrap();
+        assert_eq!(cursor.endpoint, LegacyEndpoint::Slot(InventorySlot::Cursor));
+    }
+
+    #[test]
+    fn the_open_window_id_maps_onto_the_window_slots() {
+        let chest = legacy_action(&transaction_action(InventorySourceKind::Container, Some(7), 12), Some(7)).unwrap();
+        assert_eq!(chest.endpoint, LegacyEndpoint::Slot(InventorySlot::Window(12)));
+        assert!(legacy_action(&transaction_action(InventorySourceKind::Container, Some(7), 12), None).is_none());
+        assert!(legacy_action(&transaction_action(InventorySourceKind::Container, Some(8), 12), Some(7)).is_none());
+    }
+
+    #[test]
+    fn legacy_actions_for_things_the_server_does_not_track_are_left_alone() {
+        assert!(legacy_action(&transaction_action(InventorySourceKind::Container, Some(ContainerID::PLAYER_ONLY_UI.0), 1), None).is_none());
+        assert!(legacy_action(&transaction_action(InventorySourceKind::Container, Some(50), 0), None).is_none());
+        assert!(legacy_action(&transaction_action(InventorySourceKind::Container, None, 0), None).is_none());
+        assert!(legacy_action(&transaction_action(InventorySourceKind::UntrackedInteractionUI, None, 0), None).is_none());
+    }
+
+    #[test]
+    fn dropping_and_creative_actions_are_recognised() {
+        let drop = legacy_action(&transaction_action(InventorySourceKind::WorldInteraction, None, 0), None).unwrap();
+        assert_eq!(drop.endpoint, LegacyEndpoint::Drop);
+        let creative = legacy_action(&transaction_action(InventorySourceKind::Creative, None, 0), None).unwrap();
+        assert_eq!(creative.endpoint, LegacyEndpoint::Creative);
+    }
+
+    #[test]
+    fn dragging_a_stack_to_another_slot_through_the_cursor_is_applied() {
+        let mut inventory = PlayerInventory::new();
+        inventory.main_mut().set(0, stack(8));
+        let take = request(vec![move_action(ContainerEnumName::HotbarContainer, 0, ContainerEnumName::CursorContainer, 0, 8)]);
+        assert_eq!(outcome(&mut inventory, &take), "applied");
+        assert_eq!(inventory.cursor(), &stack(8));
+        let place = request(vec![move_action(ContainerEnumName::CursorContainer, 0, ContainerEnumName::InventoryContainer, 12, 8)]);
+        assert_eq!(outcome(&mut inventory, &place), "applied");
+        assert_eq!(inventory.main().get(12), Some(&stack(8)));
+        assert!(inventory.main().get(0).unwrap().is_empty());
+        assert!(inventory.cursor().is_empty());
+    }
+
+    #[test]
+    fn a_refused_move_puts_everything_back() {
+        let mut inventory = PlayerInventory::new();
+        inventory.main_mut().set(0, stack(2));
+        let actions = vec![
+            move_action(ContainerEnumName::HotbarContainer, 0, ContainerEnumName::HotbarContainer, 1, 1),
+            move_action(ContainerEnumName::HotbarContainer, 0, ContainerEnumName::HotbarContainer, 2, 5),
+        ];
+        assert_eq!(outcome(&mut inventory, &request(actions)), "rejected");
+        assert_eq!(inventory.main().get(0), Some(&stack(2)));
+        assert!(inventory.main().get(1).unwrap().is_empty());
+    }
+
+    #[test]
+    fn requests_about_crafting_are_left_to_the_client() {
+        let mut inventory = PlayerInventory::new();
+        let craft = request(vec![move_action(ContainerEnumName::CraftingOutputPreviewContainer, 0, ContainerEnumName::CursorContainer, 0, 1)]);
+        assert_eq!(outcome(&mut inventory, &craft), "unsupported");
+        assert_eq!(outcome(&mut inventory, &request(vec![])), "unsupported");
+    }
+
+    #[test]
+    fn armour_slots_refuse_items_the_server_does_not_know_as_armour() {
+        let mut inventory = PlayerInventory::new();
+        inventory.main_mut().set(0, stack(1));
+        let equip = request(vec![move_action(ContainerEnumName::HotbarContainer, 0, ContainerEnumName::ArmorContainer, 0, 1)]);
+        assert_eq!(outcome(&mut inventory, &equip), "rejected");
+        assert!(inventory.armor().get(0).unwrap().is_empty());
+    }
+
     #[test]
     fn drops_take_from_the_right_slot() {
         let mut inventory = PlayerInventory::new();
         inventory.main_mut().set(2, stack(10));
         inventory.main_mut().set(20, stack(5));
 
-        let dropped = drop_items(
+        let dropped = dropped_by(
             &mut inventory,
             &request(vec![drop_action(ContainerEnumName::HotbarContainer, 2, 3), drop_action(ContainerEnumName::InventoryContainer, 20, 5)]),
         )
@@ -427,12 +749,12 @@ mod tests {
         inventory.main_mut().set(0, stack(4));
 
         let actions = vec![drop_action(ContainerEnumName::HotbarContainer, 0, 2), drop_action(ContainerEnumName::HotbarContainer, 0, 3)];
-        assert!(drop_items(&mut inventory, &request(actions)).is_none(), "only two are left for the second drop");
+        assert!(dropped_by(&mut inventory, &request(actions)).is_none(), "only two are left for the second drop");
         assert!(
-            drop_items(&mut inventory, &request(vec![drop_action(ContainerEnumName::InventoryContainer, 3, 1)])).is_none(),
+            dropped_by(&mut inventory, &request(vec![drop_action(ContainerEnumName::InventoryContainer, 3, 1)])).is_none(),
             "slot 3 is the hotbar"
         );
-        assert!(drop_items(&mut inventory, &request(vec![drop_action(ContainerEnumName::CursorContainer, 0, 1)])).is_none());
+        assert!(dropped_by(&mut inventory, &request(vec![drop_action(ContainerEnumName::CursorContainer, 0, 1)])).is_none(), "the cursor is empty");
         assert_eq!(inventory.main().get(0), Some(&stack(4)));
     }
 }

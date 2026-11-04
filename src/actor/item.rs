@@ -15,7 +15,7 @@ use crate::network::session::state::SessionState;
 use crate::player::PLAYER_EYE_HEIGHT;
 use crate::player::chunk_view::ChunkView;
 use crate::player::gamemode::Gamemode;
-use crate::player::inventory::{MAX_STACK_SIZE, PlayerInventory};
+use crate::player::inventory::PlayerInventory;
 use crate::registry::block_registry::BlockRegistry;
 use crate::registry::item_registry::ItemRegistry;
 use crate::server::ServerState;
@@ -27,7 +27,7 @@ use bedrock::protocol::v662::packets::{AddItemActorPacket, TakeItemActorPacket};
 use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID};
 use bedrock::protocol::v975::enums::ActorEvent;
 use bevy_ecs::message::{MessageReader, MessageWriter};
-use bevy_ecs::prelude::{Bundle, Commands, Entity, Local, Query, Res, ResMut, Without, World};
+use bevy_ecs::prelude::{Bundle, Commands, Component, Entity, Has, Local, Query, Res, ResMut, Without, World};
 use glam::{Vec2, Vec3};
 use std::collections::HashSet;
 use std::f32::consts::TAU;
@@ -162,17 +162,20 @@ pub fn load_item(world: &mut World, nbt: &nbtx::Value, dimension: i32) -> Option
     )
 }
 
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub struct NoBlockDrops;
+
 pub fn spawn_block_drops(
     mut reader: MessageReader<BlockBreakMessage>,
-    players: Query<(&Gamemode, &ChunkView)>,
+    players: Query<(&Gamemode, &ChunkView, Has<NoBlockDrops>)>,
     blocks: Res<BlockRegistry>,
     items: Res<ItemRegistry>,
     mut server_state: ResMut<ServerState>,
     mut commands: Commands,
 ) {
     for msg in reader.read() {
-        let Ok((gamemode, view)) = players.get(msg.entity) else { continue };
-        if *gamemode == Gamemode::Creative {
+        let Ok((gamemode, view, no_drops)) = players.get(msg.entity) else { continue };
+        if *gamemode == Gamemode::Creative || no_drops {
             continue;
         }
         if let Some(stack) = block_drop(&blocks, &items, msg.block_id) {
@@ -233,7 +236,7 @@ pub fn send_item_spawns(mut reader: MessageReader<ActorShown>, items: Query<(&It
             AddItemActorPacket {
                 target_actor_id: ActorUniqueID(actor.unique_id),
                 target_runtime_id: ActorRuntimeID(actor.runtime_id),
-                item: item.stack().to_actor_descriptor(),
+                item: item.stack().to_actor_descriptor_with_data(item.user_data()),
                 position: (position.x, position.y + offset.0, position.z),
                 velocity: (transform.velocity.x, transform.velocity.y, transform.velocity.z),
                 entity_data: vec![],
@@ -255,7 +258,7 @@ pub fn tick_item_entities(mut items: Query<(Entity, &mut ItemEntity), Without<De
 
 type MergeItem<'a> = (Entity, &'a mut ItemEntity, &'a ActorId, &'a Transform, &'a DimensionId, &'a Viewers);
 
-pub fn merge_item_entities(mut items: Query<MergeItem, Without<Despawn>>, mut sessions: Query<&mut Session>, mut commands: Commands, mut ticks: Local<u32>) {
+pub fn merge_item_entities(mut items: Query<MergeItem, Without<Despawn>>, registry: Res<ItemRegistry>, mut sessions: Query<&mut Session>, mut commands: Commands, mut ticks: Local<u32>) {
     *ticks += 1;
     if *ticks < MERGE_INTERVAL_TICKS {
         return;
@@ -284,7 +287,7 @@ pub fn merge_item_entities(mut items: Query<MergeItem, Without<Despawn>>, mut se
         } else {
             (&mut *second_item, &mut *first_item, second_actor, first_actor, first_entity, second_viewers, first_viewers)
         };
-        if target.absorb(source, MAX_STACK_SIZE) == 0 {
+        if target.absorb(source, registry.max_stack_size(target.stack().id)) == 0 {
             continue;
         }
         send_to_viewers(target_viewers, &mut sessions, &stack_size_packet(target_actor, target.stack().count));
@@ -312,6 +315,7 @@ fn stack_size_packet(actor: &ActorId, count: u16) -> BedrockProtocol {
 pub fn handle_item_pickup(
     mut players: Query<(Entity, &mut PlayerInventory, &ActorId, &Transform, &ChunkView, &Gamemode)>,
     items: Query<(Entity, &ItemEntity, &ActorId, &Transform, &DimensionId, &Viewers), Without<Despawn>>,
+    registry: Res<ItemRegistry>,
     mut sessions: Query<&mut Session>,
     mut writer: MessageWriter<ItemTakenMessage>,
     mut commands: Commands,
@@ -330,8 +334,15 @@ pub fn handle_item_pickup(
             if claimed.contains(&entity) || dimension.0 != view.dimension || !item.can_be_picked_up() || !within_pickup_reach(item_transform.position, feet) {
                 continue;
             }
-            if !inventory.main_mut().add(item.stack()) {
+            let stack = item.stack();
+            let max_stack = registry.max_stack_size(stack.id);
+            let target = inventory.main().first_with_room(&stack, max_stack);
+            if !inventory.main_mut().add(stack, max_stack) {
                 continue;
+            }
+            let data = item.user_data();
+            if let (Some(slot), false) = (target, data.is_empty()) {
+                inventory.set_main_user_data(slot, data.to_vec());
             }
 
             claimed.insert(entity);
