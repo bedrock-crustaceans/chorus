@@ -4,6 +4,7 @@ use std::io::Read;
 use std::path::Path;
 
 use facet::Facet;
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 pub const CHUNK_SIZE: u64 = 1024 * 1024;
@@ -14,6 +15,8 @@ pub struct ResourcePack {
     pub name: String,
     pub version: String,
     pub has_scripts: bool,
+    /// SHA-256 of the pack archive, sent to the client in `ResourcePackDataInfo`.
+    pub hash: Vec<u8>,
     data: Vec<u8>,
 }
 
@@ -92,12 +95,14 @@ impl ResourcePack {
 
         let version = format_version(&manifest.header.version).map_err(ResourcePackError::Version)?;
         let has_scripts = manifest.modules.iter().any(|m| m.module_type == "script");
+        let hash = Sha256::digest(&data).to_vec();
 
         Ok(Self {
             uuid: manifest.header.uuid,
             name: manifest.header.name,
             version,
             has_scripts,
+            hash,
             data,
         })
     }

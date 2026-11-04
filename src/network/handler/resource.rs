@@ -5,7 +5,8 @@ use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::resource::ResourcePacks;
 use bedrock::protocol::ProtoVersionPackets;
-use bedrock::protocol::v662::packets::ResourcePackChunkDataPacket;
+use bedrock::protocol::v662::enums::PackType;
+use bedrock::protocol::v662::packets::{ResourcePackChunkDataPacket, ResourcePackDataInfoPacket};
 use bedrock::protocol::v662::types::{BaseGameVersion, Experiments};
 use bedrock::protocol::v898::packets::{PackEntry, ResourcePackStackPacket};
 use bedrock::protocol::v2168::packets::{ResourcePackClientResponsePacket, ResourcePackEntry, ResourcePacksInfoPacket};
@@ -136,8 +137,28 @@ fn handle_client_response(
 
             session.close(Some("disconnectionScreen.noReason"));
         }
-        ResourcePackClientResponsePacket::Downloading(_) => {
-            // Client has begun downloading; chunk requests will follow.
+        ResourcePackClientResponsePacket::Downloading(pack_ids) => {
+            // The client only sends chunk requests after it has been told each pack's size and hash.
+            for pack_id in pack_ids {
+                let Some(pack) = resource_packs.get(pack_id) else {
+                    warn!("Client requested unknown pack: {pack_id}");
+                    continue;
+                };
+
+                session.send(BedrockProtocol::ResourcePackDataInfoPacket(
+                    ResourcePackDataInfoPacket {
+                        resource_name: pack.pack_id(),
+                        chunk_size: crate::resource::resource_pack::CHUNK_SIZE as u32,
+                        chunk_amount: pack.chunk_count(),
+                        file_size: pack.size(),
+                        file_hash: pack.hash.clone(),
+                        is_premium: false,
+                        pack_type: PackType::Resources,
+                    }
+                    .into(),
+                ));
+            }
+
             response_writer.write(ResourcePackResponseMessage {
                 entity,
                 response: ResourcePackResponseKind::Downloading,
