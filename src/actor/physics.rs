@@ -41,20 +41,25 @@ pub struct BlockCollision<'a> {
     pub air: Option<i32>,
 }
 
+pub fn collision_box_of(blocks: &BlockRegistry, id: i32, air: Option<i32>, position: IVec3) -> Option<(Vec3, Vec3)> {
+    let origin = position.as_vec3();
+    if Some(id) == air {
+        return None;
+    }
+    match blocks.get_components(id).and_then(|components| components.get::<CollisionBoxComponent>()) {
+        Some(collision) if !collision.enabled => None,
+        Some(collision) => Some((origin + collision.origin, origin + collision.origin + collision.size)),
+        None => Some((origin, origin + Vec3::ONE)),
+    }
+}
+
 impl BlockCollision<'_> {
     pub fn collision_box(&self, block: IVec3) -> Option<(Vec3, Vec3)> {
         let origin = block.as_vec3();
         let Some(id) = self.level.get_block(self.dimension, block.x, block.y, block.z, 0) else {
             return Some((origin, origin + Vec3::ONE));
         };
-        if Some(id) == self.air {
-            return None;
-        }
-        match self.blocks.get_components(id).and_then(|components| components.get::<CollisionBoxComponent>()) {
-            Some(collision) if !collision.enabled => None,
-            Some(collision) => Some((origin + collision.origin, origin + collision.origin + collision.size)),
-            None => Some((origin, origin + Vec3::ONE)),
-        }
+        collision_box_of(self.blocks, id, self.air, block)
     }
 
     fn friction(&self, block: IVec3) -> f32 {
