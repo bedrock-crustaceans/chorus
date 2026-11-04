@@ -1,5 +1,5 @@
-use crate::config::Config;
-use crate::config::Interval;
+use crate::core::config::Config;
+use crate::core::config::Interval;
 use crate::level::Level;
 use crate::level::dimension_type::DimensionType;
 use crate::level::generator::r#impl::overworld::{Java, OverworldGenerator};

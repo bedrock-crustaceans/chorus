@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 use tracing::{debug, info, warn};
 
-use crate::config::Config;
+use crate::core::config::Config;
 use crate::resource::resource_pack::ResourcePack;
 
 pub mod resource_pack;

@@ -1,6 +1,6 @@
 use crate::chat::{BroadcastMessage, PlayerChatMessage};
 use crate::command::dispatch::{CommandPreprocessMessage, CommandRequestedMessage};
-use crate::config::{Config, NetworkTransport};
+use crate::core::config::{Config, NetworkTransport};
 use crate::item::ItemTakenMessage;
 use crate::level::{BlockUpdatedMessage, LevelEventMessage, LevelSoundMessage};
 use crate::network::BedrockProtocol;

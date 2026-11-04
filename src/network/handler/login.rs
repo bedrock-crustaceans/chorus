@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::core::config::Config;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::login::auth::Auth;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};

@@ -4,7 +4,7 @@ use crate::command::context::CommandContext;
 use crate::command::parameter::{CommandEnum, CommandParameter};
 use crate::command::report::{Report, Value, duration_text};
 use crate::command::style::CommandStyle;
-use crate::config::Config;
+use crate::core::config::Config;
 use crate::format::{decimal, percent, thousands, tps_tone, usage_tone};
 use crate::level::DimensionId;
 use crate::level::generator::dimension::Dimension;

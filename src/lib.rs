@@ -1,9 +1,5 @@
-use crate::config::Config;
-use crate::logger::setup_logger;
-use crate::server::Server;
 use bevy_app::{App, AppExit, Plugin, PluginsState, PreStartup, RunFixedMainLoop, TaskPoolOptions, TaskPoolPlugin, TaskPoolThreadAssignmentPolicy};
 use bevy_ecs::schedule::{IntoScheduleConfigs, Schedule};
-use chorus_core::schedule::{run_fixed_tick, run_tasks};
 use std::time::{Duration, Instant};
 use tracing::{info, warn};
 
@@ -23,11 +19,25 @@ pub mod schedule;
 pub mod server;
 pub mod world;
 
-pub use chorus_block as block;
-pub use chorus_core::schedule::{Budget, Priority, Scheduler, Tick, TickClock, TickSet, Wake};
-pub use chorus_core::{config, info, math};
-pub use chorus_entity as entity;
-pub use chorus_item as item;
+pub mod block {
+    pub use chorus_block::*;
+}
+
+pub mod core {
+    pub use chorus_core::*;
+}
+
+pub mod entity {
+    pub use chorus_entity::*;
+}
+
+pub mod item {
+    pub use chorus_item::*;
+}
+
+pub mod worldgen {
+    pub use chorus_worldgen::*;
+}
 
 pub mod level {
     pub use chorus_level::*;
@@ -42,6 +52,11 @@ pub mod utils {
     pub use chorus_block::hash_utils;
     pub use chorus_core::utils::*;
 }
+
+use server::Server;
+use logger::setup_logger;
+use core::config::Config;
+use core::schedule::*;
 
 #[derive(bevy_ecs::prelude::Resource, Default)]
 pub struct ShutdownState {
@@ -271,7 +286,7 @@ fn drive_scheduler(world: &mut bevy_ecs::prelude::World) {
         return;
     }
     let deadline = Instant::now() + Duration::from_millis(10);
-    chorus_core::schedule::run_tasks(world, deadline);
+    run_tasks(world, deadline);
 }
 
 pub struct Chorus;

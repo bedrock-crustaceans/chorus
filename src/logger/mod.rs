@@ -1,6 +1,6 @@
 use std::io::Write as _;
 
-use crate::config::Config;
+use crate::core::config::Config;
 use bedrock::protocol::ProtoVersion;
 use bevy_ecs::prelude::Resource;
 use bevy_ecs::system::Res;

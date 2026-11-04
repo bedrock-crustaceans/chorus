@@ -3,7 +3,7 @@ use crate::block::component::replaceable_component::ReplaceableComponent;
 use crate::entity::components::transform::Transform;
 use crate::level::level::Level;
 use crate::level::{BlockUpdatedMessage, LevelEventMessage, LevelSoundMessage};
-use crate::math::enums::block_face::BlockFace;
+use crate::core::math::enums::block_face::BlockFace;
 use crate::network::BedrockProtocol;
 use crate::network::session::Session;
 use crate::network::session::state::SessionState;

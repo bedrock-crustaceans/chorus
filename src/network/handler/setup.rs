@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::core::config::Config;
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::entity::entity::Entity as PlayerEntity;

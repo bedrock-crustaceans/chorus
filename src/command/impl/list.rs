@@ -1,5 +1,5 @@
 use crate::command::command_definition::CommandDefinition;
-use crate::config::Config;
+use crate::core::config::Config;
 use crate::player::Player;
 use crate::player::identity::PlayerIdentity;
 

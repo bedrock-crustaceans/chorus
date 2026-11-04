@@ -1,7 +1,7 @@
 use crate::chat::{PlayerChatMessage, handle_text};
 use crate::command::dispatch::{CommandPreprocessMessage, CommandRequestedMessage};
 use crate::command::permission::CommandPermission;
-use crate::config::Config;
+use crate::core::config::Config;
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::network::BedrockProtocol;

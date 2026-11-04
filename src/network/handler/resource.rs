@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::core::config::Config;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;

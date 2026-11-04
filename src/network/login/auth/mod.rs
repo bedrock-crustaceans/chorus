@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::core::config::Config;
 use bedrock::auth::AuthOIDC;
 use bedrock::auth::http::ureq_agent;
 use bevy_app::{App, Plugin, Startup};

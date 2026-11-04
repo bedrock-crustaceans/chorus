@@ -1,5 +1,4 @@
-use crate::config::Config;
-use crate::console::ConsolePlugin;
+use crate::core::config::Config;
 use crate::network::network::Network;
 use crate::registry::Registry;
 use crate::utils::rolling_avg::RollingAvg;
