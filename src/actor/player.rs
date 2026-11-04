@@ -1,3 +1,4 @@
+use crate::actor::properties::ActorProperties;
 use crate::actor::viewers::{ActorShown, Viewers, send_to_viewers};
 use crate::command::permission::CommandPermission;
 use crate::entity::components::actor_id::ActorId;
@@ -73,11 +74,11 @@ pub fn handle_player_joins(
 
 pub fn send_player_spawns(
     mut reader: MessageReader<ActorShown>,
-    players: Query<(&PlayerIdentity, &ActorId, &Transform, &PlayerAppearance, &Gamemode, &PlayerInventory, Option<&CommandPermission>)>,
+    players: Query<(&PlayerIdentity, &ActorId, &Transform, &PlayerAppearance, &Gamemode, &PlayerInventory, Option<&CommandPermission>, Option<&ActorProperties>)>,
     mut sessions: Query<&mut Session>,
 ) {
     for shown in reader.read() {
-        let (Ok((identity, actor, transform, appearance, gamemode, inventory, permission)), Ok(mut session)) = (players.get(shown.actor), sessions.get_mut(shown.viewer)) else {
+        let (Ok((identity, actor, transform, appearance, gamemode, inventory, permission, properties)), Ok(mut session)) = (players.get(shown.actor), sessions.get_mut(shown.viewer)) else {
             continue;
         };
         let (position, rotation) = (transform.position, transform.rotation);
@@ -94,10 +95,7 @@ pub fn send_player_spawns(
                 carried_item: inventory.held_item().to_actor_descriptor(),
                 player_game_type: gamemode.game_type(),
                 entity_data: vec![],
-                synced_properties: PropertySyncData {
-                    int_entries_list: vec![],
-                    float_entries_list: vec![],
-                },
+                synced_properties: properties.map_or_else(|| PropertySyncData { int_entries_list: vec![], float_entries_list: vec![] }, ActorProperties::sync_data),
                 abilities_data: SerializedAbilitiesData {
                     target_player_raw_id: actor.unique_id,
                     player_permissions: 1,

@@ -4,6 +4,7 @@ use crate::entity::components::transform::Transform;
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::DimensionId;
 use crate::level::level::Level;
+use crate::actor::properties::{ActorPropertyRegistry, PLAYER_ENTITY_TYPE};
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
@@ -37,6 +38,7 @@ pub fn on_enter_setup(
     mut server_state: ResMut<ServerState>,
     items: Res<ItemRegistry>,
     level: Res<Level>,
+    properties: Option<Res<ActorPropertyRegistry>>,
     mut state_reader: MessageReader<SessionStateChangedMessage>,
     mut commands: Commands,
 ) {
@@ -79,7 +81,8 @@ pub fn on_enter_setup(
 
         let spawn = level.spawn;
         let position = spawn.as_vec3() + Vec3::new(0.5, PLAYER_EYE_HEIGHT, 0.5);
-        send_start_game(&actor, Gamemode::default(), position, spawn, &mut session);
+        let player_properties = properties.as_deref().and_then(|registry| registry.network_data(PLAYER_ENTITY_TYPE)).unwrap_or_default();
+        send_start_game(&actor, Gamemode::default(), position, spawn, player_properties, &mut session);
 
         session.send_immediate(BedrockProtocol::ItemComponentPacket(items.to_packet().into()));
 
@@ -89,7 +92,7 @@ pub fn on_enter_setup(
     }
 }
 
-fn send_start_game(actor: &ActorId, gamemode: Gamemode, position: Vec3, spawn: IVec3, session: &mut Session) {
+fn send_start_game(actor: &ActorId, gamemode: Gamemode, position: Vec3, spawn: IVec3, player_properties: std::collections::HashMap<String, nbtx::Value>, session: &mut Session) {
     session.send_immediate(BedrockProtocol::StartGamePacket(
         StartGamePacket {
             target_actor_id: ActorUniqueID(actor.unique_id),
@@ -174,7 +177,7 @@ fn send_start_game(actor: &ActorId, gamemode: Gamemode, position: Vec3, spawn: I
             multiplayer_correlation_id: "".to_string(),
             enable_item_stack_net_manager: false,
             server_version: BedrockProtocol::GAME_VERSION.to_string(),
-            player_property_data: Default::default(),
+            player_property_data: player_properties,
             server_block_type_registry_checksum: 0,
             world_template_id: Default::default(),
             server_enabled_client_side_generation: false,
@@ -194,6 +197,7 @@ pub fn handle_setup(
     config: Res<Config>,
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     items: Res<ItemRegistry>,
+    properties: Option<Res<ActorPropertyRegistry>>,
     mut state_writer: MessageWriter<SessionStateChangedMessage>,
     mut query: Query<(&mut ChunkView, &ActorId, &mut Session)>,
 ) {
@@ -203,7 +207,7 @@ pub fn handle_setup(
         };
         let in_setup = session.get_state() == SessionState::Setup;
         match &ev.packet {
-            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(&config, packet, &mut view, &mut session, &items),
+            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(&config, packet, &mut view, &mut session, &items, properties.as_deref()),
             _ if !in_setup => {}
             BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => handle_set_local_player_as_initialized(packet, actor, &mut session, &mut state_writer),
             packet => {
@@ -218,7 +222,7 @@ fn clamp_chunk_radius(requested: i32, max_view_distance: i32) -> i32 {
     requested.clamp(1, max_view_distance.max(1))
 }
 
-fn handle_request_chunk_radius(config: &Config, packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, view: &mut ChunkView, session: &mut Session, items: &ItemRegistry) {
+fn handle_request_chunk_radius(config: &Config, packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, view: &mut ChunkView, session: &mut Session, items: &ItemRegistry, properties: Option<&ActorPropertyRegistry>) {
     let radius = clamp_chunk_radius(packet.chunk_radius, config.level.max_view_distance);
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
 
@@ -232,6 +236,10 @@ fn handle_request_chunk_radius(config: &Config, packet: &<BedrockProtocol as Pro
 
     if !session.take_first_setup_response() {
         return;
+    }
+
+    for packet in properties.map(ActorPropertyRegistry::sync_packets).unwrap_or_default() {
+        session.send(packet);
     }
 
     session.send(BedrockProtocol::BiomeDefinitionListPacket(crate::level::biome::definitions::definition_list().into()));

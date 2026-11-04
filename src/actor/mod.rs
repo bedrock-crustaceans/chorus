@@ -7,6 +7,7 @@ use bevy_ecs::schedule::IntoScheduleConfigs;
 pub mod item;
 pub mod physics;
 pub mod player;
+pub mod properties;
 pub mod storage;
 pub mod viewers;
 
@@ -18,6 +19,7 @@ impl Plugin for ActorPlugin {
         registry.register(item::ITEM_IDENTIFIER, item::save_item, item::load_item);
         app.insert_resource(registry)
             .init_resource::<ActorIndex>()
+            .init_resource::<properties::ActorPropertyRegistry>()
             .add_observer(ActorIndex::track_actor_added)
             .add_observer(ActorIndex::track_actor_removed)
             .add_message::<viewers::ActorShown>()
@@ -38,6 +40,7 @@ impl Plugin for ActorPlugin {
                     item::send_item_spawns,
                     player::send_player_spawns,
                     player::broadcast_gamemode_changes,
+                    properties::broadcast_property_changes,
                     viewers::broadcast_movement,
                     viewers::despawn_actors,
                 )
