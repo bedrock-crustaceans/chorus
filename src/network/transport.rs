@@ -51,7 +51,9 @@ impl Transports<'_> {
                 if let Some(server) = self.rak.as_mut() {
                     let buf = RakNetGamePacket::wrap(&batch.data);
                     let priority = if batch.immediate { RakPriority::Immediate } else { RakPriority::Normal };
-                    let _ = server.send(*id, buf, RakReliability::ReliableOrdered, priority);
+                    if let Err(err) = server.send(*id, buf, RakReliability::ReliableOrdered, priority) {
+                        warn!("failed to send batch of {} bytes to {id:?}: {err}", batch.data.len());
+                    }
                 }
             }
             SessionId::NetherNetLan(id) => {

@@ -3,11 +3,14 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 
+use bedrock::protocol::v662::enums::PackType;
 use facet::Facet;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-pub const CHUNK_SIZE: u64 = 1024 * 1024;
+/// Size of each pack chunk sent to the client, the same as gophertunnel's default. RakNet refuses
+/// messages over 512 fragments (about 186 KB at the smallest MTU), and pack archives barely compress.
+pub const CHUNK_SIZE: u64 = 128 * 1024;
 
 #[derive(Clone, Debug)]
 pub struct ResourcePack {
@@ -15,6 +18,8 @@ pub struct ResourcePack {
     pub name: String,
     pub version: String,
     pub has_scripts: bool,
+    /// What the manifest's modules make this pack, sent to the client in `ResourcePackDataInfo`.
+    pub pack_type: PackType,
     /// SHA-256 of the pack archive, sent to the client in `ResourcePackDataInfo`.
     pub hash: Vec<u8>,
     data: Vec<u8>,
@@ -95,6 +100,7 @@ impl ResourcePack {
 
         let version = format_version(&manifest.header.version).map_err(ResourcePackError::Version)?;
         let has_scripts = manifest.modules.iter().any(|m| m.module_type == "script");
+        let pack_type = pack_type(&manifest.modules);
         let hash = Sha256::digest(&data).to_vec();
 
         Ok(Self {
@@ -102,6 +108,7 @@ impl ResourcePack {
             name: manifest.header.name,
             version,
             has_scripts,
+            pack_type,
             hash,
             data,
         })
@@ -128,6 +135,25 @@ impl ResourcePack {
         let start = (chunk_id as u64 * CHUNK_SIZE) as usize;
         let end = (start + CHUNK_SIZE as usize).min(self.data.len());
         &self.data[start..end]
+    }
+}
+
+/// Picks the pack type from the manifest's module types, the way gophertunnel does.
+fn pack_type(modules: &[ManifestModule]) -> PackType {
+    let has = |kind: &str| modules.iter().any(|m| m.module_type == kind);
+    let textures = has("resources");
+    let behaviours = has("data") || has("script") || has("javascript");
+
+    if has("world_template") {
+        PackType::WorldTemplate
+    } else if textures && behaviours {
+        PackType::Addon
+    } else if behaviours {
+        PackType::Behavior
+    } else if textures {
+        PackType::Resources
+    } else {
+        PackType::Skins
     }
 }
 
