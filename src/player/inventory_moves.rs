@@ -164,7 +164,12 @@ mod tests {
     }
 
     fn stack(id: i16, count: u16) -> ItemStack {
-        ItemStack { id, count, meta: 0, block_runtime_id: 0 }
+        ItemStack {
+            id,
+            count,
+            meta: 0,
+            block_runtime_id: 0,
+        }
     }
 
     fn inventory() -> PlayerInventory {
@@ -172,7 +177,12 @@ mod tests {
     }
 
     fn legacy(endpoint: LegacyEndpoint, from: ItemStack, to: ItemStack) -> LegacyAction {
-        LegacyAction { endpoint, from, to, to_data: Vec::new() }
+        LegacyAction {
+            endpoint,
+            from,
+            to,
+            to_data: Vec::new(),
+        }
     }
 
     fn slot(index: usize) -> LegacyEndpoint {
@@ -250,9 +260,15 @@ mod tests {
         let mut inv = inventory();
         inv.put(InventorySlot::Main(0), stack(7, 1), vec![]);
         inv.put(InventorySlot::Main(1), stack(3, 1), vec![]);
-        let good = [legacy(slot(0), stack(7, 1), ItemStack::air()), legacy(LegacyEndpoint::Slot(InventorySlot::Armor(0)), ItemStack::air(), stack(7, 1))];
+        let good = [
+            legacy(slot(0), stack(7, 1), ItemStack::air()),
+            legacy(LegacyEndpoint::Slot(InventorySlot::Armor(0)), ItemStack::air(), stack(7, 1)),
+        ];
         assert!(matches!(apply_legacy_actions(&mut inv, &good, &Rules, false), LegacyOutcome::Applied { .. }));
-        let bad = [legacy(slot(1), stack(3, 1), ItemStack::air()), legacy(LegacyEndpoint::Slot(InventorySlot::Armor(0)), stack(7, 1), stack(3, 1))];
+        let bad = [
+            legacy(slot(1), stack(3, 1), ItemStack::air()),
+            legacy(LegacyEndpoint::Slot(InventorySlot::Armor(0)), stack(7, 1), stack(3, 1)),
+        ];
         assert_eq!(apply_legacy_actions(&mut inv, &bad, &Rules, false), LegacyOutcome::Rejected);
     }
 

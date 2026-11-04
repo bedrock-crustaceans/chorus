@@ -1,10 +1,10 @@
+use crate::actor::properties::{ActorPropertyRegistry, PLAYER_ENTITY_TYPE};
 use crate::core::config::Config;
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::entity::entity::Entity as PlayerEntity;
 use crate::level::DimensionId;
 use crate::level::level::Level;
-use crate::actor::properties::{ActorPropertyRegistry, PLAYER_ENTITY_TYPE};
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
@@ -222,7 +222,14 @@ fn clamp_chunk_radius(requested: i32, max_view_distance: i32) -> i32 {
     requested.clamp(1, max_view_distance.max(1))
 }
 
-fn handle_request_chunk_radius(config: &Config, packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket, view: &mut ChunkView, session: &mut Session, items: &ItemRegistry, properties: Option<&ActorPropertyRegistry>) {
+fn handle_request_chunk_radius(
+    config: &Config,
+    packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket,
+    view: &mut ChunkView,
+    session: &mut Session,
+    items: &ItemRegistry,
+    properties: Option<&ActorPropertyRegistry>,
+) {
     let radius = clamp_chunk_radius(packet.chunk_radius, config.level.max_view_distance);
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
 

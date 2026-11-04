@@ -32,7 +32,12 @@ pub struct BlockStateUpgrader {
 impl BlockStateUpgrader {
     pub fn from_embedded() -> Result<Self, Vec<String>> {
         let bundle: Bundle = serde_json::from_str(EMBEDDED_SCHEMAS).map_err(|error| vec![error.to_string()])?;
-        let schemas = bundle.schemas.into_iter().map(BlockStateUpgradeSchema::from).filter(|schema| schema.version <= BLOCK_STATE_VERSION).collect();
+        let schemas = bundle
+            .schemas
+            .into_iter()
+            .map(BlockStateUpgradeSchema::from)
+            .filter(|schema| schema.version <= BLOCK_STATE_VERSION)
+            .collect();
         Ok(Self::from_schemas(schemas))
     }
 
@@ -221,17 +226,22 @@ impl BlockStateUpgradeSchema {
             return old_value.clone();
         };
 
-        remaps.iter().find(|remap| property_matches(&remap.old, old_value)).map_or_else(|| old_value.clone(), |remap| property_to_nbt(&remap.new))
+        remaps
+            .iter()
+            .find(|remap| property_matches(&remap.old, old_value))
+            .map_or_else(|| old_value.clone(), |remap| property_to_nbt(&remap.new))
     }
 
     fn apply_remapped_states(&self, old_name: &str, old_states: &nbtx::Compound) -> Option<(String, nbtx::Compound)> {
         let remaps = self.remapped_states.get(old_name)?;
 
         for remap in remaps {
-            let matches_filter = remap
-                .old_state
-                .as_ref()
-                .is_none_or(|old_state| old_state.len() <= old_states.len() && old_state.iter().all(|(name, expected)| old_states.get(name.as_bytes()).is_some_and(|actual| property_matches(expected, actual))));
+            let matches_filter = remap.old_state.as_ref().is_none_or(|old_state| {
+                old_state.len() <= old_states.len()
+                    && old_state
+                        .iter()
+                        .all(|(name, expected)| old_states.get(name.as_bytes()).is_some_and(|actual| property_matches(expected, actual)))
+            });
             if !matches_filter {
                 continue;
             }
@@ -325,7 +335,12 @@ mod tests {
     #[test]
     fn schemas_newer_than_the_block_state_version_are_not_applied() {
         let bundle: Bundle = serde_json::from_str(EMBEDDED_SCHEMAS).expect("the bundle parses");
-        let applicable = bundle.schemas.into_iter().map(BlockStateUpgradeSchema::from).filter(|schema| schema.version <= BLOCK_STATE_VERSION).count();
+        let applicable = bundle
+            .schemas
+            .into_iter()
+            .map(BlockStateUpgradeSchema::from)
+            .filter(|schema| schema.version <= BLOCK_STATE_VERSION)
+            .count();
         assert_eq!(BlockStateUpgrader::from_embedded().expect("embedded schemas parse").schema_count(), applicable);
     }
 

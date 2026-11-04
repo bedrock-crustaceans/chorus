@@ -74,7 +74,16 @@ pub fn handle_player_joins(
 
 pub fn send_player_spawns(
     mut reader: MessageReader<ActorShown>,
-    players: Query<(&PlayerIdentity, &ActorId, &Transform, &PlayerAppearance, &Gamemode, &PlayerInventory, Option<&CommandPermission>, Option<&ActorProperties>)>,
+    players: Query<(
+        &PlayerIdentity,
+        &ActorId,
+        &Transform,
+        &PlayerAppearance,
+        &Gamemode,
+        &PlayerInventory,
+        Option<&CommandPermission>,
+        Option<&ActorProperties>,
+    )>,
     mut sessions: Query<&mut Session>,
 ) {
     for shown in reader.read() {
@@ -95,7 +104,13 @@ pub fn send_player_spawns(
                 carried_item: inventory.held_item().to_actor_descriptor(),
                 player_game_type: gamemode.game_type(),
                 entity_data: vec![],
-                synced_properties: properties.map_or_else(|| PropertySyncData { int_entries_list: vec![], float_entries_list: vec![] }, ActorProperties::sync_data),
+                synced_properties: properties.map_or_else(
+                    || PropertySyncData {
+                        int_entries_list: vec![],
+                        float_entries_list: vec![],
+                    },
+                    ActorProperties::sync_data,
+                ),
                 abilities_data: SerializedAbilitiesData {
                     target_player_raw_id: actor.unique_id,
                     player_permissions: 1,

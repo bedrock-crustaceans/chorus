@@ -290,7 +290,14 @@ impl Network {
     }
 
     /// Pushes everything the handlers queued this tick out, and reaps closed sessions.
-    pub fn flush(mut transport: Transports, mut state: ResMut<NetworkState>, bandwidth: Res<BandwidthTracker>, mut query: Query<(Entity, &mut Session)>, announced: Query<(), With<QuitAnnounced>>, mut commands: Commands) {
+    pub fn flush(
+        mut transport: Transports,
+        mut state: ResMut<NetworkState>,
+        bandwidth: Res<BandwidthTracker>,
+        mut query: Query<(Entity, &mut Session)>,
+        announced: Query<(), With<QuitAnnounced>>,
+        mut commands: Commands,
+    ) {
         let mut sessions: Vec<(Entity, Mut<Session>)> = query.iter_mut().collect();
 
         let mut busy: Vec<usize> = Vec::new();

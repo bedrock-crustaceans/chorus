@@ -157,7 +157,10 @@ impl Chunk {
     }
 
     pub fn block_entity_at(&self, x: i32, y: i32, z: i32) -> Option<&nbtx::Value> {
-        self.block_entities.iter().find(|entity| entity.y == y && entity_column(&entity.data) == Some((x, z))).map(|entity| &entity.data)
+        self.block_entities
+            .iter()
+            .find(|entity| entity.y == y && entity_column(&entity.data) == Some((x, z)))
+            .map(|entity| &entity.data)
     }
 
     pub fn set_block_entity(&mut self, x: i32, y: i32, z: i32, data: nbtx::Value) {

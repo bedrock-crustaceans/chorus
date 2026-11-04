@@ -265,7 +265,11 @@ pub fn handle_inventory_packets(
                     match outcome {
                         LegacyOutcome::Applied { dropped } => {
                             for stack in dropped {
-                                drop_writer.write(ItemDropMessage { entity: ev.entity, stack, randomly: false });
+                                drop_writer.write(ItemDropMessage {
+                                    entity: ev.entity,
+                                    stack,
+                                    randomly: false,
+                                });
                             }
                         }
                         LegacyOutcome::Rejected => resync_inventory(&mut session, &mut inventory),
@@ -351,10 +355,7 @@ struct TouchedSlot {
 enum RequestOutcome {
     Unsupported,
     Rejected,
-    Applied {
-        dropped: Vec<(ItemStack, bool)>,
-        touched: Vec<TouchedSlot>,
-    },
+    Applied { dropped: Vec<(ItemStack, bool)>, touched: Vec<TouchedSlot> },
 }
 
 fn is_tracked(container: &FullContainerName<BedrockProtocol>) -> bool {
@@ -381,9 +382,9 @@ fn resolve_slot(container: &FullContainerName<BedrockProtocol>, slot: i8) -> Opt
 
 fn apply_stack_request(inventory: &mut PlayerInventory, request: &RequestsEntry<BedrockProtocol>, rules: &dyn MoveRules, may_destroy: bool) -> RequestOutcome {
     let tracked = |action: &ItemStackRequestActionType<BedrockProtocol>| match action {
-        ItemStackRequestActionType::Take { source, destination, .. }
-        | ItemStackRequestActionType::Place { source, destination, .. }
-        | ItemStackRequestActionType::Swap { source, destination } => is_tracked(&source.container_name) && is_tracked(&destination.container_name),
+        ItemStackRequestActionType::Take { source, destination, .. } | ItemStackRequestActionType::Place { source, destination, .. } | ItemStackRequestActionType::Swap { source, destination } => {
+            is_tracked(&source.container_name) && is_tracked(&destination.container_name)
+        }
         ItemStackRequestActionType::Drop { source, .. } | ItemStackRequestActionType::Destroy { source, .. } => is_tracked(&source.container_name),
         _ => false,
     };
@@ -401,7 +402,11 @@ fn apply_stack_request(inventory: &mut PlayerInventory, request: &RequestsEntry<
             ItemStackRequestActionType::Take { amount, source, destination } | ItemStackRequestActionType::Place { amount, source, destination } => {
                 touch(&source.container_name, source.slot);
                 touch(&destination.container_name, destination.slot);
-                match (resolve_slot(&source.container_name, source.slot), resolve_slot(&destination.container_name, destination.slot), u16::try_from(*amount)) {
+                match (
+                    resolve_slot(&source.container_name, source.slot),
+                    resolve_slot(&destination.container_name, destination.slot),
+                    u16::try_from(*amount),
+                ) {
                     (Some(from), Some(to), Ok(amount)) => move_items(inventory, from, to, amount, rules),
                     _ => false,
                 }
@@ -637,7 +642,11 @@ mod tests {
 
     fn transaction_action(source_type: InventorySourceKind, container_id: Option<i8>, slot: u32) -> InventoryAction<BedrockProtocol> {
         InventoryAction {
-            source: bedrock::protocol::v2193::types::InventorySource { source_type, container_id, flags: None },
+            source: bedrock::protocol::v2193::types::InventorySource {
+                source_type,
+                container_id,
+                flags: None,
+            },
             slot,
             from_item_descriptor: descriptor(1, 0),
             to_item_descriptor: descriptor(1, 3),
@@ -754,7 +763,10 @@ mod tests {
             dropped_by(&mut inventory, &request(vec![drop_action(ContainerEnumName::InventoryContainer, 3, 1)])).is_none(),
             "slot 3 is the hotbar"
         );
-        assert!(dropped_by(&mut inventory, &request(vec![drop_action(ContainerEnumName::CursorContainer, 0, 1)])).is_none(), "the cursor is empty");
+        assert!(
+            dropped_by(&mut inventory, &request(vec![drop_action(ContainerEnumName::CursorContainer, 0, 1)])).is_none(),
+            "the cursor is empty"
+        );
         assert_eq!(inventory.main().get(0), Some(&stack(4)));
     }
 }

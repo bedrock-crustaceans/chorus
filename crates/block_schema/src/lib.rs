@@ -146,7 +146,12 @@ mod tests {
 
     #[test]
     fn a_version_packs_into_the_number_blocks_carry() {
-        let version = Version { major: 1, minor: 26, patch: 50, revision: 0 };
+        let version = Version {
+            major: 1,
+            minor: 26,
+            patch: 50,
+            revision: 0,
+        };
         assert_eq!(version.packed(), (1 << 24) | (26 << 16) | (50 << 8));
         assert_eq!(version.to_string(), "1.26.50.0");
     }
@@ -154,7 +159,15 @@ mod tests {
     #[test]
     fn versions_round_trip_through_text_and_reject_bad_text() {
         let version: Version = serde_json::from_str("\"1.21.0.25\"").expect("parses");
-        assert_eq!(version, Version { major: 1, minor: 21, patch: 0, revision: 25 });
+        assert_eq!(
+            version,
+            Version {
+                major: 1,
+                minor: 21,
+                patch: 0,
+                revision: 25
+            }
+        );
         assert_eq!(serde_json::to_string(&version).expect("serializes"), "\"1.21.0.25\"");
         assert!(serde_json::from_str::<Version>("\"1.21.0\"").is_err());
         assert!(serde_json::from_str::<Version>("\"one.two.three.four\"").is_err());
@@ -165,14 +178,25 @@ mod tests {
         let values: Vec<PropertyValue> = serde_json::from_str("[true, 3, \"x\"]").expect("parses");
         assert_eq!(values, vec![PropertyValue::Byte(true), PropertyValue::Int(3), PropertyValue::String("x".into())]);
         let remap: ValueRemap = serde_json::from_str("[0, \"stone\"]").expect("parses");
-        assert_eq!(remap, ValueRemap { old: PropertyValue::Int(0), new: PropertyValue::String("stone".into()) });
+        assert_eq!(
+            remap,
+            ValueRemap {
+                old: PropertyValue::Int(0),
+                new: PropertyValue::String("stone".into())
+            }
+        );
         assert_eq!(serde_json::to_string(&remap).expect("serializes"), "[0,\"stone\"]");
     }
 
     #[test]
     fn a_schema_leaves_out_what_is_empty_and_what_is_default() {
         let schema = Schema {
-            version: Version { major: 1, minor: 19, patch: 60, revision: 0 },
+            version: Version {
+                major: 1,
+                minor: 19,
+                patch: 60,
+                revision: 0,
+            },
             renamed_ids: BTreeMap::new(),
             added_properties: BTreeMap::new(),
             removed_properties: BTreeMap::new(),
@@ -191,7 +215,10 @@ mod tests {
             remapped_states: BTreeMap::new(),
         };
         let text = serde_json::to_string(&schema).expect("serializes");
-        assert_eq!(text, r#"{"version":"1.19.60.0","flattened_properties":{"minecraft:wool":{"flattened_property":"color","prefix":"minecraft:","suffix":"_wool"}}}"#);
+        assert_eq!(
+            text,
+            r#"{"version":"1.19.60.0","flattened_properties":{"minecraft:wool":{"flattened_property":"color","prefix":"minecraft:","suffix":"_wool"}}}"#
+        );
         assert_eq!(serde_json::from_str::<Schema>(&text).expect("parses"), schema);
     }
 }

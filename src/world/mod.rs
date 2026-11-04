@@ -33,7 +33,12 @@ impl Plugin for WorldPlugin {
             )
             .add_systems(
                 Tick,
-                (block::resync_rejected_edits,block::broadcast_block_updates, block::broadcast_level_events, block::broadcast_level_sounds)
+                (
+                    block::resync_rejected_edits,
+                    block::broadcast_block_updates,
+                    block::broadcast_level_events,
+                    block::broadcast_level_sounds,
+                )
                     .chain()
                     .in_set(TickSet::Last),
             );

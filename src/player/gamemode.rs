@@ -133,10 +133,7 @@ impl Gamemode {
     }
 
     fn actor_flags(&self) -> i64 {
-        let mut flags = (1i64 << ActorFlags::HasGravity as i64)
-            | (1i64 << ActorFlags::Breathing as i64)
-            | (1i64 << ActorFlags::CanWalk as i64)
-            | (1i64 << ActorFlags::CanClimb as i64);
+        let mut flags = (1i64 << ActorFlags::HasGravity as i64) | (1i64 << ActorFlags::Breathing as i64) | (1i64 << ActorFlags::CanWalk as i64) | (1i64 << ActorFlags::CanClimb as i64);
         if self.has_collision() {
             flags |= 1i64 << ActorFlags::HasCollision as i64;
         } else {

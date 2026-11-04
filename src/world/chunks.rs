@@ -247,15 +247,7 @@ fn send_change_dimension(session: &mut Session, transform: &Transform, view: &mu
     ));
 }
 
-fn switch_dimension(
-    session: &mut Session,
-    transform: &Transform,
-    view: &mut ChunkView,
-    actor: &ActorId,
-    target: i32,
-    target_network: i32,
-    abandoned: &mut HashMap<i32, Vec<(i32, i32)>>,
-) {
+fn switch_dimension(session: &mut Session, transform: &Transform, view: &mut ChunkView, actor: &ActorId, target: i32, target_network: i32, abandoned: &mut HashMap<i32, Vec<(i32, i32)>>) {
     let requested = std::mem::take(&mut view.requested);
     abandoned.entry(view.dimension).or_default().extend(requested);
     view.sent.clear();

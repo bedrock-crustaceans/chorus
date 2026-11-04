@@ -98,10 +98,7 @@ fn state_remap(raw: RawStateRemap) -> StateRemap {
     }
 }
 
-fn inline_value_remaps(
-    remapped: BTreeMap<String, BTreeMap<String, String>>,
-    index: &BTreeMap<String, Vec<RawValueRemap>>,
-) -> BTreeMap<String, BTreeMap<String, Vec<ValueRemap>>> {
+fn inline_value_remaps(remapped: BTreeMap<String, BTreeMap<String, String>>, index: &BTreeMap<String, Vec<RawValueRemap>>) -> BTreeMap<String, BTreeMap<String, Vec<ValueRemap>>> {
     remapped
         .into_iter()
         .map(|(block, properties)| {
@@ -109,7 +106,16 @@ fn inline_value_remaps(
                 .into_iter()
                 .map(|(property, name)| {
                     let remaps = index.get(&name).unwrap_or_else(|| panic!("{block}.{property}: value remap {name} is not in the index"));
-                    (property, remaps.iter().map(|remap| ValueRemap { old: value(&remap.old), new: value(&remap.new) }).collect())
+                    (
+                        property,
+                        remaps
+                            .iter()
+                            .map(|remap| ValueRemap {
+                                old: value(&remap.old),
+                                new: value(&remap.new),
+                            })
+                            .collect(),
+                    )
                 })
                 .collect();
             (block, properties)
@@ -119,7 +125,12 @@ fn inline_value_remaps(
 
 pub fn convert(raw: RawSchema) -> Schema {
     Schema {
-        version: Version { major: raw.max_version_major, minor: raw.max_version_minor, patch: raw.max_version_patch, revision: raw.max_version_revision },
+        version: Version {
+            major: raw.max_version_major,
+            minor: raw.max_version_minor,
+            patch: raw.max_version_patch,
+            revision: raw.max_version_revision,
+        },
         renamed_ids: raw.renamed_ids,
         added_properties: raw.added_properties.iter().map(|(block, properties)| (block.clone(), values(properties))).collect(),
         removed_properties: raw.removed_properties,
@@ -175,8 +186,14 @@ mod tests {
             "flattenedProperties": {"minecraft:wool": {"flattenedProperty": "color", "flattenedPropertyType": "string", "prefix": "minecraft:", "suffix": "_wool", "flattenedValueRemaps": {"silver": "light_gray"}}},
             "remappedStates": {"minecraft:end_rod": [{"oldState": {"facing_direction": {"int": 6}}, "newName": "minecraft:light_block", "newState": {"block_light_level": {"int": 14}}}, {"copiedState": ["facing_direction"], "newName": "minecraft:end_rod", "newState": null, "oldState": null}]},
         }));
-        assert_eq!(schema["flattened_properties"]["minecraft:wool"], json!({"flattened_property": "color", "prefix": "minecraft:", "suffix": "_wool", "flattened_value_remaps": {"silver": "light_gray"}}));
-        assert_eq!(schema["remapped_states"]["minecraft:end_rod"][1], json!({"new_name": "minecraft:end_rod", "copied_state": ["facing_direction"]}));
+        assert_eq!(
+            schema["flattened_properties"]["minecraft:wool"],
+            json!({"flattened_property": "color", "prefix": "minecraft:", "suffix": "_wool", "flattened_value_remaps": {"silver": "light_gray"}})
+        );
+        assert_eq!(
+            schema["remapped_states"]["minecraft:end_rod"][1],
+            json!({"new_name": "minecraft:end_rod", "copied_state": ["facing_direction"]})
+        );
     }
 
     #[test]

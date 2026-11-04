@@ -84,7 +84,10 @@ impl ItemRegistry {
     }
 
     pub fn identifier(&self, runtime_id: i16) -> Option<&str> {
-        self.items.iter().find(|definition| definition.runtime_id == runtime_id).map(|definition| definition.identifier.as_str())
+        self.items
+            .iter()
+            .find(|definition| definition.runtime_id == runtime_id)
+            .map(|definition| definition.identifier.as_str())
     }
 
     pub fn max_stack_size(&self, runtime_id: i16) -> u16 {
@@ -317,7 +320,11 @@ mod tests {
 
     fn child<'a>(value: &'a nbtx::Value, key: &str) -> &'a nbtx::Value {
         let nbtx::Value::Compound(compound) = value else { panic!("{key}: not a compound") };
-        compound.iter().find(|(name, _)| name.as_slice() == key.as_bytes()).map(|(_, value)| value).unwrap_or_else(|| panic!("{key} is missing"))
+        compound
+            .iter()
+            .find(|(name, _)| name.as_slice() == key.as_bytes())
+            .map(|(_, value)| value)
+            .unwrap_or_else(|| panic!("{key} is missing"))
     }
 
     #[test]

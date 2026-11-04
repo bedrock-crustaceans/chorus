@@ -37,19 +37,31 @@ pub struct PropertyDefinition {
 
 impl PropertyDefinition {
     pub fn int(name: impl Into<String>, min: i32, max: i32) -> Self {
-        Self { name: name.into(), kind: PropertyKind::Int { min, max } }
+        Self {
+            name: name.into(),
+            kind: PropertyKind::Int { min, max },
+        }
     }
 
     pub fn float(name: impl Into<String>, min: f32, max: f32) -> Self {
-        Self { name: name.into(), kind: PropertyKind::Float { min, max } }
+        Self {
+            name: name.into(),
+            kind: PropertyKind::Float { min, max },
+        }
     }
 
     pub fn bool(name: impl Into<String>) -> Self {
-        Self { name: name.into(), kind: PropertyKind::Bool }
+        Self {
+            name: name.into(),
+            kind: PropertyKind::Bool,
+        }
     }
 
     pub fn enumeration(name: impl Into<String>, values: Vec<String>) -> Self {
-        Self { name: name.into(), kind: PropertyKind::Enum(values) }
+        Self {
+            name: name.into(),
+            kind: PropertyKind::Enum(values),
+        }
     }
 
     fn to_nbt(&self) -> nbtx::Compound {
@@ -177,7 +189,10 @@ pub fn broadcast_property_changes(changed: Query<(Entity, &ActorId, &ActorProper
             send_to_viewers(viewers, &mut sessions, &packet);
         }
         let already_sent = viewers.is_some_and(|viewers| viewers.0.contains(&entity));
-        if !already_sent && let Ok(mut session) = sessions.get_mut(entity) && session.get_state() == SessionState::Play {
+        if !already_sent
+            && let Ok(mut session) = sessions.get_mut(entity)
+            && session.get_state() == SessionState::Play
+        {
             session.send(packet);
         }
     }
@@ -189,7 +204,14 @@ mod tests {
 
     fn registry() -> ActorPropertyRegistry {
         let mut registry = ActorPropertyRegistry::default();
-        registry.register("test:thing", vec![PropertyDefinition::int("a:head", 0, 100), PropertyDefinition::float("a:glow", 0.0, 1.0), PropertyDefinition::bool("a:flag")]);
+        registry.register(
+            "test:thing",
+            vec![
+                PropertyDefinition::int("a:head", 0, 100),
+                PropertyDefinition::float("a:glow", 0.0, 1.0),
+                PropertyDefinition::bool("a:flag"),
+            ],
+        );
         registry
     }
 
@@ -220,7 +242,9 @@ mod tests {
         assert_eq!(packets.len(), 1);
         let BedrockProtocol::SyncActorPropertyPacket(packet) = &packets[0] else { panic!("wrong packet") };
         assert!(matches!(packet.property_data.get("type"), Some(nbtx::Value::String(name)) if name.to_string() == "test:thing"));
-        let Some(nbtx::Value::List(nbtx::ValueList::Compound(properties))) = packet.property_data.get("properties") else { panic!("no property list") };
+        let Some(nbtx::Value::List(nbtx::ValueList::Compound(properties))) = packet.property_data.get("properties") else {
+            panic!("no property list")
+        };
         assert_eq!(properties.len(), 3);
         assert!(matches!(field(&properties[0], "type"), Some(nbtx::Value::Int(0))));
         assert!(matches!(field(&properties[0], "max"), Some(nbtx::Value::Int(100))));

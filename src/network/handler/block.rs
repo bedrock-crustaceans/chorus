@@ -45,7 +45,12 @@ pub fn decode_block_actions(mut packet_reader: MessageReader<PacketReceivedMessa
                         slot: u8::try_from(data.hotbar_slot).ok(),
                     });
                 }
-                for action in packet.player_block_actions.iter().flatten().filter(|action| !matches!(action.action_type, PlayerActionType::StartItemUseOn)) {
+                for action in packet
+                    .player_block_actions
+                    .iter()
+                    .flatten()
+                    .filter(|action| !matches!(action.action_type, PlayerActionType::StartItemUseOn))
+                {
                     action_writer.write(BlockActionMessage {
                         entity: ev.entity,
                         action: action.action_type.clone(),

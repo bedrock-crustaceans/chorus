@@ -84,10 +84,7 @@ impl Inventory {
     }
 
     pub fn first_with_room(&self, item: &ItemStack, max_stack: u16) -> Option<usize> {
-        self.slots
-            .iter()
-            .position(|slot| slot.is_same(item) && slot.count < max_stack)
-            .or_else(|| self.first_empty())
+        self.slots.iter().position(|slot| slot.is_same(item) && slot.count < max_stack).or_else(|| self.first_empty())
     }
 
     pub fn add(&mut self, item: ItemStack, max_stack: u16) -> bool {
@@ -394,7 +391,12 @@ mod stacking_tests {
     use super::*;
 
     fn stack(id: i16, count: u16) -> ItemStack {
-        ItemStack { id, count, meta: 0, block_runtime_id: 0 }
+        ItemStack {
+            id,
+            count,
+            meta: 0,
+            block_runtime_id: 0,
+        }
     }
 
     #[test]

@@ -58,11 +58,7 @@ pub fn max_stack_size(identifier: &str) -> u16 {
     const SIXTEEN_NAMES: &[&str] = &["bucket", "ender_pearl", "snowball", "egg", "honey_bottle", "armor_stand"];
     const SIXTEEN_SUFFIXES: &[&str] = &["_sign", "_hanging_sign", "_banner"];
 
-    if SINGLE_NAMES.contains(&name)
-        || name.starts_with("music_disc_")
-        || SINGLE_SUFFIXES.iter().any(|suffix| name.ends_with(suffix))
-        || (name.ends_with("_bucket") && name != "bucket")
-    {
+    if SINGLE_NAMES.contains(&name) || name.starts_with("music_disc_") || SINGLE_SUFFIXES.iter().any(|suffix| name.ends_with(suffix)) || (name.ends_with("_bucket") && name != "bucket") {
         1
     } else if SIXTEEN_NAMES.contains(&name) || SIXTEEN_SUFFIXES.iter().any(|suffix| name.ends_with(suffix)) {
         16
@@ -77,28 +73,56 @@ mod tests {
 
     #[test]
     fn tools_weapons_and_armour_do_not_stack() {
-        for item in ["minecraft:diamond_sword", "minecraft:iron_pickaxe", "minecraft:netherite_helmet", "minecraft:bow", "minecraft:shield", "minecraft:elytra"] {
+        for item in [
+            "minecraft:diamond_sword",
+            "minecraft:iron_pickaxe",
+            "minecraft:netherite_helmet",
+            "minecraft:bow",
+            "minecraft:shield",
+            "minecraft:elytra",
+        ] {
             assert_eq!(max_stack_size(item), 1, "{item}");
         }
     }
 
     #[test]
     fn unique_state_items_do_not_stack() {
-        for item in ["minecraft:potion", "minecraft:splash_potion", "minecraft:water_bucket", "minecraft:red_bed", "minecraft:oak_boat", "minecraft:music_disc_13"] {
+        for item in [
+            "minecraft:potion",
+            "minecraft:splash_potion",
+            "minecraft:water_bucket",
+            "minecraft:red_bed",
+            "minecraft:oak_boat",
+            "minecraft:music_disc_13",
+        ] {
             assert_eq!(max_stack_size(item), 1, "{item}");
         }
     }
 
     #[test]
     fn some_items_stack_to_sixteen() {
-        for item in ["minecraft:bucket", "minecraft:ender_pearl", "minecraft:snowball", "minecraft:egg", "minecraft:oak_sign", "minecraft:white_banner"] {
+        for item in [
+            "minecraft:bucket",
+            "minecraft:ender_pearl",
+            "minecraft:snowball",
+            "minecraft:egg",
+            "minecraft:oak_sign",
+            "minecraft:white_banner",
+        ] {
             assert_eq!(max_stack_size(item), 16, "{item}");
         }
     }
 
     #[test]
     fn everything_else_stacks_to_sixty_four() {
-        for item in ["minecraft:golden_apple", "minecraft:arrow", "minecraft:cobblestone", "minecraft:diamond", "minecraft:enchanted_golden_apple", "minecraft:shulker_shell"] {
+        for item in [
+            "minecraft:golden_apple",
+            "minecraft:arrow",
+            "minecraft:cobblestone",
+            "minecraft:diamond",
+            "minecraft:enchanted_golden_apple",
+            "minecraft:shulker_shell",
+        ] {
             assert_eq!(max_stack_size(item), 64, "{item}");
         }
     }

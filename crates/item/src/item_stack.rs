@@ -125,7 +125,12 @@ mod tests {
 
     #[test]
     fn user_data_survives_the_envelope_round_trip() {
-        let stack = ItemStack { id: 5, count: 1, meta: 0, block_runtime_id: 0 };
+        let stack = ItemStack {
+            id: 5,
+            count: 1,
+            meta: 0,
+            block_runtime_id: 0,
+        };
         let nbt = [10u8, 0, 0, 0];
         let descriptor = stack.to_descriptor_with_user_data(None, &nbt);
         assert_eq!(user_data_of(&descriptor.user_data_buffer), nbt.to_vec());

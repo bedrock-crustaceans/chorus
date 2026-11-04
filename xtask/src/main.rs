@@ -86,7 +86,11 @@ fn bundle_schemas() -> Bundle {
         .map(|(id, name, path)| {
             let document = get(&format!("https://raw.githubusercontent.com/{SCHEMA_REPOSITORY}/{commit}/{path}"));
             let raw: RawSchema = serde_json::from_str(&document).unwrap_or_else(|error| panic!("{path}: {error}"));
-            BundledSchema { id, name, schema: schema::convert(raw) }
+            BundledSchema {
+                id,
+                name,
+                schema: schema::convert(raw),
+            }
         })
         .collect();
     assert!(!schemas.is_empty(), "no block upgrade schemas in {SCHEMA_REPOSITORY} at {commit}");

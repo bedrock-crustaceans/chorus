@@ -53,10 +53,10 @@ pub mod utils {
     pub use chorus_core::utils::*;
 }
 
-use server::Server;
-use logger::setup_logger;
 use core::config::Config;
 use core::schedule::*;
+use logger::setup_logger;
+use server::Server;
 
 #[derive(bevy_ecs::prelude::Resource, Default)]
 pub struct ShutdownState {

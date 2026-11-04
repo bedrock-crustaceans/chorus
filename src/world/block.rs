@@ -1,9 +1,9 @@
 use crate::block::component::mineable_component::MineableComponent;
 use crate::block::component::replaceable_component::ReplaceableComponent;
+use crate::core::math::enums::block_face::BlockFace;
 use crate::entity::components::transform::Transform;
 use crate::level::level::Level;
 use crate::level::{BlockUpdatedMessage, LevelEventMessage, LevelSoundMessage};
-use crate::core::math::enums::block_face::BlockFace;
 use crate::network::BedrockProtocol;
 use crate::network::session::Session;
 use crate::network::session::state::SessionState;
@@ -91,7 +91,13 @@ fn reject_action(action: &BlockActionMessage, writer: &mut MessageWriter<BlockEd
     match action.action {
         PlayerActionType::StartItemUseOn => {
             if let Ok(face) = BlockFace::from_index(action.face as usize) {
-                reject(writer, action.entity, action.position + face.get_unit_vec().as_ivec3(), BlockActionKind::Place, RejectReason::NotAllowed);
+                reject(
+                    writer,
+                    action.entity,
+                    action.position + face.get_unit_vec().as_ivec3(),
+                    BlockActionKind::Place,
+                    RejectReason::NotAllowed,
+                );
             }
         }
         PlayerActionType::PredictDestroyBlock | PlayerActionType::CreativeDestroyBlock => {
@@ -127,7 +133,15 @@ pub struct BlockEdit {
 
 impl BlockEdit {
     pub fn new(entity: Entity, kind: BlockActionKind, dimension: i32, position: IVec3, block_id: i32, face: i32) -> Self {
-        Self { entity, kind, dimension, position, block_id, face, rejection: None }
+        Self {
+            entity,
+            kind,
+            dimension,
+            position,
+            block_id,
+            face,
+            rejection: None,
+        }
     }
 
     pub fn cancel(&mut self) {
@@ -184,7 +198,15 @@ fn edit_command(mut edit: BlockEdit) -> impl Command {
 }
 
 fn resolve_block_edit(params: &mut EditParams, edit: BlockEdit) {
-    let EditParams { level, registry, events, blocks, broken, placed, rejected } = params;
+    let EditParams {
+        level,
+        registry,
+        events,
+        blocks,
+        broken,
+        placed,
+        rejected,
+    } = params;
     let position = edit.position;
     if let Some(reason) = edit.rejection {
         debug!("block edit {:?} at {} was rejected: {:?}", edit.kind, position, reason);
@@ -298,7 +320,18 @@ pub fn handle_block_actions(
                     place_block(action.entity, action, transform, &inventory, dimension, &level, &registry, &mut commands, &mut rejected);
                 }
                 PlayerActionType::PredictDestroyBlock | PlayerActionType::CreativeDestroyBlock => {
-                    break_block(action.entity, action, transform, &mut breaking, dimension, &level, &registry, &mut event_writer, &mut commands, &mut rejected);
+                    break_block(
+                        action.entity,
+                        action,
+                        transform,
+                        &mut breaking,
+                        dimension,
+                        &level,
+                        &registry,
+                        &mut event_writer,
+                        &mut commands,
+                        &mut rejected,
+                    );
                 }
                 _ => {}
             }
@@ -545,7 +578,11 @@ pub fn resync_rejected_edits(mut reader: MessageReader<BlockEditRejected>, level
         };
         session.send(BedrockProtocol::UpdateBlockPacket(
             UpdateBlockPacket {
-                block_position: NetworkBlockPosition { x: position.x, y: position.y, z: position.z },
+                block_position: NetworkBlockPosition {
+                    x: position.x,
+                    y: position.y,
+                    z: position.z,
+                },
                 block_runtime_id: block_id as u32,
                 flags: 0xB,
                 layer: 0,
