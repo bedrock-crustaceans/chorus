@@ -13,6 +13,7 @@ pub struct ItemEntity {
     pickup_delay: u32,
     age: u32,
     pub on_ground: bool,
+    user_data: Vec<u8>,
 }
 
 impl ItemEntity {
@@ -22,6 +23,7 @@ impl ItemEntity {
             pickup_delay: PICKUP_DELAY_TICKS,
             age: 0,
             on_ground: false,
+            user_data: Vec::new(),
         }
     }
 
@@ -34,8 +36,17 @@ impl ItemEntity {
         }
     }
 
+    pub fn with_user_data(mut self, user_data: Vec<u8>) -> Self {
+        self.user_data = user_data;
+        self
+    }
+
+    pub fn user_data(&self) -> &[u8] {
+        &self.user_data
+    }
+
     pub fn absorb(&mut self, other: &mut ItemEntity, max: u16) -> u16 {
-        if !self.stack.is_same(&other.stack) {
+        if !self.stack.is_same(&other.stack) || self.user_data != other.user_data {
             return 0;
         }
         let moved = max.saturating_sub(self.stack.count).min(other.stack.count);
@@ -55,6 +66,7 @@ impl ItemEntity {
             pickup_delay,
             age,
             on_ground: false,
+            user_data: Vec::new(),
         }
     }
 

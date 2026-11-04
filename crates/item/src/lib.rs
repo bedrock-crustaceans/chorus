@@ -1,6 +1,7 @@
 pub mod item_entity;
 pub mod item_registry;
 pub mod item_stack;
+pub mod stack_size;
 
 use bevy_ecs::prelude::{Entity, Message};
 

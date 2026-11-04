@@ -16,6 +16,7 @@ use tracing::{info, warn};
 /// it. Both are vanilla data for the protocol chorus speaks.
 const ITEM_PALETTE: &str = include_str!("../resources/item_palette.json");
 const CREATIVE_ITEMS: &str = include_str!("../resources/creative_items.json");
+const ITEM_COMPONENTS: &[u8] = include_bytes!("../resources/item_components.nbt");
 
 #[derive(Deserialize)]
 struct ItemPalette {
@@ -65,6 +66,8 @@ pub struct ItemDefinition {
 pub struct ItemRegistry {
     items: Vec<ItemDefinition>,
     index: HashMap<String, i16>,
+    max_stacks: HashMap<i16, u16>,
+    components: HashMap<String, nbtx::Value>,
 
     creative: CreativeContent,
 }
@@ -80,11 +83,20 @@ impl ItemRegistry {
         Self::default()
     }
 
+    pub fn identifier(&self, runtime_id: i16) -> Option<&str> {
+        self.items.iter().find(|definition| definition.runtime_id == runtime_id).map(|definition| definition.identifier.as_str())
+    }
+
+    pub fn max_stack_size(&self, runtime_id: i16) -> u16 {
+        self.max_stacks.get(&runtime_id).copied().unwrap_or(64)
+    }
+
     #[tracing::instrument(name = "registry", skip_all)]
     pub fn init(mut commands: Commands) {
         let mut registry = Self::new();
 
         registry.load_items();
+        registry.load_components();
         registry.load_creative();
 
         info!("registered {} items, {} creative entries", registry.items.len(), registry.creative.contents.len());
@@ -103,12 +115,29 @@ impl ItemRegistry {
 
         for item in palette {
             self.index.insert(item.name.clone(), item.id);
+            self.max_stacks.insert(item.id, crate::stack_size::max_stack_size(&item.name));
             self.items.push(ItemDefinition {
                 identifier: item.name,
                 runtime_id: item.id,
                 version: item_version(item.version),
                 component_based: item.component_based,
             });
+        }
+    }
+
+    fn load_components(&mut self) {
+        let mut bytes = ITEM_COMPONENTS;
+        let entries: HashMap<String, HashMap<String, nbtx::Value>> = match nbtx::from_be_bytes(&mut bytes) {
+            Ok(entries) => entries,
+            Err(err) => {
+                warn!("failed to read the item components: {}", err);
+                return;
+            }
+        };
+        for (identifier, mut entry) in entries {
+            if let Some(components) = entry.remove("components") {
+                self.components.insert(identifier, components);
+            }
         }
     }
 
@@ -176,13 +205,15 @@ impl ItemRegistry {
             items: self
                 .items
                 .iter()
-                .map(|item| ItemsEntry {
-                    component_item_name: item.identifier.clone(),
-                    runtime_id: item.runtime_id,
-                    is_component_based: item.component_based,
-                    version: item.version.clone(),
-                    // chorus does not ship the component definitions yet
-                    component_data: nbtx::Value::Compound(IndexMap::new()),
+                .filter_map(|item| {
+                    let components = self.components.get(&item.identifier)?;
+                    Some(ItemsEntry {
+                        component_item_name: item.identifier.clone(),
+                        runtime_id: item.runtime_id,
+                        is_component_based: item.component_based,
+                        version: item.version.clone(),
+                        component_data: nbtx::Value::Compound(IndexMap::from([("components".into(), components.clone())])),
+                    })
                 })
                 .collect(),
         }
@@ -243,6 +274,7 @@ mod tests {
     fn registry() -> ItemRegistry {
         let mut registry = ItemRegistry::new();
         registry.load_items();
+        registry.load_components();
         registry.load_creative();
         registry
     }
@@ -275,12 +307,42 @@ mod tests {
     }
 
     #[test]
-    fn the_item_packet_lists_every_item() {
+    fn the_item_packet_lists_the_items_that_have_components() {
         let registry = registry();
         let packet = registry.to_packet();
-        assert_eq!(packet.items.len(), registry.items().len());
+        assert!(!packet.items.is_empty() && packet.items.len() < registry.items().len());
         let apple = packet.items.iter().find(|item| item.component_item_name == "minecraft:apple").unwrap();
         assert_eq!(Some(apple.runtime_id), registry.get("minecraft:apple"));
+    }
+
+    fn child<'a>(value: &'a nbtx::Value, key: &str) -> &'a nbtx::Value {
+        let nbtx::Value::Compound(compound) = value else { panic!("{key}: not a compound") };
+        compound.iter().find(|(name, _)| name.as_slice() == key.as_bytes()).map(|(_, value)| value).unwrap_or_else(|| panic!("{key} is missing"))
+    }
+
+    #[test]
+    fn a_golden_apple_can_always_be_eaten() {
+        let registry = registry();
+        let packet = registry.to_packet();
+        let apple = packet.items.iter().find(|item| item.component_item_name == "minecraft:golden_apple").unwrap();
+        let components = child(&apple.component_data, "components");
+        let food = child(components, "minecraft:food");
+        assert!(matches!(child(food, "can_always_eat"), nbtx::Value::Byte(1)));
+    }
+
+    #[test]
+    fn creative_blocks_are_known_to_the_block_registry() {
+        let mut blocks = chorus_block::block_registry::BlockRegistry::new();
+        blocks.register_all(chorus_block::r#impl::DEFINITIONS.iter().copied());
+        let registry = registry();
+        let unknown: Vec<i32> = registry
+            .creative
+            .contents
+            .iter()
+            .map(|entry| entry.item_instance.block_runtime_id)
+            .filter(|id| *id != 0 && blocks.get_permutation(*id).is_none())
+            .collect();
+        assert!(unknown.is_empty(), "{} creative blocks are not in the block registry, first {:?}", unknown.len(), unknown.first());
     }
 
     #[test]
