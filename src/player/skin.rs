@@ -136,7 +136,7 @@ impl PlayerAppearance {
             is_persona_cape_on_classic_skin: claims.cape_on_classic_skin,
             is_primary_user: true,
             overrides_player_appearance: claims.override_skin,
-            trusted_skin_flag: "Unset".into(),
+            trusted_skin_flag: claims.trusted_skin.to_string(),
             profile_hash: claims.profile_hash.clone(),
         };
         Self {
@@ -157,6 +157,15 @@ mod tests {
         let claims = ClientData::offline("1.21.0", "127.0.0.1", "Steve");
         let appearance = PlayerAppearance::from_client_data(&claims);
         assert_eq!(appearance.skin.skin_resource_patch, r#"{"geometry":{"default":"geometry.humanoid.custom"}}"#);
+    }
+
+    #[test]
+    fn the_trusted_flag_is_the_one_the_client_sent() {
+        let mut claims = ClientData::offline("1.21.0", "127.0.0.1", "Steve");
+        claims.trusted_skin = false;
+        assert_eq!(PlayerAppearance::from_client_data(&claims).skin.trusted_skin_flag, "false");
+        claims.trusted_skin = true;
+        assert_eq!(PlayerAppearance::from_client_data(&claims).skin.trusted_skin_flag, "true");
     }
 
     #[test]
