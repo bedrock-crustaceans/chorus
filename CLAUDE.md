@@ -8,6 +8,8 @@ Chorus is Minecraft Bedrock Edition server software written in Rust. It is built
 
 `bedrock-rs`, `bevy-raknet`, `bevy-nethernet` and `nbtx` are git dependencies pinned to `branch = "main"` in `Cargo.toml`; nothing is vendored. To develop against a local checkout of one of them, add a temporary `[patch]` section and do not commit it.
 
+The block state upgrade schemas are bundled into `crates/block/resources/block_upgrade_schemas.json`, generated from the latest `opencollab-incubator/BedrockBlockUpgradeSchema` with `cargo run -p xtask -- block-upgrade-schemas` (fetches over HTTP, needs network). The upgrader only applies schemas up to the server's block state version. The item palette, creative items and item components in `crates/item/resources` come from one commit of the `PowerNukkitX/Gamedata` repository, written together by `cargo run -p xtask -- item-data [branch]` (default `r/26_u6`); the components stay a binary file because the client needs their exact NBT types.
+
 ## Commands
 
 ```bash
@@ -47,12 +49,13 @@ Chorus is a Cargo workspace. The root package `chorus` (`src/`) is the server: n
 |---|---|---|
 | `chorus_core` | `crates/core` | config, math, utils, version info, the `BedrockProtocol` alias, tick schedule types (`Tick`, `TickSet`, `TickClock`, `Scheduler`, `TICK_RATE`). Error types live in the module that uses them. |
 | `chorus_block` | `crates/block` | block definitions, states, components, `block_registry`, block permutation hashing |
+| `chorus_block_schema` | `crates/block_schema` | the format of the bundled block state upgrade schemas, shared by `chorus_block` and the xtask |
 | `chorus_entity` | `crates/entity` | entity components and NBT structs |
 | `chorus_item` | `crates/item` | item stacks, `item_registry` and its bundled JSON |
 | `chorus_level` | `crates/level` | world state: chunk, sub-chunk, palettes, biome ids and the biome definition list, dimension types, the `Level` resource, level messages, and the generation framework under `generator` (`Dimension`, `Generator`, `WorldGenerator`, the phase graph, phase errors) |
 | `chorus_worldgen` | `crates/worldgen` | the concrete generators: `flat`, `random`, `void` and `overworld` |
 
-Dependencies only point downwards (core, then block, then item and level, then worldgen, then the root). The root `chorus` crate re-exports the old module paths (`chorus::block`, `chorus::level`, `chorus::level::generator::r#impl` for worldgen, `chorus::utils`, `chorus::registry::block_registry`, ...), so app code and downstream users such as Pyrite keep their imports. Shared dependency versions live in `[workspace.dependencies]`.
+Dependencies only point downwards (core, then block, then item and level, then worldgen, then the root). The root `chorus` crate exposes every crate as a module (`chorus::core`, `chorus::block`, `chorus::entity`, `chorus::item`, `chorus::level` with `level::generator::r#impl` for worldgen, `chorus::worldgen`, `chorus::utils`), and `chorus::schedule` holds the schedule types (`Tick`, `TickSet`, `Scheduler`, ...) next to `GameSet`. Downstream users such as Pyrite and the Enderverse plugin depend on `chorus` alone. Shared dependency versions live in `[workspace.dependencies]`.
 
 ## Architecture
 

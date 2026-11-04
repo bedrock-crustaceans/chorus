@@ -2,7 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_permutation::BlockPermutation;
 use crate::component::block_components::BlockComponents;
 use crate::r#impl::DEFINITIONS;
-use crate::state::block_state::BlockState;
+use crate::state::block_state::{BlockState, BlockStateDefinition};
 use atomicow::CowArc;
 use bevy_ecs::prelude::{Commands, Resource};
 use rand::prelude::IteratorRandom;
@@ -107,6 +107,27 @@ impl BlockRegistry {
         self.indexed_hash.get(&(definition.identifier.clone(), index)).copied()
     }
 
+    pub fn get_block_id_lenient(&self, identifier: &str, states: &[(&str, BlockState)]) -> Option<i32> {
+        let definition = self.definitions.get(identifier)?;
+        let mut values = self.permutations.get(self.default_hash.get(identifier)?)?.get_states().clone();
+
+        for (name, value) in states {
+            let Some(state) = definition.states.iter().find(|state| state.identifier().as_ref() == *name) else {
+                continue;
+            };
+            let adjusted = match (state.as_ref(), value) {
+                (BlockStateDefinition::Int { .. }, BlockState::Bool(value)) => BlockState::Int(*value as i32),
+                (BlockStateDefinition::Bool { .. }, BlockState::Int(value)) => BlockState::Bool(*value != 0),
+                _ => value.clone(),
+            };
+            if (0..state.values_len() as i32).contains(&state.index_of(&adjusted)) {
+                values.insert(state.identifier().clone(), adjusted);
+            }
+        }
+
+        let index = BlockPermutation::compute_index(&values, definition.states.as_ref());
+        self.indexed_hash.get(&(definition.identifier.clone(), index)).copied()
+    }
     pub fn get_components(&self, hash: i32) -> Option<&BlockComponents> {
         self.components.get(&hash)
     }

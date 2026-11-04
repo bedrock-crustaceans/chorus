@@ -3,6 +3,7 @@ pub mod block_id;
 pub mod block_permutation;
 pub mod block_registry;
 pub mod block_type;
+pub mod block_upgrade;
 pub mod component;
 pub mod hash_utils;
 pub mod r#impl;

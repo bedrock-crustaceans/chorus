@@ -7,10 +7,13 @@ authors.workspace = true
 
 [dependencies]
 chorus_core.workspace = true
+chorus_block_schema.workspace = true
 atomicow.workspace = true
 bedrock.workspace = true
 bevy_ecs.workspace = true
 glam.workspace = true
 nbtx.workspace = true
 rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 tracing.workspace = true
