@@ -15,6 +15,22 @@ pub struct ResourcePacks {
 }
 
 impl ResourcePacks {
+    pub fn from_packs(packs: Vec<ResourcePack>) -> Self {
+        let mut res = Self::default();
+        for pack in packs {
+            let idx = res.packs.len();
+            res.by_id.insert(pack.pack_id(), idx);
+            res.packs.push(pack);
+        }
+        res
+    }
+
+    pub fn push(&mut self, pack: ResourcePack) {
+        let idx = self.packs.len();
+        self.by_id.insert(pack.pack_id(), idx);
+        self.packs.push(pack);
+    }
+
     pub fn packs(&self) -> &[ResourcePack] {
         &self.packs
     }

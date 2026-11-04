@@ -6,6 +6,7 @@ const LOAD_MARGIN: i32 = 1;
 #[derive(Component, Default)]
 pub struct ChunkView {
     pub(crate) dimension: i32,
+    pub(crate) network_dimension: i32,
     pub(crate) dimension_changes: i32,
     pub radius: i32,
     pub center: Option<(i32, i32)>,

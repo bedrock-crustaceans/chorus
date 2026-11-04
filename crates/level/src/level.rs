@@ -133,8 +133,22 @@ impl Level {
         dimension.set_retention_budget(self.retention_budget);
         dimension.set_lookahead(self.lookahead);
         dimension.set_chunk_cache(self.chunk_cache);
-        self.remove_dimension(dimension_type.id());
-        self.dimensions.entry(dimension_type.id()).or_insert(dimension)
+        let id = dimension.id();
+        self.remove_dimension(id);
+        self.dimensions.entry(id).or_insert(dimension)
+    }
+
+    pub fn insert_world<G: Generator>(&mut self, world_id: i32, dimension_type: DimensionType, generator: G) -> &mut Dimension {
+        let mut dimension = Dimension::new(dimension_type, generator).with_world_id(world_id);
+        dimension.set_keep_loaded(true);
+        dimension.set_retention_budget(self.retention_budget);
+        dimension.set_lookahead(self.lookahead);
+        self.remove_dimension(world_id);
+        self.dimensions.entry(world_id).or_insert(dimension)
+    }
+
+    pub fn network_id(&self, world_id: i32) -> Option<i32> {
+        self.dimension(world_id).map(Dimension::network_id)
     }
 
     pub fn remove_dimension(&mut self, id: i32) -> Option<Dimension> {
@@ -237,6 +251,18 @@ impl Level {
 
     pub fn get_block(&self, dim: i32, x: i32, y: i32, z: i32, layer: usize) -> Option<i32> {
         self.dimension(dim)?.get_block(x, y, z, layer)
+    }
+
+    pub fn get_block_entity(&self, dim: i32, x: i32, y: i32, z: i32) -> Option<&nbtx::Value> {
+        self.dimension(dim)?.get_block_entity(x, y, z)
+    }
+
+    pub fn set_block_entity(&mut self, dim: i32, x: i32, y: i32, z: i32, data: nbtx::Value) -> bool {
+        self.dimension_mut(dim).is_some_and(|dimension| dimension.set_block_entity(x, y, z, data))
+    }
+
+    pub fn remove_block_entity(&mut self, dim: i32, x: i32, y: i32, z: i32) -> bool {
+        self.dimension_mut(dim).is_some_and(|dimension| dimension.remove_block_entity(x, y, z))
     }
 
     pub fn set_block(&mut self, dim: i32, x: i32, y: i32, z: i32, layer: usize, block_id: i32, writer: &mut MessageWriter<BlockUpdatedMessage>) -> bool {

@@ -173,7 +173,8 @@ pub fn update_chunk_order(mut query: Query<(&mut Session, &Transform, &mut Chunk
     for (mut session, transform, mut view, mut breaking, actor, dimension) in query.iter_mut() {
         if view.dimension != dimension.0 {
             breaking.current = None;
-            switch_dimension(&mut session, transform, &mut view, actor, dimension.0, &mut left_view);
+            let target_network = level.network_id(dimension.0).unwrap_or(dimension.0);
+            switch_dimension(&mut session, transform, &mut view, actor, dimension.0, target_network, &mut left_view);
         }
 
         if view.radius == 0 {
@@ -229,24 +230,44 @@ pub fn update_chunk_order(mut query: Query<(&mut Session, &Transform, &mut Chunk
     }
 }
 
-fn switch_dimension(session: &mut Session, transform: &Transform, view: &mut ChunkView, actor: &ActorId, target: i32, abandoned: &mut HashMap<i32, Vec<(i32, i32)>>) {
-    let requested = std::mem::take(&mut view.requested);
-    abandoned.entry(view.dimension).or_default().extend(requested);
-    view.sent.clear();
-    view.pending.clear();
-    view.center = None;
-    view.dimension = target;
-    view.dimension_changes += 1;
+fn detour_dimension(network_id: i32) -> i32 {
+    (network_id + 1) % 3
+}
 
+fn send_change_dimension(session: &mut Session, transform: &Transform, view: &mut ChunkView, network_id: i32) {
+    view.dimension_changes += 1;
     session.send(BedrockProtocol::ChangeDimensionPacket(
         ChangeDimensionPacket {
-            dimension_id: target,
+            dimension_id: network_id,
             position: (transform.position.x, transform.position.y, transform.position.z),
             respawn: false,
             loading_screen_id: Some(view.dimension_changes),
         }
         .into(),
     ));
+}
+
+fn switch_dimension(
+    session: &mut Session,
+    transform: &Transform,
+    view: &mut ChunkView,
+    actor: &ActorId,
+    target: i32,
+    target_network: i32,
+    abandoned: &mut HashMap<i32, Vec<(i32, i32)>>,
+) {
+    let requested = std::mem::take(&mut view.requested);
+    abandoned.entry(view.dimension).or_default().extend(requested);
+    view.sent.clear();
+    view.pending.clear();
+    view.center = None;
+    view.dimension = target;
+
+    if view.network_dimension == target_network {
+        send_change_dimension(session, transform, view, detour_dimension(target_network));
+    }
+    view.network_dimension = target_network;
+    send_change_dimension(session, transform, view, target_network);
     session.send_play_status(PlayStatus::PlayerSpawn, false);
 
     let origin = || NetworkBlockPosition { x: 0, y: 0, z: 0 };
@@ -419,7 +440,7 @@ pub fn transmit_pending_chunks(
             session.send(BedrockProtocol::LevelChunkPacket(
                 LevelChunkPacket {
                     chunk_position: ChunkPos { x, z },
-                    dimension_id: view.dimension,
+                    dimension_id: level.network_id(view.dimension).unwrap_or(view.dimension),
                     sub_chunk_count: if config.network.chunks.subchunks { 0 } else { payload.sub_chunk_count },
                     client_request_sub_chunk_limit: config.network.chunks.subchunks.then_some(payload.sub_chunk_limit as i32),
                     cache_enabled: !cache_blobs.is_empty(),
@@ -523,7 +544,7 @@ fn resolve_sub_chunk_position(center: (i32, i32, i32), offset: (i32, i32, i32)) 
     Some((x, y, z))
 }
 
-pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>, mut query: Query<(&mut Session, Option<&mut ClientBlobCache>)>, level: Res<Level>, config: Res<Config>) {
+pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>, mut query: Query<(&mut Session, Option<&mut ClientBlobCache>, &ChunkView)>, level: Res<Level>, config: Res<Config>) {
     let blobs_enabled = config.network.chunks.cache;
     let subchunks_enabled = config.network.chunks.subchunks;
 
@@ -536,11 +557,11 @@ pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>
             continue;
         }
 
-        let Ok((mut session, mut cache)) = query.get_mut(ev.entity) else {
+        let Ok((mut session, mut cache, view)) = query.get_mut(ev.entity) else {
             continue;
         };
 
-        let Some(dim) = level.dimension(packet.dimension_type) else {
+        let Some(dim) = level.dimension(view.dimension) else {
             continue;
         };
 

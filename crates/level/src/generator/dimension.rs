@@ -52,6 +52,8 @@ pub trait WorldGenerator: Send + Sync {
 
 pub struct Dimension {
     pub dimension_type: DimensionType,
+    world_id: i32,
+    keep_loaded: bool,
     generator: Box<dyn WorldGenerator>,
     chunks: HashMap<(i32, i32), Arc<Chunk>>,
     storage: Option<Arc<LevelStorage>>,
@@ -74,6 +76,8 @@ impl Dimension {
     pub fn new<G: Generator>(dimension_type: DimensionType, generator: G) -> Self {
         Self {
             dimension_type,
+            world_id: dimension_type.id(),
+            keep_loaded: false,
             generator: Box::new(PhaseGraph::new(generator)),
             chunks: HashMap::new(),
             storage: None,
@@ -89,6 +93,15 @@ impl Dimension {
             cold_capacity: 0,
             chunk_cache: 0.0,
         }
+    }
+
+    pub fn with_world_id(mut self, world_id: i32) -> Self {
+        self.world_id = world_id;
+        self
+    }
+
+    pub fn set_keep_loaded(&mut self, keep_loaded: bool) {
+        self.keep_loaded = keep_loaded;
     }
 
     pub fn with_storage(mut self, storage: Arc<LevelStorage>) -> Self {
@@ -187,6 +200,10 @@ impl Dimension {
     }
 
     pub fn id(&self) -> i32 {
+        self.world_id
+    }
+
+    pub fn network_id(&self) -> i32 {
         self.dimension_type.id()
     }
 
@@ -285,6 +302,9 @@ impl Dimension {
     }
 
     pub fn unload_chunks(&mut self, keep: impl Fn(i32, i32) -> bool) -> usize {
+        if self.keep_loaded {
+            return 0;
+        }
         let persistent = self.storage.is_some();
         let unloading: Vec<(i32, i32)> = self
             .chunks
@@ -356,6 +376,28 @@ impl Dimension {
 
     pub fn get_block(&self, x: i32, y: i32, z: i32, layer: usize) -> Option<i32> {
         self.chunks.get(&(x >> 4, z >> 4)).and_then(|chunk| chunk.get_block((x & 0xF) as u8, y, (z & 0xF) as u8, layer))
+    }
+
+    pub fn insert_chunk(&mut self, x: i32, z: i32, chunk: Arc<Chunk>) {
+        self.cancelled.remove(&(x, z));
+        if self.chunks.insert((x, z), chunk).is_none() {
+            self.available.push((x, z));
+        }
+    }
+
+    pub fn get_block_entity(&self, x: i32, y: i32, z: i32) -> Option<&nbtx::Value> {
+        self.chunks.get(&(x >> 4, z >> 4))?.block_entity_at(x, y, z)
+    }
+
+    pub fn set_block_entity(&mut self, x: i32, y: i32, z: i32, data: nbtx::Value) -> bool {
+        let Some(chunk) = self.chunks.get_mut(&(x >> 4, z >> 4)) else { return false };
+        Arc::make_mut(chunk).set_block_entity(x, y, z, data);
+        true
+    }
+
+    pub fn remove_block_entity(&mut self, x: i32, y: i32, z: i32) -> bool {
+        let Some(chunk) = self.chunks.get_mut(&(x >> 4, z >> 4)) else { return false };
+        Arc::make_mut(chunk).remove_block_entity(x, y, z)
     }
 
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, layer: usize, block_id: i32) -> bool {

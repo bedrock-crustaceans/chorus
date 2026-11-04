@@ -70,7 +70,10 @@ enum ManifestVersion {
 impl ResourcePack {
     pub fn from_zip(path: impl AsRef<Path>) -> Result<Self, ResourcePackError> {
         let data = fs::read(path.as_ref()).map_err(ResourcePackError::Io)?;
+        Self::from_bytes(data)
+    }
 
+    pub fn from_bytes(data: Vec<u8>) -> Result<Self, ResourcePackError> {
         let cursor = std::io::Cursor::new(&data);
         let mut archive = zip::ZipArchive::new(cursor).map_err(ResourcePackError::Zip)?;
 
@@ -100,6 +103,10 @@ impl ResourcePack {
     }
 
     /// Returns the identifier used in protocol chunk requests: `{uuid}_{version}`.
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
     pub fn pack_id(&self) -> String {
         format!("{}_{}", self.uuid, self.version)
     }

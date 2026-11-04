@@ -51,9 +51,13 @@ pub fn load_chunk_actors(world: &mut World) {
     world.init_resource::<StoredActorChunks>();
     let Some(mut level) = world.get_resource_mut::<Level>() else { return };
     let Some(storage) = level.storage().cloned() else { return };
-    let available: Vec<(DimensionType, Vec<(i32, i32)>)> = level.dimensions_mut().map(|dimension| (dimension.dimension_type, dimension.take_available())).collect();
+    let available: Vec<(DimensionType, i32, Vec<(i32, i32)>)> = level
+        .dimensions_mut()
+        .map(|dimension| (dimension.dimension_type, dimension.id(), dimension.take_available()))
+        .filter(|(_, id, _)| DimensionType::from_id(*id).is_some())
+        .collect();
 
-    for (dimension, positions) in available {
+    for (dimension, id, positions) in available {
         for (x, z) in positions {
             let entities = match storage.load_entities(dimension, x, z) {
                 Ok(entities) => entities,
@@ -65,11 +69,11 @@ pub fn load_chunk_actors(world: &mut World) {
             if entities.is_empty() {
                 continue;
             }
-            world.resource_mut::<StoredActorChunks>().0.insert((dimension.id(), x, z));
+            world.resource_mut::<StoredActorChunks>().0.insert((id, x, z));
             for nbt in entities {
                 let load = identifier(&nbt).and_then(|identifier| world.resource::<ActorRegistry>().kinds.get(identifier.as_str()).map(|(_, load)| *load));
                 if let Some(load) = load {
-                    load(world, &nbt, dimension.id());
+                    load(world, &nbt, id);
                 }
             }
         }

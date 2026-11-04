@@ -16,6 +16,15 @@ pub struct BlockEntity {
     pub data: nbtx::Value,
 }
 
+fn entity_column(data: &nbtx::Value) -> Option<(i32, i32)> {
+    let tag = data.as_compound()?;
+    let coordinate = |name: &str| match tag.get(name.as_bytes()) {
+        Some(nbtx::Value::Int(value)) => Some(*value),
+        _ => None,
+    };
+    Some((coordinate("x")?, coordinate("z")?))
+}
+
 impl Chunk {
     pub fn new(x: i32, z: i32, min_sub_chunk_y: i8, count: usize, air_id: i32, biome: i32) -> Self {
         Self {
@@ -110,6 +119,9 @@ impl Chunk {
         };
         let changed = self.sub_chunks.get_mut(index).is_some_and(|sub_chunk| sub_chunk.set(x, (y & 0xF) as u8, z, layer, block_id));
         self.dirty |= changed;
+        if changed && layer == 0 {
+            self.remove_block_entity(self.x * 16 + i32::from(x), y, self.z * 16 + i32::from(z));
+        }
         changed
     }
 
@@ -142,6 +154,26 @@ impl Chunk {
 
     pub fn block_entities(&self) -> &[BlockEntity] {
         &self.block_entities
+    }
+
+    pub fn block_entity_at(&self, x: i32, y: i32, z: i32) -> Option<&nbtx::Value> {
+        self.block_entities.iter().find(|entity| entity.y == y && entity_column(&entity.data) == Some((x, z))).map(|entity| &entity.data)
+    }
+
+    pub fn set_block_entity(&mut self, x: i32, y: i32, z: i32, data: nbtx::Value) {
+        match self.block_entities.iter_mut().find(|entity| entity.y == y && entity_column(&entity.data) == Some((x, z))) {
+            Some(entity) => entity.data = data,
+            None => self.block_entities.push(BlockEntity { y, data }),
+        }
+        self.dirty = true;
+    }
+
+    pub fn remove_block_entity(&mut self, x: i32, y: i32, z: i32) -> bool {
+        let before = self.block_entities.len();
+        self.block_entities.retain(|entity| !(entity.y == y && entity_column(&entity.data) == Some((x, z))));
+        let removed = self.block_entities.len() != before;
+        self.dirty |= removed;
+        removed
     }
 
     pub fn sub_chunk_count(&self) -> usize {
@@ -339,5 +371,90 @@ mod tests {
         assert_eq!(chunk.get_block(0, 0, 0, 0), Some(0));
         assert_eq!(chunk.get_biome(0, 4096, 0), None);
         assert!(!chunk.set_biome(0, 4096, 0, 3));
+    }
+}
+
+#[cfg(test)]
+mod block_entity_tests {
+    use super::*;
+
+    fn entity(x: i32, y: i32, z: i32, tag: i8) -> nbtx::Value {
+        let mut compound = nbtx::Compound::new();
+        compound.insert("x".into(), nbtx::Value::Int(x));
+        compound.insert("y".into(), nbtx::Value::Int(y));
+        compound.insert("z".into(), nbtx::Value::Int(z));
+        compound.insert("marker".into(), nbtx::Value::Byte(tag));
+        nbtx::Value::Compound(compound)
+    }
+
+    fn marker(chunk: &Chunk, x: i32, y: i32, z: i32) -> Option<i8> {
+        match chunk.block_entity_at(x, y, z)?.as_compound()?.get("marker".as_bytes())? {
+            nbtx::Value::Byte(value) => Some(*value),
+            _ => None,
+        }
+    }
+
+    fn chunk() -> Chunk {
+        Chunk::new(0, 0, -4, 24, 0, 0)
+    }
+
+    #[test]
+    fn a_block_entity_is_found_where_it_was_put() {
+        let mut chunk = chunk();
+        assert!(chunk.block_entity_at(3, 64, 5).is_none());
+        chunk.set_block_entity(3, 64, 5, entity(3, 64, 5, 1));
+        assert_eq!(marker(&chunk, 3, 64, 5), Some(1));
+        assert!(chunk.block_entity_at(3, 65, 5).is_none());
+        assert!(chunk.block_entity_at(4, 64, 5).is_none());
+    }
+
+    #[test]
+    fn setting_again_replaces_instead_of_adding() {
+        let mut chunk = chunk();
+        chunk.set_block_entity(3, 64, 5, entity(3, 64, 5, 1));
+        chunk.set_block_entity(3, 64, 5, entity(3, 64, 5, 2));
+        assert_eq!(chunk.block_entities().len(), 1);
+        assert_eq!(marker(&chunk, 3, 64, 5), Some(2));
+    }
+
+    #[test]
+    fn two_blocks_in_one_sub_chunk_keep_separate_entities() {
+        let mut chunk = chunk();
+        chunk.set_block_entity(1, 64, 1, entity(1, 64, 1, 1));
+        chunk.set_block_entity(2, 64, 1, entity(2, 64, 1, 2));
+        assert_eq!(marker(&chunk, 1, 64, 1), Some(1));
+        assert_eq!(marker(&chunk, 2, 64, 1), Some(2));
+    }
+
+    #[test]
+    fn removing_reports_whether_there_was_one_and_marks_the_chunk_to_save() {
+        let mut chunk = chunk();
+        assert!(!chunk.remove_block_entity(3, 64, 5));
+        assert!(!chunk.is_dirty());
+        chunk.set_block_entity(3, 64, 5, entity(3, 64, 5, 1));
+        chunk.mark_saved();
+        assert!(chunk.remove_block_entity(3, 64, 5));
+        assert!(chunk.is_dirty());
+        assert!(chunk.block_entity_at(3, 64, 5).is_none());
+    }
+
+    #[test]
+    fn replacing_the_block_removes_its_block_entity() {
+        let mut chunk = Chunk::new(2, -1, -4, 24, 0, 0);
+        let (x, y, z) = (2 * 16 + 3, 64, -16 + 5);
+        chunk.set_block(3, y, 5, 0, 9);
+        chunk.set_block_entity(x, y, z, entity(x, y, z, 1));
+        assert!(chunk.block_entity_at(x, y, z).is_some());
+        assert!(!chunk.set_block(3, y, 5, 0, 9), "the same block changes nothing");
+        assert!(chunk.block_entity_at(x, y, z).is_some());
+        assert!(chunk.set_block(3, y, 5, 0, 0));
+        assert!(chunk.block_entity_at(x, y, z).is_none());
+    }
+
+    #[test]
+    fn changing_a_block_entity_marks_the_chunk_to_save() {
+        let mut chunk = chunk();
+        chunk.set_block_entity(3, 64, 5, entity(3, 64, 5, 1));
+        assert!(chunk.is_dirty());
     }
 }

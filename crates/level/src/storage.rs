@@ -4,16 +4,18 @@ use crate::sub_chunk::SubChunk;
 use bedrock::level::db::{CompactionMode, Database, OpenOptions, WriteBatch};
 use chorus_block::block_permutation::BlockPermutation;
 use chorus_block::block_registry::BlockRegistry;
+use chorus_block::block_upgrade::{UpgradedBlockState, upgrade_block_state};
 use chorus_block::hash_utils::HashUtils;
+use chorus_block::state::block_state::BlockState;
 use glam::IVec3;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tracing::{debug, error, info};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tracing::{debug, error, info, warn};
 
 const CHUNK_VERSION: u8 = 40;
 const SUB_CHUNK_VERSION: u8 = 9;
@@ -99,6 +101,50 @@ struct CompactionProgress {
     slices: u32,
 }
 
+#[derive(Default)]
+struct UnresolvedBlocks {
+    reported_unknown: HashSet<String>,
+    reported_state_fallback: HashSet<String>,
+    suppressed: u64,
+    last_summary: Option<Instant>,
+}
+
+impl UnresolvedBlocks {
+    fn report_unknown(&mut self, name: &str, states: &nbtx::Compound) {
+        if self.reported_unknown.insert(name.to_owned()) {
+            warn!(block = name, states = ?states, "block state is not registered after upgrading; substituting minecraft:unknown");
+        } else {
+            self.suppressed = self.suppressed.saturating_add(1);
+        }
+        self.summarise();
+    }
+
+    fn report_state_fallback(&mut self, name: &str, states: &nbtx::Compound) {
+        if self.reported_state_fallback.insert(name.to_owned()) {
+            warn!(block = name, states = ?states, "block state is not registered after upgrading; using the block's default permutation");
+        } else {
+            self.suppressed = self.suppressed.saturating_add(1);
+        }
+        self.summarise();
+    }
+
+    fn summarise(&mut self) {
+        let now = Instant::now();
+        if self.last_summary.is_none_or(|last| now.duration_since(last) >= Duration::from_secs(60)) {
+            if self.suppressed > 0 {
+                warn!(
+                    count = self.suppressed,
+                    distinct_unknown = self.reported_unknown.len(),
+                    distinct_state_fallback = self.reported_state_fallback.len(),
+                    "additional block states could not be resolved cleanly"
+                );
+                self.suppressed = 0;
+            }
+            self.last_summary = Some(now);
+        }
+    }
+}
+
 pub struct LevelStorage {
     path: PathBuf,
     db: Mutex<Database>,
@@ -107,9 +153,12 @@ pub struct LevelStorage {
     compacting: AtomicBool,
     compaction: Mutex<CompactionProgress>,
     air_id: i32,
+    unknown_id: i32,
     permutations: Arc<HashMap<i32, BlockPermutation>>,
+    default_block_ids: HashMap<String, i32>,
     block_nbt: HashMap<i32, OnceLock<Arc<[u8]>>>,
     block_ids: Mutex<HashMap<Vec<u8>, i32>>,
+    unresolved: Mutex<UnresolvedBlocks>,
 }
 
 impl LevelStorage {
@@ -123,6 +172,13 @@ impl LevelStorage {
         };
         let db = Database::open_with(db_path.to_string_lossy(), options).map_err(database_error)?;
 
+        let mut default_block_ids = HashMap::new();
+        for id in registry.get_all_block_ids() {
+            if let Some(permutation) = registry.get_permutation(id) {
+                default_block_ids.entry(permutation.get_identifier().to_owned()).or_insert(id);
+            }
+        }
+
         Ok(Self {
             path,
             db: Mutex::new(db),
@@ -131,9 +187,12 @@ impl LevelStorage {
             compacting: AtomicBool::new(false),
             compaction: Mutex::new(CompactionProgress::default()),
             air_id: registry.get_block_id("minecraft:air").expect("air is registered"),
+            unknown_id: registry.get_block_id("minecraft:unknown").unwrap_or(-2),
             permutations: registry.permutation_table(),
+            default_block_ids,
             block_nbt: registry.permutations().map(|permutation| (permutation.get_hash(), OnceLock::new())).collect(),
             block_ids: Mutex::new(HashMap::new()),
+            unresolved: Mutex::new(UnresolvedBlocks::default()),
         })
     }
 
@@ -550,9 +609,61 @@ impl LevelStorage {
             Some(nbtx::Value::Compound(states)) => states.clone(),
             _ => nbtx::Compound::new(),
         };
-        let id = HashUtils::hash_block_nbt(&name.to_string(), states);
+        let version = match tag.get("version") {
+            Some(nbtx::Value::Int(version)) => *version,
+            _ => 0,
+        };
+
+        let upgraded = upgrade_block_state(&name.to_string(), states, version);
+        let id = self.resolve_block(&upgraded);
         ids.insert(raw.to_vec(), id);
         Ok(id)
+    }
+
+    fn resolve_block(&self, upgraded: &UpgradedBlockState) -> i32 {
+        let exact = HashUtils::hash_block_nbt(&upgraded.name, upgraded.states.clone());
+        if self.permutations.contains_key(&exact) {
+            return exact;
+        }
+
+        if let Some(&default_id) = self.default_block_ids.get(&upgraded.name) {
+            if let Some(id) = self.resolve_from_default(default_id, &upgraded.name, &upgraded.states) {
+                return id;
+            }
+            self.unresolved.lock().expect("unresolved block lock poisoned").report_state_fallback(&upgraded.name, &upgraded.states);
+            return default_id;
+        }
+
+        self.unresolved.lock().expect("unresolved block lock poisoned").report_unknown(&upgraded.name, &upgraded.states);
+        self.unknown_id
+    }
+
+    fn resolve_from_default(&self, default_id: i32, name: &str, states: &nbtx::Compound) -> Option<i32> {
+        let default = self.permutations.get(&default_id)?;
+        let mut resolved = default.get_states().clone();
+
+        for (key, value) in states {
+            let state_name = key.to_string();
+            let Some((definition_key, definition_value)) = resolved.iter().find(|(key, _)| key.as_ref() == state_name.as_str()).map(|(key, value)| (key.clone(), value.clone())) else {
+                continue;
+            };
+
+            let value = match (&definition_value, value) {
+                (BlockState::Bool(_), nbtx::Value::Byte(value)) => Some(BlockState::Bool(*value != 0)),
+                (BlockState::Bool(_), nbtx::Value::Int(value)) => Some(BlockState::Bool(*value != 0)),
+                (BlockState::Int(_), nbtx::Value::Int(value)) => Some(BlockState::Int(*value)),
+                (BlockState::Int(_), nbtx::Value::Byte(value)) => Some(BlockState::Int(i32::from(*value))),
+                (BlockState::Enum(_), nbtx::Value::String(value)) => Some(BlockState::from(value.to_string())),
+                _ => None,
+            };
+
+            if let Some(value) = value {
+                resolved.insert(definition_key, value);
+            }
+        }
+
+        let candidate = HashUtils::hash_block_permutation(name, &resolved);
+        self.permutations.contains_key(&candidate).then_some(candidate)
     }
 }
 
@@ -911,5 +1022,134 @@ mod tests {
         assert_eq!(sections[0], [9; 4096]);
         assert_eq!(sections[1], [9; 4096]);
         assert!(decode_biomes(&[0u8; 10], 1).is_err());
+    }
+
+    fn palette_nbt(name: &str, version: i32, states: &[(&str, nbtx::Value)]) -> Vec<u8> {
+        let mut state_tag = nbtx::Compound::new();
+        for (key, value) in states {
+            state_tag.insert((*key).into(), value.clone());
+        }
+
+        let mut tag = nbtx::Compound::new();
+        tag.insert("name".into(), nbtx::Value::String(name.into()));
+        tag.insert("states".into(), nbtx::Value::Compound(state_tag));
+        tag.insert("version".into(), nbtx::Value::Int(version));
+        nbtx::to_le_bytes(&nbtx::Value::Compound(tag)).unwrap()
+    }
+
+    fn read_palette_block(storage: &LevelStorage, name: &str, version: i32, states: &[(&str, nbtx::Value)]) -> i32 {
+        let bytes = palette_nbt(name, version, states);
+        let mut reader = bytes.as_slice();
+        storage.read_block(&mut reader).unwrap()
+    }
+
+    #[test]
+    fn legacy_palette_entries_are_upgraded_before_lookup() {
+        let world = TempWorld::new("upgrade-rename");
+        let registry = registry();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+
+        let id = read_palette_block(&storage, "minecraft:tripWire", 0x0112_0A01, &[]);
+        assert_eq!(Some(id), registry.get_block_id("minecraft:trip_wire"));
+        assert!(registry.get_permutation(id).is_some());
+    }
+
+    #[test]
+    fn flattened_palette_entries_resolve_to_the_modern_block() {
+        let world = TempWorld::new("upgrade-flatten");
+        let registry = registry();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+
+        let id = read_palette_block(&storage, "minecraft:wool", 0x0113_3C00, &[("color", nbtx::Value::String("silver".into()))]);
+        assert_eq!(Some(id), registry.get_block_id("minecraft:light_gray_wool"));
+    }
+
+    #[test]
+    fn upgraded_state_additions_resolve_to_a_registered_permutation() {
+        let world = TempWorld::new("upgrade-state-add");
+        let registry = registry();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+
+        let id = read_palette_block(
+            &storage,
+            "minecraft:oak_stairs",
+            0x0115_1E00,
+            &[("upside_down_bit", nbtx::Value::Byte(0)), ("weirdo_direction", nbtx::Value::Int(1))],
+        );
+        let expected = registry
+            .get_block_id_with_states(
+                "minecraft:oak_stairs",
+                &[("upside_down_bit", false.into()), ("weirdo_direction", 1.into()), ("minecraft:corner", "none".into())],
+            )
+            .unwrap();
+        assert_eq!(id, expected);
+    }
+
+    #[test]
+    fn unknown_blocks_fall_back_to_the_unknown_block() {
+        let world = TempWorld::new("upgrade-unknown");
+        let registry = registry();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+        let unknown = registry.get_block_id("minecraft:unknown").unwrap();
+
+        let id = read_palette_block(&storage, "minecraft:not_a_block", 0x0112_0A01, &[("mystery", nbtx::Value::Int(3))]);
+        assert_eq!(id, unknown);
+        assert_eq!(registry.get_permutation(id).unwrap().get_identifier(), "minecraft:unknown");
+        assert!(storage.unresolved.lock().unwrap().reported_unknown.contains("minecraft:not_a_block"));
+    }
+
+    #[test]
+    fn upgraded_but_unregistered_blocks_fall_back_to_unknown_instead_of_air() {
+        let world = TempWorld::new("upgrade-unregistered");
+        let registry = registry();
+        let air = registry.get_block_id("minecraft:air").unwrap();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+
+        let id = read_palette_block(&storage, "minecraft:concretePowder", 0x0112_0A01, &[]);
+        assert_ne!(id, air);
+        assert_eq!(id, registry.get_block_id("minecraft:unknown").unwrap());
+    }
+
+    #[test]
+    fn renamed_then_flattened_blocks_resolve_to_the_coloured_block() {
+        let world = TempWorld::new("upgrade-rename-flatten");
+        let registry = registry();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+
+        let id = read_palette_block(&storage, "minecraft:concretePowder", 0x0112_0A01, &[("color", nbtx::Value::String("white".into()))]);
+        assert_eq!(Some(id), registry.get_block_id("minecraft:white_concrete_powder"));
+    }
+
+    #[test]
+    fn unresolvable_states_fall_back_to_the_default_permutation() {
+        let world = TempWorld::new("upgrade-state-fallback");
+        let registry = registry();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+
+        let id = read_palette_block(
+            &storage,
+            "minecraft:oak_stairs",
+            chorus_core::info::BLOCK_STATE_VERSION,
+            &[("upside_down_bit", nbtx::Value::Byte(0)), ("weirdo_direction", nbtx::Value::Int(99))],
+        );
+        assert_eq!(Some(id), registry.get_block_id("minecraft:oak_stairs"));
+        assert!(storage.unresolved.lock().unwrap().reported_state_fallback.contains("minecraft:oak_stairs"));
+    }
+
+    #[test]
+    fn loading_a_chunk_upgrades_legacy_palette_entries() {
+        let world = TempWorld::new("upgrade-chunk-load");
+        let registry = registry();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+
+        let mut sub_chunk = vec![SUB_CHUNK_VERSION, 1, 0, 0];
+        sub_chunk.extend(1u32.to_le_bytes());
+        sub_chunk.extend(palette_nbt("minecraft:tripWire", 0x0112_0A01, &[]));
+
+        storage.put(key(DimensionType::Overworld.id(), 0, 0, TAG_VERSION, None), vec![CHUNK_VERSION]);
+        storage.put(key(DimensionType::Overworld.id(), 0, 0, TAG_SUB_CHUNK, Some(0)), sub_chunk);
+
+        let chunk = storage.load_chunk(DimensionType::Overworld, 0, 0).unwrap().expect("chunk was written");
+        assert_eq!(chunk.get_block(0, 0, 0, 0), registry.get_block_id("minecraft:trip_wire"));
     }
 }
