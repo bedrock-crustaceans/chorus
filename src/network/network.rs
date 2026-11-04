@@ -8,11 +8,11 @@ use crate::network::bandwidth::BandwidthTracker;
 use crate::network::handler::form::FormResponseMessage;
 use crate::network::handler::inventory::{InventoryCloseMessage, InventoryOpenMessage, ItemDropMessage, PlayerItemHeldMessage};
 use crate::network::handler::login::{PlayerLoginMessage, PlayerPreLoginMessage, login_config};
-use crate::network::handler::play::{PlayerJoinedMessage, PlayerMoveMessage, PlayerQuitMessage};
+use crate::network::handler::play::{PlayerJoinedMessage, PlayerMoveMessage, PlayerQuitMessage, QuitAnnounced};
 use crate::network::handler::resource::ResourcePackResponseMessage;
 use crate::network::handler::{PacketHandlers, PacketReceivedMessage};
 use crate::network::login::auth::{Auth, LoginAuthOIDC};
-use crate::network::session::state::SessionStateChangedMessage;
+use crate::network::session::state::{SessionState, SessionStateChangedMessage};
 use crate::network::session::{Batch, LoginConfig, Session};
 use crate::network::transport::{SessionId, Transports};
 use crate::world::block::{BlockBreakMessage, BlockPlaceMessage};
@@ -182,7 +182,7 @@ impl Network {
     /// already drain their server's connect/disconnect events into `MessageWriter<*ServerEvent>`
     /// each tick, so this reads those messages directly rather than polling the servers again -
     /// by this point their own event queues are already empty.
-    pub fn accept(mut events: ConnectionEvents, config: Res<Config>, oidc: Option<Res<Auth>>, mut state: ResMut<NetworkState>, mut commands: Commands) {
+    pub fn accept(mut events: ConnectionEvents, config: Res<Config>, oidc: Option<Res<Auth>>, mut state: ResMut<NetworkState>, mut commands: Commands, mut sessions: Query<&mut Session>) {
         let options = |id: &SessionId| login_config(&config, oidc.as_deref(), id);
 
         for event in events.rak.read() {
@@ -190,7 +190,7 @@ impl Network {
                 RakServerEvent::SessionConnected { id, .. } => Network::connect(&mut state, &mut commands, SessionId::RakNet(*id), &options),
                 RakServerEvent::SessionDisconnected { id, reason } => {
                     Network::log_disconnect(*id, *reason);
-                    Network::disconnect(&mut state, &mut commands, &SessionId::RakNet(*id));
+                    Network::disconnect(&mut state, &mut commands, &mut sessions, &SessionId::RakNet(*id));
                 }
             }
         }
@@ -198,14 +198,14 @@ impl Network {
         for event in events.nether_lan.read() {
             match event {
                 NetherServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetLan(id.clone()), &options),
-                NetherServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &SessionId::NetherNetLan(id.clone())),
+                NetherServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &mut sessions, &SessionId::NetherNetLan(id.clone())),
             }
         }
 
         for event in events.nether_http.read() {
             match event {
                 NetherHttpServerEvent::SessionConnected(id) => Network::connect(&mut state, &mut commands, SessionId::NetherNetHttp(id.clone()), &options),
-                NetherHttpServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &SessionId::NetherNetHttp(id.clone())),
+                NetherHttpServerEvent::SessionDisconnected(id) => Network::disconnect(&mut state, &mut commands, &mut sessions, &SessionId::NetherNetHttp(id.clone())),
             }
         }
     }
@@ -281,14 +281,16 @@ impl Network {
         state.sessions.insert(id, entity);
     }
 
-    fn disconnect(state: &mut NetworkState, commands: &mut Commands, id: &SessionId) {
-        if let Some(entity) = state.sessions.remove(id) {
-            commands.entity(entity).despawn();
+    fn disconnect(state: &mut NetworkState, commands: &mut Commands, sessions: &mut Query<&mut Session>, id: &SessionId) {
+        let Some(entity) = state.sessions.remove(id) else { return };
+        match sessions.get_mut(entity) {
+            Ok(mut session) if session.get_state() == SessionState::Play => session.close(None),
+            _ => commands.entity(entity).despawn(),
         }
     }
 
     /// Pushes everything the handlers queued this tick out, and reaps closed sessions.
-    pub fn flush(mut transport: Transports, mut state: ResMut<NetworkState>, bandwidth: Res<BandwidthTracker>, mut query: Query<(Entity, &mut Session)>, mut commands: Commands) {
+    pub fn flush(mut transport: Transports, mut state: ResMut<NetworkState>, bandwidth: Res<BandwidthTracker>, mut query: Query<(Entity, &mut Session)>, announced: Query<(), With<QuitAnnounced>>, mut commands: Commands) {
         let mut sessions: Vec<(Entity, Mut<Session>)> = query.iter_mut().collect();
 
         let mut busy: Vec<usize> = Vec::new();
@@ -323,7 +325,8 @@ impl Network {
                 transport.send(&session.id, batch);
             }
 
-            if session.is_closed() {
+            let announced = session.get_state() != SessionState::Play || announced.contains(entity);
+            if session.is_closed() && announced {
                 transport.disconnect(&session.id);
                 state.sessions.remove(&session.id);
                 commands.entity(entity).despawn();

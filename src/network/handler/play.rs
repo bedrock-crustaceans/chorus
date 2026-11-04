@@ -17,7 +17,7 @@ use crate::registry::command_registry::CommandRegistry;
 use bedrock::protocol::v662::types::ActorRuntimeID;
 use bedrock::protocol::v729::packets::{AttributeData, UpdateAttributesPacket};
 use bevy_ecs::message::{Message, MessageReader, MessageWriter};
-use bevy_ecs::prelude::{Commands, Entity, Query, Res};
+use bevy_ecs::prelude::{Commands, Component, Entity, Query, Res, Without};
 use glam::{Vec2, Vec3};
 use tracing::{debug, info};
 
@@ -101,11 +101,16 @@ pub fn on_enter_play(
     }
 }
 
-pub fn on_quit(sessions: Query<(Entity, &Session, &PlayerIdentity)>, mut quit_writer: MessageWriter<PlayerQuitMessage>) {
+#[derive(Component, Debug)]
+pub struct QuitAnnounced;
+
+pub fn on_quit(sessions: Query<(Entity, &Session, &PlayerIdentity), Without<QuitAnnounced>>, mut quit_writer: MessageWriter<PlayerQuitMessage>, mut commands: Commands) {
     for (entity, session, identity) in &sessions {
         if !session.is_closed() || session.get_state() != SessionState::Play {
             continue;
         }
+
+        commands.entity(entity).insert(QuitAnnounced);
 
         info!("{} left the game", identity.name());
 

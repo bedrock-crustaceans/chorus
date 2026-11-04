@@ -115,7 +115,7 @@ impl PlayerAppearance {
         let skin = SerializedSkin {
             full_id: format!("{skin_id}{cape_id}"),
             skin_id,
-            skin_resource_patch: claims.skin_resource_patch.clone(),
+            skin_resource_patch: decoded_text(&claims.skin_resource_patch),
             skin_image_width: claims.skin_image_width as u32,
             skin_image_height: claims.skin_image_height as u32,
             skin_image_bytes: bytes(&claims.skin_data),
@@ -145,5 +145,25 @@ impl PlayerAppearance {
             play_fab_id: claims.play_fab_id.clone(),
             device_id: claims.device_id.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_resource_patch_goes_out_as_json_not_base64() {
+        let claims = ClientData::offline("1.21.0", "127.0.0.1", "Steve");
+        let appearance = PlayerAppearance::from_client_data(&claims);
+        assert_eq!(appearance.skin.skin_resource_patch, r#"{"geometry":{"default":"geometry.humanoid.custom"}}"#);
+    }
+
+    #[test]
+    fn the_skin_pixels_and_version_are_decoded() {
+        let claims = ClientData::offline("1.21.0", "127.0.0.1", "Steve");
+        let appearance = PlayerAppearance::from_client_data(&claims);
+        assert_eq!(appearance.skin.geometry_data_engine_version, "1.14.60");
+        assert_eq!(appearance.skin.skin_image_bytes.len() as u32, appearance.skin.skin_image_width * appearance.skin.skin_image_height * 4);
     }
 }

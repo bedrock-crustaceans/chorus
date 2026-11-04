@@ -133,7 +133,10 @@ impl Gamemode {
     }
 
     fn actor_flags(&self) -> i64 {
-        let mut flags = (1i64 << ActorFlags::HasGravity as i64) | (1i64 << ActorFlags::Breathing as i64);
+        let mut flags = (1i64 << ActorFlags::HasGravity as i64)
+            | (1i64 << ActorFlags::Breathing as i64)
+            | (1i64 << ActorFlags::CanWalk as i64)
+            | (1i64 << ActorFlags::CanClimb as i64);
         if self.has_collision() {
             flags |= 1i64 << ActorFlags::HasCollision as i64;
         } else {
@@ -312,5 +315,14 @@ mod tests {
         let base = layer(&specified, SerializedAbilitiesLayer::Base);
         assert_ne!(base.abilities_set & flying, 0);
         assert_ne!(base.ability_values & flying, 0);
+    }
+
+    #[test]
+    fn every_game_mode_lets_the_client_walk_and_climb() {
+        for mode in [Gamemode::Survival, Gamemode::Creative, Gamemode::Adventure, Gamemode::Spectator] {
+            let flags = mode.actor_flags();
+            assert_ne!(flags & (1i64 << ActorFlags::CanClimb as i64), 0, "{mode:?}");
+            assert_ne!(flags & (1i64 << ActorFlags::CanWalk as i64), 0, "{mode:?}");
+        }
     }
 }
