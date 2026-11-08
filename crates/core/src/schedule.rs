@@ -45,6 +45,12 @@ impl TickClock {
     pub fn remaining(&self) -> Duration {
         self.interval.saturating_sub(self.accumulated)
     }
+
+    pub fn restart(&mut self) {
+        self.accumulated = Duration::ZERO;
+        self.last_instant = Instant::now();
+        self.last_overload_warning = None;
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -333,6 +339,19 @@ pub fn run_fixed_tick(world: &mut World) {
 mod tests {
     use super::*;
     use bevy_ecs::system::ResMut;
+
+    #[test]
+    fn restarting_the_clock_drops_the_time_startup_took() {
+        let mut clock = TickClock {
+            accumulated: Duration::from_secs(3),
+            last_instant: Instant::now() - Duration::from_secs(3),
+            ..TickClock::default()
+        };
+        clock.restart();
+
+        assert_eq!(clock.accumulated, Duration::ZERO);
+        assert!(clock.last_instant.elapsed() < Duration::from_secs(1));
+    }
 
     struct First;
     struct Second;

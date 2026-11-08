@@ -1,7 +1,7 @@
 use crate::chat::{PlayerChatMessage, handle_text};
 use crate::command::dispatch::{CommandPreprocessMessage, CommandRequestedMessage};
 use crate::command::permission::CommandPermission;
-use crate::core::config::Config;
+use crate::core::config::PermissionConfig;
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::network::BedrockProtocol;
@@ -39,7 +39,7 @@ pub struct PlayerQuitMessage {
 pub fn on_enter_play(
     mut sessions: Query<(&mut Session, &ActorId, &PlayerIdentity, &Gamemode, &FlySpeed)>,
     commands: Res<CommandRegistry>,
-    config: Res<Config>,
+    permissions: Res<PermissionConfig>,
     mut entities: Commands,
     mut state_reader: MessageReader<SessionStateChangedMessage>,
     mut join_writer: MessageWriter<PlayerJoinedMessage>,
@@ -56,7 +56,7 @@ pub fn on_enter_play(
 
         info!("{} joined the game", identity.name());
 
-        let permission = config.permissions.level_of(identity.name(), identity.xuid());
+        let permission = permissions.level_of(identity.name(), identity.xuid());
         entities.entity(ev.entity).insert(CommandPermission(permission));
 
         join_writer.write(PlayerJoinedMessage {

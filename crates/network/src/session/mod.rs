@@ -1,6 +1,5 @@
-use crate::network::BedrockProtocol;
-use crate::network::session::state::{SessionState, SessionStateChangedMessage};
-use crate::network::transport::SessionId;
+use crate::session::state::{SessionState, SessionStateChangedMessage};
+use crate::transport::SessionId;
 use bedrock::auth::Login;
 use bedrock::network::codec::{UnreadBytes, decode_packets, encode_packets};
 use bedrock::network::compression::Compression;
@@ -10,6 +9,7 @@ use bedrock::protocol::v662::packets::PlayStatusPacket;
 use bedrock::protocol::v712::packets::{DisconnectMessage, DisconnectPacket};
 use bedrock::protocol::v2225::enums::ConnectionFailReason;
 use bevy_ecs::prelude::{Component, Entity, MessageWriter};
+use chorus_core::protocol::BedrockProtocol;
 use std::collections::HashMap;
 use std::mem::take;
 use tracing::{debug, error};
@@ -35,6 +35,7 @@ pub struct Batch {
 pub struct Session {
     entity: Entity,
     pub id: SessionId,
+    send_capacity: Option<usize>,
 
     closed: bool,
     setup_responded: bool,
@@ -57,6 +58,7 @@ impl Session {
         Self {
             entity,
             id,
+            send_capacity: None,
 
             closed: false,
             setup_responded: false,
@@ -73,7 +75,6 @@ impl Session {
         }
     }
 
-    /// Decodes a raw batch the transport handed us, dropping it if it fails to decrypt/decompress.
     pub fn decode(&mut self, stream: Vec<u8>, max_batch_size: usize) -> Vec<BedrockProtocol> {
         match decode_packets(stream, self.compression.as_ref(), self.encryption.as_mut(), max_batch_size, UnreadBytes::default()) {
             Ok(packets) => packets.into_iter().map(|(_, packet)| packet).collect(),
@@ -84,9 +85,6 @@ impl Session {
         }
     }
 
-    /// Encodes the packet and sends it ahead of anything still queued in `out_q`, using the
-    /// session's current compression/encryption so a state change right after this call doesn't
-    /// retroactively apply to it.
     pub fn send_immediate(&mut self, packet: BedrockProtocol) {
         self.flush_queue();
         self.encode_now(vec![packet], true);
@@ -114,11 +112,19 @@ impl Session {
         !self.out_q.is_empty()
     }
 
-    /// Drains everything encoded this tick for [`Network::flush`](crate::network::network::Network::flush)
+    /// Drains everything encoded this tick for `Network::flush`
     /// to hand to the transport, in the order it was produced.
     pub fn take_outgoing(&mut self) -> Vec<Batch> {
         self.flush_queue();
         take(&mut self.pending_wire)
+    }
+
+    pub fn send_capacity(&self) -> Option<usize> {
+        self.send_capacity
+    }
+
+    pub fn set_send_capacity(&mut self, capacity: Option<usize>) {
+        self.send_capacity = capacity;
     }
 
     pub fn set_compression(&mut self, compression: Option<Compression>) {
@@ -126,8 +132,6 @@ impl Session {
         self.compression = compression;
     }
 
-    /// No-op for a NetherNet session: WebRTC's own DTLS already secures the connection, so this
-    /// layer isn't needed and vanilla clients don't complete the handshake for it over NetherNet.
     pub fn set_encryption(&mut self, encryption: Option<Encryption>) {
         if !self.id.supports_encryption() {
             return;

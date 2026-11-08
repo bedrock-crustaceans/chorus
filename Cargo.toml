@@ -16,12 +16,14 @@ chorus_entity = { path = "crates/entity" }
 chorus_item = { path = "crates/item" }
 chorus_level = { path = "crates/level" }
 chorus_worldgen = { path = "crates/worldgen" }
+chorus_network = { path = "crates/network" }
+chorus_nethernet = { path = "crates/nethernet" }
 
 bevy_app = "0.20.0"
 bevy_ecs = { version = "0.20.0", features = ["debug", "multi_threaded"] }
 bevy_tasks = { version = "0.20.0", features = ["multi_threaded"] }
 
-bedrock = { git = "https://github.com/bedrock-crustaceans/bedrock-rs", branch = "main", features = ["level", "network", "network-nethernet", "protocol", "auth", "form", "protocol-packet-meta", "protocol-packet-dyn", "protocol-unknown", "protocol-v2225", "auth-ureq"] }
+bedrock = { git = "https://github.com/bedrock-crustaceans/bedrock-rs", branch = "main", features = ["level", "network", "protocol", "auth", "form", "protocol-packet-meta", "protocol-packet-dyn", "protocol-unknown", "protocol-v2225", "auth-ureq"] }
 bevy-nethernet = { git = "https://github.com/bedrock-crustaceans/nethernet", branch = "main" }
 bevy-raknet = { git = "https://github.com/bedrock-crustaceans/raknet", branch = "main" }
 # TODO: use crates.io after 4.0.0 release
@@ -38,7 +40,7 @@ facet = { version = "0.50.0-rc.7", features = ["uuid"] }
 facet-json = "0.50.0-rc.7"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
-toml = "1.1.6"
+toml = { version = "1.1.6", features = ["preserve_order"] }
 
 base64 = "0.23.1"
 
@@ -89,8 +91,8 @@ bevy_app.workspace = true
 bevy_ecs.workspace = true
 bevy_tasks.workspace = true
 bedrock.workspace = true
-bevy-nethernet.workspace = true
-bevy-raknet.workspace = true
+chorus_network.workspace = true
+chorus_nethernet.workspace = true
 nbtx.workspace = true
 atomicow.workspace = true
 crossbeam-channel.workspace = true

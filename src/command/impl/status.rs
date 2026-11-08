@@ -1,10 +1,10 @@
+use crate::core::config::{NetworkConfig, ServerConfig};
 use crate::Scheduler;
 use crate::command::command_definition::{CommandDefinition, CommandFlags};
 use crate::command::context::CommandContext;
 use crate::command::parameter::{CommandEnum, CommandParameter};
 use crate::command::report::{Report, Value, duration_text};
 use crate::command::style::CommandStyle;
-use crate::core::config::Config;
 use crate::format::{decimal, percent, thousands, tps_tone, usage_tone};
 use crate::level::DimensionId;
 use crate::level::generator::dimension::Dimension;
@@ -85,7 +85,7 @@ fn summary(context: &CommandContext, report: &mut Report) {
     report.section("Server status", |report| {
         report.row("Uptime", Value::duration(context.resource::<ServerState>().uptime()));
         report.row("TPS", tps_value(metrics.tps()).note(format!("{} avg, {}% of the tick", decimal(metrics.tps_average(), 1), decimal(metrics.tick_usage(), 1))));
-        report.row("Players", Value::ratio(players(context, None), context.resource::<Config>().server.max_players as usize));
+        report.row("Players", Value::ratio(players(context, None), context.resource::<ServerConfig>().max_players as usize));
         if let Some(stats) = process_stats() {
             report.row("Memory", Value::bytes(stats.resident_bytes));
         }
@@ -117,11 +117,12 @@ fn performance(context: &CommandContext, report: &mut Report) {
 }
 
 fn network(context: &CommandContext, report: &mut Report) {
-    let config = context.resource::<Config>();
     let bandwidth = context.resource::<BandwidthTracker>();
+    let network = context.resource::<NetworkConfig>();
+    let server = context.resource::<ServerConfig>();
     report.section("Network", |report| {
-        report.row("Listening", Value::new(format!("{}:{}", config.network.ip, config.network.port)).note(format!("{:?}", config.network.transport)));
-        report.row("Players", Value::ratio(players(context, None), config.server.max_players as usize));
+        report.row("Listening", Value::new(format!("{}:{}", network.ip, network.port)));
+        report.row("Players", Value::ratio(players(context, None), server.max_players as usize));
         report.row("Upload", Value::new(decimal(bandwidth.average_sent() / 1024., 1)).unit("kB/s"));
         report.row("Download", Value::new(decimal(bandwidth.average_received() / 1024., 1)).unit("kB/s"));
     });

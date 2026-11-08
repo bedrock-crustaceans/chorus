@@ -54,8 +54,11 @@ Chorus is a Cargo workspace. The root package `chorus` (`src/`) is the server: n
 | `chorus_item` | `crates/item` | item stacks, `item_registry` and its bundled JSON |
 | `chorus_level` | `crates/level` | world state: chunk, sub-chunk, palettes, biome ids and the biome definition list, dimension types, the `Level` resource, level messages, and the generation framework under `generator` (`Dimension`, `Generator`, `WorldGenerator`, the phase graph, phase errors) |
 | `chorus_worldgen` | `crates/worldgen` | the concrete generators: `flat`, `random`, `void` and `overworld` |
+| `chorus_network` | `crates/network` | the transport-facing session layer: `Session`, `SessionId`, `SendBatchMessage` / `DisconnectSessionMessage`, `PacketReceivedMessage`, `NetworkState` (connect / disconnect), `NetworkPlugin`, `NetworkSet`, `BandwidthTracker`, login config and OIDC auth, `motd` |
+| `chorus_nethernet` | `crates/nethernet` | `NetherNetPlugin` (LAN discovery and HTTP signaling), always added by `ChorusPlugin` |
+| `chorus_raknet` | `crates/raknet` | optional `RakNetPlugin`, not part of the default build; current clients no longer speak RakNet |
 
-Dependencies only point downwards (core, then block, then item and level, then worldgen, then the root). The root `chorus` crate exposes every crate as a module (`chorus::core`, `chorus::block`, `chorus::entity`, `chorus::item`, `chorus::level` with `level::generator::r#impl` for worldgen, `chorus::worldgen`, `chorus::utils`), and `chorus::schedule` holds the schedule types (`Tick`, `TickSet`, `Scheduler`, ...) next to `GameSet`. Downstream users such as Pyrite and the Enderverse plugin depend on `chorus` alone. Shared dependency versions live in `[workspace.dependencies]`.
+Dependencies only point downwards (core, then block, then item and level, then worldgen; core, then network, then the transport crates; the root depends on `chorus_network` and `chorus_nethernet`). `chorus_raknet` depends on `chorus_network` only and is added by downstream code. The root `chorus` crate exposes every crate as a module (`chorus::core`, `chorus::block`, `chorus::entity`, `chorus::item`, `chorus::level` with `level::generator::r#impl` for worldgen, `chorus::worldgen`, `chorus::utils`), and `chorus::schedule` holds the schedule types (`Tick`, `TickSet`, `Scheduler`, ...) next to `GameSet`. Downstream users such as Pyrite and the Enderverse plugin depend on `chorus` alone. Shared dependency versions live in `[workspace.dependencies]`.
 
 ## Architecture
 
@@ -76,14 +79,11 @@ ChorusPlugin (src/lib.rs)        — Config::setup(), Tick schedule, TaskPoolPlu
     └── Network (src/network/network.rs)
         ├── PacketHandlers        — all packet handler systems, in Tick / TickSet::Update
         ├── LoginAuthOIDC         — optional OIDC auth resource
-        ├── RakServerPlugin       — bevy-raknet transport
-        ├── NetherServerPlugin    — bevy-nethernet LAN signaling transport
-        └── NetherHttpServerPlugin
 ```
 
 ### Network & Session lifecycle
 
-`Network::init` (Startup) binds either a RakNet or a NetherNet server depending on `config.transport`. `Network::accept` and `Network::queue_receive` run in `PreUpdate` (after the transport plugins' sets), and `Network::flush` runs in `PostUpdate`.
+Transports are plugins that manage themselves, so the root crate has no transport code. `ChorusPlugin` adds `chorus_nethernet::NetherNetPlugin`; `chorus_raknet::RakNetPlugin` is the optional RakNet one. A transport plugin (it adds `chorus_network::NetworkPlugin` if missing) binds its server at startup, spawns and closes sessions with `NetworkState::connect` / `disconnect`, decodes received batches with `Session::decode` into `PacketReceivedMessage`s, and sends the `SendBatchMessage` / `DisconnectSessionMessage`s that `Network::flush` writes (in `NetworkSet::Flush`, so transports order their send `.after(NetworkSet::Flush)`) for sessions whose `SessionId.transport` it owns. `SessionId.key` is the plugin's own handle and `encryption` says whether the login handshake encrypts. A transport reports `Session::set_send_capacity` for chunk pacing and wakes `ChunkSendTask` after pumping.
 
 Each connection becomes a `Session` Bevy component (`src/network/session/mod.rs`) on its own entity. `Session` owns the connection's `SessionState`, compression and encryption settings, and an outgoing packet queue that `flush` encodes and sends.
 
@@ -142,16 +142,17 @@ Worlds are saved in the vanilla Bedrock LevelDB layout under `worlds/<level_name
 
 ### Configuration
 
-`chorus.toml` is read (or created with defaults) at startup by `Config::setup()` (`crates/core/src/config.rs`). It is split into sections:
+`chorus.toml` is read at startup by `Config::setup()` (`crates/core/src/config/`) and the server never modifies an existing file. When it is missing, `Config::setup` creates it (with `create_new`, so it cannot overwrite) from the registered sections and their defaults at `Startup`; a `Config` built in code and passed to `ChorusPlugin::with_config` never writes. `Config` holds the raw TOML and has no typed fields. Every section is a type that implements `ConfigSection` (its `NAME` is the table name) and is a Bevy `Resource`. A plugin registers its section in `build` with `app.init_config::<T>()` (`AppConfigExt`), which parses the section (`T::default()` when it is missing), inserts it as a resource, exits with a clean error when it is invalid, and claims the name; systems then take `Res<LevelConfig>`, `Res<NetworkConfig>` and so on rather than the config. `ConfigPlugin` (added by `ChorusPlugin`, which then registers the six core sections: `ServerConfig`, `NetworkConfig`, `LevelConfig`, `PackConfig`, `LogConfig`, `PermissionConfig`) inserts `Config` as the registry, so a plugin has to be added after it, and a `Startup` system warns about every top-level section nobody claimed (a typo such as `[netherent]`) and creates the missing file. A section type is owned by whoever uses it (the core ones are in `sections.rs`, `NetherNetConfig` and `RakNetConfig` in their crates), `Config::with(section)` sets one in code, and `Config::get` / `try_get` are there for tests and one-off reads. Directories are made by their users (the logger, `ResourcePacks::load`). The sections are:
 
 - `[server]`: `name`, `description` (second line in the server list), `max_players`, `authentication` (require Xbox Live sign-in), `threads` (a number, or `"auto"` for one per CPU core; 0 runs everything on the main thread)
-- `[network]`: `ip`, `port`, `transport` (`raknet` | `nethernet`, the old `RakNet` and `NetherNet` spellings still load), `max_batch_size` (bytes a received batch may inflate to once decompressed, default 16 MiB; larger batches are dropped), with `[network.raknet]` `encryption` and `[network.nethernet]` `signaler` (`http` | `lan` | `both`; LAN discovery always binds 7551, HTTP uses `port`)
+- `[network]`: `ip`, `port` (shared by the transport plugins), `max_batch_size` (bytes a received batch may inflate to once decompressed, default 16 MiB; larger batches are dropped), with `[network.zlib]`, `[network.snappy]` and `[network.chunks]`
 - `[level]`: `name`, `seed`, `chunk_saving` (`"modified"`, the default, saves changed chunks and ones kept with `Dimension::persist_chunk` such as by `/generate`; `"all"` saves every generated chunk) (a number, or text parsed like vanilla's `WorldOptions.parseSeed`; `LevelSeed::parse_with` lets a generator use its own rule), `max_view_distance` (also caps how far chunks are generated), `autosave` (an `Interval`: `"30s"`, `"5m"`, seconds, or `false`), and `[level.database]` with `compression` (deflate 0-10), `auto_compaction` (an `Interval`) and `shutdown_compaction`
 - `[packs]`: `resource_directory`, `behavior_directory`, `force_accept`, `force_disable_vibrant_visuals`
 - `[permissions]`: `default` (`member`, `operator`, `admin`, `host` or `owner`, which the protocol calls any, game directors, admin, host and owner; default `member`) and `players`, a table of player names or XUIDs to levels
+- `[nethernet]` has `signaler` (`http`, the default, `lan` or `both`; LAN discovery always binds 7551, HTTP uses `network.port`), `[raknet]` has `encryption`. Any other top-level table is kept as raw TOML for whatever section type claims it; a top-level key that is not a table is rejected as unknown
 - `[log]`: `level` (a tracing `EnvFilter` string, e.g. `"info"` or `"info,chorus=debug"`), `to_file`, `directory`
 
-A config in an older layout is migrated on startup (`MOVED_KEYS` and `REMOVED_KEYS` list the changes as dotted paths) and the original kept as `chorus.toml.old`.
+The config code is `crates/core/src/config/` (`sections.rs` and `values.rs` the core types, `load.rs` reading and `ConfigError`, `app.rs` `ConfigPlugin` and `init_config`).
 
 ### Protocol version
 

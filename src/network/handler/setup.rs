@@ -1,5 +1,5 @@
 use crate::actor::properties::{ActorPropertyRegistry, PLAYER_ENTITY_TYPE};
-use crate::core::config::Config;
+use crate::core::config::LevelConfig;
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::entity::entity::Entity as PlayerEntity;
@@ -194,7 +194,7 @@ fn send_start_game(actor: &ActorId, gamemode: Gamemode, position: Vec3, spawn: I
 }
 
 pub fn handle_setup(
-    config: Res<Config>,
+    level: Res<LevelConfig>,
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     items: Res<ItemRegistry>,
     properties: Option<Res<ActorPropertyRegistry>>,
@@ -207,7 +207,7 @@ pub fn handle_setup(
         };
         let in_setup = session.get_state() == SessionState::Setup;
         match &ev.packet {
-            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(&config, packet, &mut view, &mut session, &items, properties.as_deref()),
+            BedrockProtocol::RequestChunkRadiusPacket(packet) => handle_request_chunk_radius(&level, packet, &mut view, &mut session, &items, properties.as_deref()),
             _ if !in_setup => {}
             BedrockProtocol::SetLocalPlayerAsInitializedPacket(packet) => handle_set_local_player_as_initialized(packet, actor, &mut session, &mut state_writer),
             packet => {
@@ -223,14 +223,14 @@ fn clamp_chunk_radius(requested: i32, max_view_distance: i32) -> i32 {
 }
 
 fn handle_request_chunk_radius(
-    config: &Config,
+    level: &LevelConfig,
     packet: &<BedrockProtocol as ProtoVersionPackets>::RequestChunkRadiusPacket,
     view: &mut ChunkView,
     session: &mut Session,
     items: &ItemRegistry,
     properties: Option<&ActorPropertyRegistry>,
 ) {
-    let radius = clamp_chunk_radius(packet.chunk_radius, config.level.max_view_distance);
+    let radius = clamp_chunk_radius(packet.chunk_radius, level.max_view_distance);
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
 
     // the queue itself is filled by update_chunk_order, which also keeps it following the player

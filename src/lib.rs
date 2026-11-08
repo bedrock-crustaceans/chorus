@@ -1,3 +1,4 @@
+use crate::core::config::{AppConfigExt, ConfigPlugin, LevelConfig, LogConfig, NetworkConfig, PackConfig, PermissionConfig, ServerConfig};
 use bevy_app::{App, AppExit, Plugin, PluginsState, PreStartup, RunFixedMainLoop, TaskPoolOptions, TaskPoolPlugin, TaskPoolThreadAssignmentPolicy};
 use bevy_ecs::schedule::{IntoScheduleConfigs, Schedule};
 use std::time::{Duration, Instant};
@@ -75,7 +76,7 @@ pub fn shutdown(world: &mut bevy_ecs::prelude::World) {
     }
 
     let _tag = tracing::info_span!("shutdown").entered();
-    let compact = world.get_resource::<Config>().is_some_and(|config| config.level.database.shutdown_compaction);
+    let compact = world.get_resource::<LevelConfig>().is_some_and(|level| level.database.shutdown_compaction);
     actor::storage::save_all_actors(world);
     if let Some(mut level) = world.get_resource_mut::<level::Level>() {
         let saved = level.save_blocking();
@@ -222,7 +223,13 @@ impl ChorusPlugin {
 
 impl Plugin for ChorusPlugin {
     fn build(&self, app: &mut App) {
-        let config = self.config.clone().unwrap_or_else(Config::setup);
+        app.add_plugins(ConfigPlugin { config: self.config.clone() })
+            .init_config::<ServerConfig>()
+            .init_config::<NetworkConfig>()
+            .init_config::<LevelConfig>()
+            .init_config::<PackConfig>()
+            .init_config::<LogConfig>()
+            .init_config::<PermissionConfig>();
 
         app.init_resource::<ShutdownState>();
 
@@ -253,10 +260,11 @@ impl Plugin for ChorusPlugin {
         app.init_resource::<TickClock>().init_resource::<Scheduler>().add_systems(RunFixedMainLoop, run_fixed_tick);
 
         if !app.is_plugin_added::<TaskPoolPlugin>() {
+            let threads = app.world().resource::<ServerConfig>().threads.count();
             app.add_plugins(TaskPoolPlugin {
                 task_pool_options: TaskPoolOptions {
-                    min_total_threads: config.server.threads.count(),
-                    max_total_threads: config.server.threads.count(),
+                    min_total_threads: threads,
+                    max_total_threads: threads,
                     io: thread_policy(2, 0.1),
                     async_compute: thread_policy(usize::MAX, 0.75),
                     compute: thread_policy(usize::MAX, 1.0),
@@ -264,7 +272,9 @@ impl Plugin for ChorusPlugin {
             });
         }
 
-        app.insert_resource(config).add_systems(PreStartup, setup_logger).add_plugins(Server);
+        app.add_systems(PreStartup, setup_logger).add_plugins(Server);
+
+        app.add_plugins(chorus_nethernet::NetherNetPlugin);
 
         if self.schedule_driver {
             app.add_systems(bevy_app::Last, drive_scheduler);

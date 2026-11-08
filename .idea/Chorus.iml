@@ -14,6 +14,10 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/level/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/worldgen/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/xtask/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/block_schema/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/nethernet/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/network/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/raknet/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/protocol/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/run" />

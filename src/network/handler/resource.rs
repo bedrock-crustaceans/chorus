@@ -1,4 +1,4 @@
-use crate::core::config::Config;
+use crate::core::config::PackConfig;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
@@ -45,7 +45,7 @@ pub struct ResourcePackResponseMessage {
 }
 
 pub fn handle_resource(
-    config: Res<Config>,
+    packs: Res<PackConfig>,
     resource_packs: Res<ResourcePacks>,
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     mut state_message_set: ParamSet<(MessageReader<SessionStateChangedMessage>, MessageWriter<SessionStateChangedMessage>)>,
@@ -81,10 +81,10 @@ pub fn handle_resource(
 
         session.send(BedrockProtocol::ResourcePacksInfoPacket(
             ResourcePacksInfoPacket {
-                resource_pack_required: config.packs.force_accept,
+                resource_pack_required: packs.force_accept,
                 has_addon_packs: false,
                 has_scripts: entries.iter().any(|e| e.has_scripts),
-                force_disable_vibrant_visuals: config.packs.force_disable_vibrant_visuals,
+                force_disable_vibrant_visuals: packs.force_disable_vibrant_visuals,
                 world_template_uuid: Default::default(),
                 world_template_version: String::new(),
                 resource_packs: entries,
@@ -105,7 +105,7 @@ pub fn handle_resource(
             BedrockProtocol::ResourcePackClientResponsePacket(packet) => {
                 handle_client_response(
                     ev.entity,
-                    &config,
+                    &packs,
                     &mut session,
                     &resource_packs,
                     packet,
@@ -208,7 +208,7 @@ fn send_chunk(session: &mut Session, resource_packs: &ResourcePacks, resource_na
 #[allow(clippy::too_many_arguments)]
 fn handle_client_response(
     entity: Entity,
-    config: &Config,
+    packs: &PackConfig,
     session: &mut Session,
     resource_packs: &ResourcePacks,
     packet: &<BedrockProtocol as ProtoVersionPackets>::ResourcePackClientResponsePacket,
@@ -257,7 +257,7 @@ fn handle_client_response(
 
             session.send(BedrockProtocol::ResourcePackStackPacket(
                 ResourcePackStackPacket {
-                    texture_pack_required: config.packs.force_accept,
+                    texture_pack_required: packs.force_accept,
                     addon_list,
                     base_game_version: BaseGameVersion("*".to_string()),
                     experiments: Experiments {

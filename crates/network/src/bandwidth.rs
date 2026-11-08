@@ -1,6 +1,6 @@
-use crate::server::{ServerState, TICK_RATE};
-use crate::utils::rolling_avg::RollingAvg;
-use bevy_ecs::prelude::{Res, ResMut, Resource};
+use bevy_ecs::prelude::Resource;
+use chorus_core::schedule::TICK_RATE;
+use chorus_core::utils::rolling_avg::RollingAvg;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -76,21 +76,21 @@ impl BandwidthTracker {
     }
 
     /// Takes one sample per second, so the averages come out as bytes per second.
-    pub fn sample(mut tracker: ResMut<Self>, state: Res<ServerState>) {
-        if state.tick() % TICK_RATE as i64 != 0 {
+    pub fn sample(&mut self, tick: i64) {
+        if tick % TICK_RATE as i64 != 0 {
             return;
         }
 
-        let sent = tracker.counters.sent();
-        let received = tracker.counters.received();
+        let sent = self.counters.sent();
+        let received = self.counters.received();
 
-        let since_last_sent = sent.saturating_sub(tracker.last_sent);
-        let since_last_received = received.saturating_sub(tracker.last_received);
+        let since_last_sent = sent.saturating_sub(self.last_sent);
+        let since_last_received = received.saturating_sub(self.last_received);
 
-        tracker.sent_avg.add(since_last_sent as f64);
-        tracker.received_avg.add(since_last_received as f64);
+        self.sent_avg.add(since_last_sent as f64);
+        self.received_avg.add(since_last_received as f64);
 
-        tracker.last_sent = sent;
-        tracker.last_received = received;
+        self.last_sent = sent;
+        self.last_received = received;
     }
 }

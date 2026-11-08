@@ -1,6 +1,6 @@
+use crate::core::config::LogConfig;
 use std::io::Write as _;
 
-use crate::core::config::Config;
 use bedrock::protocol::ProtoVersion;
 use bevy_ecs::prelude::Resource;
 use bevy_ecs::system::Res;
@@ -70,10 +70,10 @@ where
     }
 }
 
-pub fn setup_logger(config: Res<Config>) {
+pub fn setup_logger(log: Res<LogConfig>) {
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
-        .parse_lossy(config.log.level.clone())
+        .parse_lossy(log.level.clone())
         .add_directive("reqwest=warn".parse().unwrap())
         .add_directive("hyper=warn".parse().unwrap())
         .add_directive("h2=warn".parse().unwrap());
@@ -83,10 +83,10 @@ pub fn setup_logger(config: Res<Config>) {
         .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stdout()))
         .with_writer(crate::console::ConsoleWriter::default);
 
-    let file_layer = if config.log.to_file {
+    let file_layer = if log.to_file && std::fs::create_dir_all(&log.directory).is_ok() {
         let file_path = format!("{}.log", Local::now().format("%Y-%m-%d_%H-%M-%S"));
 
-        let appender = rolling::never(config.log.directory.display().to_string(), file_path);
+        let appender = rolling::never(log.directory.display().to_string(), file_path);
 
         Some(fmt::layer().with_writer(appender).with_ansi(false).event_format(PrettyFormatter { with_target: true }))
     } else {

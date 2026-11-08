@@ -1,6 +1,5 @@
 use crate::Tick;
 use crate::command::dispatch::{dispatch_commands, has_pending_commands};
-use crate::network::BedrockProtocol;
 use crate::network::handler::block::decode_block_actions;
 use crate::network::handler::inventory::{handle_inventory_packets, send_initial_inventory};
 use crate::network::handler::login::handle_login;
@@ -10,7 +9,6 @@ use crate::network::handler::setup::{handle_setup, on_enter_setup};
 use crate::registry::command_registry::CommandRegistry;
 use crate::schedule::GameSet;
 use bevy_app::{App, Plugin};
-use bevy_ecs::prelude::{Entity, Message};
 use bevy_ecs::schedule::IntoScheduleConfigs;
 
 pub mod block;
@@ -21,11 +19,7 @@ pub mod play;
 pub mod resource;
 pub mod setup;
 
-#[derive(Message)]
-pub struct PacketReceivedMessage {
-    pub entity: Entity,
-    pub packet: BedrockProtocol,
-}
+pub use chorus_network::PacketReceivedMessage;
 
 pub struct PacketHandlers;
 

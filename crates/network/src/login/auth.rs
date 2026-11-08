@@ -1,8 +1,8 @@
-use crate::core::config::Config;
 use bedrock::auth::AuthOIDC;
 use bedrock::auth::http::ureq_agent;
 use bevy_app::{App, Plugin, Startup};
 use bevy_ecs::prelude::{Commands, Res, Resource};
+use chorus_core::config::ServerConfig;
 use std::sync::Arc;
 use tracing::debug;
 
@@ -18,8 +18,8 @@ impl Plugin for LoginAuthOIDC {
 }
 
 impl LoginAuthOIDC {
-    pub fn fetch_oidc(config: Res<Config>, mut commands: Commands) {
-        if !config.server.authentication {
+    pub fn fetch_oidc(server: Res<ServerConfig>, mut commands: Commands) {
+        if !server.authentication {
             debug!("Skipping Auth OIDC fetch, authentication is disabled");
             return;
         }

@@ -1,16 +1,10 @@
-use crate::core::config::Config;
 use crate::network::handler::PacketReceivedMessage;
-use crate::network::login::auth::Auth;
+use crate::network::session::Session;
 use crate::network::session::state::{SessionState, SessionStateChangedMessage};
-use crate::network::session::{LoginConfig, Session};
-use crate::network::transport::SessionId;
 use crate::player::identity::PlayerIdentity;
 use crate::player::skin::PlayerAppearance;
-use bedrock::network::compression::Compression;
-use bedrock::network::login::{LoginOptions, NetworkSettings};
 use bevy_ecs::message::{Message, MessageReader};
 use bevy_ecs::prelude::{Commands, Entity, MessageWriter, Query};
-use chorus_core::config::NetworkCompression;
 use tracing::error;
 
 #[derive(Message, Clone, Debug)]
@@ -23,29 +17,6 @@ pub struct PlayerLoginMessage {
     pub entity: Entity,
     pub name: String,
     pub xuid: String,
-}
-
-pub fn login_config(config: &Config, oidc: Option<&Auth>, id: &SessionId) -> LoginConfig {
-    let options = LoginOptions::default().require_authentication(config.server.authentication);
-    let options = match oidc {
-        Some(auth) => options.oidc(auth.0.clone()),
-        None => options,
-    };
-
-    LoginConfig {
-        options,
-        settings: NetworkSettings::new(match config.network.compression {
-            NetworkCompression::Zlib => Compression::Zlib {
-                threshold: config.network.zlib.threshold,
-                compression_level: config.network.zlib.level,
-            },
-            NetworkCompression::Snappy => Compression::Snappy {
-                threshold: config.network.snappy.threshold,
-            },
-            NetworkCompression::None => Compression::None,
-        }),
-        encryption: config.network.raknet.encryption && id.supports_encryption(),
-    }
 }
 
 pub fn handle_login(

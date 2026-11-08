@@ -1,3 +1,4 @@
+use crate::core::config::NetworkConfig;
 use crate::entity::components::actor_id::ActorId;
 use crate::entity::components::transform::Transform;
 use crate::level::DimensionId;
@@ -6,7 +7,6 @@ use crate::level::level::Level;
 use crate::network::BedrockProtocol;
 use crate::network::handler::PacketReceivedMessage;
 use crate::network::session::Session;
-use crate::network::transport::Transports;
 use crate::player::block_break::BlockBreaking;
 use crate::player::chunk_view::ChunkView;
 use crate::world::blob_cache::{ClientBlobCache, blob_id};
@@ -23,7 +23,6 @@ use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::{Local, Query, Resource};
 use bevy_ecs::system::{In, Res};
 use bevy_tasks::ComputeTaskPool;
-use chorus_core::config::Config;
 use chorus_core::schedule::{Budget, Scheduler, Wake};
 use chorus_level::chunk::Chunk;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -366,12 +365,11 @@ pub fn request_view_chunks(
     scheduler.wake::<ChunkSendTask>();
 }
 
-pub struct ChunkSendTask;
+pub use chorus_network::ChunkSendTask;
 
 pub fn transmit_pending_chunks(
     _budget: In<Budget>,
-    config: Res<Config>,
-    transports: Transports,
+    network: Res<NetworkConfig>,
     mut query: Query<(&mut Session, &Transform, &mut ChunkView, Option<&mut ClientBlobCache>)>,
     level: Res<Level>,
     mut serializer: ResMut<ChunkSerializer>,
@@ -385,7 +383,7 @@ pub fn transmit_pending_chunks(
             continue;
         };
         let dimension_id = view.dimension;
-        let limit = chunk_allowance(transports.send_capacity(&session.id), *average_chunk_bytes);
+        let limit = chunk_allowance(session.send_capacity(), *average_chunk_bytes);
         let selection = take_ready(&view.pending, limit, |(x, z)| serializer.current(&(dimension_id, x, z), dimension));
 
         let mut lookahead = limit;
@@ -407,6 +405,7 @@ pub fn transmit_pending_chunks(
         selections.push(selection);
     }
 
+    let chunks = &network.chunks;
     let mut sent_keys: HashSet<ChunkKey> = HashSet::new();
     for ((mut session, transform, mut view, mut cache), selection) in query.iter_mut().zip(selections) {
         let dimension_id = view.dimension;
@@ -415,26 +414,22 @@ pub fn transmit_pending_chunks(
         for (x, z) in selection {
             let Some(payload) = serializer.ready.get(&(dimension_id, x, z)).cloned() else { continue };
 
-            let cached = if config.network.chunks.cache {
-                cache.as_mut().filter(|cache| cache.has_room(payload.blobs.len()))
-            } else {
-                None
-            };
+            let cached = if chunks.cache { cache.as_mut().filter(|cache| cache.has_room(payload.blobs.len())) } else { None };
 
             let (cache_blobs, serialized_chunk_data) = match cached {
                 Some(cache) => {
                     cache.track(&payload.blobs);
                     (payload.blobs.iter().map(|(id, _)| *id).collect(), payload.tail.clone())
                 }
-                None => (vec![], if config.network.chunks.subchunks { payload.tail.clone() } else { payload.full().to_vec() }),
+                None => (vec![], if chunks.subchunks { payload.tail.clone() } else { payload.full().to_vec() }),
             };
 
             session.send(BedrockProtocol::LevelChunkPacket(
                 LevelChunkPacket {
                     chunk_position: ChunkPos { x, z },
                     dimension_id: level.network_id(view.dimension).unwrap_or(view.dimension),
-                    sub_chunk_count: if config.network.chunks.subchunks { 0 } else { payload.sub_chunk_count },
-                    client_request_sub_chunk_limit: config.network.chunks.subchunks.then_some(payload.sub_chunk_limit as i32),
+                    sub_chunk_count: if chunks.subchunks { 0 } else { payload.sub_chunk_count },
+                    client_request_sub_chunk_limit: chunks.subchunks.then_some(payload.sub_chunk_limit as i32),
                     cache_enabled: !cache_blobs.is_empty(),
                     cache_blobs,
                     serialized_chunk_data,
@@ -536,9 +531,14 @@ fn resolve_sub_chunk_position(center: (i32, i32, i32), offset: (i32, i32, i32)) 
     Some((x, y, z))
 }
 
-pub fn handle_sub_chunk_request(mut reader: MessageReader<PacketReceivedMessage>, mut query: Query<(&mut Session, Option<&mut ClientBlobCache>, &ChunkView)>, level: Res<Level>, config: Res<Config>) {
-    let blobs_enabled = config.network.chunks.cache;
-    let subchunks_enabled = config.network.chunks.subchunks;
+pub fn handle_sub_chunk_request(
+    mut reader: MessageReader<PacketReceivedMessage>,
+    mut query: Query<(&mut Session, Option<&mut ClientBlobCache>, &ChunkView)>,
+    level: Res<Level>,
+    network: Res<NetworkConfig>,
+) {
+    let chunks = &network.chunks;
+    let (blobs_enabled, subchunks_enabled) = (chunks.cache, chunks.subchunks);
 
     for ev in reader.read() {
         let BedrockProtocol::SubChunkRequestPacket(packet) = &ev.packet else {

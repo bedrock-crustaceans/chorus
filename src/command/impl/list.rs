@@ -1,5 +1,5 @@
+use crate::core::config::{ServerConfig};
 use crate::command::command_definition::CommandDefinition;
-use crate::core::config::Config;
 use crate::player::Player;
 use crate::player::identity::PlayerIdentity;
 
@@ -12,7 +12,7 @@ pub static LIST_COMMAND: CommandDefinition = CommandDefinition::new("list", "Lis
         .collect();
     names.sort_unstable();
 
-    let max_players = context.resource::<Config>().server.max_players;
+    let max_players = context.resource::<ServerConfig>().max_players;
     context.reply(format!("There are {}/{max_players} players online:", names.len()));
 
     // the client drops the connection on an empty system message

@@ -1,5 +1,4 @@
 use super::{LoginProgress, Session};
-use crate::network::BedrockProtocol;
 use bedrock::auth::Login;
 use bedrock::network::compression::Compression;
 use bedrock::network::error::LoginError;
@@ -7,6 +6,7 @@ use bedrock::network::login::{LoginOptions, NetworkSettings, begin_encryption, c
 use bedrock::protocol::ProtoVersion;
 use bedrock::protocol::v662::enums::{PacketCompressionAlgorithm, PlayStatus};
 use bedrock::protocol::v662::packets::{NetworkSettingsPacket, ServerToClientHandshakePacket};
+use chorus_core::protocol::BedrockProtocol;
 use std::fmt::{Display, Formatter};
 use std::mem::replace;
 use tracing::warn;

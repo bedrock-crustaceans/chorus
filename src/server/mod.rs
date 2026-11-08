@@ -1,8 +1,8 @@
-use crate::core::config::Config;
+use crate::core::config::NetworkConfig;
 use crate::network::network::Network;
 use crate::registry::Registry;
 use crate::utils::rolling_avg::RollingAvg;
-use crate::{Tick, TickSet};
+use crate::{Tick, TickClock, TickSet};
 use bevy_app::{App, Plugin, PostStartup};
 use bevy_ecs::prelude::{IntoScheduleConfigs, Res, Resource};
 use bevy_ecs::system::ResMut;
@@ -127,7 +127,7 @@ impl Plugin for Server {
                 mspt_max: 0.0,
                 mspt_avg: RollingAvg::new(20),
             })
-            .add_systems(PostStartup, Server::start)
+            .add_systems(PostStartup, (Server::start, Server::restart_clock).chain())
             .add_systems(Tick, Server::start_tick.in_set(TickSet::First))
             .add_systems(Tick, pregen::Pregen::run.in_set(TickSet::First).after(Server::start_tick))
             .add_systems(Tick, Server::end_tick.in_set(TickSet::Last))
@@ -139,8 +139,12 @@ impl Plugin for Server {
 }
 
 impl Server {
-    pub fn start(config: Res<Config>) {
-        info!("Started on {}:{}.", config.network.ip, config.network.port);
+    pub fn start(network: Res<NetworkConfig>) {
+        info!("Started on {}:{}.", network.ip, network.port);
+    }
+
+    pub fn restart_clock(mut clock: ResMut<TickClock>) {
+        clock.restart();
     }
 
     pub fn start_tick(mut server_state: ResMut<ServerState>) {

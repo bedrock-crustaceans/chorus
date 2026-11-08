@@ -1,9 +1,9 @@
+use crate::core::config::PackConfig;
 use std::collections::HashMap;
 
 use bevy_ecs::prelude::*;
 use tracing::{debug, info, warn};
 
-use crate::core::config::Config;
 use crate::resource::resource_pack::ResourcePack;
 
 pub mod resource_pack;
@@ -44,10 +44,16 @@ impl ResourcePacks {
     }
 
     #[tracing::instrument(name = "resources", skip_all)]
-    pub fn load(config: Res<Config>, mut commands: Commands) {
+    pub fn load(packs: Res<PackConfig>, mut commands: Commands) {
         let mut res = ResourcePacks::default();
 
-        let entries = match std::fs::read_dir(&config.packs.resource_directory) {
+        for directory in [&packs.resource_directory, &packs.behavior_directory] {
+            if let Err(err) = std::fs::create_dir_all(directory) {
+                warn!("Could not create {}: {err}", directory.display());
+            }
+        }
+
+        let entries = match std::fs::read_dir(&packs.resource_directory) {
             Ok(e) => e,
             Err(err) => {
                 warn!("Could not read resource packs directory: {err}");

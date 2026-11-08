@@ -1,5 +1,5 @@
-use crate::core::config::Config;
 use crate::core::config::Interval;
+use crate::core::config::LevelConfig;
 use crate::level::Level;
 use crate::level::dimension_type::DimensionType;
 use crate::level::generator::r#impl::overworld::{Java, OverworldGenerator};
@@ -62,16 +62,16 @@ fn interval_elapsed(last: &mut Option<Instant>, interval: Interval) -> bool {
     true
 }
 
-fn compact_level(level: Option<Res<Level>>, config: Res<Config>, mut last: Local<Option<Instant>>) {
+fn compact_level(level: Option<Res<Level>>, settings: Res<LevelConfig>, mut last: Local<Option<Instant>>) {
     let Some(storage) = level.as_ref().and_then(|level| level.storage()) else { return };
     storage.step_compaction();
-    if interval_elapsed(&mut last, config.level.database.auto_compaction) {
+    if interval_elapsed(&mut last, settings.database.auto_compaction) {
         let _ = storage.schedule_compaction();
     }
 }
 
 fn autosave(world: &mut World, mut last: Local<Option<Instant>>) {
-    if !interval_elapsed(&mut last, world.resource::<Config>().level.autosave) {
+    if !interval_elapsed(&mut last, world.resource::<LevelConfig>().autosave) {
         return;
     }
     crate::actor::storage::save_all_actors(world);
@@ -84,13 +84,13 @@ fn autosave(world: &mut World, mut last: Local<Option<Instant>>) {
     }
 }
 
-pub fn open_level(mut commands: Commands, registry: Res<BlockRegistry>, config: Res<Config>) {
-    let path = Path::new(WORLDS_DIRECTORY).join(&config.level.name);
-    let mut level = Level::open(path, &config.level.name, config.level.seed.value(), &registry, config.level.database.compression);
-    level.set_chunk_saving(config.level.chunk_saving);
-    level.set_retention_budget(config.level.retention_budget);
-    level.set_lookahead(config.level.lookahead);
-    level.set_chunk_cache(config.level.chunk_cache);
+pub fn open_level(mut commands: Commands, registry: Res<BlockRegistry>, settings: Res<LevelConfig>) {
+    let path = Path::new(WORLDS_DIRECTORY).join(&settings.name);
+    let mut level = Level::open(path, &settings.name, settings.seed.value(), &registry, settings.database.compression);
+    level.set_chunk_saving(settings.chunk_saving);
+    level.set_retention_budget(settings.retention_budget);
+    level.set_lookahead(settings.lookahead);
+    level.set_chunk_cache(settings.chunk_cache);
     commands.insert_resource(level);
 }
 

@@ -819,8 +819,6 @@ dependencies = [
  "atomicow",
  "base64 0.23.1",
  "bedrock",
- "bevy-nethernet",
- "bevy-raknet",
  "bevy_app",
  "bevy_ecs",
  "bevy_tasks",
@@ -829,6 +827,8 @@ dependencies = [
  "chorus_entity",
  "chorus_item",
  "chorus_level",
+ "chorus_nethernet",
+ "chorus_network",
  "chorus_worldgen",
  "chrono",
  "crossbeam-channel",
@@ -885,6 +885,7 @@ name = "chorus_core"
 version = "0.0.1"
 dependencies = [
  "bedrock",
+ "bevy_app",
  "bevy_ecs",
  "glam 0.34.2",
  "humantime",
@@ -941,6 +942,48 @@ dependencies = [
  "serde",
  "serde_json",
  "slotmap",
+ "tracing",
+]
+
+[[package]]
+name = "chorus_nethernet"
+version = "0.0.1"
+dependencies = [
+ "bedrock",
+ "bevy-nethernet",
+ "bevy_app",
+ "bevy_ecs",
+ "chorus_core",
+ "chorus_network",
+ "rand",
+ "serde",
+ "toml",
+ "tracing",
+]
+
+[[package]]
+name = "chorus_network"
+version = "0.0.1"
+dependencies = [
+ "bedrock",
+ "bevy_app",
+ "bevy_ecs",
+ "chorus_core",
+ "tracing",
+]
+
+[[package]]
+name = "chorus_raknet"
+version = "0.0.1"
+dependencies = [
+ "bedrock",
+ "bevy-raknet",
+ "bevy_app",
+ "bevy_ecs",
+ "chorus_core",
+ "chorus_network",
+ "rand",
+ "serde",
  "tracing",
 ]
 
