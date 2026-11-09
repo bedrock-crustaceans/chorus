@@ -260,7 +260,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 [[package]]
 name = "bedrock"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#38beee6d4f65d60fc725bffc5f2fc7a2127c0bd3"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#3bf3b7f73da86ba4c9a3b1400230e926898a9c82"
 dependencies = [
  "bedrock_auth",
  "bedrock_form",
@@ -275,7 +275,7 @@ dependencies = [
 [[package]]
 name = "bedrock_auth"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#38beee6d4f65d60fc725bffc5f2fc7a2127c0bd3"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#3bf3b7f73da86ba4c9a3b1400230e926898a9c82"
 dependencies = [
  "base64 0.23.1",
  "md-5 0.11.0",
@@ -293,7 +293,7 @@ dependencies = [
 [[package]]
 name = "bedrock_form"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#38beee6d4f65d60fc725bffc5f2fc7a2127c0bd3"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#3bf3b7f73da86ba4c9a3b1400230e926898a9c82"
 dependencies = [
  "facet 0.50.0-rc.7",
  "facet-format",
@@ -304,7 +304,7 @@ dependencies = [
 [[package]]
 name = "bedrock_level"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#38beee6d4f65d60fc725bffc5f2fc7a2127c0bd3"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#3bf3b7f73da86ba4c9a3b1400230e926898a9c82"
 dependencies = [
  "bedrock_shared",
  "bytemuck",
@@ -323,7 +323,7 @@ dependencies = [
 [[package]]
 name = "bedrock_macros"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#38beee6d4f65d60fc725bffc5f2fc7a2127c0bd3"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#3bf3b7f73da86ba4c9a3b1400230e926898a9c82"
 dependencies = [
  "nbtx",
  "proc-macro2",
@@ -334,7 +334,7 @@ dependencies = [
 [[package]]
 name = "bedrock_network"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#38beee6d4f65d60fc725bffc5f2fc7a2127c0bd3"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#3bf3b7f73da86ba4c9a3b1400230e926898a9c82"
 dependencies = [
  "aes 0.9.4",
  "bedrock_auth",
@@ -356,7 +356,7 @@ dependencies = [
 [[package]]
 name = "bedrock_protocol"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#38beee6d4f65d60fc725bffc5f2fc7a2127c0bd3"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#3bf3b7f73da86ba4c9a3b1400230e926898a9c82"
 dependencies = [
  "bedrock_macros",
  "bedrock_protocol_core",
@@ -371,7 +371,7 @@ dependencies = [
 [[package]]
 name = "bedrock_protocol_core"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#38beee6d4f65d60fc725bffc5f2fc7a2127c0bd3"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#3bf3b7f73da86ba4c9a3b1400230e926898a9c82"
 dependencies = [
  "byteorder",
  "nbtx",
@@ -385,7 +385,7 @@ dependencies = [
 [[package]]
 name = "bedrock_shared"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#38beee6d4f65d60fc725bffc5f2fc7a2127c0bd3"
+source = "git+https://github.com/bedrock-crustaceans/bedrock-rs?branch=main#3bf3b7f73da86ba4c9a3b1400230e926898a9c82"
 dependencies = [
  "bedrock_macros",
  "bedrock_protocol_core",
