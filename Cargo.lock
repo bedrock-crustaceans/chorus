@@ -397,7 +397,7 @@ dependencies = [
 [[package]]
 name = "bevy-nethernet"
 version = "0.1.0"
-source = "git+https://github.com/bedrock-crustaceans/nethernet?branch=main#1963dbaf172c8823617d28598a08b99d2d539e56"
+source = "git+https://github.com/bedrock-crustaceans/nethernet?branch=main#ed552b0b60dc6f8d54e0d7d42a9c66a9b9bdfb99"
 dependencies = [
  "async-channel",
  "bevy_app",
@@ -2513,7 +2513,7 @@ dependencies = [
 [[package]]
 name = "nethernet"
 version = "0.0.1"
-source = "git+https://github.com/bedrock-crustaceans/nethernet?branch=main#1963dbaf172c8823617d28598a08b99d2d539e56"
+source = "git+https://github.com/bedrock-crustaceans/nethernet?branch=main#ed552b0b60dc6f8d54e0d7d42a9c66a9b9bdfb99"
 dependencies = [
  "aes 0.9.4",
  "base64 0.23.1",
