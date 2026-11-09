@@ -18,7 +18,6 @@ use crate::generator::pos::ChunkPos;
 
 /// Sweep the retained nodes once their number has grown by this factor since the last sweep.
 const REPORT_INTERVAL: Duration = Duration::from_secs(30);
-const COMPLETION_WAIT: Duration = Duration::from_millis(1);
 
 pub enum Completion {
     Finished(NodeKey, Outcome, Outbox),
@@ -992,18 +991,6 @@ impl<G: Generator> WorldGenerator for PhaseGraph<G> {
             }
         } else {
             self.fill_pool(pool);
-
-            // nothing more can be handed out until a worker finishes, so wait briefly instead of spinning
-            if self.in_flight > 0
-                && (self.in_flight >= pool.thread_num() * 2 || self.pending_dispatch.is_empty())
-                && let Ok(completion) = self.completions_rx.recv_timeout(COMPLETION_WAIT)
-            {
-                self.handle(completion);
-                while let Ok(completion) = self.completions_rx.try_recv() {
-                    self.handle(completion);
-                }
-                self.fill_pool(pool);
-            }
         }
 
         std::mem::take(&mut self.finished)
