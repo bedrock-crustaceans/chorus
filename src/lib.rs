@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 use tracing::{info, warn};
 
 pub mod actor;
+pub mod camera;
 pub mod chat;
 pub mod command;
 pub mod console;

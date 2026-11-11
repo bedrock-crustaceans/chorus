@@ -251,6 +251,8 @@ fn handle_request_chunk_radius(
 
     session.send(BedrockProtocol::BiomeDefinitionListPacket(crate::level::biome::definitions::definition_list().into()));
 
+    session.send(crate::camera::presets_packet());
+
     session.send_play_status(PlayStatus::PlayerSpawn, false);
 
     session.send(BedrockProtocol::CreativeContentPacket(items.to_creative_packet().into()));
