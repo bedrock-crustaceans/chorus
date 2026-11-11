@@ -219,7 +219,7 @@ pub enum ParameterKind {
     Argument(ArgumentType),
     Enum(CommandEnum),
     Literal(CowArc<'static, str>),
-    SoftEnum(CowArc<'static, str>),
+    SoftEnum(CowArc<'static, str>, CowArc<'static, [CowArc<'static, str>]>),
     Postfix(CowArc<'static, str>),
     CommandName,
 }
@@ -262,7 +262,11 @@ impl CommandParameter {
     }
 
     pub const fn soft_enum(name: &'static str, soft_enum: &'static str) -> Self {
-        Self::of(name, ParameterKind::SoftEnum(CowArc::Static(soft_enum)))
+        Self::soft_enum_with(name, soft_enum, &[])
+    }
+
+    pub const fn soft_enum_with(name: &'static str, soft_enum: &'static str, values: &'static [CowArc<'static, str>]) -> Self {
+        Self::of(name, ParameterKind::SoftEnum(CowArc::Static(soft_enum), CowArc::Static(values)))
     }
 
     pub const fn postfix(name: &'static str, postfix: &'static str) -> Self {
@@ -297,7 +301,7 @@ impl CommandParameter {
             ParameterKind::Argument(kind) => format!("{}: {}", self.name, kind.label()),
             ParameterKind::Enum(values) => format!("{}: {}", self.name, values.values.join("|")),
             ParameterKind::Literal(word) => return if self.optional { format!("[{word}]") } else { word.to_string() },
-            ParameterKind::SoftEnum(name) => format!("{}: {name}", self.name),
+            ParameterKind::SoftEnum(name, _) => format!("{}: {name}", self.name),
             ParameterKind::Postfix(postfix) => format!("{}: int{postfix}", self.name),
             ParameterKind::CommandName => format!("{}: {COMMAND_NAME_ENUM}", self.name),
         };

@@ -135,11 +135,11 @@ mod tests {
     use super::*;
     use crate::command::args::parse;
     use crate::debug::DEBUG_COMMAND;
+    use crate::registry::command_registry::CommandRegistry;
     use chorus_core::permission::PermissionLevel;
-    use std::collections::HashMap;
 
     fn run_line(hud: &mut DebugHud, line: &str) -> Result<String, String> {
-        let args = parse("debug", &DEBUG_COMMAND.overloads, line, &HashMap::new(), PermissionLevel::Operator).map_err(|error| error.message)?;
+        let args = parse("debug", &DEBUG_COMMAND.overloads, line, &CommandRegistry::new(), PermissionLevel::Operator).map_err(|error| error.message)?;
         apply(hud, &args, 0)
     }
 

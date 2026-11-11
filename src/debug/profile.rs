@@ -31,11 +31,13 @@ pub fn run(context: &mut CommandContext, args: &CommandArgs) -> Result<(), Strin
 mod tests {
     use crate::command::args::parse;
     use crate::debug::DEBUG_COMMAND;
+    use crate::registry::command_registry::CommandRegistry;
     use chorus_core::permission::PermissionLevel;
-    use std::collections::HashMap;
 
     fn seconds(command: &crate::command::command_definition::CommandDefinition, line: &str) -> Option<i32> {
-        parse(&command.name, &command.overloads, line, &HashMap::new(), PermissionLevel::Operator).unwrap().int("seconds")
+        parse(&command.name, &command.overloads, line, &CommandRegistry::new(), PermissionLevel::Operator)
+            .unwrap()
+            .int("seconds")
     }
 
     #[test]
@@ -43,7 +45,7 @@ mod tests {
         assert_eq!(seconds(&DEBUG_COMMAND, "profile start 45"), Some(45));
         assert_eq!(seconds(&DEBUG_COMMAND, "profile start"), None);
         assert!(
-            parse("debug", &DEBUG_COMMAND.overloads, "profile stop", &HashMap::new(), PermissionLevel::Operator)
+            parse("debug", &DEBUG_COMMAND.overloads, "profile stop", &CommandRegistry::new(), PermissionLevel::Operator)
                 .unwrap()
                 .has("stop")
         );

@@ -11,7 +11,7 @@ use bedrock::protocol::ProtoVersionPackets;
 use bedrock::protocol::v662::enums::SoftEnumUpdateType;
 use bedrock::protocol::v898::packets::{AvailableCommandsPacket, ChainedSubCommandDataEntry, CommandsEntry, ConstraintsEntry, EnumDataEntry, OverloadsEntry, SoftEnumsEntry, SubCommandValues};
 use bevy_ecs::prelude::{Commands, Query, ResMut, Resource};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use std::collections::HashMap;
 use tracing::{debug, info};
 
@@ -26,7 +26,7 @@ const ARG_FLAG_SOFT_ENUM: u32 = 0x4000000;
 pub struct CommandRegistry {
     commands: Vec<CowArc<'static, CommandDefinition>>,
     index: HashMap<String, usize>,
-    soft_enums: IndexMap<String, Vec<String>>,
+    soft_enums: IndexMap<String, IndexSet<String>>,
     soft_enum_updates: Vec<(String, Vec<String>, SoftEnumUpdateType)>,
 }
 
@@ -56,8 +56,8 @@ impl CommandRegistry {
             self.index.insert(alias.to_ascii_lowercase(), position);
         }
         for parameter in command.overloads.iter().flat_map(|overload| overload.parameters.iter()) {
-            if let ParameterKind::SoftEnum(name) = &parameter.kind {
-                self.soft_enums.entry(name.to_string()).or_default();
+            if let ParameterKind::SoftEnum(name, defaults) = &parameter.kind {
+                self.soft_enums.entry(name.to_string()).or_default().extend(defaults.iter().map(|default| default.to_string()));
             }
         }
 
@@ -88,35 +88,40 @@ impl CommandRegistry {
         self.commands.iter().map(|c| c.as_ref())
     }
 
-    pub fn soft_enum(&self, name: &str) -> Option<&[String]> {
-        self.soft_enums.get(name).map(Vec::as_slice)
+    pub fn soft_enum(&self, name: &str) -> Option<&IndexSet<String>> {
+        self.soft_enums.get(name)
+    }
+
+    pub fn find_enum(&self, enum_name: &str, text: &str) -> Option<String> {
+        if enum_name == COMMAND_NAME_ENUM {
+            return self.index.get_key_value(&text.to_ascii_lowercase()).map(|(name, _)| name.clone());
+        }
+        self.soft_enums.get(enum_name)?.iter().find(|value| value.eq_ignore_ascii_case(text)).cloned()
     }
 
     pub fn set_soft_enum(&mut self, name: impl Into<String>, values: impl IntoIterator<Item = impl Into<String>>) {
         let (name, values): (String, Vec<String>) = (name.into(), values.into_iter().map(Into::into).collect());
-        self.soft_enums.insert(name.clone(), values.clone());
+        self.soft_enums.insert(name.clone(), values.iter().cloned().collect());
         self.soft_enum_updates.push((name, values, SoftEnumUpdateType::Replace));
     }
 
     pub fn add_soft_enum_values(&mut self, name: impl Into<String>, values: impl IntoIterator<Item = impl Into<String>>) {
         let name = name.into();
         let existing = self.soft_enums.entry(name.clone()).or_default();
-        let added: Vec<String> = values.into_iter().map(Into::into).filter(|value| !existing.contains(value)).collect();
+        let added: Vec<String> = values.into_iter().map(Into::into).filter(|value| existing.insert(value.clone())).collect();
         if added.is_empty() {
             return;
         }
-        existing.extend(added.iter().cloned());
         self.soft_enum_updates.push((name, added, SoftEnumUpdateType::Add));
     }
 
     pub fn remove_soft_enum_values(&mut self, name: impl Into<String>, values: impl IntoIterator<Item = impl Into<String>>) {
         let name = name.into();
         let Some(existing) = self.soft_enums.get_mut(&name) else { return };
-        let removed: Vec<String> = values.into_iter().map(Into::into).filter(|value| existing.contains(value)).collect();
+        let removed: Vec<String> = values.into_iter().map(Into::into).filter(|value| existing.shift_remove(value)).collect();
         if removed.is_empty() {
             return;
         }
-        existing.retain(|value| !removed.contains(value));
         self.soft_enum_updates.push((name, removed, SoftEnumUpdateType::Remove));
     }
 
@@ -146,20 +151,19 @@ impl CommandRegistry {
         }
 
         let registry = context.registry();
-        let mut lookups: HashMap<String, Vec<String>> = registry.soft_enums.clone().into_iter().collect();
-        lookups.insert(COMMAND_NAME_ENUM.to_owned(), registry.index.keys().cloned().collect());
         let command = registry.get(name).cloned();
         let Some(command) = command else {
             context.reply(format!("§cUnknown command: {name}. Please check that the command exists and that you have permission to use it."));
             return;
         };
         context.set_style(command.style);
-        if context.permission_level() < command.permission {
+        let level = context.permission_level();
+        if level < command.permission {
             context.reply(format!("§cYou don't have permission to use /{}.", command.name));
             return;
         }
 
-        let parsed = match args::parse(&command.name, &command.overloads, rest, &lookups, context.permission_level()) {
+        let parsed = match args::parse(&command.name, &command.overloads, rest, context.registry(), level) {
             Ok(parsed) => parsed,
             Err(error) => {
                 context.reply(format!("§cSyntax error: {}", error.message));
@@ -196,7 +200,7 @@ struct PacketBuilder {
 }
 
 impl PacketBuilder {
-    fn new(soft_enums: &IndexMap<String, Vec<String>>, mut command_names: Vec<String>) -> Self {
+    fn new(soft_enums: &IndexMap<String, IndexSet<String>>, mut command_names: Vec<String>) -> Self {
         command_names.sort_unstable();
         Self {
             command_names,
@@ -212,7 +216,7 @@ impl PacketBuilder {
                 .iter()
                 .map(|(name, values)| SoftEnumsEntry {
                     enum_name: name.clone(),
-                    enum_options: values.clone(),
+                    enum_options: values.iter().cloned().collect(),
                 })
                 .collect(),
         }
@@ -295,7 +299,7 @@ impl PacketBuilder {
                 self.command_names = names;
                 ARG_FLAG_VALID | ARG_FLAG_ENUM | index
             }
-            ParameterKind::SoftEnum(name) => {
+            ParameterKind::SoftEnum(name, _) => {
                 let index = match self.soft_enums.iter().position(|entry| entry.enum_name == name.as_ref()) {
                     Some(index) => index,
                     None => {

@@ -1,7 +1,7 @@
 use crate::command::parameter::{ArgumentType, COMMAND_NAME_ENUM, CommandOverload, CommandParameter, ParameterKind};
+use crate::registry::command_registry::CommandRegistry;
 use chorus_core::permission::PermissionLevel;
 use glam::{DVec3, IVec3, Vec2};
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Coordinate {
@@ -208,7 +208,7 @@ struct Attempt {
     message: String,
 }
 
-fn parse_overload(parameters: &[CommandParameter], tokens: &[Token], soft_enums: &HashMap<String, Vec<String>>, level: PermissionLevel) -> Result<Vec<(String, ArgValue)>, Attempt> {
+fn parse_overload(parameters: &[CommandParameter], tokens: &[Token], registry: &CommandRegistry, level: PermissionLevel) -> Result<Vec<(String, ArgValue)>, Attempt> {
     let mut values = Vec::with_capacity(parameters.len());
     let mut index = 0;
     for parameter in parameters {
@@ -237,14 +237,13 @@ fn parse_overload(parameters: &[CommandParameter], tokens: &[Token], soft_enums:
                 Some(value) => ArgValue::Text(value.to_owned()),
                 None => return Err(fail(format!("\"{text}\" is not one of {}", values.values.join(", ")))),
             },
-            ParameterKind::SoftEnum(_) | ParameterKind::CommandName => {
+            ParameterKind::SoftEnum(..) | ParameterKind::CommandName => {
                 let key = match &parameter.kind {
-                    ParameterKind::SoftEnum(name) => name.as_ref(),
+                    ParameterKind::SoftEnum(name, _) => name.as_ref(),
                     _ => COMMAND_NAME_ENUM,
                 };
-                let known = soft_enums.get(key);
-                match known.and_then(|values| values.iter().find(|value| value.eq_ignore_ascii_case(text))) {
-                    Some(value) => ArgValue::Text(value.clone()),
+                match registry.find_enum(key, text) {
+                    Some(value) => ArgValue::Text(value),
                     None => return Err(fail(format!("\"{text}\" is not a valid {}", parameter.name))),
                 }
             }
@@ -344,14 +343,14 @@ fn parse_argument(kind: ArgumentType, text: &str) -> Option<ArgValue> {
     })
 }
 
-pub fn parse(name: &str, overloads: &[CommandOverload], line: &str, soft_enums: &HashMap<String, Vec<String>>, level: PermissionLevel) -> Result<CommandArgs, ParseError> {
+pub fn parse(name: &str, overloads: &[CommandOverload], line: &str, registry: &CommandRegistry, level: PermissionLevel) -> Result<CommandArgs, ParseError> {
     let tokens = tokenize(line);
     let empty = [CommandOverload::new(&[])];
     let overloads = if overloads.is_empty() { &empty[..] } else { overloads };
 
     let mut attempts = Vec::with_capacity(overloads.len());
     for (index, overload) in overloads.iter().enumerate() {
-        match parse_overload(&overload.parameters, &tokens, soft_enums, level) {
+        match parse_overload(&overload.parameters, &tokens, registry, level) {
             Ok(values) => {
                 return Ok(CommandArgs {
                     overload: index,
@@ -392,7 +391,7 @@ mod tests {
     ];
 
     fn parse_line(line: &str) -> Result<CommandArgs, ParseError> {
-        parse("test", OVERLOADS, line, &HashMap::new(), PermissionLevel::Member)
+        parse("test", OVERLOADS, line, &CommandRegistry::new(), PermissionLevel::Member)
     }
 
     #[test]
@@ -432,7 +431,7 @@ mod tests {
         const RESTRICTED: CommandEnum = CommandEnum::new("Restricted", values!["open", "locked"]).constrained(crate::constraints![("locked", EnumConstraints::OPERATOR_PERMISSIONS)]);
         const LOCKED: &[CommandOverload] = crate::overloads![[CommandParameter::enumeration("state", RESTRICTED)]];
 
-        let run = |line: &str, level| parse("test", LOCKED, line, &HashMap::new(), level);
+        let run = |line: &str, level| parse("test", LOCKED, line, &CommandRegistry::new(), level);
         assert!(run("open", PermissionLevel::Member).is_ok());
         assert!(run("locked", PermissionLevel::Member).unwrap_err().message.contains("permission"));
         assert_eq!(run("LOCKED", PermissionLevel::Operator).unwrap().string("state"), Some("locked"));

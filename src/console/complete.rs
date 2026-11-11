@@ -27,7 +27,7 @@ impl Param {
         let values = match &parameter.kind {
             ParameterKind::Enum(values) => Some(values.values.iter().map(|value| value.to_string()).collect()),
             ParameterKind::Literal(word) => Some(vec![word.to_string()]),
-            ParameterKind::SoftEnum(name) => Some(registry.soft_enum(name).map(<[String]>::to_vec).unwrap_or_default()),
+            ParameterKind::SoftEnum(name, _) => Some(registry.soft_enum(name).map(|values| values.iter().cloned().collect()).unwrap_or_default()),
             ParameterKind::CommandName => Some(command_names.to_vec()),
             ParameterKind::Argument(_) | ParameterKind::Postfix(_) => None,
         };
