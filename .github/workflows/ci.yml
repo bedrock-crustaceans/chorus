@@ -2,8 +2,7 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
   schedule:
     - cron: "0 6 * * 1"
@@ -11,89 +10,90 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
+
+# A new push to a pull request cancels the run it replaces; runs on `main` always finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # No debug info and no incremental files: they make the caches large and the builds no faster.
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_INCREMENTAL: 0
 
 jobs:
-  test:
-    name: Test
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          add-job-id-key: false
-          add-rust-environment-hash-key: false
-          shared-key: "chorus-cache"
-          cache-on-failure: false
-          cache-all-crates: true
-
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --all
-
   fmt:
-    name: Formatting
+    name: Format
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-      - run: cargo fmt --all -- --check
+      - run: cargo fmt --all --check
 
+  # Not `--all-features`: `chorus_worldgen`'s `dhat-heap` and `count-alloc` each set the global
+  # allocator of its tests, so they are linted one at a time.
   clippy:
-    name: Clippy
+    name: Clippy (${{ matrix.os }})
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      RUSTFLAGS: -Dwarnings
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          add-job-id-key: false
-          add-rust-environment-hash-key: false
-          shared-key: "chorus-cache"
-          cache-on-failure: false
-          cache-all-crates: true
-
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - run: cargo clippy --all-targets --all-features
-
-  windows:
-    name: Windows
-    if: github.event_name != 'schedule'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v6
-
       - uses: Swatinem/rust-cache@v2
         with:
-          add-job-id-key: false
-          shared-key: "chorus-cache-windows"
-          cache-on-failure: false
-          cache-all-crates: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo clippy --workspace --all-targets --features debug
+      - name: Allocator features
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cargo clippy -p chorus_worldgen --all-targets --features dhat-heap
+          cargo clippy -p chorus_worldgen --all-targets --features count-alloc
 
+  test:
+    name: Test (${{ matrix.os }})
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo check --workspace
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Tests
+        run: cargo nextest run --workspace --profile ci
+      # nextest does not run doctests.
+      - name: Doctests
+        run: cargo test --workspace --doc
 
+  # The generated terrain against its recorded checksums, once a week: too slow for every push.
   worldgen-checksum:
     name: Worldgen checksum
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          add-job-id-key: false
-          shared-key: "chorus-cache-release"
-          cache-on-failure: false
-          cache-all-crates: true
-
-      - uses: dtolnay/rust-toolchain@stable
+          key: release
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo test --release -p chorus_worldgen -- --ignored output_checksum --nocapture

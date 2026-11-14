@@ -130,7 +130,8 @@ target/
 
 run
 /chorus.toml
-.cargo/
+.cargo/*
+!.cargo/config.toml
 /resource_packs
 /logs
 /behavior_packs
@@ -139,3 +140,5 @@ dhat-heap.json
 
 /.local/
 /Cargo.lock
+.envrc.local
+.direnv/

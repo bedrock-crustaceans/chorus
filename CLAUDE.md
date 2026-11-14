@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Chorus is Minecraft Bedrock Edition server software written in Rust. It is built on top of [`bedrock-rs`](https://github.com/bedrock-crustaceans/bedrock-rs) and uses Bevy ECS (`bevy_app` / `bevy_ecs`, no full Bevy) as the server tick/scheduling backbone.
 
-`bedrock-rs`, `bevy-raknet`, `bevy-nethernet` and `nbtx` are git dependencies pinned to `branch = "main"` in `Cargo.toml`; nothing is vendored. To develop against a local checkout of one of them, add a temporary `[patch]` section and do not commit it.
+`bedrock-rs`, `bevy-raknet`, `bevy-nethernet` and `nbtx` are git dependencies pinned to `branch = "main"` in `Cargo.toml`; nothing is vendored. `Cargo.lock` is not committed, so every build resolves the newest versions the requirements allow. To develop against a local checkout of one of them, add a temporary `[patch]` section and do not commit it.
 
 The block state upgrade schemas are bundled into `crates/block/resources/block_upgrade_schemas.json`, generated from the latest `opencollab-incubator/BedrockBlockUpgradeSchema` with `cargo run -p xtask -- block-upgrade-schemas` (fetches over HTTP, needs network). The upgrader only applies schemas up to the server's block state version. The item palette, creative items and item components in `crates/item/resources` come from one commit of the `PowerNukkitX/Gamedata` repository, written together by `cargo run -p xtask -- item-data [branch]` (default `r/26_u6`); the components stay a binary file because the client needs their exact NBT types.
 
@@ -28,8 +28,12 @@ cargo check
 # Format (max_width = 200 per rustfmt.toml)
 cargo fmt
 
-# Lint
-cargo clippy
+# Lint as CI does (warnings are errors there; not --all-features, the worldgen allocator features exclude each other)
+cargo clippy --workspace --all-targets --features debug
+
+# Test as CI does (nextest, profile in .config/nextest.toml; doctests separately)
+cargo nextest run --workspace
+cargo test --workspace --doc
 ```
 
 ```bash

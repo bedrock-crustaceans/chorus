@@ -54,6 +54,14 @@ If you're unsure where to start or want to discuss ideas before building, join t
 
 Join our Discord to follow development, ask questions, and get involved on [Discord](https://discord.bedrock-crustaceans.org)
 
+## Contributors
+
+<p align="center">
+  <a href="https://github.com/bedrock-crustaceans/chorus/graphs/contributors">
+    <img src=".github/assets/contributors.svg" alt="Contributors" width="100%" />
+  </a>
+</p>
+
 ## License
 
 Chorus is licensed under the [Apache License 2.0](LICENSE).
