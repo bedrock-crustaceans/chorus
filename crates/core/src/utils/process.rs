@@ -11,7 +11,7 @@ pub struct ProcessStats {
 pub fn process_stats() -> Option<ProcessStats> {
     let pid = Pid::from_u32(std::process::id());
 
-    let mut system = System::new();
+    let mut system = System::new().ok()?;
     system.refresh_processes_specifics(ProcessesToUpdate::Some(&[pid]), true, ProcessRefreshKind::nothing().with_memory().with_tasks());
 
     let process = system.process(pid)?;

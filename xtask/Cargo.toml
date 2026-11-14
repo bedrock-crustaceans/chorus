@@ -10,5 +10,5 @@ publish = false
 chorus_block_schema.workspace = true
 serde = { workspace = true }
 serde_json.workspace = true
-ureq = "3"
-flate2 = "1"
+ureq = "3.5.1"
+flate2 = "1.1.11"
