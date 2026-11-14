@@ -521,7 +521,7 @@ struct Zoom(SectionStore);
 impl Zoom {
     fn pack(biomes: &[Biome]) -> Self {
         let mut builder = SectionStoreBuilder::default();
-        for section in biomes.chunks_exact(4096) {
+        for section in biomes.as_chunks::<4096>().0 {
             builder.push_blocks(&std::array::from_fn(|index| section[index] as i32));
         }
         Self(builder.build())

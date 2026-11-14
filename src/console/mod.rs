@@ -2,7 +2,7 @@ use crate::command::dispatch::CommandRequestedMessage;
 use bevy_app::{App, AppExit, Plugin, PreUpdate, Startup};
 use bevy_ecs::entity::Entity;
 use bevy_ecs::message::MessageWriter;
-use bevy_ecs::prelude::{Commands, Component, DetectChanges, Res, ResMut, Resource};
+use bevy_ecs::prelude::{Component, DetectChanges, Res, ResMut, Resource};
 use bevy_ecs::system::Local;
 use std::io::IsTerminal;
 use std::sync::atomic::{AtomicBool, Ordering};

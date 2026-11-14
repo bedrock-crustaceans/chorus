@@ -113,7 +113,7 @@ mod tests {
         let mut cache = ClientBlobCache::default();
         let shared = blob(1);
         cache.track(&[shared.clone(), blob(2)]);
-        cache.track(&[shared.clone()]);
+        cache.track(std::slice::from_ref(&shared));
 
         assert!(cache.get(shared.0).is_some());
         assert!(cache.get(shared.0).is_some());

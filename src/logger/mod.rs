@@ -1,5 +1,4 @@
 use crate::core::config::LogConfig;
-use std::io::Write as _;
 
 use bedrock::protocol::ProtoVersion;
 use bevy_ecs::prelude::Resource;

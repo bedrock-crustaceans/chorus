@@ -1,3 +1,6 @@
+// The NBT structs mirror vanilla's and are filled in before anything reads them.
+#![allow(dead_code)]
+
 pub mod components;
 pub mod entity;
 pub mod entity_abstract_arrow;

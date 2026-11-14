@@ -56,7 +56,7 @@ impl MossCarpet {
                 let carpet = Carpet::from_index(index);
                 let mut states = vec![state(&UPPER_BLOCK_BIT, flag(!carpet.base))];
                 for (definition, side) in SIDE_STATES.into_iter().zip(carpet.sides) {
-                    states.push(state(&definition, text(SIDE_NAMES[side as usize])));
+                    states.push(state(definition, text(SIDE_NAMES[side as usize])));
                 }
                 table.get(PALE_MOSS_CARPET, &states)
             })

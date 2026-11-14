@@ -687,7 +687,7 @@ impl LevelStorage {
     pub fn load_entities(&self, dimension: DimensionType, x: i32, z: i32) -> StorageResult<Vec<nbtx::Value>> {
         let Some(ids) = self.get(&digp_key(dimension.id(), x, z))? else { return Ok(Vec::new()) };
         let mut entities = Vec::with_capacity(ids.len() / 8);
-        for id in ids.chunks_exact(8) {
+        for id in ids.as_chunks::<8>().0 {
             if let Some(data) = self.get(&actor_key(id))? {
                 entities.push(nbtx::from_le_bytes(&mut data.as_slice())?);
             }
@@ -699,8 +699,8 @@ impl LevelStorage {
         let digp = digp_key(dimension.id(), x, z);
         let ids: Vec<[u8; 8]> = entities.iter().map(|(id, _)| id.to_le_bytes()).collect();
         if let Some(old) = self.get(&digp)? {
-            let kept = |old_id: &[u8]| ids.iter().any(|id| id == old_id) || old_id.try_into().is_ok_and(|bytes: [u8; 8]| saved_elsewhere.contains(&i64::from_le_bytes(bytes)));
-            for old_id in old.chunks_exact(8).filter(|old_id| !kept(old_id)) {
+            let kept = |old_id: &[u8; 8]| ids.contains(old_id) || saved_elsewhere.contains(&i64::from_le_bytes(*old_id));
+            for old_id in old.as_chunks::<8>().0.iter().filter(|old_id| !kept(old_id)) {
                 self.remove(actor_key(old_id));
             }
         }

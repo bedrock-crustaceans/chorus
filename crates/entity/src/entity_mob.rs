@@ -36,8 +36,8 @@ pub struct EntityMob {
     exp_drop_enabled: bool,
 }
 
-impl EntityMob {
-    pub fn default() -> Self {
+impl Default for EntityMob {
+    fn default() -> Self {
         Self {
             active_effects: None,
             air: 0,

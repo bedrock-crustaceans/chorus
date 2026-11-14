@@ -233,7 +233,7 @@ mod tests {
     }
 
     fn field<'a>(tag: &'a nbtx::Compound, key: &str) -> Option<&'a nbtx::Value> {
-        tag.iter().find(|(name, _)| name.to_string() == key).map(|(_, value)| value)
+        tag.iter().find(|(name, _)| *name == key).map(|(_, value)| value)
     }
 
     #[test]
@@ -241,7 +241,7 @@ mod tests {
         let packets = registry().sync_packets();
         assert_eq!(packets.len(), 1);
         let BedrockProtocol::SyncActorPropertyPacket(packet) = &packets[0] else { panic!("wrong packet") };
-        assert!(matches!(packet.property_data.get("type"), Some(nbtx::Value::String(name)) if name.to_string() == "test:thing"));
+        assert!(matches!(packet.property_data.get("type"), Some(nbtx::Value::String(name)) if *name == "test:thing"));
         let Some(nbtx::Value::List(nbtx::ValueList::Compound(properties))) = packet.property_data.get("properties") else {
             panic!("no property list")
         };
@@ -278,7 +278,7 @@ mod tests {
         registry.register(PLAYER_ENTITY_TYPE, vec![PropertyDefinition::int("a:head", 0, 100)]);
         assert_eq!(registry.sync_packets().len(), 1);
         let data = registry.network_data(PLAYER_ENTITY_TYPE).expect("player data");
-        assert!(matches!(data.get("type"), Some(nbtx::Value::String(name)) if name.to_string() == PLAYER_ENTITY_TYPE));
+        assert!(matches!(data.get("type"), Some(nbtx::Value::String(name)) if *name == PLAYER_ENTITY_TYPE));
         assert!(registry.network_data("test:missing").is_none());
     }
 }

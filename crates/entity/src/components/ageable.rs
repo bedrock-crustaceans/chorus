@@ -1,12 +1,6 @@
 use bevy_ecs::prelude::Component;
 
-#[derive(Component)]
+#[derive(Component, Default)]
 pub struct Ageable {
     age: i32,
-}
-
-impl Ageable {
-    pub fn default() -> Self {
-        Self { age: 0 }
-    }
 }

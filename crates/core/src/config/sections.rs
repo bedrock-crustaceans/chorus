@@ -104,21 +104,12 @@ impl Default for SnappyConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct NetworkChunksConfig {
+    // TODO: subchunks disabled by default, since we don't have their heightmaps implemented yet
     pub subchunks: bool,
     pub cache: bool,
-}
-
-impl Default for NetworkChunksConfig {
-    fn default() -> Self {
-        Self {
-            // TODO: subchunks disabled by default, since we don't have their heightmaps implemented yet
-            subchunks: false,
-            cache: false,
-        }
-    }
 }
 
 #[derive(Resource, Serialize, Deserialize, Clone, Debug)]
