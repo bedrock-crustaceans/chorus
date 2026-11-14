@@ -1,11 +1,57 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
+# Dependency updates, once a week. One entry per ecosystem, so no update is proposed twice.
 version: 2
+
 updates:
-  - package-ecosystem: "cargo" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  # Every manifest of the workspace. Most versions live in the root's `[workspace.dependencies]`;
+  # the rest are a member's own. `Cargo.lock` is not committed, so a pull request comes only when
+  # a release falls outside a requirement, and it raises the requirement.
+  - package-ecosystem: cargo
+    directories:
+      - "/"
+      - "/crates/*"
+      - "/xtask"
     schedule:
-      interval: "daily"
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    # Let a release sit before proposing it; a yanked or broken one rarely lasts that long.
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    open-pull-requests-limit: 10
+    labels: [dependencies]
+    commit-message:
+      prefix: chore
+      include: scope
+    # The first group a crate matches wins.
+    groups:
+      bevy:
+        patterns: ["bevy_*"]
+      facet:
+        patterns: ["facet", "facet-*"]
+      rustcrypto:
+        patterns: ["md-5", "sha2"]
+      strum:
+        patterns: ["strum", "strum_macros"]
+      # Any other crate: one pull request per crate, however many manifests name it.
+      per-crate:
+        group-by: dependency-name
+
+  # The actions of the workflows, all in one pull request.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    cooldown:
+      default-days: 3
+    labels: [dependencies]
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]
