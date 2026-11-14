@@ -69,7 +69,7 @@ Chorus is licensed under the [Apache License 2.0](LICENSE).
 <!-- CHORUS -->
 
 [chorus_logo_url]: .github/img/chorus.256.png
-[chorus_url]: https://bedrock-crustaceans.org/chorus
+[chorus_url]: https://github.com/bedrock-crustaceans/chorus
 
 <!-- CHORUS -->
 
