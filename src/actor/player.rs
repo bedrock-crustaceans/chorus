@@ -11,7 +11,7 @@ use crate::player::gamemode::Gamemode;
 use crate::player::identity::PlayerIdentity;
 use crate::player::inventory::PlayerInventory;
 use crate::player::skin::PlayerAppearance;
-use bedrock::protocol::ProtoCodec;
+use bedrock::protocol::codec::ProtoCodec;
 use bedrock::protocol::v662::enums::BuildPlatform;
 use bedrock::protocol::v662::packets::RemoveActorPacket;
 use bedrock::protocol::v662::types::{ActorRuntimeID, ActorUniqueID, PropertySyncData};

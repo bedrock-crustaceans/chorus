@@ -1,5 +1,5 @@
 use crate::palette::Palette;
-use bedrock::protocol::ProtoCodec;
+use bedrock::protocol::codec::ProtoCodec;
 
 #[derive(Clone)]
 pub struct SubChunk {

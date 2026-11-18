@@ -368,7 +368,7 @@ impl PacketBuilder {
 mod tests {
     use super::CommandRegistry;
     use crate::command::r#impl::DEFINITIONS;
-    use bedrock::protocol::ProtoCodec;
+    use bedrock::protocol::codec::ProtoCodec;
     use bedrock::protocol::v898::packets::AvailableCommandsPacket;
 
     const ARG_FLAG_ENUM: u32 = super::ARG_FLAG_ENUM;
