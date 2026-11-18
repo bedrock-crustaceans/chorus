@@ -1,6 +1,6 @@
 use crate::bit_array::BitArray;
-use bedrock::protocol::error::ProtoCodecError;
 use bedrock::protocol::codec::{ProtoCodec, ProtoCodecLE, ProtoCodecVAR};
+use bedrock::protocol::error::ProtoCodecError;
 use indexmap::IndexMap;
 use indexmap::map::Entry;
 use rustc_hash::FxBuildHasher;
