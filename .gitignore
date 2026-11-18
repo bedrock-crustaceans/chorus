@@ -139,6 +139,5 @@ run
 dhat-heap.json
 
 /.local/
-/Cargo.lock
 .envrc.local
 .direnv/

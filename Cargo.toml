@@ -14,7 +14,7 @@ authors = ["OmniacDev"]
 too_many_arguments = "allow"
 type_complexity = "allow"
 
-# `Cargo.lock` is not committed. Each requirement is the oldest version known to work, and only
+# `Cargo.lock` pins the exact versions. Each requirement is the oldest version known to work, and only
 # a release outside it (a new major, or a new minor before 1.0) needs a change here.
 [workspace.dependencies]
 chorus_core = { path = "crates/core" }
