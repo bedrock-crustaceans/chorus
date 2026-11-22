@@ -110,12 +110,6 @@ pub fn tags(biome: &Biome) -> impl Iterator<Item = &'static str> {
     crate::shared::biome_documents::tags(biome.pack_name())
 }
 
-#[cfg(test)]
-pub fn missing_identifiers() -> Vec<Biome> {
-    let root: &'static Value = &ROOT;
-    Biome::ALL.into_iter().filter(|biome| root.get(biome.pack_name()).is_none()).collect()
-}
-
 pub(super) fn material_name(value: &'static Value) -> Option<&'static str> {
     let name = value.as_str().or_else(|| value.get(NAME)?.as_str())?;
     if name == DIRT && value.get(STATES).and_then(|states| states.get(DIRT_TYPE)).and_then(Value::as_str) == Some(COARSE) {

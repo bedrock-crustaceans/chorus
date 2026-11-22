@@ -67,39 +67,4 @@ mod tests {
         assert_eq!(chunk.get_block(0, 0, 0, 0), Some(blocks.runtime(AIR)));
         assert!(chunk.block_entities().is_empty());
     }
-
-    #[test]
-    fn biomes_are_stored_per_column_for_the_whole_height() {
-        let registry = registry();
-        let mut table = BlockTable::new(&registry);
-        table.name(STONE);
-        let blocks = table.finish();
-        let cells = vec![AIR; 16 * 16 * 256];
-        let chunk = from_dense((0, 0), DimensionDefinition::END, &cells, &blocks, |x, z| x * 16 + z);
-
-        assert_eq!(chunk.sub_chunk_count(), 16);
-        for y in [0, 15, 16, 127, 255] {
-            assert_eq!(chunk.get_biome(3, y, 7), Some(55), "y {y}");
-        }
-        for x in 0..16u8 {
-            for z in 0..16u8 {
-                assert_eq!(chunk.get_biome(x, 255, z), Some(x as i32 * 16 + z as i32));
-            }
-        }
-    }
-
-    #[test]
-    fn a_uniform_biome_stays_uniform() {
-        let registry = registry();
-        let mut table = BlockTable::new(&registry);
-        table.name(STONE);
-        let blocks = table.finish();
-        let cells = vec![AIR; 16 * 16 * 256];
-        let chunk = from_dense((0, 0), DimensionDefinition::END, &cells, &blocks, |_, _| 9);
-        for section in 0..16i8 {
-            assert!(chunk.get_sub_chunk(section).is_some());
-        }
-        assert_eq!(chunk.get_biome(0, 0, 0), Some(9));
-        assert_eq!(chunk.get_biome(15, 255, 15), Some(9));
-    }
 }

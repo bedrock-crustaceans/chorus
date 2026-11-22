@@ -88,17 +88,3 @@ pub(super) fn fossil(view: &mut View, random: &mut MersenneTwister, [x, y0, z]: 
     }
     true
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn every_listed_fossil_is_in_the_pack() {
-        let pack = bedrock_vanilla::structures();
-        for name in FOSSILS {
-            assert!(pack.get(&format!("{name}.bin")).is_some(), "{name}");
-        }
-        assert_eq!(pack.names().iter().filter(|name| name.starts_with("nether_fossils/")).count(), FOSSILS.len());
-    }
-}

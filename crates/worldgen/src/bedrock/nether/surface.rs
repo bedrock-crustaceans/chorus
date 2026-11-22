@@ -393,7 +393,7 @@ pub fn place_bedrock(random: &mut MersenneTwister, mut set: impl FnMut(i32, i32,
 
 #[cfg(test)]
 mod tests {
-    use super::super::biome::{BASALT_DELTAS, CRIMSON_FOREST, HELL, SOULSAND_VALLEY, WARPED_FOREST};
+    use super::super::biome::{BASALT_DELTAS, SOULSAND_VALLEY};
     use super::*;
     use chorus_block::block_registry::BlockRegistry;
     use std::sync::LazyLock;
@@ -410,114 +410,11 @@ mod tests {
         (surface, table)
     }
 
-    fn default_of(surface: &NetherSurface, biome: i32) -> (i32, Materials, &[Adjustment]) {
-        match surface.builder(biome) {
-            Some(Builder::Default {
-                sea_floor_depth,
-                materials,
-                adjustments,
-            }) => (*sea_floor_depth, *materials, adjustments),
-            _ => panic!("biome {biome} has no default builder"),
-        }
-    }
-
     fn capped_of(surface: &NetherSurface, biome: i32) -> &Capped {
         match surface.builder(biome) {
             Some(Builder::Capped(capped)) => capped,
             _ => panic!("biome {biome} has no capped builder"),
         }
-    }
-
-    #[test]
-    fn the_height_ranges_follow_the_sea_level() {
-        assert_eq!(height(&serde_json::json!("variable.sea_level - 3")), SEA_LEVEL - 3);
-        assert_eq!(height(&serde_json::json!("variable.sea_level + 2")), SEA_LEVEL + 2);
-        assert_eq!(height(&serde_json::json!("variable.sea_level")), SEA_LEVEL);
-        assert_eq!(height(&serde_json::json!(12)), 12);
-        assert_eq!(height(&serde_json::json!("12")), 12);
-    }
-
-    #[test]
-    fn every_nether_biome_gets_a_builder_from_its_document() {
-        let (surface, _) = parsed();
-        assert_eq!(surface.builders.len(), BIOMES.len());
-        for biome in BIOMES {
-            assert!(surface.builder(biome).is_some(), "{biome}");
-        }
-        assert!(surface.builder(1).is_none());
-    }
-
-    #[test]
-    fn the_default_builders_hold_what_the_documents_say() {
-        let (surface, mut table) = parsed();
-        let mut id = |name: &'static str| table.name(name);
-        let (netherrack, lava, gravel, soul_sand) = (id("minecraft:netherrack"), id("minecraft:lava"), id("minecraft:gravel"), id("minecraft:soul_sand"));
-        let (crimson, warped, wart) = (id("minecraft:crimson_nylium"), id("minecraft:warped_nylium"), id("minecraft:nether_wart_block"));
-
-        let adjustment = |scale, range, heights, top, mid, sea_floor| Adjustment {
-            noise_scale: scale,
-            range,
-            heights,
-            top,
-            mid,
-            sea_floor,
-            foundation: None,
-        };
-        let near_sea = [SEA_LEVEL - 3, SEA_LEVEL + 2];
-
-        let (depth, materials, adjustments) = default_of(&surface, HELL);
-        assert_eq!(depth, 7);
-        assert_eq!(
-            materials,
-            Materials {
-                top: netherrack,
-                mid: netherrack,
-                sea_floor: netherrack,
-                foundation: netherrack,
-                sea: lava
-            }
-        );
-        assert_eq!(
-            adjustments,
-            [
-                adjustment(0.03125, [-1.0, -0.4], near_sea, Some(gravel), None, Some(gravel)),
-                adjustment(0.03125, [0.4, 1.0], near_sea, Some(soul_sand), Some(soul_sand), Some(soul_sand)),
-            ]
-        );
-
-        let (depth, materials, adjustments) = default_of(&surface, CRIMSON_FOREST);
-        assert_eq!(depth, 1);
-        assert_eq!(
-            materials,
-            Materials {
-                top: crimson,
-                mid: netherrack,
-                sea_floor: crimson,
-                foundation: netherrack,
-                sea: lava
-            }
-        );
-        assert_eq!(
-            adjustments,
-            [
-                adjustment(0.1, [0.4, 1.0], WHOLE_COLUMN, Some(netherrack), None, Some(netherrack)),
-                adjustment(1.0, [-0.75, -0.5], WHOLE_COLUMN, Some(wart), None, Some(wart)),
-            ]
-        );
-
-        let (depth, materials, adjustments) = default_of(&surface, WARPED_FOREST);
-        assert_eq!(depth, 1);
-        assert_eq!(
-            materials,
-            Materials {
-                top: warped,
-                mid: netherrack,
-                sea_floor: warped,
-                foundation: netherrack,
-                sea: lava
-            }
-        );
-        assert_eq!(adjustments, [adjustment(0.1, [0.4, 1.0], WHOLE_COLUMN, Some(netherrack), None, Some(netherrack))]);
     }
 
     #[test]

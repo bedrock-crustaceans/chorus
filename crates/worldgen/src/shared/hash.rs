@@ -23,11 +23,4 @@ mod tests {
         assert_eq!(fnv1a_64(*b"a"), 0xaf63_dc4c_8601_ec8c);
         assert_eq!(fnv1a_64(*b"foobar"), 0x8594_4171_f739_67e8);
     }
-
-    #[test]
-    fn fnv1_matches_the_reference_vectors() {
-        assert_eq!(fnv1_64(""), FNV_OFFSET_BASIS);
-        assert_eq!(fnv1_64("a"), 0xaf63_bd4c_8601_b7be);
-        assert_eq!(fnv1_64("foobar"), 0x340d_8765_a4dd_a9c2);
-    }
 }

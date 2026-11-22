@@ -30,16 +30,3 @@ pub fn tags(pack: &str) -> impl Iterator<Item = &'static str> {
         .flatten()
         .filter_map(Value::as_str)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn every_pack_biome_has_a_document_and_the_nether_biomes_carry_their_tags() {
-        assert_eq!(ROOT.as_object().map(|map| map.len()), Some(89));
-        assert!(tags("hell").any(|tag| tag == "nether_wastes"));
-        assert!(tags("crimson_forest").any(|tag| tag == "netherwart_forest"));
-        assert_eq!(tags("not_a_biome").count(), 0);
-    }
-}

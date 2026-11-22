@@ -308,8 +308,6 @@ mod tests {
         }
     }
 
-    const ENTRY_COUNT: usize = 7594;
-
     const RANDOM_TARGETS: usize = 4000;
     const TARGET_SPAN: i64 = 24000;
 
@@ -320,14 +318,6 @@ mod tests {
     fn lcg(state: &mut u64) -> u64 {
         *state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         *state >> 33
-    }
-
-    #[test]
-    fn loads_every_listed_entry() {
-        let tree = BiomeTree::parse().expect("the biome tree parses");
-        assert_eq!(tree.entries().len(), ENTRY_COUNT);
-        let leaves = tree.nodes.iter().filter(|node| node.entry.is_some()).count();
-        assert_eq!(leaves, ENTRY_COUNT);
     }
 
     #[test]

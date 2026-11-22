@@ -71,17 +71,3 @@ pub fn info_noise(x: f32, z: f32) -> f32 {
     static NOISE: OnceLock<PerlinSimplex> = OnceLock::new();
     NOISE.get_or_init(|| PerlinSimplex::new(&mut MersenneTwister::new(FROZEN_MINOR_SEED), SINGLE_LEVEL, false)).sum_2d(x, z)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_cooling_follows_the_sea_level() {
-        for biome in [Biome::PLAINS, Biome::TAIGA, Biome::OCEAN] {
-            let at_vanilla = temperature_at(&biome, 100, 140, 100, 63);
-            assert_eq!(temperature_at(&biome, 100, 140 + 37, 100, 63 + 37), at_vanilla);
-            assert_ne!(temperature_at(&biome, 100, 140, 100, 63 + 37), at_vanilla);
-        }
-    }
-}

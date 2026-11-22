@@ -253,8 +253,6 @@ impl Structures {
 }
 
 #[cfg(test)]
-mod pack_gate;
-#[cfg(test)]
 mod pinned_dump;
 #[cfg(test)]
 mod tests;

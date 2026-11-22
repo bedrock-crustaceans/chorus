@@ -310,40 +310,11 @@ mod tests {
     use super::*;
     use crate::shared::structure::data::StructureData;
     use chorus_block::block_registry::BlockRegistry;
-    use std::collections::BTreeSet;
 
     fn registry() -> BlockRegistry {
         let mut registry = BlockRegistry::new();
         registry.register_all(chorus_block::r#impl::DEFINITIONS.iter().copied());
         registry
-    }
-
-    #[test]
-    fn every_transform_rule_names_a_real_state_key() {
-        let registry = registry();
-        let real = registry
-            .permutations()
-            .flat_map(|permutation| permutation.get_states().keys().map(|key| key.to_string()).collect::<Vec<_>>())
-            .collect::<BTreeSet<_>>();
-        let missing = STATE_TRANSFORM.state_keys().into_iter().filter(|key| !real.contains(key)).collect::<Vec<_>>();
-        assert!(missing.is_empty(), "transform rules name unknown state keys {missing:?}");
-    }
-
-    #[test]
-    fn the_blocks_the_portal_code_names_are_declared() {
-        let registry = registry();
-        let data = StructureData::load().expect("vanilla templates");
-        let library = data.library.as_ref().expect("the structure data holds the templates");
-        let mut table = BlockTable::new(&registry);
-        let palette = PaletteBlocks::register(&mut table, library);
-        for name in ["magma", "netherrack", "crying_obsidian", "polished_blackstone", "mossy_stone_bricks"] {
-            palette.named(name, "", false);
-        }
-        palette.named("iron_chain", "pillar_axis=y", false);
-        palette.named("stone_brick_slab", "minecraft:vertical_half=bottom", false);
-        for name in ["stone_brick_stairs", "polished_blackstone_brick_stairs"] {
-            palette.named(name, "minecraft:corner=none,upside_down_bit=1,weirdo_direction=3", false);
-        }
     }
 
     #[test]

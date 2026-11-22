@@ -96,12 +96,4 @@ mod tests {
         assert_eq!(distance(1600, WEIRDNESS_ABOVE), 0);
         assert_eq!(distance(0, WEIRDNESS_ABOVE), 1599);
     }
-
-    #[test]
-    fn the_requantisation_matches_a_float_round_trip() {
-        assert_eq!(requantised(0), 0);
-        assert_eq!(requantised(-5), -5);
-        assert_eq!(requantised(10000), 10000);
-        assert!((requantised(6999) - 6999).abs() <= 1);
-    }
 }

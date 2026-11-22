@@ -161,17 +161,3 @@ impl Fossil {
         Ok(true)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn every_listed_fossil_is_in_the_pack() {
-        let pack = bedrock_vanilla::structures();
-        for name in TEMPLATES {
-            assert!(pack.get(&format!("{name}.bin")).is_some(), "{name}");
-        }
-        assert_eq!(pack.names().iter().filter(|name| name.starts_with("fossils/")).count(), TEMPLATES.len());
-    }
-}

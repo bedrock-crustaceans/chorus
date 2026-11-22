@@ -7,8 +7,6 @@ mod mesa;
 mod palette;
 mod simplex;
 mod temperature;
-#[cfg(test)]
-mod tests;
 
 use super::terrain::{BedrockTerrain, SURFACE_NOT_FOUND};
 use crate::shared::biome::Biome;

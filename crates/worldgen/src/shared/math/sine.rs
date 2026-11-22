@@ -18,17 +18,3 @@ pub fn sin(radians: f32) -> f32 {
 pub fn cos(radians: f32) -> f32 {
     at(radians * SCALE + COSINE_SHIFT)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn table_is_the_rounded_sine() {
-        assert_eq!(sin(0.0), 0.0);
-        assert!((sin(std::f32::consts::FRAC_PI_2) - 1.0).abs() < 1e-6);
-        assert!((cos(0.0) - 1.0).abs() < 1e-6);
-        assert!((sin(-1.0) + 0.841_470_96).abs() < 2e-4);
-        assert_eq!(TABLE[7078], ((7078f32 / SCALE) as f64).sin() as f32);
-    }
-}

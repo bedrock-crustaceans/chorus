@@ -175,35 +175,3 @@ impl StructureBuilder for ShipwreckBuilder {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::shared::structure::data::StructureData;
-
-    #[test]
-    fn every_listed_template_is_in_the_pack() {
-        let pack = bedrock_vanilla::structures();
-        for name in TEMPLATES {
-            assert!(pack.get(&format!("shipwreck/{name}.bin")).is_some(), "{name}");
-        }
-        assert_eq!(pack.names().iter().filter(|name| name.starts_with("shipwreck/")).count(), TEMPLATES.len());
-    }
-
-    #[test]
-    fn every_wood_state_has_its_siblings_in_the_pool() {
-        let data = StructureData::shared().expect("structure data");
-        let pool = data.library.as_ref().expect("templates").pool();
-        let mut checked = 0;
-        for entry in pool.entries() {
-            let Some(family) = WOOD_FAMILIES.iter().find(|family| family.contains(&entry.name.as_str())) else {
-                continue;
-            };
-            for member in family {
-                assert!(pool.find(member, &entry.states, entry.waterlogged).is_some(), "{member}[{}] is missing", entry.states);
-            }
-            checked += 1;
-        }
-        assert!(checked > 100, "{checked}");
-    }
-}

@@ -7,8 +7,6 @@ mod kinds;
 mod reef;
 
 pub use crust::CoralCrust;
-#[cfg(test)]
-pub(super) use crust::template_count;
 pub use kinds::Coral;
 
 const CORAL_COLORS: usize = 5;

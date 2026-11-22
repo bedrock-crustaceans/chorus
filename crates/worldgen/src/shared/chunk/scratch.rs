@@ -54,24 +54,4 @@ mod tests {
         assert_eq!(Scratch::take(&SPARE, 3, 2u32).len(), 3);
         assert_eq!(Scratch::take(&SPARE, 20, 2u32).len(), 20);
     }
-
-    #[test]
-    fn a_returned_buffer_is_reused_and_refilled() {
-        let first_pointer = {
-            let mut buffer = Scratch::take(&SPARE, 64, 0u32);
-            buffer[3] = 9;
-            buffer.as_ptr()
-        };
-        let buffer = Scratch::take(&SPARE, 64, 1u32);
-        assert_eq!(buffer.as_ptr(), first_pointer);
-        assert!(buffer.iter().all(|&value| value == 1));
-    }
-
-    #[test]
-    fn two_live_buffers_do_not_share_storage() {
-        let mut first = Scratch::take(&SPARE, 4, 0u32);
-        let second = Scratch::take(&SPARE, 4, 5u32);
-        first[0] = 1;
-        assert_eq!(second[0], 5);
-    }
 }

@@ -14,6 +14,7 @@ mod overworld {
         let elapsed = start.elapsed();
         let total = order.iter().fold(FNV_OFFSET_BASIS, |total, cell| fnv1a_mix(total, hashes[cell]));
         println!("bedrock checksum {total:016x} over {} chunks in {elapsed:?}", order.len());
+        assert_eq!(total, 0x8e8f748080ed215c);
     }
 }
 
@@ -54,6 +55,7 @@ mod end {
             }
         }
         println!("end checksum {total:016x} over {} chunks in {:?}", order.len(), start.elapsed());
+        assert_eq!(total, 0x8e9f39b592c8b0bd);
     }
 }
 
@@ -85,5 +87,6 @@ mod nether {
             }
         }
         println!("nether checksum {total:016x} over {} chunks in {:?}", order.len(), start.elapsed());
+        assert_eq!(total, 0x47ad46941a4200f1);
     }
 }

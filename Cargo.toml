@@ -77,12 +77,6 @@ uuid = { version = "1.29.2", features = ["v4"] }
 xxhash-rust = { version = "0.8.19", features = ["xxh64"] }
 zip = "9.5.1"
 
-[profile.dev.build-override]
-opt-level = 3
-
-[profile.release.build-override]
-opt-level = 3
-
 [package]
 name = "chorus"
 version.workspace = true

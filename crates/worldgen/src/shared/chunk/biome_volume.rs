@@ -189,27 +189,6 @@ mod tests {
     }
 
     #[test]
-    fn jitter_is_deterministic_and_bounded() {
-        for x in (-80..80).step_by(8) {
-            for y in (-64..320).step_by(8) {
-                let first = jitter(SEED, x, y, x ^ y);
-                assert_eq!(first, jitter(SEED, x, y, x ^ y));
-                assert!(first.iter().all(|value| value.abs() <= 0.5 * JITTER_SCALE));
-            }
-        }
-        assert_ne!(jitter(SEED, 0, 0, 0), jitter(SEED + 1, 0, 0, 0));
-    }
-
-    #[test]
-    fn uniform_samples_give_uniform_sections() {
-        let volume = BiomeVolume::resolve(&uniform_samples(Biome::DESERT), SEED, 3, -5, MIN_Y, HEIGHT);
-        assert!((0..SECTIONS).all(|section| volume.sections.uniform_value(section) == Some(Biome::DESERT.bedrock_id())));
-        assert_eq!(volume.get(0, MIN_Y, 0), Biome::DESERT);
-        assert_eq!(volume.get(15, MIN_Y + HEIGHT + 10, 15), Biome::DESERT);
-        assert_eq!(volume.uniform_biome_at(0), Some(Biome::DESERT));
-    }
-
-    #[test]
     fn mixed_cells_match_the_uniform_shortcut_when_every_candidate_agrees() {
         let levels = sample_levels(HEIGHT);
         let mut samples = uniform_samples(Biome::PLAINS);

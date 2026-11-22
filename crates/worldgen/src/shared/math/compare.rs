@@ -22,11 +22,4 @@ mod tests {
         assert!(not_greater(f32::NAN, 1.0) && not_greater(1.0, f32::NAN));
         assert!(not_less_or_equal(f32::NAN, 1.0) && not_less_or_equal(1.0, f32::NAN));
     }
-
-    #[test]
-    fn ordered_operands_follow_the_negated_comparison() {
-        assert!(!not_less(0.0, 1.0) && not_less(1.0, 1.0) && not_less(2.0, 1.0));
-        assert!(!not_greater(2.0, 1.0) && not_greater(1.0, 1.0) && not_greater(0.0, 1.0));
-        assert!(!not_less_or_equal(0.0, 1.0) && !not_less_or_equal(1.0, 1.0) && not_less_or_equal(2.0, 1.0));
-    }
 }

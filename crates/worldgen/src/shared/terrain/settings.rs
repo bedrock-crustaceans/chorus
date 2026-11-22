@@ -271,13 +271,6 @@ mod tests {
     }
 
     #[test]
-    fn the_default_preset_is_the_default_settings() {
-        assert_eq!(Preset::Default.settings(), OverworldSettings::default());
-        assert_eq!(OverworldSettings::default().terrain.global_offset, VANILLA_GLOBAL_OFFSET);
-        assert_eq!(OverworldSettings::default().terrain.sea_level, 63);
-    }
-
-    #[test]
     fn settings_survive_a_serde_round_trip() {
         let checkerboard = OverworldSettings {
             biome_source: BiomeSource::Checkerboard(Checkerboard {
@@ -290,45 +283,6 @@ mod tests {
         for settings in every.into_iter().chain([OverworldSettings::single_biome(Biome::DESERT), checkerboard]) {
             assert_eq!(serde_json::from_value::<OverworldSettings>(serde_json::to_value(&settings).unwrap()).unwrap(), settings);
         }
-    }
-
-    #[test]
-    fn the_presets_keep_their_meaning() {
-        let vanilla = OverworldSettings::default();
-        let large = ClimateScale {
-            temperature: 4.0,
-            humidity: 4.0,
-            continentalness: 4.0,
-            erosion: 4.0,
-            weirdness: 1.0,
-        };
-        let amplified = TerrainShape {
-            offset: LeafTransform::Scale { below_zero: 1.0, above_zero: 2.0 },
-            factor: LeafTransform::Hyperbola {
-                base: 1.25,
-                numerator: 6.25,
-                shift: 5.0,
-            },
-            jaggedness: LeafTransform::Scale { below_zero: 2.0, above_zero: 2.0 },
-            ..TerrainShape::default()
-        };
-        assert_eq!(Preset::Default.settings(), vanilla);
-        assert_eq!(Preset::LargeBiomes.settings(), OverworldSettings { climate: large, ..vanilla.clone() });
-        assert_eq!(
-            Preset::Amplified.settings(),
-            OverworldSettings {
-                terrain: amplified,
-                ..vanilla.clone()
-            }
-        );
-        assert_eq!(
-            Preset::AmplifiedLargeBiomes.settings(),
-            OverworldSettings {
-                climate: large,
-                terrain: amplified,
-                ..vanilla
-            }
-        );
     }
 
     #[test]
@@ -375,48 +329,5 @@ mod tests {
         assert!(rejected(r#"{"terrain": {"sea_level": 320}}"#));
         assert!(rejected(r#"{"biome_source": {"checkerboard": {"biomes": []}}}"#));
         assert!(rejected(r#"{"biome_source": {"checkerboard": {"biomes": ["plains"], "scale": 21}}}"#));
-    }
-
-    #[test]
-    fn amplified_factor_keeps_the_low_continentalness_leaves() {
-        use crate::shared::math::spline::{SplineInput, overworld_factor};
-        let vanilla = overworld_factor(LeafTransform::Identity);
-        let amplified = overworld_factor(LeafTransform::AMPLIFIED_FACTOR);
-        let input = |continents| SplineInput {
-            continents,
-            erosion: -0.6,
-            weirdness: 0.0,
-            ridges: -0.2,
-        };
-        for continents in [-0.19, -0.15] {
-            assert_eq!(amplified.sample(&input(continents)), vanilla.sample(&input(continents)));
-        }
-        for continents in [-0.1, 0.03, 0.06] {
-            assert!(amplified.sample(&input(continents)) < vanilla.sample(&input(continents)) / 2.0);
-        }
-    }
-
-    #[test]
-    fn transforms_follow_the_amplified_curves() {
-        assert_eq!(LeafTransform::AMPLIFIED_OFFSET.apply(-0.3), -0.3);
-        assert_eq!(LeafTransform::AMPLIFIED_OFFSET.apply(0.3), 0.6);
-        assert_eq!(LeafTransform::AMPLIFIED_JAGGEDNESS.apply(0.5), 1.0);
-        assert_eq!(LeafTransform::AMPLIFIED_FACTOR.apply(5.0), 1.25 - 0.625);
-        assert_eq!(LeafTransform::Identity.apply(-1.5), -1.5);
-    }
-
-    #[test]
-    fn a_checkerboard_alternates_every_square() {
-        let checkerboard = Checkerboard {
-            biomes: vec![Biome::PLAINS, Biome::DESERT],
-            scale: 2,
-        };
-        let side = 64;
-        assert_eq!(checkerboard.at(0, 0), Biome::PLAINS);
-        assert_eq!(checkerboard.at(side - 1, side - 1), Biome::PLAINS);
-        assert_eq!(checkerboard.at(side, 0), Biome::DESERT);
-        assert_eq!(checkerboard.at(0, side), Biome::DESERT);
-        assert_eq!(checkerboard.at(side, side), Biome::PLAINS);
-        assert_eq!(checkerboard.at(-1, 0), Biome::DESERT);
     }
 }

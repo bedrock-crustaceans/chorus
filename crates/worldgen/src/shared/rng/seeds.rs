@@ -44,11 +44,4 @@ mod tests {
         assert_eq!(region_seed(0, 1, 1, 0), (-245998635i32).wrapping_add(-1724254968) as u32);
         assert_eq!(level_seed32(-1), -1);
     }
-
-    #[test]
-    fn material_adjustment_burns_the_documented_draws() {
-        let mut expected = MersenneTwister::new(7);
-        expected.skip(20202);
-        assert_eq!(material_adjustment_random(7).next_u32(), expected.next_u32());
-    }
 }

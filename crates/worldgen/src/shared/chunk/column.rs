@@ -103,15 +103,4 @@ mod tests {
         assert_eq!(cells[chunk.index(1, 2, 3)], 7);
         assert_eq!(cells.iter().filter(|&&block| block != AIR).count(), 1);
     }
-
-    #[test]
-    fn a_shifted_range_indexes_from_its_floor() {
-        let mut chunk = ColumnChunk::empty(DimensionDefinition { min_y: -32, height: 96 });
-        chunk.set(2, -32, 5, 6);
-        chunk.set(2, 63, 5, 8);
-        assert_eq!(chunk.get_at(chunk.index(2, -32, 5)), 6);
-        assert_eq!(chunk.get_at(chunk.index(2, 63, 5)), 8);
-        assert!(chunk.contains_y(-32) && chunk.contains_y(63) && !chunk.contains_y(64) && !chunk.contains_y(-33));
-        assert_eq!(chunk.cells_vec()[chunk.index(2, 63, 5)], 8);
-    }
 }

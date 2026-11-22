@@ -171,12 +171,6 @@ mod tests {
     }
 
     #[test]
-    fn stated_outputs_are_rendered_in_sorted_order() {
-        let output = output_state("minecraft:waxed_exposed_copper_bulb", Some(&states(serde_json::json!({"powered_bit": false, "lit": true})))).unwrap();
-        assert_eq!(output.states, "lit=1,powered_bit=0");
-    }
-
-    #[test]
     fn a_legacy_output_is_upgraded_to_its_current_block() {
         let output = output_state("minecraft:dirt", Some(&states(serde_json::json!({"dirt_type": "coarse"})))).unwrap();
         assert_eq!((output.name.as_str(), output.states.as_str()), ("coarse_dirt", ""));

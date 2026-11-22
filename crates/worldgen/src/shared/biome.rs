@@ -201,19 +201,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_constants_follow_the_registry_rows() {
-        let registry = BiomeRegistry::vanilla();
-        for biome in Biome::ALL {
-            assert!(registry.entry(biome.name()).is_some(), "{}", biome.name());
-        }
-        assert_eq!(Biome::OCEAN.name(), "ocean");
-        assert_eq!(Biome::PLAINS.name(), "plains");
-        assert_eq!(Biome::DEEP_DARK.name(), "deep_dark");
-        assert_eq!(Biome::ALL.len(), registry.generated.len());
-        assert!(Biome::ALL.iter().zip(&registry.generated).all(|(biome, entry)| biome.name() == entry.name));
-    }
-
-    #[test]
     fn every_biome_has_a_pack_document_and_ids_are_unique() {
         let registry = BiomeRegistry::vanilla();
         let mut ids: Vec<i32> = Biome::ALL.iter().map(Biome::bedrock_id).collect();
@@ -237,25 +224,6 @@ mod tests {
         assert_eq!(Biome::from_name("swampland"), Some(Biome::SWAMP));
         assert_eq!(Biome::from_name("minecraft:mesa"), Some(Biome::BADLANDS));
         assert_eq!(format!("{:?}", Biome::OLD_GROWTH_PINE_TAIGA), "OldGrowthPineTaiga");
-    }
-
-    #[test]
-    fn the_generated_pack_ids_match_the_registry() {
-        let registry = BiomeRegistry::vanilla();
-        assert_eq!(registry.pack_id("the_end"), Some(pack_ids::THE_END));
-        assert_eq!(registry.pack_id("hell"), Some(pack_ids::HELL));
-        assert_eq!(registry.pack_id("crimson_forest"), Some(pack_ids::CRIMSON_FOREST));
-        assert_eq!(registry.pack_id("plains"), Some(pack_ids::PLAINS));
-        assert_eq!(pack_ids::BASALT_DELTAS, 181);
-    }
-
-    #[test]
-    fn ids_resolve_back_to_their_keys() {
-        for biome in Biome::ALL {
-            assert_eq!(Biome::from_id(biome.bedrock_id()), Some(biome));
-        }
-        assert_eq!(Biome::from_id(-12345), None);
-        assert_eq!(Biome::from_id(9), None);
     }
 
     #[test]

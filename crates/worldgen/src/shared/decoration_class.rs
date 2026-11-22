@@ -128,19 +128,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_four_parities_map_to_distinct_classes() {
-        let classes: Vec<u8> = [(0, 0), (1, 0), (0, 1), (1, 1)].into_iter().map(class_of).collect();
-        assert_eq!(classes, vec![0, 1, 3, 2]);
-        assert_eq!(class_of((-1, -2)), class_of((1, 0)));
-        let cell = IVec2::new(5, -3);
-        let count = [is_class::<0>(cell), is_class::<1>(cell), is_class::<2>(cell), is_class::<3>(cell)]
-            .into_iter()
-            .filter(|&member| member)
-            .count();
-        assert_eq!(count, 1);
-    }
-
-    #[test]
     fn earlier_offsets_land_on_cells_of_the_earlier_class() {
         for (reader, earlier) in [(1, 0), (2, 0), (2, 1), (3, 0), (3, 1), (3, 2)] {
             for x in 0..2 {

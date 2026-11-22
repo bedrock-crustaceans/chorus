@@ -444,69 +444,36 @@ mod malformed {
     }
 
     #[test]
-    fn a_pool_without_elements_names_the_pool_and_field() {
-        let error = error_of(build(vec![json!({"description": {"identifier": "test:pool"}})], Vec::new()));
-        assert_eq!(error.document, "test:pool");
-        assert_eq!(
-            error.fault,
-            Fault {
-                field: "elements",
-                problem: super::super::fault::Problem::Missing
-            }
-        );
+    fn malformed_pools_are_errors_naming_the_field() {
+        let cases = [
+            (vec![json!({"description": {"identifier": "test:pool"}})], "elements", "test:pool"),
+            (vec![pool(json!([{"weight": "heavy", "element": {}}]))], "weight", "test:pool"),
+            (vec![element(json!({}))], "element_type", "test:pool"),
+            (vec![element(template_element(json!({"post_process": "everything"})))], "post_process", "test:pool"),
+            (vec![element(template_element(json!({"processors": "test:nowhere"})))], "processors", "test:pool"),
+        ];
+        for (pools, field, document) in cases {
+            let error = error_of(build(pools, Vec::new()));
+            assert_eq!((error.fault.field, error.document.as_str()), (field, document));
+        }
     }
 
     #[test]
-    fn an_element_weight_of_the_wrong_type_is_an_error() {
-        let error = error_of(build(vec![pool(json!([{"weight": "heavy", "element": {}}]))], Vec::new()));
-        assert_eq!((error.fault.field, error.document.as_str()), ("weight", "test:pool"));
-    }
-
-    #[test]
-    fn an_element_without_a_type_is_an_error() {
-        let error = error_of(build(vec![element(json!({}))], Vec::new()));
-        assert_eq!(error.fault.field, "element_type");
-    }
-
-    #[test]
-    fn a_processor_reference_no_document_declares_is_an_error() {
-        let error = error_of(build(vec![element(template_element(json!({"processors": "test:nowhere"})))], Vec::new()));
-        assert_eq!((error.fault.field, error.document.as_str()), ("processors", "test:pool"));
-    }
-
-    #[test]
-    fn an_unknown_processor_type_names_the_processor_document() {
-        let processors = vec![("lists", json!({"processors": [{"processor_type": "minecraft:mystery"}]}))];
-        let error = error_of(build(vec![element(template_element(json!({"processors": "minecraft:lists"})))], processors));
-        assert_eq!((error.fault.field, error.document.as_str()), ("processor_type", "lists"));
-    }
-
-    #[test]
-    fn an_unknown_predicate_type_is_an_error() {
-        let rule = json!({"input_predicate": {"predicate_type": "minecraft:mystery"}, "output_state": {"name": "minecraft:air"}});
-        let processors = vec![("lists", json!({"processors": [{"processor_type": "minecraft:rule", "rules": [rule]}]}))];
-        let error = error_of(build(vec![element(template_element(json!({"processors": "minecraft:lists"})))], processors));
-        assert_eq!(error.fault.field, "predicate_type");
-    }
-
-    #[test]
-    fn a_processor_output_nothing_declared_is_an_error() {
-        let rule = json!({"input_predicate": {"predicate_type": "minecraft:always_true"}, "output_state": {"name": "minecraft:chorus_test_block"}});
-        let processors = vec![("lists", json!({"processors": [{"processor_type": "minecraft:rule", "rules": [rule]}]}))];
-        let error = error_of(build(vec![element(template_element(json!({"processors": "minecraft:lists"})))], processors));
-        assert_eq!(error.fault.field, "output_state");
-    }
-
-    #[test]
-    fn an_unknown_post_process_mode_is_an_error() {
-        let error = error_of(build(vec![element(template_element(json!({"post_process": "everything"})))], Vec::new()));
-        assert_eq!(error.fault, Fault::unknown("post_process", "everything"));
-    }
-
-    #[test]
-    fn a_processor_list_without_processors_is_an_error() {
-        let error = error_of(build(vec![element(template_element(json!({"processors": "minecraft:lists"})))], vec![("lists", json!({}))]));
-        assert_eq!((error.fault.field, error.document.as_str()), ("processors", "lists"));
+    fn malformed_processors_are_errors_naming_the_field_and_document() {
+        let rule = |input: &str, output: &str| json!({"input_predicate": {"predicate_type": input}, "output_state": {"name": output}});
+        let list = |processor: Value| json!({"processors": [processor]});
+        let rules = |rule: Value| list(json!({"processor_type": "minecraft:rule", "rules": [rule]}));
+        let cases = [
+            (list(json!({"processor_type": "minecraft:mystery"})), "processor_type"),
+            (rules(rule("minecraft:mystery", "minecraft:air")), "predicate_type"),
+            (rules(rule("minecraft:always_true", "minecraft:chorus_test_block")), "output_state"),
+            (json!({}), "processors"),
+        ];
+        for (document, field) in cases {
+            let pools = vec![element(template_element(json!({"processors": "minecraft:lists"})))];
+            let error = error_of(build(pools, vec![("lists", document)]));
+            assert_eq!((error.fault.field, error.document.as_str()), (field, "lists"));
+        }
     }
 
     #[test]

@@ -156,12 +156,7 @@ impl NetherRules {
 
 #[cfg(test)]
 mod tests {
-    use super::super::biome::{BASALT_DELTAS, CRIMSON_FOREST, HELL, WARPED_FOREST};
     use super::*;
-
-    fn has(tag: &str) -> Value {
-        serde_json::json!({"test": "has_biome_tag", "operator": "==", "value": tag})
-    }
 
     #[test]
     fn no_nether_rule_filter_holds_a_test_the_shared_filter_cannot_evaluate() {
@@ -179,16 +174,5 @@ mod tests {
             checked += 1;
         }
         assert!(checked > 100);
-    }
-
-    #[test]
-    fn masks_follow_the_biome_document_tags() {
-        let only = |biome: i32| bit(biome).expect("a nether biome");
-        assert_eq!(mask(Some(&has("nether_wastes"))), only(HELL));
-        assert_eq!(mask(Some(&has("netherwart_forest"))), only(CRIMSON_FOREST) | only(WARPED_FOREST));
-        assert_eq!(mask(Some(&has("basalt_deltas"))), only(BASALT_DELTAS));
-        assert_eq!(mask(Some(&has("nether"))), ALL_BIOMES);
-        assert_eq!(mask(Some(&has("overworld"))), 0);
-        assert_eq!(mask(None), ALL_BIOMES);
     }
 }

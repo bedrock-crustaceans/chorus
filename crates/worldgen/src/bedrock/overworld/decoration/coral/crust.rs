@@ -112,11 +112,6 @@ fn templates() -> &'static [Crust] {
     &CELL
 }
 
-#[cfg(test)]
-pub(in super::super) fn template_count() -> usize {
-    templates().len()
-}
-
 fn probe(size: usize, rotation: usize) -> [i32; 2] {
     PROBE[size][rotation]
 }
