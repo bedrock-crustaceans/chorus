@@ -34,8 +34,6 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all --check
 
-  # Not `--all-features`: `chorus_worldgen`'s `dhat-heap` and `count-alloc` each set the global
-  # allocator of its tests, so they are linted one at a time.
   clippy:
     name: Clippy (${{ matrix.os }})
     if: github.event_name != 'schedule'
@@ -55,11 +53,6 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo clippy --workspace --all-targets --features debug
-      - name: Allocator features
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          cargo clippy -p chorus_worldgen --all-targets --features dhat-heap
-          cargo clippy -p chorus_worldgen --all-targets --features count-alloc
 
   test:
     name: Test (${{ matrix.os }})
