@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::collision_box_component::CollisionBoxComponent;
 use crate::component::internal_friction_component::InternalFrictionComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
@@ -24,6 +25,7 @@ pub static WEEPING_VINES: BlockDefinition = const_block! {
         MineableComponent::hardness(0.0),
         MoveableComponent { movement: Movement::Break, sticky: false },
         CollisionBoxComponent { origin: Vec3::new(0.25, 0.0, 0.25), size: Vec3::new(0.5, 0.9375, 0.5), enabled: false },
+        LiquidDetectionComponent::BROKEN_BY_WATER,
     ],
     permutations: [],
 };

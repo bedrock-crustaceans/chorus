@@ -1,0 +1,18 @@
+{
+  "identifier": "shipwreck",
+  "kind": "shipwreck",
+  "rule": "bedrock",
+  "placement": {
+    "random_spread": {
+      "spacing": 24,
+      "separation": 4,
+      "salt": 165745295,
+      "spread": "linear"
+    }
+  },
+  "reach": 2,
+  "biome_tags": {
+    "beaches": ["mushroom_island_shore", "beach", "cold_beach"],
+    "shipwreck": ["beach", "cold_beach", "ocean", "cold_ocean", "lukewarm_ocean", "frozen_ocean", "mushroom_island_shore", "deep_ocean", "deep_cold_ocean", "deep_lukewarm_ocean", "deep_frozen_ocean", "warm_ocean"]
+  }
+}

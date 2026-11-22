@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::STRUCTURE_BLOCK_TYPE;
 
@@ -13,6 +14,7 @@ pub static STRUCTURE_BLOCK: BlockDefinition = const_block! {
         MapColorComponent { r: 153, g: 153, b: 153, a: 255 },
         MineableComponent::hardness(-1.0),
         MoveableComponent { movement: Movement::None, sticky: false },
+        SupportComponent::TOP,
     ],
     permutations: [],
 };

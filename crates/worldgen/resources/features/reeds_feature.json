@@ -1,0 +1,12 @@
+{
+  "format_version": "1.0.0",
+  "chorus:water_edge_column": {
+    "description": {
+      "identifier": "minecraft:reeds_feature"
+    },
+    "block": "minecraft:reeds",
+    "tries": 20,
+    "min_height": 2,
+    "bound": 3
+  }
+}

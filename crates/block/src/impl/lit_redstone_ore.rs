@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 
 pub static LIT_REDSTONE_ORE: BlockDefinition = const_block! {
@@ -12,6 +13,7 @@ pub static LIT_REDSTONE_ORE: BlockDefinition = const_block! {
         MapColorComponent { r: 112, g: 112, b: 112, a: 255 },
         LightEmissionComponent { emission: 9 },
         MineableComponent::hardness(3.0),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

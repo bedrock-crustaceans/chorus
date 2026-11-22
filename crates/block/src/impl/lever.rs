@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::collision_box_component::CollisionBoxComponent;
 use crate::component::internal_friction_component::InternalFrictionComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::component::solid_component::SolidComponent;
@@ -21,6 +22,7 @@ pub static LEVER: BlockDefinition = const_block! {
         MineableComponent::hardness(0.5),
         MoveableComponent { movement: Movement::Break, sticky: false },
         CollisionBoxComponent::enabled(false),
+        LiquidDetectionComponent::CONTAINS_AND_BROKEN_BY_WATER_AND_LAVA,
     ],
     permutations: [],
 };

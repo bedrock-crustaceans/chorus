@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::flammable_component::FlammableComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::EXPLODE_BIT;
 
@@ -13,6 +14,7 @@ pub static UNDERWATER_TNT: BlockDefinition = const_block! {
         MapColorComponent { r: 255, g: 0, b: 0, a: 255 },
         FlammableComponent { catch_chance: 15, destroy_chance: 100 },
         MineableComponent::hardness(0.0),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

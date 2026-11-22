@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 
 pub static LIT_REDSTONE_LAMP: BlockDefinition = const_block! {
@@ -10,6 +11,7 @@ pub static LIT_REDSTONE_LAMP: BlockDefinition = const_block! {
     components: [
         LightEmissionComponent { emission: 15 },
         MineableComponent::hardness(0.3),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::state::common::{LIT, POWERED_BIT};
 use crate::{const_block, const_permutation};
 
@@ -13,6 +14,7 @@ pub static WAXED_OXIDIZED_COPPER_BULB: BlockDefinition = const_block! {
         MapColorComponent { r: 22, g: 126, b: 134, a: 255 },
         LightEmissionComponent { emission: 4 },
         MineableComponent::hardness(3.0),
+        SupportComponent::ALL,
     ],
     permutations: [
         const_permutation! {

@@ -1,9 +1,11 @@
 use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
+use crate::component::support_component::SupportComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{MINECRAFT_CONNECTION_DOWN, MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_UP, MINECRAFT_CONNECTION_WEST};
@@ -17,6 +19,8 @@ pub static CHORUS_PLANT: BlockDefinition = const_block! {
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(0.4),
         MoveableComponent { movement: Movement::Break, sticky: false },
+        LiquidDetectionComponent::BROKEN_BY_WATER_AND_LAVA,
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

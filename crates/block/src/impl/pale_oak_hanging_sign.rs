@@ -5,7 +5,6 @@ use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
-use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{ATTACHED_BIT, FACING_DIRECTION, GROUND_SIGN_DIRECTION, HANGING};
@@ -14,7 +13,6 @@ pub static PALE_OAK_HANGING_SIGN: BlockDefinition = const_block! {
     identifier: block_id::PALE_OAK_HANGING_SIGN,
     states: [ATTACHED_BIT, FACING_DIRECTION, GROUND_SIGN_DIRECTION, HANGING],
     components: [
-        SolidComponent { solid: false },
         TransparentComponent { transparent: true },
         MapColorComponent { r: 255, g: 252, b: 245, a: 255 },
         LightDampeningComponent { dampening: 1 },

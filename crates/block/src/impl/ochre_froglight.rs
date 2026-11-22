@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::map_color_component::MapColorComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
@@ -11,6 +12,7 @@ pub static OCHRE_FROGLIGHT: BlockDefinition = const_block! {
     components: [
         MapColorComponent { r: 247, g: 233, b: 163, a: 255 },
         LightEmissionComponent { emission: 15 },
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

@@ -1,0 +1,23 @@
+{
+  "format_version": "1.0.0",
+  "chorus:block_pile": {
+    "description": {
+      "identifier": "minecraft:pumpkin_pile_feature"
+    },
+    "block": {
+      "name": "minecraft:pumpkin",
+      "states": {
+        "minecraft:cardinal_direction": "south"
+      }
+    },
+    "alternate": {
+      "block": {
+        "name": "minecraft:carved_pumpkin",
+        "states": {
+          "minecraft:cardinal_direction": "south"
+        }
+      },
+      "at_least": 0.95
+    }
+  }
+}

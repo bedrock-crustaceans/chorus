@@ -1,3 +1,5 @@
+pub const BLOCK_DEFINITIONS: &[u8] = include_bytes!("../resources/block_definitions.nbt");
+
 pub mod block_definition;
 pub mod block_id;
 pub mod block_permutation;
@@ -7,4 +9,5 @@ pub mod block_upgrade;
 pub mod component;
 pub mod hash_utils;
 pub mod r#impl;
+pub mod placement;
 pub mod state;

@@ -4,6 +4,7 @@ use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::MINECRAFT_CARDINAL_DIRECTION;
 
@@ -15,6 +16,7 @@ pub static LIT_PUMPKIN: BlockDefinition = const_block! {
         LightEmissionComponent { emission: 15 },
         MineableComponent::hardness(1.0),
         MoveableComponent { movement: Movement::Break, sticky: false },
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

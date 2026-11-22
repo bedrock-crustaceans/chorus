@@ -29,6 +29,7 @@ pub struct Level {
     pub seed: i64,
     pub spawn: IVec3,
     pub start_count: i64,
+    pub chorus: nbtx::Compound,
     dimensions: HashMap<i32, Dimension>,
     storage: Option<Arc<LevelStorage>>,
     chunk_saving: ChunkSaving,
@@ -63,6 +64,7 @@ impl Level {
             level.seed = data.seed;
             level.spawn = data.spawn;
             level.start_count = data.start_count;
+            level.chorus = data.chorus;
             level.is_new = false;
         } else {
             info!("created \"{}\" at {} with seed {seed}", level.name, path.display());
@@ -78,10 +80,11 @@ impl Level {
             seed,
             spawn: IVec3::ZERO,
             start_count: 0,
+            chorus: nbtx::Compound::new(),
             dimensions: HashMap::new(),
             storage: None,
             chunk_saving: ChunkSaving::default(),
-            retention_budget: 1.0,
+            retention_budget: 8.0,
             lookahead: 0,
             chunk_cache: 0.0,
             is_new: true,
@@ -118,6 +121,14 @@ impl Level {
         for dimension in self.dimensions.values_mut() {
             dimension.set_chunk_cache(chunk_cache);
         }
+    }
+
+    pub fn chorus_tag(&self, key: &str) -> Option<&nbtx::Value> {
+        self.chorus.get(key.as_bytes())
+    }
+
+    pub fn set_chorus_tag(&mut self, key: &str, value: nbtx::Value) {
+        self.chorus.insert(key.into(), value);
     }
 
     pub fn storage(&self) -> Option<&Arc<LevelStorage>> {
@@ -177,6 +188,7 @@ impl Level {
             seed: self.seed,
             spawn: self.spawn,
             start_count: self.start_count,
+            chorus: self.chorus.clone(),
         };
         if let Err(err) = storage.write_level_data(&data) {
             error!("failed to write level data: {err}");
@@ -209,6 +221,22 @@ impl Level {
             (true, _) => Wake::Now,
             (false, true) => Wake::after(IDLE_POLL_WAIT),
             (false, false) => Wake::Done,
+        }
+    }
+
+    pub fn tick_fluids(mut level: ResMut<Level>, mut writer: MessageWriter<BlockUpdatedMessage>) {
+        for dimension in level.dimensions.values_mut() {
+            let id = dimension.id();
+            for &(pos, block) in dimension.tick_fluids() {
+                writer.write(BlockUpdatedMessage {
+                    dimension_id: id,
+                    x: pos.x,
+                    y: pos.y,
+                    z: pos.z,
+                    layer: 0,
+                    block_id: block,
+                });
+            }
         }
     }
 
@@ -265,6 +293,7 @@ impl Level {
         self.dimension_mut(dim).is_some_and(|dimension| dimension.remove_block_entity(x, y, z))
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub fn set_block(&mut self, dim: i32, x: i32, y: i32, z: i32, layer: usize, block_id: i32, writer: &mut MessageWriter<BlockUpdatedMessage>) -> bool {
         let changed = match self.dimension_mut(dim) {
             Some(d) => d.set_block(x, y, z, layer, block_id),

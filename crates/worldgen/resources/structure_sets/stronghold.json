@@ -1,0 +1,7 @@
+{
+  "identifier": "stronghold",
+  "kind": "stronghold",
+  "rule": "bedrock",
+  "placement": "concentric_rings",
+  "reach": 9
+}

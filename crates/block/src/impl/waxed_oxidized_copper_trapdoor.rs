@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::collision_box_component::CollisionBoxComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::transparent_component::TransparentComponent;
@@ -18,6 +19,7 @@ pub static WAXED_OXIDIZED_COPPER_TRAPDOOR: BlockDefinition = const_block! {
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(3.0),
         CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(0.1875, 1.0, 1.0)),
+        LiquidDetectionComponent::CONTAINS_WATER,
     ],
     permutations: [
         const_permutation! {

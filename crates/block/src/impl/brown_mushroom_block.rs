@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::HUGE_MUSHROOM_BITS;
 
@@ -11,6 +12,7 @@ pub static BROWN_MUSHROOM_BLOCK: BlockDefinition = const_block! {
     components: [
         MapColorComponent { r: 151, g: 109, b: 77, a: 255 },
         MineableComponent::hardness(0.2),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

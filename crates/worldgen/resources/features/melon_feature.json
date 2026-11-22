@@ -1,0 +1,15 @@
+{
+  "format_version": "1.0.0",
+  "chorus:spread_plant": {
+    "description": {
+      "identifier": "minecraft:melon_feature"
+    },
+    "block": "minecraft:melon_block",
+    "tries": 64,
+    "start": "origin",
+    "open": "replaceable",
+    "below": [
+      "minecraft:grass_block"
+    ]
+  }
+}

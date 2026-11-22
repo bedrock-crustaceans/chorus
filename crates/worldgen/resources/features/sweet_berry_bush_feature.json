@@ -1,0 +1,62 @@
+{
+  "format_version": "1.0.0",
+  "chorus:random_walk_plant": {
+    "description": {
+      "identifier": "minecraft:sweet_berry_bush_feature"
+    },
+    "tries": 1,
+    "variants": [
+      {
+        "name": "minecraft:sweet_berry_bush",
+        "states": {
+          "growth": 0
+        }
+      },
+      {
+        "name": "minecraft:sweet_berry_bush",
+        "states": {
+          "growth": 1
+        }
+      },
+      {
+        "name": "minecraft:sweet_berry_bush",
+        "states": {
+          "growth": 2
+        }
+      },
+      {
+        "name": "minecraft:sweet_berry_bush",
+        "states": {
+          "growth": 3
+        }
+      },
+      {
+        "name": "minecraft:sweet_berry_bush",
+        "states": {
+          "growth": 4
+        }
+      },
+      {
+        "name": "minecraft:sweet_berry_bush",
+        "states": {
+          "growth": 5
+        }
+      },
+      {
+        "name": "minecraft:sweet_berry_bush",
+        "states": {
+          "growth": 6
+        }
+      },
+      {
+        "name": "minecraft:sweet_berry_bush",
+        "states": {
+          "growth": 7
+        }
+      }
+    ],
+    "below": [
+      "minecraft:grass_block"
+    ]
+  }
+}

@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::loot_component::LootComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 
 pub static GRASS_BLOCK: BlockDefinition = const_block! {
@@ -10,6 +11,7 @@ pub static GRASS_BLOCK: BlockDefinition = const_block! {
     components: [
         MineableComponent::hardness(0.6),
         LootComponent::item(block_id::DIRT),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

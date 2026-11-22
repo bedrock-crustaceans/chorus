@@ -1,0 +1,14 @@
+{
+  "identifier": "ruined_portal",
+  "kind": "ruined_portal",
+  "rule": "bedrock",
+  "placement": {
+    "random_spread": {
+      "spacing": 40,
+      "separation": 15,
+      "salt": 40552231,
+      "spread": "linear"
+    }
+  },
+  "reach": 2
+}

@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::collision_box_component::CollisionBoxComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
@@ -16,6 +17,7 @@ pub static IRON_CHAIN: BlockDefinition = const_block! {
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(5.0),
         CollisionBoxComponent::new(Vec3::new(0.4375, 0.0, 0.4375), Vec3::new(0.125, 1.0, 0.125)),
+        LiquidDetectionComponent::CONTAINS_WATER,
     ],
     permutations: [],
 };

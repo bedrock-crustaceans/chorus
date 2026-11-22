@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::internal_friction_component::InternalFrictionComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::light_emission_component::LightEmissionComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
@@ -25,6 +26,7 @@ pub static SOUL_FIRE: BlockDefinition = const_block! {
         ReplaceableComponent { replaceable: true },
         MineableComponent::hardness(0.0),
         MoveableComponent { movement: Movement::Break, sticky: false },
+        LiquidDetectionComponent::BROKEN_BY_WATER_AND_LAVA,
     ],
     permutations: [],
 };

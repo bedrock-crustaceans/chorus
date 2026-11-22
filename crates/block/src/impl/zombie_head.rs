@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::collision_box_component::CollisionBoxComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::component::solid_component::SolidComponent;
@@ -20,6 +21,7 @@ pub static ZOMBIE_HEAD: BlockDefinition = const_block! {
         MineableComponent::hardness(1.0),
         MoveableComponent { movement: Movement::Break, sticky: false },
         CollisionBoxComponent::new(Vec3::new(0.25, 0.0, 0.25), Vec3::new(0.5, 0.5, 0.5)),
+        LiquidDetectionComponent::BROKEN_BY_WATER,
     ],
     permutations: [
         const_permutation! {

@@ -4,21 +4,35 @@ use std::sync::Arc;
 use tracing::{error, warn};
 
 use crate::chunk::Chunk;
+use crate::dimension_definition::DimensionDefinition;
 use crate::dimension_type::DimensionType;
+use crate::fluid::{FluidRules, FluidTicks, Grid};
+use crate::generator::engine::{Engine, Immediate, LocateJob, Located};
 use crate::generator::error::PhaseFailure;
 use crate::generator::phase::Phase;
-use crate::generator::phase_graph::PhaseGraph;
 use crate::storage::{LevelStorage, StorageResult, spawn_io};
 use chorus_core::config::ChunkSaving;
 use crossbeam_channel::{Receiver, Sender};
 
 pub trait Generator: Send + Sync + Sized + 'static {
     type Terminal: Phase<Self, Output = Chunk>;
+
+    fn locate_structure(&self, _name: &str, _from: (i32, i32), _radius: i32) -> Option<(i32, i32)> {
+        None
+    }
+
+    fn locate_job(self: &Arc<Self>, name: &str, from: (i32, i32), radius: i32) -> Option<Box<dyn LocateJob<Self>>> {
+        Some(Box::new(Immediate(self.locate_structure(name, from, radius).map(|(x, z)| Located { x, z, y: None, position: None }))))
+    }
+
+    fn fluid_rules(&self) -> Option<FluidRules> {
+        None
+    }
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct GenerationStats {
-    pub nodes: usize,
+    pub tasks: usize,
     pub waiting: usize,
     pub discarded: usize,
     pub completed: usize,
@@ -41,8 +55,18 @@ pub trait WorldGenerator: Send + Sync {
     fn stats(&self) -> GenerationStats {
         GenerationStats::default()
     }
+    fn retention_sizes(&self) -> Vec<crate::generator::engine::RetentionSize> {
+        Vec::new()
+    }
     fn set_retention_budget(&mut self, _budget: f64) {}
     fn set_lookahead(&mut self, _lookahead: i32) {}
+    fn start_locate(&mut self, _name: &str, _from: (i32, i32), _radius: i32) -> Option<u64> {
+        None
+    }
+
+    fn take_located(&mut self) -> Vec<(u64, Option<Located>)> {
+        Vec::new()
+    }
 
     #[cfg(feature = "debug")]
     fn debug_graph(&self) -> Option<&dyn crate::generator::debug::DebugGraph> {
@@ -50,12 +74,51 @@ pub trait WorldGenerator: Send + Sync {
     }
 }
 
+struct Fluids {
+    rules: FluidRules,
+    ticks: FluidTicks,
+}
+
+struct ChunkGrid<'a> {
+    chunks: &'a mut HashMap<(i32, i32), Arc<Chunk>>,
+    changed: &'a mut Vec<(glam::IVec3, i32)>,
+}
+
+impl Grid for ChunkGrid<'_> {
+    fn read(&self, pos: glam::IVec3) -> Option<i32> {
+        self.chunks.get(&(pos.x >> 4, pos.z >> 4))?.get_block((pos.x & 15) as u8, pos.y, (pos.z & 15) as u8, 0)
+    }
+
+    fn write(&mut self, pos: glam::IVec3, block: i32) -> bool {
+        let Some(chunk) = self.chunks.get_mut(&(pos.x >> 4, pos.z >> 4)) else { return false };
+        if chunk.get_block((pos.x & 15) as u8, pos.y, (pos.z & 15) as u8, 0) == Some(block) {
+            return false;
+        }
+        let changed = Arc::make_mut(chunk).set_block((pos.x & 15) as u8, pos.y, (pos.z & 15) as u8, 0, block);
+        if changed {
+            self.changed.push((pos, block));
+        }
+        changed
+    }
+
+    fn can_tick(&self, pos: glam::IVec3) -> bool {
+        if !self.chunks.contains_key(&(pos.x >> 4, pos.z >> 4)) {
+            return false;
+        }
+        let (cx, cz) = (pos.x >> 4, pos.z >> 4);
+        (-1..=1).all(|dx| (-1..=1).all(|dz| self.chunks.contains_key(&(cx + dx, cz + dz))))
+    }
+}
+
 pub struct Dimension {
     pub dimension_type: DimensionType,
+    definition: DimensionDefinition,
     world_id: i32,
     keep_loaded: bool,
     generator: Box<dyn WorldGenerator>,
     chunks: HashMap<(i32, i32), Arc<Chunk>>,
+    fluids: Option<Fluids>,
+    fluid_changes: Vec<(glam::IVec3, i32)>,
     storage: Option<Arc<LevelStorage>>,
     chunk_saving: ChunkSaving,
     persist: HashSet<(i32, i32)>,
@@ -74,12 +137,20 @@ type LoadResult = (i32, i32, StorageResult<Option<Chunk>>);
 
 impl Dimension {
     pub fn new<G: Generator>(dimension_type: DimensionType, generator: G) -> Self {
+        Self::with_definition(dimension_type, dimension_type.definition(), generator)
+    }
+
+    pub fn with_definition<G: Generator>(dimension_type: DimensionType, definition: DimensionDefinition, generator: G) -> Self {
+        let fluids = generator.fluid_rules().map(|rules| Fluids { rules, ticks: FluidTicks::default() });
         Self {
             dimension_type,
+            definition,
             world_id: dimension_type.id(),
             keep_loaded: false,
-            generator: Box::new(PhaseGraph::new(generator)),
+            generator: Box::new(Engine::new(generator)),
             chunks: HashMap::new(),
+            fluids,
+            fluid_changes: Vec::new(),
             storage: None,
             chunk_saving: ChunkSaving::default(),
             persist: HashSet::new(),
@@ -93,6 +164,10 @@ impl Dimension {
             cold_capacity: 0,
             chunk_cache: 0.0,
         }
+    }
+
+    pub fn definition(&self) -> DimensionDefinition {
+        self.definition
     }
 
     pub fn with_world_id(mut self, world_id: i32) -> Self {
@@ -116,6 +191,14 @@ impl Dimension {
     /// Keeps chunks that left every focus's view for a while, up to this multiple of the chunks in view, so one that is walked back to does not generate again.
     pub fn set_chunk_cache(&mut self, chunk_cache: f64) {
         self.chunk_cache = chunk_cache.max(0.0);
+    }
+
+    pub fn start_locate(&mut self, name: &str, from: (i32, i32), radius: i32) -> Option<u64> {
+        self.generator.start_locate(name, from, radius)
+    }
+
+    pub fn take_located(&mut self) -> Vec<(u64, Option<Located>)> {
+        self.generator.take_located()
     }
 
     pub fn cached_count(&self) -> usize {
@@ -234,9 +317,9 @@ impl Dimension {
         if !self.loading.insert((x, z)) {
             return;
         }
-        let (storage, sender, dimension_type) = (storage.clone(), self.loads.0.clone(), self.dimension_type);
+        let (storage, sender, dimension_type, definition) = (storage.clone(), self.loads.0.clone(), self.dimension_type, self.definition);
         spawn_io(move || {
-            let _ = sender.send((x, z, storage.load_chunk(dimension_type, x, z)));
+            let _ = sender.send((x, z, storage.load_chunk(dimension_type, definition, x, z)));
         });
     }
 
@@ -287,6 +370,11 @@ impl Dimension {
         for (x, z, result) in self.generator.tick() {
             match result {
                 Ok(mut chunk) => {
+                    if let Some(fluids) = &mut self.fluids {
+                        for update in chunk.take_fluid_updates() {
+                            fluids.ticks.add(update.pos, update.lava, update.delay);
+                        }
+                    }
                     chunk.mark_saved();
                     if self.persist.remove(&(x, z)) || self.chunk_saving == ChunkSaving::All {
                         chunk.mark_dirty();
@@ -337,6 +425,10 @@ impl Dimension {
         self.generator.retention_report()
     }
 
+    pub fn retention_sizes(&self) -> Vec<crate::generator::engine::RetentionSize> {
+        self.generator.retention_sizes()
+    }
+
     pub fn set_retention_budget(&mut self, budget: f64) {
         self.generator.set_retention_budget(budget);
     }
@@ -360,6 +452,22 @@ impl Dimension {
 
     pub fn has_pending_generation(&self) -> bool {
         self.generator.has_pending_work() || !self.loading.is_empty()
+    }
+
+    pub fn tick_fluids(&mut self) -> &[(glam::IVec3, i32)] {
+        self.fluid_changes.clear();
+        let Self { fluids, chunks, fluid_changes, .. } = self;
+        if let Some(fluids) = fluids {
+            let mut grid = ChunkGrid { chunks, changed: fluid_changes };
+            fluids.ticks.advance(&mut grid, &fluids.rules);
+        }
+        &self.fluid_changes
+    }
+
+    pub fn settle_fluids(&mut self, ticks: usize) {
+        for _ in 0..=ticks {
+            self.tick_fluids();
+        }
     }
 
     pub fn get_chunk(&self, x: i32, z: i32) -> Option<&Chunk> {
@@ -411,9 +519,9 @@ impl Dimension {
 mod tests {
     use super::*;
     use crate::generator::error::PhaseError;
-    use crate::generator::phase::{Phase, PhaseInputs};
-    use crate::generator::pos::ChunkPos;
+    use crate::generator::phase::{Phase, PhaseContext};
     use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
+    use glam::IVec2;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{Duration, Instant};
 
@@ -431,11 +539,11 @@ mod tests {
     impl Phase<Toy> for ChunkPhase {
         type Output = Chunk;
 
-        fn run(_: &Toy, cell: ChunkPos, _: &mut PhaseInputs<Toy>) -> Result<Chunk, PhaseError> {
+        fn run(_: &Toy, cell: IVec2, _: &mut PhaseContext<Toy>) -> Result<Chunk, PhaseError> {
             if cell.x == WATCHED {
                 GENERATED.fetch_add(1, Ordering::Relaxed);
             }
-            Ok(Chunk::new(cell.x, cell.z, -4, 24, 0, 1))
+            Ok(Chunk::new(cell.x, cell.y, -4, 24, 0, 1))
         }
     }
 

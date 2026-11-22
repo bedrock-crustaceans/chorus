@@ -1,6 +1,7 @@
 use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 
 pub static REINFORCED_DEEPSLATE: BlockDefinition = const_block! {
@@ -8,6 +9,7 @@ pub static REINFORCED_DEEPSLATE: BlockDefinition = const_block! {
     states: [],
     components: [
         MapColorComponent { r: 100, g: 100, b: 100, a: 255 },
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

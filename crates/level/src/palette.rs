@@ -359,13 +359,6 @@ mod tests {
         assert_eq!(palette.get(77), 4);
         assert_eq!(palette.get(76), 9);
         assert_eq!(palette.count(4), 1);
-    }
-
-    #[test]
-    fn the_old_value_loses_one_count_when_a_uniform_palette_becomes_indexed() {
-        let mut palette = Palette::new(9);
-        palette.set(77, 4);
-
         assert_eq!(palette.count(9), 4095);
         assert!(!palette.is_all(9));
     }
@@ -391,15 +384,10 @@ mod tests {
 
         palette.set(0, 3);
         assert_eq!((palette.count(1), palette.count(2), palette.count(3)), (4093, 1, 2));
-    }
 
-    #[test]
-    fn rewriting_the_stored_value_leaves_the_counts_alone() {
-        let mut blocks = [1; 4096];
-        blocks[0] = 3;
-        let mut palette = Palette::from_blocks(&blocks);
+        palette.set(2, 3);
         palette.set(0, 3);
-        assert_eq!((palette.count(1), palette.count(3)), (4095, 1));
+        assert_eq!((palette.count(1), palette.count(2), palette.count(3)), (4093, 1, 2));
     }
 
     #[test]
@@ -500,11 +488,11 @@ mod tests {
                 }
             }
             assert_matches(&palette, &reference);
+            if let Palette::Indexed { values, .. } = &palette {
+                assert_eq!(values.values().map(|&count| count as u32).sum::<u32>(), 4096);
+            }
         }
-    }
 
-    #[test]
-    fn random_edits_from_a_uniform_palette_keep_the_counts_exact() {
         let mut rng = Lcg::new(1);
         let mut reference = [5i32; 4096];
         let mut palette = Palette::new(5);
@@ -517,21 +505,6 @@ mod tests {
             }
         }
         assert_matches(&palette, &reference);
-    }
-
-    #[test]
-    fn counts_always_sum_to_the_block_total() {
-        let mut rng = Lcg::new(11);
-        let (mut palette, _) = random_palette(12, 12);
-        for _ in 0..5000 {
-            let index = rng.below(4096) as usize;
-            let value = rng.below(12) as i32 * 37 - 100;
-            if palette.get(index) != value {
-                palette.set(index, value);
-            }
-        }
-        let Palette::Indexed { values, .. } = &palette else { panic!("expected an indexed palette") };
-        assert_eq!(values.values().map(|&count| count as u32).sum::<u32>(), 4096);
     }
 
     #[test]

@@ -1,5 +1,6 @@
 use crate::block_definition::BlockDefinition;
 use crate::block_id;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::const_block;
@@ -11,6 +12,7 @@ pub static COMPOSTER: BlockDefinition = const_block! {
     components: [
         MapColorComponent { r: 143, g: 119, b: 72, a: 255 },
         MineableComponent::hardness(0.6),
+        LiquidDetectionComponent::CONTAINS_WATER,
     ],
     permutations: [],
 };

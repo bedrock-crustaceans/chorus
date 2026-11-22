@@ -1,3 +1,5 @@
+use crate::dimension_definition::DimensionDefinition;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum DimensionType {
     Overworld,
@@ -31,22 +33,23 @@ impl DimensionType {
         }
     }
 
-    pub const fn min_sub_chunk_y(self) -> i8 {
+    pub const fn definition(self) -> DimensionDefinition {
         match self {
-            Self::Overworld => -4,
-            Self::Nether | Self::End => 0,
+            Self::Overworld => DimensionDefinition::OVERWORLD,
+            Self::Nether => DimensionDefinition::NETHER,
+            Self::End => DimensionDefinition::END,
         }
+    }
+
+    pub const fn min_sub_chunk_y(self) -> i8 {
+        self.definition().min_sub_chunk_y()
     }
 
     pub const fn max_sub_chunk_y(self) -> i8 {
-        match self {
-            Self::Overworld => 19,
-            Self::Nether => 7,
-            Self::End => 15,
-        }
+        self.definition().max_sub_chunk_y()
     }
 
     pub const fn sub_chunk_count(self) -> usize {
-        (self.max_sub_chunk_y() as i32 - self.min_sub_chunk_y() as i32 + 1) as usize
+        self.definition().sub_chunk_count()
     }
 }

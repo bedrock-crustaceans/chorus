@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 
 pub static HARDENED_CLAY: BlockDefinition = const_block! {
@@ -12,6 +13,7 @@ pub static HARDENED_CLAY: BlockDefinition = const_block! {
         MineableComponent::hardness(1.25),
         MapColorComponent { r: 135, g: 107, b: 98, a: 255 },
         MineableComponent::hardness(1.25),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

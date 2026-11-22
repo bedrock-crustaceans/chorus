@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::flammable_component::FlammableComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::state::common::PILLAR_AXIS;
 use crate::{const_block, const_permutation};
 
@@ -13,6 +14,7 @@ pub static ACACIA_LOG: BlockDefinition = const_block! {
         MapColorComponent { r: 216, g: 127, b: 51, a: 255 },
         FlammableComponent { catch_chance: 5, destroy_chance: 10 },
         MineableComponent::hardness(2.0),
+        SupportComponent::ALL,
     ],
     permutations: [
         const_permutation! {

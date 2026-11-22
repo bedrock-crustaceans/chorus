@@ -259,37 +259,8 @@ fn parse_overload(parameters: &[CommandParameter], tokens: &[Token], registry: &
                 return Ok(values);
             }
             ParameterKind::Argument(ArgumentType::Position | ArgumentType::BlockPosition) => {
-                let integer = matches!(parameter.kind, ParameterKind::Argument(ArgumentType::BlockPosition));
-                let mut coordinates = Vec::with_capacity(3);
-                let mut next = index;
-                while coordinates.len() < 3 {
-                    let Some(token) = tokens.get(next).filter(|token| !token.quoted) else { break };
-                    let parts = coordinate_parts(&token.text);
-                    if coordinates.len() + parts.len() > 3 {
-                        break;
-                    }
-                    for part in parts {
-                        let coordinate = Coordinate::parse(part).filter(|coordinate| !integer || !matches!(coordinate, Coordinate::Absolute(value) if value.fract() != 0.0));
-                        match coordinate {
-                            Some(coordinate) => coordinates.push(coordinate),
-                            None => {
-                                return Err(Attempt {
-                                    consumed: next,
-                                    message: format!("\"{part}\" is not a valid coordinate"),
-                                });
-                            }
-                        }
-                    }
-                    next += 1;
-                }
-                let [x, y, z] = coordinates[..] else {
-                    return Err(fail(format!("expected three coordinates for {}", parameter.usage_token())));
-                };
-                let local = [x, y, z].iter().filter(|coordinate| matches!(coordinate, Coordinate::Local(_))).count();
-                if local != 0 && local != 3 {
-                    return Err(fail("local coordinates (^) can't be mixed with other kinds".to_owned()));
-                }
-                values.push((parameter.name.to_string(), ArgValue::Position(CommandPosition { x, y, z })));
+                let (position, next) = parse_position(parameter, tokens, index)?;
+                values.push((parameter.name.to_string(), ArgValue::Position(position)));
                 index = next;
                 continue;
             }
@@ -308,6 +279,41 @@ fn parse_overload(parameters: &[CommandParameter], tokens: &[Token], registry: &
         }),
         None => Ok(values),
     }
+}
+
+fn parse_position(parameter: &CommandParameter, tokens: &[Token], index: usize) -> Result<(CommandPosition, usize), Attempt> {
+    let integer = matches!(parameter.kind, ParameterKind::Argument(ArgumentType::BlockPosition));
+    let mut coordinates = Vec::with_capacity(3);
+    let mut next = index;
+    while coordinates.len() < 3 {
+        let Some(token) = tokens.get(next).filter(|token| !token.quoted) else { break };
+        let parts = coordinate_parts(&token.text);
+        if coordinates.len() + parts.len() > 3 {
+            break;
+        }
+        for part in parts {
+            let coordinate = Coordinate::parse(part).filter(|coordinate| !integer || !matches!(coordinate, Coordinate::Absolute(value) if value.fract() != 0.0));
+            match coordinate {
+                Some(coordinate) => coordinates.push(coordinate),
+                None => {
+                    return Err(Attempt {
+                        consumed: next,
+                        message: format!("\"{part}\" is not a valid coordinate"),
+                    });
+                }
+            }
+        }
+        next += 1;
+    }
+    let fail = |message: String| Attempt { consumed: index, message };
+    let [x, y, z] = coordinates[..] else {
+        return Err(fail(format!("expected three coordinates for {}", parameter.usage_token())));
+    };
+    let local = [x, y, z].iter().filter(|coordinate| matches!(coordinate, Coordinate::Local(_))).count();
+    if local != 0 && local != 3 {
+        return Err(fail("local coordinates (^) can't be mixed with other kinds".to_owned()));
+    }
+    Ok((CommandPosition { x, y, z }, next))
 }
 
 fn parse_argument(kind: ArgumentType, text: &str) -> Option<ArgValue> {

@@ -9,24 +9,25 @@ authors.workspace = true
 workspace = true
 
 [dependencies]
-chorus_core.workspace = true
 chorus_block.workspace = true
 chorus_level.workspace = true
+chorus_structure_data.workspace = true
+bedrock_vanilla.workspace = true
 atomicow.workspace = true
 bedrock.workspace = true
 bevy_tasks.workspace = true
 glam.workspace = true
 md-5.workspace = true
 nbtx.workspace = true
-rand.workspace = true
+molangx.workspace = true
 rustc-hash.workspace = true
-sha2.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 tracing.workspace = true
 
-[features]
-dhat-heap = []
-count-alloc = []
-debug = ["chorus_level/debug"]
+[build-dependencies]
+serde_json.workspace = true
+walkdir.workspace = true
 
 [dev-dependencies]
-dhat.workspace = true
+sha2.workspace = true

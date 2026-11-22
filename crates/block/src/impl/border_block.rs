@@ -5,7 +5,6 @@ use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
-use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{WALL_CONNECTION_TYPE_EAST, WALL_CONNECTION_TYPE_NORTH, WALL_CONNECTION_TYPE_SOUTH, WALL_CONNECTION_TYPE_WEST, WALL_POST_BIT};
@@ -15,7 +14,6 @@ pub static BORDER_BLOCK: BlockDefinition = const_block! {
     identifier: block_id::BORDER_BLOCK,
     states: [WALL_CONNECTION_TYPE_EAST, WALL_CONNECTION_TYPE_NORTH, WALL_CONNECTION_TYPE_SOUTH, WALL_CONNECTION_TYPE_WEST, WALL_POST_BIT],
     components: [
-        SolidComponent { solid: false },
         TransparentComponent { transparent: true },
         MapColorComponent { r: 255, g: 0, b: 0, a: 255 },
         LightDampeningComponent { dampening: 1 },

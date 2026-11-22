@@ -1,0 +1,25 @@
+{
+  "identifier": "village",
+  "kind": "village",
+  "rule": "bedrock",
+  "placement": {
+    "random_spread": {
+      "spacing": 34,
+      "separation": 8,
+      "salt": 10387312,
+      "spread": "triangular"
+    }
+  },
+  "reach": 9,
+  "biome_filter": {
+    "tag": "village",
+    "radius": 2
+  },
+  "biome_tags": {
+    "village": ["plains", "desert", "taiga", "ice_plains", "taiga_hills", "cold_taiga", "cold_taiga_hills", "savanna", "sunflower_plains", "meadow"],
+    "village_desert": ["desert"],
+    "village_savanna": ["savanna"],
+    "village_snowy": ["ice_plains"],
+    "village_taiga": ["taiga", "taiga_hills", "cold_taiga", "cold_taiga_hills"]
+  }
+}

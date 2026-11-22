@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
@@ -11,6 +12,7 @@ pub static STRIPPED_WARPED_STEM: BlockDefinition = const_block! {
     components: [
         MapColorComponent { r: 58, g: 142, b: 140, a: 255 },
         MineableComponent::hardness(2.0),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

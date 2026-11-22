@@ -3,7 +3,9 @@ use crate::block_id;
 use crate::component::collision_box_component::CollisionBoxComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::light_emission_component::LightEmissionComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::FACING_DIRECTION;
@@ -18,6 +20,8 @@ pub static END_ROD: BlockDefinition = const_block! {
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(0.0),
         CollisionBoxComponent::new(Vec3::new(0.4, 0.0, 0.4), Vec3::new(0.2, 1.0, 0.2)),
+        LiquidDetectionComponent::BROKEN_BY_WATER,
+        SolidComponent { solid: false },
     ],
     permutations: [],
 };

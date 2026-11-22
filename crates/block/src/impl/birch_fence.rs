@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::collision_box_component::CollisionBoxComponent;
 use crate::component::flammable_component::FlammableComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::transparent_component::TransparentComponent;
@@ -20,6 +21,7 @@ pub static BIRCH_FENCE: BlockDefinition = const_block! {
         FlammableComponent { catch_chance: 5, destroy_chance: 20 },
         MineableComponent::hardness(2.0),
         CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 1.5, 1.0)),
+        LiquidDetectionComponent::CONTAINS_WATER,
     ],
     permutations: [],
 };

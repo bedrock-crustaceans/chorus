@@ -1,0 +1,14 @@
+{
+  "format_version": "1.0.0",
+  "chorus:mushroom": {
+    "description": {
+      "identifier": "minecraft:brown_mushroom_feature"
+    },
+    "block": "minecraft:brown_mushroom",
+    "ground": [
+      "minecraft:mycelium",
+      "minecraft:podzol"
+    ],
+    "tries": 1
+  }
+}

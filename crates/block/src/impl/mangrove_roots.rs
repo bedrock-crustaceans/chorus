@@ -2,8 +2,10 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::flammable_component::FlammableComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
@@ -16,6 +18,8 @@ pub static MANGROVE_ROOTS: BlockDefinition = const_block! {
         LightDampeningComponent { dampening: 1 },
         FlammableComponent { catch_chance: 5, destroy_chance: 0 },
         MineableComponent::hardness(0.7),
+        LiquidDetectionComponent::CONTAINS_WATER,
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

@@ -1,0 +1,20 @@
+{
+  "identifier": "temple",
+  "kind": "temple",
+  "rule": "bedrock",
+  "placement": {
+    "random_spread": {
+      "spacing": 32,
+      "separation": 8,
+      "salt": 14357617,
+      "spread": "linear"
+    }
+  },
+  "reach": 2,
+  "biome_tags": {
+    "desert_pyramid": ["desert", "desert_hills"],
+    "jungle_temple": ["jungle", "jungle_hills"],
+    "swamp_hut": ["swampland", "swampland_mutated"],
+    "temple": ["desert", "desert_hills", "jungle", "jungle_hills", "swampland", "swampland_mutated", "ice_plains", "cold_taiga", "snowy_slopes"]
+  }
+}

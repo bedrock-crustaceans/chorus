@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::generator::dimension::Generator;
 use crate::generator::error::PhaseError;
-use crate::generator::pos::ChunkPos;
+use glam::IVec2;
 
 pub type ErasedOutput = Arc<dyn Any + Send + Sync>;
 
@@ -27,105 +27,138 @@ pub trait Phase<G: Generator>: 'static {
 
     const RETAIN: usize = 0;
 
-    fn requires() -> Vec<Requirement<G>> {
+    fn dependencies() -> Vec<Dependency<G>> {
         Vec::new()
     }
 
-    fn run(generator: &G, cell: ChunkPos, inputs: &mut PhaseInputs<G>) -> Result<Self::Output, PhaseError>;
+    fn resolve(_generator: &G, _cell: IVec2, _inputs: &PhaseContext<G>) -> Vec<Request<G>> {
+        Vec::new()
+    }
 
-    fn at(offsets: &'static [(i32, i32)]) -> Requirement<G>
-    where
-        Self: Sized,
-    {
-        Requirement {
-            descriptor: PhaseDescriptor::of::<Self>(),
-            offsets,
-            max_hops: None,
-            mail_for: None,
-        }
+    fn run(generator: &G, cell: IVec2, context: &mut PhaseContext<G>) -> Result<Self::Output, PhaseError>;
+}
+
+pub struct Request<G: Generator> {
+    pub handle: PhaseHandle<G>,
+    pub cell: IVec2,
+}
+
+impl<G: Generator> Request<G> {
+    pub fn of<P: Phase<G>>(cell: IVec2) -> Self {
+        Self { handle: PhaseHandle::of::<P>(), cell }
     }
 }
 
 /// A phase that sends a value to other cells besides its own output. The value is addressed to a target cell, and a
-/// consumer that depends on this phase with [`Mailing::at_with_mail`] receives the values addressed to the cells it asks for.
 pub trait Mailing<G: Generator>: Phase<G> {
     type Mail: Send + Sync + 'static;
-
-    /// Depends on this phase at `offsets` like [`Phase::at`], and also receives what those cells addressed to the cells at `targets`
-    /// (offsets from the consumer), in the order of `offsets`.
-    fn at_with_mail(offsets: &'static [(i32, i32)], targets: &'static [(i32, i32)]) -> Requirement<G>
-    where
-        Self: Sized,
-    {
-        Requirement {
-            mail_for: Some(targets),
-            ..Self::at(offsets)
-        }
-    }
 }
 
-pub struct Requirement<G: Generator> {
-    pub descriptor: PhaseDescriptor<G>,
+pub struct Dependency<G: Generator> {
+    pub handle: PhaseHandle<G>,
     pub offsets: &'static [(i32, i32)],
     pub max_hops: Option<u32>,
     pub mail_for: Option<&'static [(i32, i32)]>,
+    pub if_dependent: Option<fn(IVec2) -> bool>,
+    pub if_dependency: Option<fn(IVec2) -> bool>,
+    pub position_gate: bool,
 }
 
-impl<G: Generator> Requirement<G> {
+impl<G: Generator> Dependency<G> {
+    pub fn on<P: Phase<G>>(offsets: &'static [(i32, i32)]) -> Self {
+        Self {
+            handle: PhaseHandle::of::<P>(),
+            offsets,
+            max_hops: None,
+            mail_for: None,
+            if_dependent: None,
+            if_dependency: None,
+            position_gate: false,
+        }
+    }
+
+    pub fn with_mail(mut self, targets: &'static [(i32, i32)]) -> Self {
+        self.mail_for = Some(targets);
+        self
+    }
+
     pub fn max_hops(mut self, max_hops: u32) -> Self {
         self.max_hops = Some(max_hops);
         self
     }
+
+    pub fn if_dependent(mut self, condition: fn(IVec2) -> bool) -> Self {
+        self.if_dependent = Some(condition);
+        self
+    }
+
+    pub fn if_dependent_position(mut self, condition: fn(IVec2) -> bool) -> Self {
+        self.if_dependent = Some(condition);
+        self.position_gate = true;
+        self
+    }
+
+    pub fn if_dependency(mut self, condition: fn(IVec2) -> bool) -> Self {
+        self.if_dependency = Some(condition);
+        self
+    }
+
+    pub fn if_dependency_position(mut self, condition: fn(IVec2) -> bool) -> Self {
+        self.if_dependency = Some(condition);
+        self.position_gate = true;
+        self
+    }
 }
 
-pub struct PhaseDescriptor<G: Generator> {
+pub struct PhaseHandle<G: Generator> {
     pub phase: PhaseId,
     pub name: &'static str,
     pub retain: usize,
-    pub requires: fn() -> Vec<Requirement<G>>,
-    pub run: fn(&G, ChunkPos, &mut PhaseInputs<G>) -> Result<ErasedOutput, PhaseError>,
+    pub dependencies: fn() -> Vec<Dependency<G>>,
+    pub resolve: fn(&G, IVec2, &PhaseContext<G>) -> Vec<Request<G>>,
+    pub run: fn(&G, IVec2, &mut PhaseContext<G>) -> Result<ErasedOutput, PhaseError>,
 }
 
-impl<G: Generator> Clone for PhaseDescriptor<G> {
+impl<G: Generator> Clone for PhaseHandle<G> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<G: Generator> Copy for PhaseDescriptor<G> {}
+impl<G: Generator> Copy for PhaseHandle<G> {}
 
-impl<G: Generator> PhaseDescriptor<G> {
+impl<G: Generator> PhaseHandle<G> {
     pub fn of<P: Phase<G>>() -> Self {
         Self {
             phase: PhaseId::of::<P>(),
             name: short_type_name::<P>(),
             retain: P::RETAIN,
-            requires: P::requires,
-            run: |generator, cell, inputs| P::run(generator, cell, inputs).map(|output| Arc::new(output) as ErasedOutput),
+            dependencies: P::dependencies,
+            resolve: P::resolve,
+            run: |generator, cell, context| P::run(generator, cell, context).map(|output| Arc::new(output) as ErasedOutput),
         }
     }
 }
 
-pub type Outbox = Vec<(ChunkPos, ErasedOutput)>;
+pub type Outbox = Vec<(IVec2, ErasedOutput)>;
 
 pub struct InboxEntry {
     pub producer: PhaseId,
-    pub target: ChunkPos,
-    pub source: ChunkPos,
+    pub target: IVec2,
+    pub source: IVec2,
     pub value: ErasedOutput,
 }
 
-pub struct PhaseInputs<G: Generator> {
-    pub resolved: Vec<(PhaseId, ChunkPos, ErasedOutput)>,
+pub struct PhaseContext<G: Generator> {
+    pub resolved: Vec<(PhaseId, IVec2, ErasedOutput)>,
     pub generator: std::marker::PhantomData<fn() -> G>,
     pub phase: PhaseId,
     pub inbox: Vec<InboxEntry>,
     pub outbox: Outbox,
 }
 
-impl<G: Generator> PhaseInputs<G> {
-    /// What the cells this phase depends on with mail addressed to `target`, as `(source cell, mail)` in the order the requirement lists them.
-    pub fn mail<P: Mailing<G>>(&self, target: ChunkPos) -> impl Iterator<Item = (ChunkPos, &P::Mail)> {
+impl<G: Generator> PhaseContext<G> {
+    pub fn mail<P: Mailing<G>>(&self, target: IVec2) -> impl Iterator<Item = (IVec2, &P::Mail)> {
         let producer = PhaseId::of::<P>();
         self.inbox
             .iter()
@@ -134,22 +167,22 @@ impl<G: Generator> PhaseInputs<G> {
     }
 
     /// Addresses `value` to `target`. Only the phase that is running may send, as itself.
-    pub fn send<P: Mailing<G>>(&mut self, target: ChunkPos, value: P::Mail) {
+    pub fn send<P: Mailing<G>>(&mut self, target: IVec2, value: P::Mail) {
         assert_eq!(PhaseId::of::<P>(), self.phase, "a phase can only send mail as itself");
         self.outbox.push((target, Arc::new(value) as ErasedOutput));
     }
 
-    pub fn get<Q: Phase<G>>(&self, cell: ChunkPos) -> Result<Arc<Q::Output>, PhaseError> {
+    pub fn get<Q: Phase<G>>(&self, cell: IVec2) -> Result<Arc<Q::Output>, PhaseError> {
         self.try_get::<Q>(cell).ok_or_else(|| Self::undeclared::<Q>(cell))
     }
 
-    pub fn try_get<Q: Phase<G>>(&self, cell: ChunkPos) -> Option<Arc<Q::Output>> {
+    pub fn try_get<Q: Phase<G>>(&self, cell: IVec2) -> Option<Arc<Q::Output>> {
         let phase = PhaseId::of::<Q>();
         let (_, _, output) = self.resolved.iter().find(|(id, at, _)| *id == phase && *at == cell)?;
         Some(Self::downcast::<Q>(output.clone()))
     }
 
-    pub fn take<Q: Phase<G>>(&mut self, cell: ChunkPos) -> Result<Q::Output, PhaseError>
+    pub fn take<Q: Phase<G>>(&mut self, cell: IVec2) -> Result<Q::Output, PhaseError>
     where
         Q::Output: Clone,
     {
@@ -163,7 +196,7 @@ impl<G: Generator> PhaseInputs<G> {
         output.downcast::<Q::Output>().expect("phase output stored under the wrong phase id")
     }
 
-    fn undeclared<Q: Phase<G>>(cell: ChunkPos) -> PhaseError {
+    fn undeclared<Q: Phase<G>>(cell: IVec2) -> PhaseError {
         PhaseError::UndeclaredRead {
             dependency: std::any::type_name::<Q>(),
             cell,

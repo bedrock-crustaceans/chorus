@@ -1,0 +1,18 @@
+{
+  "format_version": "1.0.0",
+  "chorus:disk": {
+    "description": {
+      "identifier": "minecraft:grass_disc_feature"
+    },
+    "block": "minecraft:grass_block",
+    "covered_block": "minecraft:dirt",
+    "radius": 5,
+    "half_height": 2,
+    "replaces": [
+      "minecraft:dirt",
+      "minecraft:coarse_dirt",
+      "minecraft:grass_block",
+      "minecraft:mud"
+    ]
+  }
+}

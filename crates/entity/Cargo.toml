@@ -9,7 +9,6 @@ authors.workspace = true
 workspace = true
 
 [dependencies]
-chorus_core.workspace = true
 bevy_ecs.workspace = true
 glam.workspace = true
 nbtx.workspace = true

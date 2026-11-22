@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::internal_friction_component::InternalFrictionComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::replaceable_component::ReplaceableComponent;
 use crate::component::solid_component::SolidComponent;
@@ -18,6 +19,7 @@ pub static AIR: BlockDefinition = const_block! {
         LightDampeningComponent { dampening: 1 },
         ReplaceableComponent { replaceable: true },
         MineableComponent::hardness(0.0),
+        LiquidDetectionComponent::BROKEN_BY_WATER_AND_LAVA,
     ],
     permutations: [],
 };

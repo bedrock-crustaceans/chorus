@@ -155,10 +155,7 @@ mod tests {
         assert!(sub_chunk.is_all_air());
         sub_chunk.set(15, 15, 15, 0, 3);
         assert!(!sub_chunk.is_all_air());
-    }
 
-    #[test]
-    fn placing_a_block_in_an_empty_sub_chunk_makes_it_not_all_air() {
         let mut sub_chunk = SubChunk::new(AIR, PLAINS);
         sub_chunk.set(15, 15, 15, 0, 3);
         assert!(!sub_chunk.is_all_air());

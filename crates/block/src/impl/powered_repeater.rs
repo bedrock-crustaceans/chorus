@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::collision_box_component::CollisionBoxComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::light_emission_component::LightEmissionComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::component::solid_component::SolidComponent;
@@ -22,6 +23,7 @@ pub static POWERED_REPEATER: BlockDefinition = const_block! {
         MineableComponent::hardness(0.0),
         MoveableComponent { movement: Movement::Break, sticky: false },
         CollisionBoxComponent::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.125, 1.0)),
+        LiquidDetectionComponent::BROKEN_BY_WATER,
     ],
     permutations: [],
 };

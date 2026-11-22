@@ -2,9 +2,11 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::collision_box_component::CollisionBoxComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
+use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::state::common::{AGE_3, DIRECTION};
 use crate::{const_block, const_permutation};
@@ -20,6 +22,8 @@ pub static COCOA: BlockDefinition = const_block! {
         MineableComponent::hardness(0.2),
         MoveableComponent { movement: Movement::Break, sticky: false },
         CollisionBoxComponent::new(Vec3::new(0.375, 0.4375, 0.6875), Vec3::new(0.25, 0.3125, 0.25)),
+        LiquidDetectionComponent::BROKEN_BY_WATER,
+        SolidComponent { solid: false },
     ],
     permutations: [
         const_permutation! {

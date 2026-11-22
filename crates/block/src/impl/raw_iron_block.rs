@@ -1,6 +1,7 @@
 use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 
 pub static RAW_IRON_BLOCK: BlockDefinition = const_block! {
@@ -8,6 +9,7 @@ pub static RAW_IRON_BLOCK: BlockDefinition = const_block! {
     states: [],
     components: [
         MapColorComponent { r: 216, g: 175, b: 147, a: 255 },
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

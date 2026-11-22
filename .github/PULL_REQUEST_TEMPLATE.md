@@ -23,5 +23,5 @@ Closes #
 
 - [ ] I kept the PR scope focused.
 - [ ] I ran `cargo fmt` and `cargo clippy`, and `cargo nextest run` passes.
-- [ ] I updated docs (README, CLAUDE.md) when needed.
+- [ ] I updated docs (README, DEVELOPMENT.md) when needed.
 - [ ] I added or updated tests where relevant.

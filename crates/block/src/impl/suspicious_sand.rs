@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::{BRUSHED_PROGRESS, HANGING};
 
@@ -11,6 +12,7 @@ pub static SUSPICIOUS_SAND: BlockDefinition = const_block! {
     components: [
         MapColorComponent { r: 247, g: 233, b: 163, a: 255 },
         MineableComponent::hardness(0.25),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

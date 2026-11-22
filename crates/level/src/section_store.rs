@@ -164,6 +164,11 @@ impl SectionStore {
         values[index as usize]
     }
 
+    pub fn uniform_value(&self, section: usize) -> Option<i32> {
+        let meta = self.0.meta[section];
+        (meta.bits == 0).then(|| self.0.values[meta.values_at as usize])
+    }
+
     pub fn to_array(&self, section: usize) -> [i32; 4096] {
         let meta = self.0.meta[section];
         let values = &self.0.values[meta.values_at as usize..meta.values_at as usize + meta.values_len as usize];
@@ -263,9 +268,14 @@ mod tests {
     }
 
     #[test]
-    fn cloning_shares_the_storage() {
-        let store = SectionStore::uniform(1, 4);
-        let copy = store.clone();
-        assert!(Arc::ptr_eq(&store.0, &copy.0));
+    fn a_section_reports_its_value_only_when_it_is_uniform() {
+        let (palette, _) = random_palette(11, 5);
+        let mut builder = SectionStoreBuilder::default();
+        builder.push_palette(&Palette::new(7));
+        builder.push_palette(&palette);
+        let store = builder.build();
+        assert_eq!(store.uniform_value(0), Some(7));
+        assert_eq!(store.uniform_value(1), None);
+        assert_eq!(SectionStore::uniform(-3, 4).uniform_value(2), Some(-3));
     }
 }

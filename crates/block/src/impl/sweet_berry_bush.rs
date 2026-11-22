@@ -4,11 +4,14 @@ use crate::component::collision_box_component::CollisionBoxComponent;
 use crate::component::flammable_component::FlammableComponent;
 use crate::component::internal_friction_component::InternalFrictionComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
+use crate::component::placement_filter_component::PlacementFilterComponent;
 use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
+use crate::placement;
 use crate::state::common::GROWTH_8;
 use crate::{const_block, const_permutation};
 
@@ -25,6 +28,8 @@ pub static SWEET_BERRY_BUSH: BlockDefinition = const_block! {
         MineableComponent::hardness(0.0),
         MoveableComponent { movement: Movement::Break, sticky: false },
         CollisionBoxComponent::enabled(false),
+        LiquidDetectionComponent::BROKEN_BY_WATER_AND_LAVA,
+        PlacementFilterComponent::new(placement::VEGETATION),
     ],
     permutations: [
         const_permutation! {

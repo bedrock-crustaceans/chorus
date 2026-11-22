@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 
 pub static INVISIBLE_BEDROCK: BlockDefinition = const_block! {
@@ -10,6 +11,7 @@ pub static INVISIBLE_BEDROCK: BlockDefinition = const_block! {
     components: [
         MineableComponent::hardness(-1.0),
         MoveableComponent { movement: Movement::None, sticky: false },
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

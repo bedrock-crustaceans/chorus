@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 
 pub static BLACK_TERRACOTTA: BlockDefinition = const_block! {
@@ -10,6 +11,7 @@ pub static BLACK_TERRACOTTA: BlockDefinition = const_block! {
     components: [
         MapColorComponent { r: 37, g: 22, b: 16, a: 255 },
         MineableComponent::hardness(1.25),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

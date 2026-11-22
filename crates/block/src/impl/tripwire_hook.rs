@@ -1,6 +1,7 @@
 use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
@@ -13,6 +14,7 @@ pub static TRIPWIRE_HOOK: BlockDefinition = const_block! {
         SolidComponent { solid: false },
         TransparentComponent { transparent: true },
         LightDampeningComponent { dampening: 1 },
+        LiquidDetectionComponent::CONTAINS_AND_BROKEN_BY_WATER_AND_LAVA,
     ],
     permutations: [],
 };

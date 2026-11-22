@@ -113,6 +113,7 @@ pub static LEVER_DIRECTION: BlockStateDefinition = const_enum!(
 pub static LIQUID_DEPTH: BlockStateDefinition = const_int!("liquid_depth", 0, 15);
 pub static LIT: BlockStateDefinition = const_bool!("lit", false);
 pub static MINECRAFT_BLOCK_FACE: BlockStateDefinition = const_enum!("minecraft:block_face", ["down", "up", "north", "south", "west", "east"]);
+pub const CARDINAL_DIRECTIONS: [&str; 4] = ["south", "west", "north", "east"];
 pub static MINECRAFT_CARDINAL_DIRECTION: BlockStateDefinition = const_enum!("minecraft:cardinal_direction", ["south", "west", "north", "east"]);
 pub static MINECRAFT_FACING_DIRECTION: BlockStateDefinition = const_enum!("minecraft:facing_direction", ["down", "up", "north", "south", "west", "east"]);
 pub static MINECRAFT_VERTICAL_HALF: BlockStateDefinition = const_enum!("minecraft:vertical_half", ["bottom", "top"]);
@@ -267,3 +268,17 @@ pub static MINECRAFT_CONNECTION_NORTH: BlockStateDefinition = const_bool!("minec
 pub static MINECRAFT_CONNECTION_SOUTH: BlockStateDefinition = const_bool!("minecraft:connection_south", false);
 pub static MINECRAFT_CONNECTION_UP: BlockStateDefinition = const_bool!("minecraft:connection_up", false);
 pub static MINECRAFT_CONNECTION_WEST: BlockStateDefinition = const_bool!("minecraft:connection_west", false);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_cardinal_constant_matches_the_state_definition() {
+        let BlockStateDefinition::Enum { values, .. } = &MINECRAFT_CARDINAL_DIRECTION else {
+            panic!("the cardinal direction is an enum state")
+        };
+        let listed: Vec<&str> = values.iter().map(|value| value.as_ref()).collect();
+        assert_eq!(listed, CARDINAL_DIRECTIONS);
+    }
+}

@@ -1,0 +1,11 @@
+{
+  "identifier": "trail_ruins",
+  "kind": "trail_ruins",
+  "rule": "java",
+  "placement": "pack",
+  "reach": 6,
+  "adaptation": {
+    "mode": "bury",
+    "order": 0
+  }
+}

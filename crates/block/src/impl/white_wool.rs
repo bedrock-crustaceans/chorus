@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::flammable_component::FlammableComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 
 pub static WHITE_WOOL: BlockDefinition = const_block! {
@@ -12,6 +13,7 @@ pub static WHITE_WOOL: BlockDefinition = const_block! {
         MapColorComponent { r: 255, g: 255, b: 255, a: 255 },
         FlammableComponent { catch_chance: 30, destroy_chance: 60 },
         MineableComponent::hardness(0.8),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::map_color_component::MapColorComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::PILLAR_AXIS;
 
@@ -11,6 +12,7 @@ pub static VERDANT_FROGLIGHT: BlockDefinition = const_block! {
     components: [
         MapColorComponent { r: 127, g: 167, b: 150, a: 255 },
         LightEmissionComponent { emission: 15 },
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

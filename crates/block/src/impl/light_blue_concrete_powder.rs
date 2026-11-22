@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 
 pub static LIGHT_BLUE_CONCRETE_POWDER: BlockDefinition = const_block! {
@@ -10,6 +11,7 @@ pub static LIGHT_BLUE_CONCRETE_POWDER: BlockDefinition = const_block! {
     components: [
         MapColorComponent { r: 102, g: 153, b: 216, a: 255 },
         MineableComponent::hardness(0.5),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

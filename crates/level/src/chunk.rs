@@ -1,3 +1,4 @@
+use crate::fluid::PendingUpdate;
 use crate::sub_chunk::SubChunk;
 
 #[derive(Clone)]
@@ -7,6 +8,7 @@ pub struct Chunk {
     sub_chunks: Vec<SubChunk>,
     min_sub_chunk_y: i8,
     block_entities: Vec<BlockEntity>,
+    fluid_updates: Vec<PendingUpdate>,
     dirty: bool,
 }
 
@@ -33,6 +35,7 @@ impl Chunk {
             sub_chunks: (0..count).map(|_| SubChunk::new(air_id, biome)).collect(),
             min_sub_chunk_y,
             block_entities: Vec::new(),
+            fluid_updates: Vec::new(),
             dirty: false,
         }
     }
@@ -44,6 +47,7 @@ impl Chunk {
             sub_chunks,
             min_sub_chunk_y,
             block_entities,
+            fluid_updates: Vec::new(),
             dirty: false,
         }
     }
@@ -179,6 +183,18 @@ impl Chunk {
         removed
     }
 
+    pub fn fluid_updates(&self) -> &[PendingUpdate] {
+        &self.fluid_updates
+    }
+
+    pub fn set_fluid_updates(&mut self, updates: Vec<PendingUpdate>) {
+        self.fluid_updates = updates;
+    }
+
+    pub fn take_fluid_updates(&mut self) -> Vec<PendingUpdate> {
+        std::mem::take(&mut self.fluid_updates)
+    }
+
     pub fn sub_chunk_count(&self) -> usize {
         self.sub_chunks.len()
     }
@@ -240,6 +256,12 @@ mod tests {
         assert_eq!(chunk.get_block(0, 320, 0, 0), None);
         assert!(!chunk.set_block(0, -65, 0, 0, 1));
         assert!(!chunk.set_block(0, 320, 0, 0, 1));
+        assert_eq!(chunk.get_block(0, 4096, 0, 0), None);
+        assert!(!chunk.set_block(0, 4096, 0, 0, 5));
+        assert!(!chunk.set_block(0, -4096, 0, 0, 5));
+        assert_eq!(chunk.get_block(0, 0, 0, 0), Some(AIR));
+        assert_eq!(chunk.get_biome(0, 4096, 0), None);
+        assert!(!chunk.set_biome(0, 4096, 0, 3));
         assert!(!chunk.is_dirty());
     }
 
@@ -319,13 +341,10 @@ mod tests {
         chunk.set_block(0, 16, 0, 0, AIR);
         assert_eq!(chunk.highest_non_air_sub_chunk_y_relative(), -4);
         assert_eq!(chunk.highest_non_air_sub_chunk_y(), 0);
-    }
 
-    #[test]
-    fn highest_non_air_sub_chunk_sees_a_block_placed_in_an_empty_chunk() {
-        let mut chunk = overworld();
-        chunk.set_block(0, 20, 0, 0, 1);
-        assert_eq!(chunk.highest_non_air_sub_chunk_y_relative(), 1);
+        let mut empty = overworld();
+        empty.set_block(0, 20, 0, 0, 1);
+        assert_eq!(empty.highest_non_air_sub_chunk_y_relative(), 1);
     }
 
     #[test]
@@ -348,32 +367,6 @@ mod tests {
         expected.extend(sub_chunk.serialize_biomes());
         expected.push(0);
         assert_eq!(bytes, expected);
-    }
-
-    fn chunk() -> Chunk {
-        Chunk::new(0, 0, -4, 24, 0, 0)
-    }
-
-    #[test]
-    fn in_range_blocks_round_trip() {
-        let mut chunk = chunk();
-        assert!(chunk.set_block(1, -64, 2, 0, 7));
-        assert_eq!(chunk.get_block(1, -64, 2, 0), Some(7));
-        assert!(chunk.set_block(1, 319, 2, 0, 9));
-        assert_eq!(chunk.get_block(1, 319, 2, 0), Some(9));
-    }
-
-    #[test]
-    fn out_of_range_y_does_not_alias() {
-        let mut chunk = chunk();
-        assert_eq!(chunk.get_block(0, 4096, 0, 0), None);
-        assert_eq!(chunk.get_block(0, -65, 0, 0), None);
-        assert_eq!(chunk.get_block(0, 320, 0, 0), None);
-        assert!(!chunk.set_block(0, 4096, 0, 0, 5));
-        assert!(!chunk.set_block(0, -4096, 0, 0, 5));
-        assert_eq!(chunk.get_block(0, 0, 0, 0), Some(0));
-        assert_eq!(chunk.get_biome(0, 4096, 0), None);
-        assert!(!chunk.set_biome(0, 4096, 0, 3));
     }
 }
 
@@ -407,6 +400,7 @@ mod block_entity_tests {
         assert!(chunk.block_entity_at(3, 64, 5).is_none());
         chunk.set_block_entity(3, 64, 5, entity(3, 64, 5, 1));
         assert_eq!(marker(&chunk, 3, 64, 5), Some(1));
+        assert!(chunk.is_dirty());
         assert!(chunk.block_entity_at(3, 65, 5).is_none());
         assert!(chunk.block_entity_at(4, 64, 5).is_none());
     }
@@ -452,12 +446,5 @@ mod block_entity_tests {
         assert!(chunk.block_entity_at(x, y, z).is_some());
         assert!(chunk.set_block(3, y, 5, 0, 0));
         assert!(chunk.block_entity_at(x, y, z).is_none());
-    }
-
-    #[test]
-    fn changing_a_block_entity_marks_the_chunk_to_save() {
-        let mut chunk = chunk();
-        chunk.set_block_entity(3, 64, 5, entity(3, 64, 5, 1));
-        assert!(chunk.is_dirty());
     }
 }

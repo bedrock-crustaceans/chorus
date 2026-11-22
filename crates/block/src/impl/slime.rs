@@ -4,6 +4,7 @@ use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
+use crate::component::support_component::SupportComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
@@ -16,6 +17,7 @@ pub static SLIME: BlockDefinition = const_block! {
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(0.0),
         MoveableComponent { movement: Movement::Both, sticky: true },
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

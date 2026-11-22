@@ -148,8 +148,8 @@ mod tests {
     }
 
     #[test]
-    fn the_retention_budget_defaults_to_one_view_and_is_read_from_the_config() {
-        assert_eq!(Config::default().get::<LevelConfig>().retention_budget, 1.0);
+    fn the_retention_budget_defaults_to_a_full_footprint_and_is_read_from_the_config() {
+        assert_eq!(Config::default().get::<LevelConfig>().retention_budget, 8.0);
         assert_eq!(config("[level]\nretention_budget = 0.5").get::<LevelConfig>().retention_budget, 0.5);
     }
 

@@ -78,6 +78,13 @@ pub fn send_initial_inventory(mut sessions: Query<(&mut Session, &mut PlayerInve
     }
 }
 
+#[derive(Clone, Copy)]
+struct Sender {
+    entity: Entity,
+    actor: ActorId,
+    gamemode: Gamemode,
+}
+
 pub fn handle_inventory_packets(
     mut packet_reader: MessageReader<PacketReceivedMessage>,
     blocks: Res<BlockRegistry>,
@@ -96,6 +103,11 @@ pub fn handle_inventory_packets(
         if session.get_state() != SessionState::Play {
             continue;
         }
+        let sender = Sender {
+            entity: ev.entity,
+            actor: *actor,
+            gamemode: *gamemode,
+        };
 
         match &ev.packet {
             BedrockProtocol::InteractPacket(packet) => {
@@ -137,43 +149,7 @@ pub fn handle_inventory_packets(
                     container_id: packet.container_id.0 as u32,
                 });
             }
-            BedrockProtocol::MobEquipmentPacket(packet) => {
-                // the offhand uses the same packet, only the main inventory changes the held slot
-                if !matches!(packet.container_id, ContainerID::INVENTORY) {
-                    continue;
-                }
-
-                let slot = packet.selected_slot as u8;
-                if !inventory.set_held_slot(slot) {
-                    send_held_item(&mut session, &inventory, actor);
-                    continue;
-                }
-
-                held_writer.write(PlayerItemHeldMessage { entity: ev.entity, slot });
-
-                if *gamemode != Gamemode::Creative {
-                    continue;
-                }
-
-                // creative picks are the only way items enter an inventory right now, and they
-                // arrive as item stack requests chorus cannot read yet
-                let item = ItemStack {
-                    id: packet.item.id,
-                    count: packet.item.stack_size,
-                    meta: packet.item.aux_value,
-                    block_runtime_id: packet.item.block_runtime_id as i32,
-                };
-
-                let known = item.is_empty() || blocks.get_permutation(item.block_runtime_id).is_some();
-                if !known {
-                    debug!("refusing unknown item {} in slot {}", item.id, slot);
-                    send_held_item(&mut session, &inventory, actor);
-                    continue;
-                }
-
-                inventory.main_mut().set(slot as usize, item);
-                inventory.set_main_user_data(slot as usize, Vec::new());
-            }
+            BedrockProtocol::MobEquipmentPacket(packet) => equip_held_item(packet, sender, &mut session, &mut inventory, &blocks, &mut held_writer),
             // middle click - the client asks the server to hand it the block it is looking at
             BedrockProtocol::BlockPickRequestPacket(packet) => {
                 if !gamemode.allows_interaction() {
@@ -183,97 +159,14 @@ pub fn handle_inventory_packets(
                 let Some(block_id) = level.get_block(view.dimension, position.x, position.y, position.z, 0) else {
                     continue;
                 };
-
-                if Some(block_id) == blocks.get_block_id("minecraft:air") {
-                    continue;
-                }
-
-                let Some(item) = picked_item(&blocks, &items, block_id) else {
-                    debug!("no item for block {}", block_id);
-                    continue;
-                };
-
-                // only creative players get a stack they do not own yet
-                let allow_new = *gamemode == Gamemode::Creative;
-                if !inventory.pick_item(item, allow_new) {
-                    continue;
-                }
-
-                send_content(&mut session, &mut inventory, ContainerID::INVENTORY);
-                send_held_item(&mut session, &inventory, actor);
+                pick_block(block_id, sender, &mut session, &mut inventory, &blocks, &items);
             }
             BedrockProtocol::ItemStackRequestPacket(packet) => {
-                let mut responses = Vec::new();
-                let rules = StackRules { items: &items };
-
-                for request in &packet.requests {
-                    let outcome = if gamemode.allows_interaction() {
-                        apply_stack_request(&mut inventory, request, &rules, *gamemode == Gamemode::Creative)
-                    } else {
-                        RequestOutcome::Rejected
-                    };
-                    debug!(
-                        "stack request {} from {}: {:?} -> {}",
-                        request.client_request_id,
-                        actor.unique_id,
-                        request.actions,
-                        match &outcome {
-                            RequestOutcome::Unsupported => "left to the client",
-                            RequestOutcome::Rejected => "rejected",
-                            RequestOutcome::Applied { .. } => "applied",
-                        }
-                    );
-                    let response = match outcome {
-                        RequestOutcome::Unsupported => continue,
-                        RequestOutcome::Applied { dropped, touched } => {
-                            for (stack, randomly) in dropped {
-                                drop_writer.write(ItemDropMessage { entity: ev.entity, stack, randomly });
-                            }
-                            applied_response(&mut inventory, request.client_request_id, &touched)
-                        }
-                        RequestOutcome::Rejected => {
-                            debug!("rejecting stack request {} from {}", request.client_request_id, actor.unique_id);
-                            ItemStackResponseInfo {
-                                result: ItemStackNetResult::Error,
-                                client_request_id: request.client_request_id,
-                                containers: None,
-                            }
-                        }
-                    };
-                    responses.push(response);
-                }
-
-                if !responses.is_empty() {
-                    session.send(BedrockProtocol::ItemStackResponsePacket(ItemStackResponsePacket { responses }.into()));
-                }
+                handle_stack_requests(&packet.requests, sender, &mut session, &mut inventory, &items, &mut drop_writer);
             }
             BedrockProtocol::InventoryTransactionPacket(packet) => match &packet.data {
                 InventoryTransactionData::Normal => {
-                    let window_id = inventory.window_id();
-                    let Some(actions) = packet.actions.iter().map(|action| legacy_action(action, window_id)).collect::<Option<Vec<_>>>() else {
-                        continue;
-                    };
-                    if actions.is_empty() {
-                        continue;
-                    }
-                    let outcome = if gamemode.allows_interaction() {
-                        apply_legacy_actions(&mut inventory, &actions, &StackRules { items: &items }, *gamemode == Gamemode::Creative)
-                    } else {
-                        LegacyOutcome::Rejected
-                    };
-                    debug!("inventory transaction from {}: {:?} -> {:?}", actor.unique_id, actions, outcome);
-                    match outcome {
-                        LegacyOutcome::Applied { dropped } => {
-                            for stack in dropped {
-                                drop_writer.write(ItemDropMessage {
-                                    entity: ev.entity,
-                                    stack,
-                                    randomly: false,
-                                });
-                            }
-                        }
-                        LegacyOutcome::Rejected => resync_inventory(&mut session, &mut inventory),
-                    }
+                    handle_normal_transaction(&packet.actions, sender, &mut session, &mut inventory, &items, &mut drop_writer);
                 }
                 InventoryTransactionData::InventoryMismatch => {
                     debug!("{} reported an inventory mismatch", actor.unique_id);
@@ -283,6 +176,163 @@ pub fn handle_inventory_packets(
             },
             _ => {}
         }
+    }
+}
+
+fn equip_held_item(
+    packet: &MobEquipmentPacket<BedrockProtocol>,
+    sender: Sender,
+    session: &mut Session,
+    inventory: &mut PlayerInventory,
+    blocks: &BlockRegistry,
+    held_writer: &mut MessageWriter<PlayerItemHeldMessage>,
+) {
+    // the offhand uses the same packet, only the main inventory changes the held slot
+    if !matches!(packet.container_id, ContainerID::INVENTORY) {
+        return;
+    }
+
+    let slot = packet.selected_slot as u8;
+    if !inventory.set_held_slot(slot) {
+        send_held_item(session, inventory, &sender.actor);
+        return;
+    }
+
+    held_writer.write(PlayerItemHeldMessage { entity: sender.entity, slot });
+
+    if sender.gamemode != Gamemode::Creative {
+        return;
+    }
+
+    // creative picks are the only way items enter an inventory right now, and they
+    // arrive as item stack requests chorus cannot read yet
+    let item = ItemStack {
+        id: packet.item.id,
+        count: packet.item.stack_size,
+        meta: packet.item.aux_value,
+        block_runtime_id: packet.item.block_runtime_id as i32,
+    };
+
+    let known = item.is_empty() || blocks.get_permutation(item.block_runtime_id).is_some();
+    if !known {
+        debug!("refusing unknown item {} in slot {}", item.id, slot);
+        send_held_item(session, inventory, &sender.actor);
+        return;
+    }
+
+    inventory.main_mut().set(slot as usize, item);
+    inventory.set_main_user_data(slot as usize, Vec::new());
+}
+
+fn pick_block(block_id: i32, sender: Sender, session: &mut Session, inventory: &mut PlayerInventory, blocks: &BlockRegistry, items: &ItemRegistry) {
+    if Some(block_id) == blocks.get_block_id("minecraft:air") {
+        return;
+    }
+
+    let Some(item) = picked_item(blocks, items, block_id) else {
+        debug!("no item for block {}", block_id);
+        return;
+    };
+
+    // only creative players get a stack they do not own yet
+    let allow_new = sender.gamemode == Gamemode::Creative;
+    if !inventory.pick_item(item, allow_new) {
+        return;
+    }
+
+    send_content(session, inventory, ContainerID::INVENTORY);
+    send_held_item(session, inventory, &sender.actor);
+}
+
+fn handle_stack_requests(
+    requests: &[RequestsEntry<BedrockProtocol>],
+    sender: Sender,
+    session: &mut Session,
+    inventory: &mut PlayerInventory,
+    items: &ItemRegistry,
+    drop_writer: &mut MessageWriter<ItemDropMessage>,
+) {
+    let mut responses = Vec::new();
+    let rules = StackRules { items };
+
+    for request in requests {
+        let outcome = if sender.gamemode.allows_interaction() {
+            apply_stack_request(inventory, request, &rules, sender.gamemode == Gamemode::Creative)
+        } else {
+            RequestOutcome::Rejected
+        };
+        debug!(
+            "stack request {} from {}: {:?} -> {}",
+            request.client_request_id,
+            sender.actor.unique_id,
+            request.actions,
+            match &outcome {
+                RequestOutcome::Unsupported => "left to the client",
+                RequestOutcome::Rejected => "rejected",
+                RequestOutcome::Applied { .. } => "applied",
+            }
+        );
+        let response = match outcome {
+            RequestOutcome::Unsupported => continue,
+            RequestOutcome::Applied { dropped, touched } => {
+                for (stack, randomly) in dropped {
+                    drop_writer.write(ItemDropMessage {
+                        entity: sender.entity,
+                        stack,
+                        randomly,
+                    });
+                }
+                applied_response(inventory, request.client_request_id, &touched)
+            }
+            RequestOutcome::Rejected => {
+                debug!("rejecting stack request {} from {}", request.client_request_id, sender.actor.unique_id);
+                ItemStackResponseInfo {
+                    result: ItemStackNetResult::Error,
+                    client_request_id: request.client_request_id,
+                    containers: None,
+                }
+            }
+        };
+        responses.push(response);
+    }
+
+    if !responses.is_empty() {
+        session.send(BedrockProtocol::ItemStackResponsePacket(ItemStackResponsePacket { responses }.into()));
+    }
+}
+
+fn handle_normal_transaction(
+    transaction_actions: &[InventoryAction<BedrockProtocol>],
+    sender: Sender,
+    session: &mut Session,
+    inventory: &mut PlayerInventory,
+    items: &ItemRegistry,
+    drop_writer: &mut MessageWriter<ItemDropMessage>,
+) {
+    let window_id = inventory.window_id();
+    let Some(actions) = transaction_actions.iter().map(|action| legacy_action(action, window_id)).collect::<Option<Vec<_>>>() else {
+        return;
+    };
+    if actions.is_empty() {
+        return;
+    }
+    let outcome = if sender.gamemode.allows_interaction() {
+        apply_legacy_actions(inventory, &actions, &StackRules { items }, sender.gamemode == Gamemode::Creative)
+    } else {
+        LegacyOutcome::Rejected
+    };
+    debug!("inventory transaction from {}: {:?} -> {:?}", sender.actor.unique_id, actions, outcome);
+    match outcome {
+        LegacyOutcome::Applied { dropped } => {
+            for stack in dropped {
+                drop_writer.write(ItemDropMessage {
+                    entity: sender.entity,
+                    stack,
+                    randomly: false,
+                });
+            }
+        }
+        LegacyOutcome::Rejected => resync_inventory(session, inventory),
     }
 }
 

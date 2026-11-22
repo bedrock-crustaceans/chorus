@@ -1,0 +1,10 @@
+{
+  "identifier": "mineshaft",
+  "kind": "mineshaft",
+  "rule": "bedrock",
+  "placement": "per_chunk",
+  "reach": 6,
+  "biome_tags": {
+    "mesa": ["mesa", "mesa_plateau_stone", "mesa_plateau", "mesa_bryce", "mesa_plateau_stone_mutated", "mesa_plateau_mutated"]
+  }
+}

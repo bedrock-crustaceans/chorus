@@ -276,7 +276,7 @@ fn switch_dimension(session: &mut Session, transform: &Transform, view: &mut Chu
 
 const UNLOAD_MARGIN: i32 = 2;
 const MAX_NEW_REQUESTS_PER_TICK: usize = 256;
-const MAX_OUTSTANDING_REQUESTS: usize = 1024;
+const MAX_OUTSTANDING_REQUESTS: usize = 128;
 const SCAN_WINDOW: usize = MAX_OUTSTANDING_REQUESTS * 2;
 const UNLOAD_INTERVAL_TICKS: u32 = 20;
 

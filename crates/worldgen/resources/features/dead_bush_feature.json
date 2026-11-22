@@ -1,0 +1,13 @@
+{
+  "format_version": "1.0.0",
+  "chorus:spread_plant": {
+    "description": {
+      "identifier": "minecraft:dead_bush_feature"
+    },
+    "block": "minecraft:deadbush",
+    "tries": 4,
+    "start": "ground",
+    "open": "air",
+    "survive": true
+  }
+}

@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::flammable_component::FlammableComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::MINECRAFT_VERTICAL_HALF;
 
@@ -13,6 +14,7 @@ pub static CYAN_WOOL_DOUBLE_SLAB: BlockDefinition = const_block! {
         MapColorComponent { r: 76, g: 127, b: 153, a: 255 },
         FlammableComponent { catch_chance: 30, destroy_chance: 60 },
         MineableComponent::hardness(0.8),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

@@ -1,0 +1,25 @@
+{
+  "format_version": "1.0.0",
+  "chorus:block_pile": {
+    "description": {
+      "identifier": "minecraft:hay_pile_feature"
+    },
+    "block": {
+      "name": "minecraft:hay_block",
+      "states": {
+        "pillar_axis": "x",
+        "deprecated": 0
+      }
+    },
+    "alternate": {
+      "block": {
+        "name": "minecraft:hay_block",
+        "states": {
+          "pillar_axis": "y",
+          "deprecated": 0
+        }
+      },
+      "one_in": 2
+    }
+  }
+}

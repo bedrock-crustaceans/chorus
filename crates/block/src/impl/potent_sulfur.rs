@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::POTENT_SULFUR_STATE;
 
@@ -11,6 +12,7 @@ pub static POTENT_SULFUR: BlockDefinition = const_block! {
     components: [
         MapColorComponent { r: 250, g: 238, b: 77, a: 255 },
         MineableComponent::hardness(1.5),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

@@ -16,6 +16,7 @@ commands! {
     stop::STOP_COMMAND,
     compact::COMPACT_COMMAND,
     generate::GENERATE_COMMAND,
+    locate::LOCATE_COMMAND,
 
     gamemode::GAMEMODE_COMMAND,
     dimension::DIMENSION_COMMAND,

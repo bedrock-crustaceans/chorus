@@ -1,0 +1,21 @@
+{
+  "identifier": "mansion",
+  "kind": "mansion",
+  "rule": "bedrock",
+  "placement": {
+    "random_spread": {
+      "spacing": 80,
+      "separation": 20,
+      "salt": 10387319,
+      "spread": "triangular"
+    }
+  },
+  "reach": 5,
+  "biome_filter": {
+    "tag": "mansion",
+    "radius": 32
+  },
+  "biome_tags": {
+    "mansion": ["pale_garden", "roofed_forest", "roofed_forest_mutated", "dripstone_caves", "lush_caves", "sulfur_caves"]
+  }
+}

@@ -6,6 +6,7 @@ use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
 use crate::component::solid_component::SolidComponent;
+use crate::component::support_component::SupportComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
@@ -13,13 +14,14 @@ pub static WAXED_EXPOSED_COPPER_GRATE: BlockDefinition = const_block! {
     identifier: block_id::WAXED_EXPOSED_COPPER_GRATE,
     states: [],
     components: [
-        SolidComponent { solid: false },
+        SolidComponent { solid: true },
         TransparentComponent { transparent: true },
         MapColorComponent { r: 135, g: 107, b: 98, a: 255 },
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(3.0),
         MoveableComponent { movement: Movement::Both, sticky: false },
-        CollisionBoxComponent::enabled(false),
+        CollisionBoxComponent::enabled(true),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

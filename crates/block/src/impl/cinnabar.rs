@@ -2,6 +2,7 @@ use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 
 pub static CINNABAR: BlockDefinition = const_block! {
@@ -10,6 +11,7 @@ pub static CINNABAR: BlockDefinition = const_block! {
     components: [
         MapColorComponent { r: 153, g: 51, b: 51, a: 255 },
         MineableComponent::hardness(1.5),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

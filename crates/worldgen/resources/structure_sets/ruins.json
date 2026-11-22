@@ -1,0 +1,21 @@
+{
+  "identifier": "ruins",
+  "kind": "ocean_ruins",
+  "rule": "bedrock",
+  "placement": {
+    "random_spread": {
+      "spacing": 20,
+      "separation": 8,
+      "salt": 14357621,
+      "spread": "linear"
+    }
+  },
+  "reach": 2,
+  "biome_filter": {
+    "tag": "ocean_ruins",
+    "radius": 0
+  },
+  "biome_tags": {
+    "ocean_ruins": ["ocean", "deep_ocean", "deep_cold_ocean", "deep_frozen_ocean", "deep_lukewarm_ocean", "cold_ocean", "frozen_ocean", "lukewarm_ocean", "warm_ocean", "deep_warm_ocean"]
+  }
+}

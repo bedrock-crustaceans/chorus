@@ -1,0 +1,18 @@
+{
+  "identifier": "monument",
+  "kind": "monument",
+  "rule": "bedrock",
+  "placement": {
+    "random_spread": {
+      "spacing": 32,
+      "separation": 5,
+      "salt": 10387313,
+      "spread": "triangular"
+    }
+  },
+  "reach": 3,
+  "biome_tags": {
+    "deep_oceans": ["deep_ocean", "deep_cold_ocean", "deep_lukewarm_ocean", "deep_warm_ocean", "deep_frozen_ocean"],
+    "monument_surroundings": ["ocean", "deep_ocean", "cold_ocean", "deep_cold_ocean", "frozen_ocean", "deep_frozen_ocean", "lukewarm_ocean", "deep_lukewarm_ocean", "warm_ocean", "deep_warm_ocean", "frozen_river", "river"]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "format_version": "1.0.0",
+  "chorus:kelp": {
+    "description": {
+      "identifier": "minecraft:kelp_feature"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "format_version": "1.0.0",
+  "chorus:block_pile": {
+    "description": {
+      "identifier": "minecraft:snow_pile_feature"
+    },
+    "block": {
+      "name": "minecraft:snow"
+    }
+  }
+}

@@ -6,7 +6,6 @@ use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
-use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::state::common::HANGING;
 use crate::{const_block, const_permutation};
@@ -16,7 +15,6 @@ pub static WAXED_OXIDIZED_COPPER_LANTERN: BlockDefinition = const_block! {
     identifier: block_id::WAXED_OXIDIZED_COPPER_LANTERN,
     states: [HANGING],
     components: [
-        SolidComponent { solid: false },
         TransparentComponent { transparent: true },
         MapColorComponent { r: 167, g: 167, b: 167, a: 255 },
         LightEmissionComponent { emission: 15 },

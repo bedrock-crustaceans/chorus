@@ -5,7 +5,7 @@
 
 # Chorus
 
-Minecraft: Bedrock server software, open source and written in Rust
+Open-source Minecraft: Bedrock Edition server software, written in Rust
 
 [![rust][rust_badge_url]][rust_url]
 [![minecraft][minecraft_badge_url]][minecraft_url]
@@ -14,7 +14,15 @@ Minecraft: Bedrock server software, open source and written in Rust
 
 </div>
 
-Chorus is modern Minecraft Bedrock Edition server software written in Rust, built on top of [`bedrock-rs`](https://github.com/bedrock-crustaceans/bedrock-rs) - a foundational library for MCBE tooling in Rust.
+Chorus is a Minecraft Bedrock Edition server written in Rust. It is built on [`bedrock-rs`](https://github.com/bedrock-crustaceans/bedrock-rs), a foundational library for Bedrock tooling, and uses Bevy ECS to drive its tick loop and scheduling.
+
+## Features
+
+- **Performance.** Chorus is optimized for memory and speed, and massively outperforms other Bedrock servers under the same conditions. It runs equally well on one thread or many, scaling with the resources it is given.
+- **Extensibility.** Chorus takes full advantage of Bevy's architecture to be as customizable as possible. Replace existing behavior without forking, disable what you don't need for a leaner build, or use Chorus as a library for your own server software, as [Pyrite](https://github.com/bedrock-crustaceans/pyrite) (Beta 1.7.3 for Bedrock) does.
+- **World generation.** Fully accurate Bedrock world generation in the Overworld, Nether and End:
+  - Terrain, caves, aquifers, ore veins and decoration.
+  - Every vanilla structure, from villages, mansions and trial chambers to Nether fortresses, bastions and end cities.
 
 ## Building
 

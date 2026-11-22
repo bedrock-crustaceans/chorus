@@ -4,6 +4,7 @@ use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
@@ -16,6 +17,7 @@ pub static SHROOMLIGHT: BlockDefinition = const_block! {
         LightEmissionComponent { emission: 15 },
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(1.0),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

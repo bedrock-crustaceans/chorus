@@ -1,5 +1,6 @@
 use crate::Tick;
 use crate::command::dispatch::{dispatch_commands, has_pending_commands};
+use crate::command::r#impl::locate::{deliver_locates, has_pending_locates};
 use crate::network::handler::block::decode_block_actions;
 use crate::network::handler::inventory::{handle_inventory_packets, send_initial_inventory};
 use crate::network::handler::login::handle_login;
@@ -39,6 +40,7 @@ impl Plugin for PacketHandlers {
                     decode_block_actions,
                     handle_inventory_packets,
                     dispatch_commands.run_if(has_pending_commands),
+                    deliver_locates.run_if(has_pending_locates),
                     CommandRegistry::broadcast_soft_enum_updates,
                 )
                     .chain()

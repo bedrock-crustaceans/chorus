@@ -1,47 +1,32 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::generator::dimension::Generator;
-use crate::generator::phase::{PhaseDescriptor, PhaseId};
+use crate::generator::phase::{PhaseHandle, PhaseId};
+use glam::IVec2;
 
 pub type Footprints = FxHashMap<(PhaseId, u32), Vec<(i32, i32)>>;
 
+const ORIGINS: [(i32, i32); 4] = [(0, 0), (1, 0), (0, 1), (1, 1)];
+
 pub fn footprints<G: Generator>() -> Footprints {
-    let terminal = PhaseDescriptor::of::<G::Terminal>();
-    let mut descriptors: FxHashMap<PhaseId, PhaseDescriptor<G>> = FxHashMap::default();
+    let terminal = PhaseHandle::of::<G::Terminal>();
+    let mut handles: FxHashMap<PhaseId, PhaseHandle<G>> = FxHashMap::default();
     let mut stack = vec![terminal];
-    while let Some(descriptor) = stack.pop() {
-        if descriptors.insert(descriptor.phase, descriptor).is_some() {
+    while let Some(handle) = stack.pop() {
+        if handles.insert(handle.phase, handle).is_some() {
             continue;
         }
-        stack.extend((descriptor.requires)().iter().map(|requirement| requirement.descriptor));
+        stack.extend((handle.dependencies)().iter().map(|dependency| dependency.handle));
     }
 
-    let mut offsets_from_terminal: FxHashMap<(PhaseId, u32), FxHashSet<(i32, i32)>> = FxHashMap::default();
-    offsets_from_terminal.entry((terminal.phase, 0)).or_default().insert((0, 0));
-    let mut work = vec![(terminal.phase, 0u32)];
-    while let Some((phase, hop)) = work.pop() {
-        let reached: Vec<(i32, i32)> = offsets_from_terminal[&(phase, hop)].iter().copied().collect();
-        for requirement in (descriptors[&phase].requires)() {
-            let requires_itself = requirement.descriptor.phase == phase;
-            let dependency_hop = match (requires_itself, requirement.max_hops) {
-                (false, None) => 0,
-                (true, Some(max_hops)) if hop < max_hops => hop + 1,
-                _ => continue,
-            };
-            let target = offsets_from_terminal.entry((requirement.descriptor.phase, dependency_hop)).or_default();
-            let before = target.len();
-            for &(sx, sz) in &reached {
-                for &(dx, dz) in requirement.offsets {
-                    target.insert((sx + dx, sz + dz));
-                }
-            }
-            if target.len() > before {
-                work.push((requirement.descriptor.phase, dependency_hop));
-            }
+    let mut union: FxHashMap<(PhaseId, u32), FxHashSet<(i32, i32)>> = FxHashMap::default();
+    for origin in ORIGINS {
+        for (key, reached) in reach(&handles, terminal.phase, origin) {
+            union.entry(key).or_default().extend(reached);
         }
     }
 
-    offsets_from_terminal
+    union
         .into_iter()
         .map(|(key, reached)| {
             let mut cells: Vec<(i32, i32)> = reached.into_iter().map(|(x, z)| (-x, -z)).collect();
@@ -51,17 +36,53 @@ pub fn footprints<G: Generator>() -> Footprints {
         .collect()
 }
 
+fn reach<G: Generator>(handles: &FxHashMap<PhaseId, PhaseHandle<G>>, terminal: PhaseId, origin: (i32, i32)) -> FxHashMap<(PhaseId, u32), FxHashSet<(i32, i32)>> {
+    let mut reached_from_terminal: FxHashMap<(PhaseId, u32), FxHashSet<(i32, i32)>> = FxHashMap::default();
+    reached_from_terminal.entry((terminal, 0)).or_default().insert((0, 0));
+    let mut work = vec![(terminal, 0u32)];
+    while let Some((phase, hop)) = work.pop() {
+        let reached: Vec<(i32, i32)> = reached_from_terminal[&(phase, hop)].iter().copied().collect();
+        for dependency in (handles[&phase].dependencies)() {
+            let depends_on_itself = dependency.handle.phase == phase;
+            let dependency_hop = match (depends_on_itself, dependency.max_hops) {
+                (false, None) => 0,
+                (true, Some(max_hops)) if hop < max_hops => hop + 1,
+                _ => continue,
+            };
+            let target = reached_from_terminal.entry((dependency.handle.phase, dependency_hop)).or_default();
+            let before = target.len();
+            for &(sx, sz) in &reached {
+                let consumer = IVec2::new(origin.0 + sx, origin.1 + sz);
+                if !dependency.position_gate && dependency.if_dependent.is_some_and(|applies| !applies(consumer)) {
+                    continue;
+                }
+                for &(dx, dz) in dependency.offsets {
+                    let dependency_cell = consumer + IVec2::new(dx, dz);
+                    if !dependency.position_gate && dependency.if_dependency.is_some_and(|applies| !applies(dependency_cell)) {
+                        continue;
+                    }
+                    target.insert((sx + dx, sz + dz));
+                }
+            }
+            if target.len() > before {
+                work.push((dependency.handle.phase, dependency_hop));
+            }
+        }
+    }
+    reached_from_terminal
+}
+
 pub fn extent(footprints: &Footprints) -> f64 {
     footprints.values().flatten().map(|&(x, z)| ((x * x + z * z) as f64).sqrt()).fold(0.0, f64::max)
 }
 
-pub struct Region {
+pub struct CellSet {
     half: i32,
     side: usize,
     bits: Box<[bool]>,
 }
 
-impl Region {
+impl CellSet {
     pub fn new(footprint: &[(i32, i32)], radius: i32) -> Self {
         let reach = footprint.iter().map(|&(x, z)| x.abs().max(z.abs())).max().unwrap_or(0);
         let half = reach + radius;
@@ -94,7 +115,7 @@ mod tests {
 
     #[test]
     fn a_region_is_the_footprint_grown_by_the_demand_disc() {
-        let region = Region::new(&[(0, 0)], 2);
+        let region = CellSet::new(&[(0, 0)], 2);
         assert!(region.contains(2, 0) && region.contains(-2, 0) && region.contains(1, 1));
         assert!(!region.contains(2, 1), "5 is more than 4");
         assert!(!region.contains(3, 0));
@@ -102,14 +123,14 @@ mod tests {
 
     #[test]
     fn a_region_unites_the_disc_around_every_footprint_cell() {
-        let region = Region::new(&[(-3, 0), (3, 0)], 1);
+        let region = CellSet::new(&[(-3, 0), (3, 0)], 1);
         assert!(region.contains(-4, 0) && region.contains(-3, 1) && region.contains(4, 0) && region.contains(3, -1));
         assert!(!region.contains(0, 0), "between the two cells nothing is reached");
     }
 
     #[test]
     fn an_empty_footprint_reaches_nowhere() {
-        let region = Region::new(&[], 3);
+        let region = CellSet::new(&[], 3);
         assert!(!region.contains(0, 0));
     }
 }

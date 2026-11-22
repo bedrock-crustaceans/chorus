@@ -5,7 +5,6 @@ use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
-use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{CRACKED_STATE, TURTLE_EGG_COUNT};
@@ -15,7 +14,6 @@ pub static TURTLE_EGG: BlockDefinition = const_block! {
     identifier: block_id::TURTLE_EGG,
     states: [CRACKED_STATE, TURTLE_EGG_COUNT],
     components: [
-        SolidComponent { solid: false },
         TransparentComponent { transparent: true },
         MapColorComponent { r: 247, g: 233, b: 163, a: 255 },
         LightDampeningComponent { dampening: 1 },

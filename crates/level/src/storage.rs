@@ -1,4 +1,5 @@
 use crate::chunk::{BlockEntity, Chunk};
+use crate::dimension_definition::DimensionDefinition;
 use crate::dimension_type::DimensionType;
 use crate::sub_chunk::SubChunk;
 use bedrock::level::db::{CompactionMode, Database, OpenOptions, WriteBatch};
@@ -20,6 +21,7 @@ use tracing::{debug, error, info, warn};
 const CHUNK_VERSION: u8 = 40;
 const SUB_CHUNK_VERSION: u8 = 9;
 const STORAGE_VERSION: i32 = 10;
+const CHORUS_KEY: &str = "chorus";
 const FINALIZED: i32 = 2;
 const PLAINS: i32 = 1;
 const POOL_COMPACTION_SLICE: Duration = Duration::from_millis(50);
@@ -76,6 +78,7 @@ pub struct LevelData {
     pub seed: i64,
     pub spawn: IVec3,
     pub start_count: i64,
+    pub chorus: nbtx::Compound,
 }
 
 type PendingWrite = (Vec<u8>, Option<Arc<[u8]>>);
@@ -399,7 +402,17 @@ impl LevelStorage {
             Some(nbtx::Value::Long(count)) => *count,
             _ => 0,
         };
-        Ok(Some(LevelData { name, seed, spawn, start_count }))
+        let chorus = match tag.get(CHORUS_KEY) {
+            Some(nbtx::Value::Compound(chorus)) => chorus.clone(),
+            _ => nbtx::Compound::new(),
+        };
+        Ok(Some(LevelData {
+            name,
+            seed,
+            spawn,
+            start_count,
+            chorus,
+        }))
     }
 
     pub fn write_level_data(&self, data: &LevelData) -> StorageResult<()> {
@@ -414,6 +427,9 @@ impl LevelStorage {
         tag.insert("Generator".into(), nbtx::Value::Int(1));
         tag.insert("LastPlayed".into(), nbtx::Value::Long(last_played));
         tag.insert("worldStartCount".into(), nbtx::Value::Long(data.start_count));
+        if !data.chorus.is_empty() {
+            tag.insert(CHORUS_KEY.into(), nbtx::Value::Compound(data.chorus.clone()));
+        }
         let body = nbtx::to_le_bytes(&nbtx::Value::Compound(tag))?;
 
         let mut bytes = Vec::with_capacity(body.len() + 8);
@@ -515,14 +531,14 @@ impl LevelStorage {
         heights
     }
 
-    pub fn load_chunk(&self, dimension: DimensionType, x: i32, z: i32) -> StorageResult<Option<Chunk>> {
+    pub fn load_chunk(&self, dimension: DimensionType, definition: DimensionDefinition, x: i32, z: i32) -> StorageResult<Option<Chunk>> {
         let id = dimension.id();
         if self.get(&key(id, x, z, TAG_VERSION, None))?.is_none() {
             return Ok(None);
         }
 
-        let min = dimension.min_sub_chunk_y();
-        let count = dimension.sub_chunk_count();
+        let min = definition.min_sub_chunk_y();
+        let count = definition.sub_chunk_count();
         let biomes = match self.get(&key(id, x, z, TAG_DATA_3D, None))? {
             Some(data) => decode_biomes(&data, count)?,
             None => vec![[PLAINS; 4096]; count],
@@ -857,6 +873,53 @@ mod tests {
     }
 
     #[test]
+    fn a_custom_height_chunk_loads_with_its_definition() {
+        let world = TempWorld::new("custom-height");
+        let registry = registry();
+        let air = registry.get_block_id("minecraft:air").unwrap();
+        let stone = registry.get_block_id("minecraft:stone").unwrap();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+        let definition = DimensionDefinition { min_y: -32, height: 160 };
+        let mut chunk = Chunk::new(0, 0, definition.min_sub_chunk_y(), definition.sub_chunk_count(), air, 1);
+        chunk.set_block(3, -20, 4, 0, stone);
+        chunk.set_block(5, 100, 6, 0, stone);
+        storage.save_chunk(DimensionType::Overworld, &chunk).unwrap();
+        storage.flush_blocking().unwrap();
+        let loaded = storage.load_chunk(DimensionType::Overworld, definition, 0, 0).unwrap().expect("chunk was saved");
+        assert_eq!((loaded.min_sub_chunk_y(), loaded.sub_chunk_count()), (-2, 10));
+        assert_eq!(loaded.get_block(3, -20, 4, 0), Some(stone));
+        assert_eq!(loaded.get_block(5, 100, 6, 0), Some(stone));
+    }
+
+    #[test]
+    fn the_chorus_compound_survives_in_the_level_data() {
+        let world = TempWorld::new("generator-settings");
+        let storage = LevelStorage::open(&world.0, &registry(), 4).unwrap();
+        let mut data = LevelData {
+            name: "settings".into(),
+            seed: 42,
+            spawn: IVec3::new(1, 2, 3),
+            start_count: 1,
+            chorus: nbtx::Compound::from_iter([
+                (
+                    "generator".into(),
+                    nbtx::Value::Compound(nbtx::Compound::from_iter([("preset".into(), nbtx::Value::String("amplified".into()))])),
+                ),
+                ("extra".into(), nbtx::Value::Int(7)),
+            ]),
+        };
+        storage.write_level_data(&data).unwrap();
+        let read = storage.read_level_data().unwrap().unwrap().chorus;
+        assert_eq!(read.len(), 2);
+        assert!(matches!(read.get("extra".as_bytes()), Some(nbtx::Value::Int(7))));
+        assert!(matches!(read.get("generator".as_bytes()), Some(nbtx::Value::Compound(generator)) if generator.len() == 1));
+
+        data.chorus.clear();
+        storage.write_level_data(&data).unwrap();
+        assert!(storage.read_level_data().unwrap().unwrap().chorus.is_empty());
+    }
+
+    #[test]
     fn chunks_survive_a_save_and_load_through_the_database() {
         let world = TempWorld::new("round-trip");
         let registry = registry();
@@ -872,7 +935,10 @@ mod tests {
         storage.flush_blocking().unwrap();
 
         for original in &originals {
-            let loaded = storage.load_chunk(DimensionType::Overworld, original.x, original.z).unwrap().expect("chunk was saved");
+            let loaded = storage
+                .load_chunk(DimensionType::Overworld, DimensionType::Overworld.definition(), original.x, original.z)
+                .unwrap()
+                .expect("chunk was saved");
             assert_same(&loaded, original);
             assert!(!loaded.is_dirty());
         }
@@ -894,7 +960,10 @@ mod tests {
         }
 
         let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
-        let loaded = storage.load_chunk(DimensionType::Overworld, 7, 8).unwrap().expect("chunk was saved");
+        let loaded = storage
+            .load_chunk(DimensionType::Overworld, DimensionType::Overworld.definition(), 7, 8)
+            .unwrap()
+            .expect("chunk was saved");
         assert_same(&loaded, &original);
     }
 
@@ -909,7 +978,7 @@ mod tests {
         storage.save_chunk(DimensionType::Overworld, &original).unwrap();
         storage.flush_blocking().unwrap();
 
-        let loaded = storage.load_chunk(DimensionType::Overworld, 0, 0).unwrap().unwrap();
+        let loaded = storage.load_chunk(DimensionType::Overworld, DimensionType::Overworld.definition(), 0, 0).unwrap().unwrap();
         assert_same(&loaded, &original);
         assert_eq!(loaded.highest_non_air_sub_chunk_y_relative(), -4);
     }
@@ -918,7 +987,7 @@ mod tests {
     fn a_chunk_that_was_never_saved_loads_as_none() {
         let world = TempWorld::new("missing");
         let storage = LevelStorage::open(&world.0, &registry(), 4).unwrap();
-        assert!(storage.load_chunk(DimensionType::Overworld, 12, 12).unwrap().is_none());
+        assert!(storage.load_chunk(DimensionType::Overworld, DimensionType::Overworld.definition(), 12, 12).unwrap().is_none());
     }
 
     #[test]
@@ -937,8 +1006,8 @@ mod tests {
         storage.save_chunk(DimensionType::Nether, &nether).unwrap();
         storage.flush_blocking().unwrap();
 
-        assert!(storage.load_chunk(DimensionType::Overworld, 0, 0).unwrap().is_none());
-        let loaded = storage.load_chunk(DimensionType::Nether, 0, 0).unwrap().unwrap();
+        assert!(storage.load_chunk(DimensionType::Overworld, DimensionType::Overworld.definition(), 0, 0).unwrap().is_none());
+        let loaded = storage.load_chunk(DimensionType::Nether, DimensionType::Nether.definition(), 0, 0).unwrap().unwrap();
         assert_eq!(loaded.sub_chunk_count(), 8);
         assert_eq!(loaded.get_block(1, 2, 3, 0), Some(stone));
         assert_eq!(loaded.get_biome(0, 0, 0), Some(8));
@@ -957,7 +1026,7 @@ mod tests {
         storage.save_chunk(DimensionType::Overworld, &chunk).unwrap();
         storage.flush_blocking().unwrap();
 
-        let loaded = storage.load_chunk(DimensionType::Overworld, 0, 0).unwrap().unwrap();
+        let loaded = storage.load_chunk(DimensionType::Overworld, DimensionType::Overworld.definition(), 0, 0).unwrap().unwrap();
         assert_eq!(loaded.get_block(1, 100, 3, 0), Some(stone));
     }
 
@@ -978,7 +1047,7 @@ mod tests {
         storage.save_chunk(DimensionType::Overworld, &chunk).unwrap();
         storage.flush_blocking().unwrap();
 
-        let loaded = storage.load_chunk(DimensionType::Overworld, 0, 0).unwrap().unwrap();
+        let loaded = storage.load_chunk(DimensionType::Overworld, DimensionType::Overworld.definition(), 0, 0).unwrap().unwrap();
         assert_eq!(loaded.get_block(0, 100, 0, 0), Some(air));
         assert_eq!(loaded.highest_non_air_sub_chunk_y_relative(), -4);
     }
@@ -1149,7 +1218,10 @@ mod tests {
         storage.put(key(DimensionType::Overworld.id(), 0, 0, TAG_VERSION, None), vec![CHUNK_VERSION]);
         storage.put(key(DimensionType::Overworld.id(), 0, 0, TAG_SUB_CHUNK, Some(0)), sub_chunk);
 
-        let chunk = storage.load_chunk(DimensionType::Overworld, 0, 0).unwrap().expect("chunk was written");
+        let chunk = storage
+            .load_chunk(DimensionType::Overworld, DimensionType::Overworld.definition(), 0, 0)
+            .unwrap()
+            .expect("chunk was written");
         assert_eq!(chunk.get_block(0, 0, 0, 0), registry.get_block_id("minecraft:trip_wire"));
     }
 }

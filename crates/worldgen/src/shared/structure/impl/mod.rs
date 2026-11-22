@@ -1,0 +1,13 @@
+pub mod ancient_city;
+pub mod igloo;
+pub mod mansion;
+pub mod mineshaft;
+pub mod monument;
+pub mod ocean_ruin;
+pub mod outpost;
+pub mod ruined_portal;
+pub mod scattered;
+pub mod shipwreck;
+pub mod stronghold;
+pub mod treasure;
+pub mod village;

@@ -1,6 +1,7 @@
 use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::map_color_component::MapColorComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::{MINECRAFT_CARDINAL_DIRECTION, OMINOUS, VAULT_STATE};
 
@@ -9,6 +10,7 @@ pub static VAULT: BlockDefinition = const_block! {
     states: [MINECRAFT_CARDINAL_DIRECTION, OMINOUS, VAULT_STATE],
     components: [
         MapColorComponent { r: 112, g: 112, b: 112, a: 255 },
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

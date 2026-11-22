@@ -4,6 +4,7 @@ use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
+use crate::component::support_component::SupportComponent;
 use crate::state::common::RESPAWN_ANCHOR_CHARGE;
 use crate::{const_block, const_permutation};
 
@@ -14,6 +15,7 @@ pub static RESPAWN_ANCHOR: BlockDefinition = const_block! {
         MapColorComponent { r: 25, g: 25, b: 25, a: 255 },
         MineableComponent::hardness(50.0),
         MoveableComponent { movement: Movement::None, sticky: false },
+        SupportComponent::ALL,
     ],
     permutations: [
         const_permutation! {

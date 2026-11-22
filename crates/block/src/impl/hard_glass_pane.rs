@@ -11,7 +11,6 @@ pub static HARD_GLASS_PANE: BlockDefinition = const_block! {
     identifier: block_id::HARD_GLASS_PANE,
     states: [MINECRAFT_CONNECTION_EAST, MINECRAFT_CONNECTION_NORTH, MINECRAFT_CONNECTION_SOUTH, MINECRAFT_CONNECTION_WEST],
     components: [
-        SolidComponent { solid: false },
         TransparentComponent { transparent: true },
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(0.3),

@@ -4,6 +4,7 @@ use crate::component::friction_component::FrictionComponent;
 use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 
 pub static BLUE_ICE: BlockDefinition = const_block! {
@@ -14,6 +15,7 @@ pub static BLUE_ICE: BlockDefinition = const_block! {
         FrictionComponent { friction: 0.989 },
         LightEmissionComponent { emission: 4 },
         MineableComponent::hardness(2.8),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

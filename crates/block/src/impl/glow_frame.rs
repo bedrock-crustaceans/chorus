@@ -5,6 +5,7 @@ use crate::component::internal_friction_component::InternalFrictionComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
+use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::state::common::{FACING_DIRECTION, ITEM_FRAME_MAP_BIT, ITEM_FRAME_PHOTO_BIT};
 use crate::{const_block, const_permutation};
@@ -20,6 +21,7 @@ pub static GLOW_FRAME: BlockDefinition = const_block! {
         MineableComponent::hardness(0.25),
         MoveableComponent { movement: Movement::Break, sticky: false },
         CollisionBoxComponent { origin: Vec3::new(0.125, 0.125, 0.125), size: Vec3::new(0.75, 0.75, 0.75), enabled: false },
+        SolidComponent { solid: false },
     ],
     permutations: [
         const_permutation! {

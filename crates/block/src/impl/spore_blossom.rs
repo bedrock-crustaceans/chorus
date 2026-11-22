@@ -1,6 +1,7 @@
 use crate::block_definition::BlockDefinition;
 use crate::block_id;
 use crate::component::light_dampening_component::LightDampeningComponent;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::solid_component::SolidComponent;
@@ -16,6 +17,7 @@ pub static SPORE_BLOSSOM: BlockDefinition = const_block! {
         MapColorComponent { r: 0, g: 124, b: 0, a: 255 },
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(0.0),
+        LiquidDetectionComponent::BROKEN_BY_WATER_AND_LAVA,
     ],
     permutations: [],
 };

@@ -1,0 +1,21 @@
+{
+  "identifier": "buried_treasure",
+  "kind": "buried_treasure",
+  "rule": "bedrock",
+  "placement": {
+    "random_spread": {
+      "spacing": 4,
+      "separation": 2,
+      "salt": 16842397,
+      "spread": "triangular"
+    }
+  },
+  "reach": 0,
+  "biome_filter": {
+    "tag": "buried_treasure",
+    "radius": 3
+  },
+  "biome_tags": {
+    "buried_treasure": ["beach", "cold_beach", "stone_beach", "mushroom_island_shore"]
+  }
+}

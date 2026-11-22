@@ -1,0 +1,20 @@
+{
+  "format_version": "1.0.0",
+  "chorus:disk": {
+    "description": {
+      "identifier": "minecraft:clay_feature"
+    },
+    "block": "minecraft:clay",
+    "radius": 4,
+    "half_height": 1,
+    "needs": [
+      "minecraft:water",
+      "minecraft:clay"
+    ],
+    "replaces": [
+      "minecraft:dirt",
+      "minecraft:coarse_dirt",
+      "minecraft:mud"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "format_version": "1.0.0",
+  "chorus:disk": {
+    "description": {
+      "identifier": "minecraft:gravel_feature"
+    },
+    "block": "minecraft:gravel",
+    "radius": 6,
+    "half_height": 2,
+    "needs": [
+      "minecraft:water"
+    ],
+    "replaces": [
+      "minecraft:dirt",
+      "minecraft:coarse_dirt",
+      "minecraft:grass_block"
+    ]
+  }
+}

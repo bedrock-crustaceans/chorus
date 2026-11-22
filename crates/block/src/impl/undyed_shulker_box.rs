@@ -12,7 +12,6 @@ pub static UNDYED_SHULKER_BOX: BlockDefinition = const_block! {
     identifier: block_id::UNDYED_SHULKER_BOX,
     states: [],
     components: [
-        SolidComponent { solid: false },
         TransparentComponent { transparent: true },
         MapColorComponent { r: 153, g: 153, b: 153, a: 255 },
         LightDampeningComponent { dampening: 1 },

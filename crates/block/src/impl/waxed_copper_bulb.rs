@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::state::common::{LIT, POWERED_BIT};
 use crate::{const_block, const_permutation};
 
@@ -13,6 +14,7 @@ pub static WAXED_COPPER_BULB: BlockDefinition = const_block! {
         MapColorComponent { r: 216, g: 127, b: 51, a: 255 },
         LightEmissionComponent { emission: 15 },
         MineableComponent::hardness(3.0),
+        SupportComponent::ALL,
     ],
     permutations: [
         const_permutation! {

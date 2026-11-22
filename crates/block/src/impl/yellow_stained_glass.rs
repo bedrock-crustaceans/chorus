@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
@@ -14,6 +15,7 @@ pub static YELLOW_STAINED_GLASS: BlockDefinition = const_block! {
         MapColorComponent { r: 229, g: 229, b: 51, a: 255 },
         LightDampeningComponent { dampening: 1 },
         MineableComponent::hardness(0.3),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

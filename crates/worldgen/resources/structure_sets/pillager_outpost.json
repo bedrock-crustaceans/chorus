@@ -1,0 +1,21 @@
+{
+  "identifier": "pillager_outpost",
+  "kind": "outpost",
+  "rule": "bedrock",
+  "placement": {
+    "random_spread": {
+      "spacing": 80,
+      "separation": 24,
+      "salt": 165745296,
+      "spread": "triangular"
+    }
+  },
+  "reach": 3,
+  "biome_filter": {
+    "tag": "outpost",
+    "radius": 0
+  },
+  "biome_tags": {
+    "outpost": ["plains", "sunflower_plains", "savanna", "ice_plains", "taiga", "taiga_hills", "cold_taiga", "cold_taiga_hills", "desert", "meadow", "frozen_peaks", "jagged_peaks", "stony_peaks", "snowy_slopes", "cherry_grove", "grove"]
+  }
+}

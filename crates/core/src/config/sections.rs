@@ -120,7 +120,6 @@ pub struct LevelConfig {
     pub chunk_saving: ChunkSaving,
     pub max_view_distance: i32,
     /// How many generated pieces of each kind to keep per player for neighbouring chunks, as a multiple of the chunks in the player's view.
-    /// A lower value uses less memory and regenerates more, 0 keeps nothing.
     pub retention_budget: f64,
     /// How many chunks beyond the loaded area a player is assumed to be able to walk before the generator has to be ready, which is how far outside
     /// the view generated pieces are kept for. A higher value uses more memory and regenerates less for a player on the move.
@@ -139,7 +138,7 @@ impl Default for LevelConfig {
             seed: LevelSeed::default(),
             chunk_saving: ChunkSaving::default(),
             max_view_distance: 32,
-            retention_budget: 1.0,
+            retention_budget: 8.0,
             lookahead: 0,
             chunk_cache: 0.5,
             autosave: Interval::every(Duration::from_secs(60)),

@@ -1,0 +1,9 @@
+{
+  "format_version": "1.0.0",
+  "chorus:seagrass": {
+    "description": {
+      "identifier": "minecraft:shortest_seagrass_feature"
+    },
+    "tall_chance": 0.3
+  }
+}

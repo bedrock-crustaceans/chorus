@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::MINECRAFT_CARDINAL_DIRECTION;
 
@@ -13,6 +14,7 @@ pub static LIT_SMOKER: BlockDefinition = const_block! {
         MapColorComponent { r: 112, g: 112, b: 112, a: 255 },
         LightEmissionComponent { emission: 13 },
         MineableComponent::hardness(3.5),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

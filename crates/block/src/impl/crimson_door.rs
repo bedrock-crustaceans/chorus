@@ -5,7 +5,6 @@ use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
-use crate::component::solid_component::SolidComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::state::common::{DOOR_HINGE_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT, UPPER_BLOCK_BIT};
 use crate::{const_block, const_permutation};
@@ -15,7 +14,6 @@ pub static CRIMSON_DOOR: BlockDefinition = const_block! {
     identifier: block_id::CRIMSON_DOOR,
     states: [DOOR_HINGE_BIT, MINECRAFT_CARDINAL_DIRECTION, OPEN_BIT, UPPER_BLOCK_BIT],
     components: [
-        SolidComponent { solid: false },
         TransparentComponent { transparent: true },
         MapColorComponent { r: 148, g: 63, b: 97, a: 255 },
         LightDampeningComponent { dampening: 1 },

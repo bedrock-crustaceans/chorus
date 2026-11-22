@@ -5,6 +5,7 @@ use crate::component::friction_component::FrictionComponent;
 use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
+use crate::component::support_component::SupportComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 
@@ -18,6 +19,7 @@ pub static ICE: BlockDefinition = const_block! {
         LightDampeningComponent { dampening: 2 },
         FlammableComponent { catch_chance: -1, destroy_chance: 0 },
         MineableComponent::hardness(0.5),
+        SupportComponent::ALL,
     ],
     permutations: [],
 };

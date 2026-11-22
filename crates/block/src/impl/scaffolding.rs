@@ -6,6 +6,7 @@ use crate::component::light_dampening_component::LightDampeningComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::mineable_component::MineableComponent;
 use crate::component::solid_component::SolidComponent;
+use crate::component::support_component::SupportComponent;
 use crate::component::transparent_component::TransparentComponent;
 use crate::const_block;
 use crate::state::common::{STABILITY, STABILITY_CHECK};
@@ -22,6 +23,7 @@ pub static SCAFFOLDING: BlockDefinition = const_block! {
         FlammableComponent { catch_chance: 60, destroy_chance: 60 },
         MineableComponent::hardness(0.5),
         CollisionBoxComponent::new(Vec3::new(0.0, 0.875, 0.0), Vec3::new(1.0, 0.125, 1.0)),
+        SupportComponent::TOP,
     ],
     permutations: [],
 };

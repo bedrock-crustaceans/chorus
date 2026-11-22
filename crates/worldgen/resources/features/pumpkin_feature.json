@@ -1,0 +1,38 @@
+{
+  "format_version": "1.0.0",
+  "chorus:random_walk_plant": {
+    "description": {
+      "identifier": "minecraft:pumpkin_feature"
+    },
+    "tries": 96,
+    "variants": [
+      {
+        "name": "minecraft:pumpkin",
+        "states": {
+          "minecraft:cardinal_direction": "south"
+        }
+      },
+      {
+        "name": "minecraft:pumpkin",
+        "states": {
+          "minecraft:cardinal_direction": "west"
+        }
+      },
+      {
+        "name": "minecraft:pumpkin",
+        "states": {
+          "minecraft:cardinal_direction": "north"
+        }
+      },
+      {
+        "name": "minecraft:pumpkin",
+        "states": {
+          "minecraft:cardinal_direction": "east"
+        }
+      }
+    ],
+    "below": [
+      "minecraft:grass_block"
+    ]
+  }
+}

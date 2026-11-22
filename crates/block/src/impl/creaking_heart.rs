@@ -3,6 +3,7 @@ use crate::block_id;
 use crate::component::light_emission_component::LightEmissionComponent;
 use crate::component::map_color_component::MapColorComponent;
 use crate::component::moveable_component::{MoveableComponent, Movement};
+use crate::component::support_component::SupportComponent;
 use crate::state::common::{CREAKING_HEART_STATE, NATURAL, PILLAR_AXIS};
 use crate::{const_block, const_permutation};
 
@@ -12,6 +13,7 @@ pub static CREAKING_HEART: BlockDefinition = const_block! {
     components: [
         MapColorComponent { r: 216, g: 127, b: 51, a: 255 },
         MoveableComponent { movement: Movement::None, sticky: false },
+        SupportComponent::ALL,
     ],
     permutations: [
         const_permutation! {

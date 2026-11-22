@@ -1,0 +1,18 @@
+{
+  "identifier": "trial_chambers",
+  "kind": "trial_chambers",
+  "rule": "java",
+  "placement": {
+    "random_spread": {
+      "spacing": 34,
+      "separation": 12,
+      "salt": 94251327,
+      "spread": "linear"
+    }
+  },
+  "reach": 9,
+  "adaptation": {
+    "mode": "encapsulate",
+    "order": 1
+  }
+}

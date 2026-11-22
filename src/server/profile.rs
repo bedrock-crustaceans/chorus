@@ -263,7 +263,7 @@ fn write_generation(report: &mut Report, before: &[(&'static str, GenerationStat
             report.section(name, |report| {
                 let retained: usize = now.retained.iter().map(|(_, count)| count).sum();
                 let per_phase: Vec<String> = now.retained.iter().map(|(phase, count)| format!("{} {}", phase.trim_end_matches("Phase"), thousands(*count))).collect();
-                report.row("Nodes", Value::count(now.nodes).note(format!("{} finished and waiting", thousands(now.waiting))));
+                report.row("Tasks", Value::count(now.tasks).note(format!("{} finished and waiting", thousands(now.waiting))));
                 report.row("Retained", Value::count(retained).note(per_phase.join(", ")));
                 report.row("Discarded", Value::count(now.discarded).note("waiting to be freed"));
                 let finished = now.completed.saturating_sub(earlier.map_or(0, |stats| stats.completed));

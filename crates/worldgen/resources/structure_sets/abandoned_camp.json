@@ -1,0 +1,11 @@
+{
+  "identifier": "abandoned_camp",
+  "kind": "abandoned_camp",
+  "rule": "java",
+  "placement": "pack",
+  "reach": 4,
+  "adaptation": {
+    "mode": "beard_thin",
+    "order": 2
+  }
+}

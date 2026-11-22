@@ -22,7 +22,7 @@ use bedrock::protocol::v818::types::SyncedPlayerMovementSettings;
 use bedrock::protocol::v944::packets::VoxelShapesPacket;
 use bedrock::protocol::v944::types::NetworkBlockPosition;
 use bedrock::protocol::v2168::enums::EducationEditionOffer;
-use bedrock::protocol::v2168::packets::StartGamePacket;
+use bedrock::protocol::v2168::packets::{BlockProperty, StartGamePacket};
 use bedrock::protocol::v2225::types::{EditorLevelMigrationVersion, GameRuleLegacyData, LevelSettings};
 use bedrock::protocol::{ProtoVersion, ProtoVersionPackets};
 use bevy_ecs::message::{MessageReader, MessageWriter};
@@ -31,7 +31,38 @@ use bevy_ecs::system::{Res, ResMut};
 use glam::{IVec3, Vec3};
 use indexmap::IndexMap;
 use nbtx::ValueList;
+use std::sync::LazyLock;
 use tracing::{debug, warn};
+
+static BLOCK_PROPERTIES: LazyLock<Vec<BlockProperty>> = LazyLock::new(|| decode_block_definitions(chorus_block::BLOCK_DEFINITIONS));
+
+fn field<'a>(compound: &'a nbtx::Compound, name: &str) -> Option<&'a nbtx::Value> {
+    compound.iter().find(|(key, _)| AsRef::<[u8]>::as_ref(key) == name.as_bytes()).map(|(_, value)| value)
+}
+
+fn decode_block_definitions(bytes: &[u8]) -> Vec<BlockProperty> {
+    let mut reader = bytes;
+    let value: nbtx::Value = nbtx::from_be_bytes(&mut reader).expect("the block definitions are big-endian NBT");
+    let nbtx::Value::Compound(root) = value else { panic!("the block definitions root is a compound") };
+    let Some(nbtx::Value::List(list)) = field(&root, "properties") else {
+        panic!("the block definitions have a properties list")
+    };
+    list.iter()
+        .map(|entry| {
+            let nbtx::Value::Compound(entry) = entry else { panic!("a block definition is a compound") };
+            let Some(nbtx::Value::String(name)) = field(&entry, "name") else {
+                panic!("a block definition has a name")
+            };
+            let Some(nbtx::Value::Compound(definition)) = field(&entry, "properties") else {
+                panic!("a block definition has properties")
+            };
+            BlockProperty {
+                block_name: name.to_string(),
+                block_definition: definition.iter().map(|(key, value)| (key.to_string(), value.clone())).collect(),
+            }
+        })
+        .collect()
+}
 
 pub fn on_enter_setup(
     mut sessions: Query<&mut Session>,
@@ -173,7 +204,7 @@ fn send_start_game(actor: &ActorId, gamemode: Gamemode, position: Vec3, spawn: I
             },
             current_level_time: 0,
             enchantment_seed: 0,
-            block_properties: vec![],
+            block_properties: BLOCK_PROPERTIES.clone(),
             multiplayer_correlation_id: "".to_string(),
             enable_item_stack_net_manager: false,
             server_version: BedrockProtocol::GAME_VERSION.to_string(),
@@ -274,7 +305,7 @@ fn handle_set_local_player_as_initialized(
 
 #[cfg(test)]
 mod tests {
-    use super::clamp_chunk_radius;
+    use super::{clamp_chunk_radius, decode_block_definitions};
 
     #[test]
     fn clamps_to_valid_range() {
@@ -285,5 +316,14 @@ mod tests {
         assert_eq!(clamp_chunk_radius(100, 16), 16);
         assert_eq!(clamp_chunk_radius(8, 0), 1);
         assert_eq!(clamp_chunk_radius(8, -3), 1);
+    }
+
+    #[test]
+    fn data_driven_block_definitions_are_complete() {
+        let properties = decode_block_definitions(chorus_block::BLOCK_DEFINITIONS);
+        assert_eq!(properties.len(), 98);
+        let wool = properties.iter().find(|property| property.block_name == "minecraft:white_wool_stairs").expect("white wool stairs");
+        assert!(wool.block_definition.contains_key("vanilla_block_data"));
+        assert!(wool.block_definition.contains_key("components"));
     }
 }

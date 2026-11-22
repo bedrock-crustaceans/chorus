@@ -1,6 +1,8 @@
 use crate::block_definition::BlockDefinition;
 use crate::block_id;
+use crate::component::liquid_detection_component::LiquidDetectionComponent;
 use crate::component::map_color_component::MapColorComponent;
+use crate::component::support_component::SupportComponent;
 use crate::const_block;
 use crate::state::common::{OMINOUS, TRIAL_SPAWNER_STATE};
 
@@ -9,6 +11,8 @@ pub static TRIAL_SPAWNER: BlockDefinition = const_block! {
     states: [OMINOUS, TRIAL_SPAWNER_STATE],
     components: [
         MapColorComponent { r: 112, g: 112, b: 112, a: 255 },
+        LiquidDetectionComponent::CONTAINS_WATER,
+        SupportComponent::ALL,
     ],
     permutations: [],
 };
