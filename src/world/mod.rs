@@ -6,6 +6,7 @@ use bevy_ecs::schedule::IntoScheduleConfigs;
 pub mod blob_cache;
 pub mod block;
 pub mod chunks;
+pub mod tick_area;
 
 pub struct WorldPlugin;
 

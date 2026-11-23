@@ -1,26 +1,20 @@
-use super::super::liquid::TickQueue;
 use super::super::{NetherBlocks, NetherChunk};
-use super::{CHUNK_WIDTH, RoutedTick};
+use super::CHUNK_WIDTH;
 use crate::bedrock::overworld::expression::Host;
 use crate::bedrock::overworld::ore::Cells;
+use crate::shared::CHUNK_MASK;
 use crate::shared::blocks::{BlockId, Blocks};
-use crate::shared::decoration_window::{SLOTS, Window, Writes};
-use crate::shared::{CHUNK_MASK, CHUNK_SHIFT};
+use crate::shared::chunk::proto::RoutedTick;
+use crate::shared::decoration_window::{SLOTS, SourceChanges, Window};
 use chorus_block::block_id::{BROWN_MUSHROOM, FIRE, LAVA, RED_MUSHROOM, SOUL_FIRE};
 use glam::IVec3;
 use std::sync::Arc;
-
-const TICK_REACH: i32 = 8;
-
-const ROUTED_TICK_NOW: u64 = 0;
 
 pub struct View<'a> {
     window: Window<'a>,
     heights: &'a [Arc<[i32; 256]>; SLOTS],
     blocks: &'a Blocks,
     ids: &'a NetherBlocks,
-    pub ticks: TickQueue,
-    pub routed: Vec<RoutedTick>,
 }
 
 fn named(blocks: &Blocks, id: BlockId) -> &str {
@@ -65,10 +59,10 @@ pub fn light_heights(blocks: &Blocks, chunk: &NetherChunk) -> [i32; 256] {
     let mut heights = [0i32; 256];
     for x in 0..CHUNK_WIDTH {
         for z in 0..CHUNK_WIDTH {
-            heights[(z * CHUNK_WIDTH + x) as usize] = (chunk.min_y()..=chunk.max_y())
+            heights[(z * CHUNK_WIDTH + x) as usize] = (chunk.min_y..=chunk.max_y())
                 .rev()
                 .find(|&y| opaque_to_light(blocks, chunk.get(x, y, z)))
-                .map_or(chunk.min_y(), |y| y + 1);
+                .map_or(chunk.min_y, |y| y + 1);
         }
     }
     heights
@@ -81,8 +75,6 @@ impl<'a> View<'a> {
             heights,
             blocks,
             ids,
-            ticks: TickQueue::chunk(),
-            routed: Vec::new(),
         }
     }
 
@@ -94,35 +86,16 @@ impl<'a> View<'a> {
         self.window.set_changed(x, y, z, block)
     }
 
-    pub fn has_block(&self, x: i32, y: i32, z: i32) -> bool {
-        self.window.has_block(x, y, z)
-    }
-
-    pub fn take_writes(&mut self) -> Writes {
-        self.window.take_writes()
-    }
-
-    pub fn can_tick(&self, x: i32, z: i32) -> bool {
-        [-1, 1].iter().all(|dx| [-1, 1].iter().all(|dz| self.window.slot(x + dx, z + dz).is_some()))
-    }
-
-    pub fn queue_reaches(&self, x: i32, z: i32) -> bool {
-        [-TICK_REACH, TICK_REACH]
-            .iter()
-            .all(|dx| [-TICK_REACH, TICK_REACH].iter().all(|dz| self.window.slot(x + dx, z + dz).is_some()))
+    pub fn take_changes(&mut self) -> SourceChanges {
+        self.window.take_changes()
     }
 
     pub fn schedule(&mut self, pos: [i32; 3], lava: bool, delay: u64) {
-        if self.queue_reaches(pos[0], pos[2]) {
-            self.ticks.add(pos, lava, delay);
-        } else {
-            self.routed.push(RoutedTick {
-                target: (pos[0] >> CHUNK_SHIFT, pos[2] >> CHUNK_SHIFT),
-                pos,
-                lava,
-                delay: ROUTED_TICK_NOW,
-            });
-        }
+        self.window.route_tick(RoutedTick {
+            pos: IVec3::from_array(pos),
+            lava,
+            delay,
+        });
     }
 
     pub fn heightmap(&self, x: i32, z: i32) -> i32 {
@@ -136,10 +109,6 @@ impl<'a> View<'a> {
 
     pub fn ids(&self) -> &'a NetherBlocks {
         self.ids
-    }
-
-    pub fn lava_level(&self, depth: u8) -> BlockId {
-        self.ids.lava_levels[depth as usize]
     }
 }
 

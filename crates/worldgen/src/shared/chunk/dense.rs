@@ -15,10 +15,11 @@ pub fn from_dense(position: (i32, i32), definition: DimensionDefinition, cells: 
     let mut layer = [air; SECTION_CELLS];
     let mut biomes = [0i32; SECTION_CELLS];
     let mut sub_chunks = Vec::with_capacity(sections);
+    let column_biomes: [i32; COLUMN_WIDTH * COLUMN_WIDTH] = std::array::from_fn(|column| biome((column / COLUMN_WIDTH) as i32, (column % COLUMN_WIDTH) as i32));
     for section in 0..sections {
         for x in 0..COLUMN_WIDTH {
             for z in 0..COLUMN_WIDTH {
-                let column_biome = biome(x as i32, z as i32);
+                let column_biome = column_biomes[x * COLUMN_WIDTH + z];
                 for y in 0..SECTION_HEIGHT {
                     let index = SubChunk::index(x as u8, y as u8, z as u8);
                     let dense = (x * COLUMN_WIDTH + z) * height + section * SECTION_HEIGHT + y;

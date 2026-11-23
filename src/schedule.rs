@@ -7,6 +7,7 @@ pub enum GameSet {
     Connection,
     Input,
     World,
+    Fluids,
     Actors,
     Chat,
     Chunks,

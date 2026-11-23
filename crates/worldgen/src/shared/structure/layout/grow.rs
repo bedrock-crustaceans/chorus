@@ -59,6 +59,7 @@ pub struct Grower<'a> {
     height: &'a dyn Fn(i32, i32) -> Probed<i32>,
     max_depth: i32,
     pub pieces: Vec<Part>,
+    options: Vec<Connector<'a>>,
 }
 
 impl<'a> Grower<'a> {
@@ -70,6 +71,7 @@ impl<'a> Grower<'a> {
             height,
             max_depth,
             pieces: Vec::new(),
+            options: Vec::new(),
         }
     }
 
@@ -120,7 +122,8 @@ impl<'a> Grower<'a> {
             let mut rotations = CANDIDATE_ROTATIONS;
             shuffle(self.random, &mut rotations);
             for rotation in rotations {
-                let mut candidates = element.jigsaws(self.library, (0, 0, 0), rotation);
+                let mut candidates = std::mem::take(&mut self.options);
+                element.jigsaws_into(self.library, (0, 0, 0), rotation, &mut candidates);
                 shuffle(self.random, &mut candidates);
                 for candidate in &candidates {
                     if !layout.can_attach(candidate, false) {
@@ -139,9 +142,13 @@ impl<'a> Grower<'a> {
                     piece.ground = candidate.pos.1;
                     let child = self.pieces.len();
                     self.pieces.push(piece);
+                    candidates.clear();
+                    self.options = candidates;
                     self.expand(child)?;
                     return Ok(true);
                 }
+                candidates.clear();
+                self.options = candidates;
             }
         }
         Ok(false)

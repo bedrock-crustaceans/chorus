@@ -27,13 +27,6 @@ const POOL_CATALOGUE: &str = "bastion";
 
 pub(super) const NETHER_GRID: Grid = Grid::new(SPACING, SEPARATION, SALT, Spread::Linear);
 
-pub(super) const START_REACH: i32 = REACH;
-
-pub(super) fn may_start(x: i32, z: i32) -> bool {
-    let range = SPACING - SEPARATION;
-    x.rem_euclid(SPACING) < range && z.rem_euclid(SPACING) < range
-}
-
 fn column_box(chunk: (i32, i32), definition: DimensionDefinition) -> BoundingBox {
     BoundingBox::chunk(chunk.0, chunk.1, definition)
 }
@@ -209,12 +202,29 @@ fn stair_corner(chunk: &NetherChunk, chunk_x: i32, chunk_z: i32, neighbour: &dyn
     NO_CORNER
 }
 
+fn section_may_join(chunk: &NetherChunk, section: usize, ids: &NetherBlocks, blocks: &Blocks) -> bool {
+    chunk.section_palette(section).is_none_or(|palette| {
+        palette.iter().any(|&value| {
+            let block = value as BlockId;
+            blocks.name_of(block) == chorus_block::block_id::NETHER_BRICK_FENCE || stair_facing(ids, block).is_some()
+        })
+    })
+}
+
 impl NetherStructures {
+    pub fn joins_reach_neighbours(&self, chunk: &NetherChunk, ids: &NetherBlocks, blocks: &Blocks) -> bool {
+        (0..=((chunk.max_y() - chunk.min_y) >> 4) as usize).any(|section| section_may_join(chunk, section, ids, blocks))
+    }
+
     pub fn join(&self, chunk: &mut NetherChunk, (chunk_x, chunk_z): (i32, i32), neighbour: &dyn Fn(i32, i32) -> Arc<NetherChunk>, ids: &NetherBlocks, blocks: &Blocks) {
         let mut updates = Vec::new();
         {
             let get = |x: i32, y: i32, z: i32| world_block(chunk, chunk_x, chunk_z, neighbour, x, y, z);
-            for y in chunk.min_y()..=chunk.max_y() {
+            for y in chunk.min_y..=chunk.max_y() {
+                let section = ((y - chunk.min_y) >> 4) as usize;
+                if !section_may_join(chunk, section, ids, blocks) {
+                    continue;
+                }
                 for z in 0..CHUNK_WIDTH {
                     for x in 0..CHUNK_WIDTH {
                         let (world_x, world_z) = (chunk_x * CHUNK_WIDTH + x, chunk_z * CHUNK_WIDTH + z);
@@ -323,6 +333,20 @@ impl NetherStructures {
                     .map(|(catalogue, library)| Arc::new(bastion::generate(&mut random, chunk, catalogue, library))),
             },
         }
+    }
+
+    pub fn start_cells_near(&self, chunk: (i32, i32)) -> Vec<(i32, i32)> {
+        let region = |value: i32| value.div_euclid(SPACING);
+        let mut cells = Vec::new();
+        for region_x in region(chunk.0 - REACH)..=region(chunk.0 + REACH) {
+            for region_z in region(chunk.1 - REACH)..=region(chunk.1 + REACH) {
+                let candidate = NETHER_GRID.candidate(self.level_seed, (region_x * SPACING, region_z * SPACING));
+                if (candidate.0 - chunk.0).abs() <= REACH && (candidate.1 - chunk.1).abs() <= REACH {
+                    cells.push(candidate);
+                }
+            }
+        }
+        cells
     }
 
     pub fn fortresses_at(&self, chunk: (i32, i32), starts: &[((i32, i32), Arc<Starts>)]) -> Vec<Arc<fortress::Fortress>> {

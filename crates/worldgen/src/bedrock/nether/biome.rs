@@ -90,7 +90,7 @@ impl NetherBiomes {
         })
     }
 
-    pub fn biome(&self, x: i32, z: i32) -> i32 {
+    fn zoomed_quart(&self, x: i32, z: i32) -> (i32, i32) {
         let (x, z) = (x - ZOOM_ORIGIN, z - ZOOM_ORIGIN);
         let (quart_x, quart_z) = (x >> 2, z >> 2);
         let (offset_x, offset_z) = ((x & 3) as f32, (z & 3) as f32);
@@ -101,6 +101,44 @@ impl NetherBiomes {
         });
         let pick = (0..3).find(|&index| (0..4).all(|other| other == index || distances[index] < distances[other])).unwrap_or(3);
         let (corner_x, corner_z) = JITTER_CORNERS[pick];
-        self.quart_biome(quart_x + corner_x, quart_z + corner_z)
+        (quart_x + corner_x, quart_z + corner_z)
+    }
+
+    pub fn biome(&self, x: i32, z: i32) -> i32 {
+        let (quart_x, quart_z) = self.zoomed_quart(x, z);
+        self.quart_biome(quart_x, quart_z)
+    }
+
+    pub fn chunk_biomes(&self, chunk_x: i32, chunk_z: i32) -> [i32; 256] {
+        const SPAN: usize = 6;
+        let (base_x, base_z) = (chunk_x * 4 - 1, chunk_z * 4 - 1);
+        let mut memo = [[None; SPAN]; SPAN];
+        let mut biomes = [0i32; 256];
+        for x in 0..16 {
+            for z in 0..16 {
+                let (quart_x, quart_z) = self.zoomed_quart(chunk_x * 16 + x, chunk_z * 16 + z);
+                let slot = &mut memo[(quart_x - base_x) as usize][(quart_z - base_z) as usize];
+                biomes[(x * 16 + z) as usize] = *slot.get_or_insert_with(|| self.quart_biome(quart_x, quart_z));
+            }
+        }
+        biomes
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chunk_biomes_match_per_column_lookup() {
+        let biomes = NetherBiomes::new(899197117575234806);
+        for (chunk_x, chunk_z) in [(0, 0), (-1, -1), (-7, 12), (31, -40), (5, 5)] {
+            let table = biomes.chunk_biomes(chunk_x, chunk_z);
+            for x in 0..16 {
+                for z in 0..16 {
+                    assert_eq!(table[(x * 16 + z) as usize], biomes.biome(chunk_x * 16 + x, chunk_z * 16 + z));
+                }
+            }
+        }
     }
 }

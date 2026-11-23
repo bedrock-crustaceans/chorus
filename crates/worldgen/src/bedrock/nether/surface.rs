@@ -3,7 +3,8 @@ use super::terrain::{NetherNoises, SEA_LEVEL, TERRAIN_HEIGHT};
 use super::{NetherBlocks, NetherChunk};
 use crate::shared::biome::BiomeRegistry;
 use crate::shared::biome_documents::ROOT;
-use crate::shared::blocks::{BlockId, BlockTable};
+use crate::shared::blocks::{AIR, BlockId, BlockTable};
+use crate::shared::chunk::store::{give_scratch, take_scratch};
 use crate::shared::noise::legacy::LegacyPerlin;
 use crate::shared::rng::mersenne::MersenneTwister;
 use serde_json::Value;
@@ -165,7 +166,6 @@ impl CappedNoises {
 }
 
 pub struct Context<'a> {
-    pub biomes: &'a super::biome::NetherBiomes,
     pub noises: &'a NetherNoises,
     pub ids: &'a NetherBlocks,
 }
@@ -193,11 +193,18 @@ impl NetherSurface {
         self.builders.iter().find(|(known, _)| *known == biome).map(|(_, builder)| builder)
     }
 
-    pub fn build(&self, chunk: &mut NetherChunk, context: &Context, chunk_x: i32, chunk_z: i32, random: &mut MersenneTwister) {
+    pub fn build(&self, proto: &mut NetherChunk, context: &Context, chunk_x: i32, chunk_z: i32, column_biomes: &[i32; 256], random: &mut MersenneTwister) {
+        let mut blocks = take_scratch(proto.cells(), AIR);
+        proto.read_cells(&mut blocks);
+        let mut cells = Cells {
+            blocks: &mut blocks,
+            min_y: proto.min_y,
+        };
+        let chunk = &mut cells;
         for x in 0..16 {
             for z in 0..16 {
                 let world = (chunk_x * 16 + x, chunk_z * 16 + z);
-                let biome = context.biomes.biome(world.0, world.1);
+                let biome = column_biomes[(x * 16 + z) as usize];
                 let depth_noise = context.noises.depth_noise(world.0, world.1, DEPTH_FREQUENCY);
                 match self.builder(biome) {
                     Some(Builder::Default {
@@ -223,6 +230,31 @@ impl NetherSurface {
                 }
             }
         }
+        proto.write_cells(&blocks);
+        give_scratch(blocks);
+    }
+}
+
+struct Cells<'a> {
+    blocks: &'a mut [BlockId],
+    min_y: i32,
+}
+
+impl Cells<'_> {
+    fn index(&self, x: i32, y: i32, z: i32) -> Option<usize> {
+        let row = usize::try_from(y - self.min_y).ok()?;
+        let index = (row << 8) | ((z << 4) | x) as usize;
+        (index < self.blocks.len()).then_some(index)
+    }
+
+    fn get(&self, x: i32, y: i32, z: i32) -> BlockId {
+        self.index(x, y, z).map_or(AIR, |index| self.blocks[index])
+    }
+
+    fn set(&mut self, x: i32, y: i32, z: i32, block: BlockId) {
+        if let Some(index) = self.index(x, y, z) {
+            self.blocks[index] = block;
+        }
     }
 }
 
@@ -244,7 +276,7 @@ fn surface_depth(random: &mut MersenneTwister, noise: f32) -> i32 {
     (random.next_float() * 0.25 + (noise / 3.0 + 3.0)) as i32
 }
 
-fn build_default(chunk: &mut NetherChunk, (x, z): (i32, i32), materials: impl Fn(i32) -> Materials, sea_floor_depth: i32, depth: i32, random: &mut MersenneTwister, ids: &NetherBlocks) {
+fn build_default(chunk: &mut Cells, (x, z): (i32, i32), materials: impl Fn(i32) -> Materials, sea_floor_depth: i32, depth: i32, random: &mut MersenneTwister, ids: &NetherBlocks) {
     let sea = SEA_LEVEL;
     let sea_floor_limit = sea_floor_depth + depth;
     let start = materials(TERRAIN_HEIGHT - 1);
@@ -314,7 +346,7 @@ fn solid(block: u16, ids: &NetherBlocks) -> bool {
     block != ids.air && block != ids.water && block != ids.lava
 }
 
-fn build_capped(chunk: &mut NetherChunk, (x, z): (i32, i32), world: (i32, i32), capped: &Capped, depth_noise: f32, random: &mut MersenneTwister, ids: &NetherBlocks) {
+fn build_capped(chunk: &mut Cells, (x, z): (i32, i32), world: (i32, i32), capped: &Capped, depth_noise: f32, random: &mut MersenneTwister, ids: &NetherBlocks) {
     let noises = &capped.noises;
     let floor_depth = surface_depth(random, depth_noise);
     let ceiling_depth = surface_depth(random, depth_noise);
@@ -355,7 +387,7 @@ fn build_capped(chunk: &mut NetherChunk, (x, z): (i32, i32), world: (i32, i32), 
     }
 }
 
-fn fill(chunk: &mut NetherChunk, (x, z): (i32, i32), from: i32, until: i32, material: impl Fn(i32) -> u16, ids: &NetherBlocks) {
+fn fill(chunk: &mut Cells, (x, z): (i32, i32), from: i32, until: i32, material: impl Fn(i32) -> u16, ids: &NetherBlocks) {
     let step = if from <= until { 1 } else { -1 };
     let mut cell = from;
     while cell != until && (0..TERRAIN_HEIGHT).contains(&cell) && solid(chunk.get(x, cell, z), ids) {

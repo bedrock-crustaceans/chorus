@@ -50,9 +50,18 @@ pub fn is_start(level_seed: u32, chunk: (i32, i32)) -> bool {
     PORTAL_GRID.candidate(level_seed, chunk) == chunk
 }
 
-pub fn may_start(x: i32, z: i32) -> bool {
-    let range = SPACING - SEPARATION;
-    x.rem_euclid(SPACING) < range && z.rem_euclid(SPACING) < range
+pub fn start_cells_near(level_seed: u32, chunk: (i32, i32)) -> Vec<(i32, i32)> {
+    let region = |value: i32| value.div_euclid(SPACING);
+    let mut cells = Vec::new();
+    for region_x in region(chunk.0 - REACH)..=region(chunk.0 + REACH) {
+        for region_z in region(chunk.1 - REACH)..=region(chunk.1 + REACH) {
+            let candidate = PORTAL_GRID.candidate(level_seed, (region_x * SPACING, region_z * SPACING));
+            if (candidate.0 - chunk.0).abs() <= REACH && (candidate.1 - chunk.1).abs() <= REACH {
+                cells.push(candidate);
+            }
+        }
+    }
+    cells
 }
 
 struct View<'a> {

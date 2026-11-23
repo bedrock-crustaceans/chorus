@@ -1,12 +1,13 @@
 mod changes;
 mod heightmap;
 mod merge;
+mod radix;
 mod rules;
 mod ticks;
 
-pub use changes::Changes;
+pub use changes::{Changes, Write};
 pub use heightmap::Heightmap;
-pub use merge::merge;
+pub use merge::{merge, replay_ordered};
 pub use rules::RuleKind;
 pub use ticks::FluidSchedule;
 
@@ -15,17 +16,13 @@ use super::scratch::Scratch;
 use crate::shared::SEA_LEVEL;
 use crate::shared::biome::Biome;
 use crate::shared::blocks::{AIR, BlockId, Blocks};
+use crate::shared::decoration_window::slot_at;
 use crate::shared::structure::Probed;
-use changes::Write;
 use glam::IVec3;
 use rules::NO_RULE;
 
 const SPAN: usize = 48;
 const CENTER: usize = 4;
-
-pub fn slot(dx: i32, dz: i32) -> Option<usize> {
-    ((-1..=1).contains(&dx) && (-1..=1).contains(&dz)).then_some(((dx + 1) * 3 + dz + 1) as usize)
-}
 
 thread_local! {
     static SPARE_DIRTY: std::cell::RefCell<Vec<Vec<(u8, i16, u8)>>> = const { std::cell::RefCell::new(Vec::new()) };
@@ -44,6 +41,7 @@ pub struct Region<'a> {
     routed: [Vec<RoutedTick>; 9],
     heights: Scratch<Option<i32>>,
     highest: [Option<i32>; 9],
+    top_block: Option<i32>,
     preliminary: Option<&'a (dyn Fn(i32, i32) -> i32 + Sync)>,
     structure_check: Option<&'a (dyn Fn(IVec3) -> Probed<bool> + Sync)>,
     partial_template: Option<&'a (dyn Fn(BlockId) -> bool + Sync)>,
@@ -83,6 +81,7 @@ impl<'a> Region<'a> {
             routed: Default::default(),
             heights: Scratch::take(&SPARE_HEIGHTS, Heightmap::TRACKED.len() * SPAN * SPAN, None),
             highest: [None; 9],
+            top_block: None,
             preliminary: None,
             structure_check: None,
             partial_template: None,
@@ -92,6 +91,20 @@ impl<'a> Region<'a> {
             replay: false,
             sea_level: SEA_LEVEL,
         }
+    }
+
+    pub fn top_block_y(&mut self) -> i32 {
+        if let Some(top) = self.top_block {
+            return top;
+        }
+        let top = self
+            .chunks
+            .iter()
+            .map(|chunk| chunk.highest_block_y())
+            .try_fold(i32::MIN, |top, found| found.map(|found| top.max(found)))
+            .unwrap_or(i32::MAX);
+        self.top_block = Some(top);
+        top
     }
 
     pub fn with_sea_level(mut self, sea_level: i32) -> Self {
@@ -151,7 +164,7 @@ impl<'a> Region<'a> {
     }
 
     fn slot(&self, x: i32, z: i32) -> Option<usize> {
-        slot((x >> 4) - self.owner_x, (z >> 4) - self.owner_z)
+        slot_at((x >> 4) - self.owner_x, (z >> 4) - self.owner_z)
     }
 
     pub fn contains(&self, pos: IVec3) -> bool {
@@ -197,10 +210,13 @@ impl<'a> Region<'a> {
             self.chunks[slot].set(lx, pos.y, lz, block);
         }
         self.dirty[slot].push((lx as u8, pos.y as i16, lz as u8));
-        if !self.blocks.is_air(block)
-            && let Some(top) = &mut self.highest[slot]
-        {
-            *top = (*top).max(pos.y);
+        if !self.blocks.is_air(block) {
+            if let Some(top) = &mut self.highest[slot] {
+                *top = (*top).max(pos.y);
+            }
+            if let Some(top) = &mut self.top_block {
+                *top = (*top).max(pos.y);
+            }
         }
         let column = self.column_index(pos.x, pos.z);
         for kind in Heightmap::TRACKED {
@@ -283,6 +299,10 @@ impl<'a> Region<'a> {
 
     pub fn uniform_biome_id_at(&self, y: i32) -> Option<i32> {
         self.chunks[CENTER].uniform_biome_id_at(y)
+    }
+
+    pub fn owner_biome_section(&self, y: i32) -> (usize, [i32; 4096]) {
+        (self.chunks[CENTER].biome_palette_len_at(y), self.chunks[CENTER].biome_section_ids_at(y))
     }
 
     pub fn biomes(&self) -> Vec<Biome> {

@@ -26,6 +26,7 @@ use crate::shared::structure::{Adjustments, Probed, Reaching, Remembering, Start
 use crate::shared::terrain::{CornerColumns, NoiseChunk, OverworldSettings, SettingsError};
 use chorus_block::block_id::{LAVA, STONE, WATER};
 use chorus_block::block_registry::BlockRegistry;
+use chorus_level::chunk::Chunk;
 use chorus_level::dimension_definition::DimensionDefinition;
 use chorus_level::generator::phase::{PhaseContext, Request};
 
@@ -48,6 +49,7 @@ pub struct OverworldGenerator {
     liquids: Liquids,
     structures: Option<Structures>,
     moss_carpet: MossCarpet,
+    fluid_rules: std::sync::OnceLock<chorus_level::fluid::FluidRules>,
 }
 
 impl OverworldGenerator {
@@ -121,6 +123,7 @@ impl OverworldGenerator {
             liquids,
             structures,
             moss_carpet,
+            fluid_rules: std::sync::OnceLock::new(),
         })
     }
 
@@ -158,8 +161,12 @@ impl OverworldGenerator {
         std::array::from_fn(|index| self.terrain.preliminary_surface(x * 4 + index as i32 / 4, z * 4 + index as i32 % 4) as i16)
     }
 
-    pub fn quart_biomes(&self, x: i32, z: i32) -> QuartBiomes {
-        QuartBiomes::new(self.biomes.samples(&self.terrain, x, z, self.terrain.min_y(), self.terrain.definition().height), NO_SURFACE_LEVELS)
+    pub fn biome_columns(&self, x: i32, z: i32) -> Vec<i32> {
+        self.biomes.own_columns(&self.terrain, x, z, self.terrain.min_y(), self.terrain.definition().height)
+    }
+
+    pub fn quart_biomes(&self, neighbours: impl Fn(i32, i32) -> Arc<Vec<i32>>) -> QuartBiomes {
+        QuartBiomes::new(BiomeSampler::assemble_samples(neighbours, self.terrain.definition().height), NO_SURFACE_LEVELS)
     }
 
     pub(crate) fn corner_columns(&self, x: i32, z: i32) -> CornerColumns {
@@ -290,5 +297,11 @@ impl OverworldGenerator {
 
     pub fn fluid_rules(&self) -> Option<chorus_level::fluid::FluidRules> {
         Some(self.liquids.rules(&self.blocks))
+    }
+
+    pub(crate) fn active_fluid_ticks(&self, chunk: &mut Chunk) {
+        let rules = self.fluid_rules.get_or_init(|| self.liquids.rules(&self.blocks));
+        let updates = chunk.take_fluid_updates();
+        chunk.set_fluid_updates(chorus_level::fluid::retain_active(chunk, rules, updates));
     }
 }

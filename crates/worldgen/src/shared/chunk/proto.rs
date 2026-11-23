@@ -19,14 +19,14 @@ pub struct ProtoChunk {
     pub lava: BlockId,
     store: BlockStore,
     tops: Vec<i16>,
-    worldgen_heights: Arc<Vec<[i16; 2]>>,
-    volume: Arc<BiomeVolume>,
+    worldgen_heights: Option<Arc<Vec<[i16; 2]>>>,
+    volume: Option<Arc<BiomeVolume>>,
     entities: Vec<PlacedEntity>,
     post_process: Vec<(u8, i16, u8)>,
     settle: Vec<(u8, i16, u8)>,
     structure_spills: Vec<(i32, i32, i32, BlockId)>,
     magma_ticks: Vec<(u8, i16, u8)>,
-    fluid_ticks: Arc<Vec<FluidTick>>,
+    fluid_ticks: Option<Arc<Vec<FluidTick>>>,
     inherited_ticks: Vec<RoutedTick>,
     routed_ticks: Vec<RoutedTick>,
     pending_fluid: Vec<RoutedTick>,
@@ -139,14 +139,39 @@ impl ProtoChunk {
             lava,
             store: BlockStore::new(min_y, height, AIR),
             tops: vec![min_y as i16; 256],
-            worldgen_heights: Arc::new(Vec::new()),
-            volume: Arc::new(volume),
+            worldgen_heights: None,
+            volume: Some(Arc::new(volume)),
             entities: Vec::new(),
             post_process: Vec::new(),
             settle: Vec::new(),
             structure_spills: Vec::new(),
             magma_ticks: Vec::new(),
-            fluid_ticks: Arc::new(Vec::new()),
+            fluid_ticks: None,
+            inherited_ticks: Vec::new(),
+            routed_ticks: Vec::new(),
+            pending_fluid: Vec::new(),
+        }
+    }
+
+    pub fn empty(definition: DimensionDefinition) -> Self {
+        Self {
+            x: 0,
+            z: 0,
+            min_y: definition.min_y,
+            height: definition.height,
+            air: AIR,
+            water: AIR,
+            lava: AIR,
+            store: BlockStore::new(definition.min_y, definition.height, AIR),
+            tops: Vec::new(),
+            worldgen_heights: None,
+            volume: None,
+            entities: Vec::new(),
+            post_process: Vec::new(),
+            settle: Vec::new(),
+            structure_spills: Vec::new(),
+            magma_ticks: Vec::new(),
+            fluid_ticks: None,
             inherited_ticks: Vec::new(),
             routed_ticks: Vec::new(),
             pending_fluid: Vec::new(),
@@ -163,15 +188,15 @@ impl ProtoChunk {
             water: self.water,
             lava: self.lava,
             store: BlockStore::new(self.min_y, self.height, self.air),
-            tops: vec![self.min_y as i16; 256],
-            worldgen_heights: Arc::new(Vec::new()),
+            tops: if self.tops.is_empty() { Vec::new() } else { vec![self.min_y as i16; 256] },
+            worldgen_heights: None,
             volume: self.volume.clone(),
             entities: Vec::new(),
             post_process: Vec::new(),
             settle: Vec::new(),
             structure_spills: Vec::new(),
             magma_ticks: Vec::new(),
-            fluid_ticks: Arc::new(Vec::new()),
+            fluid_ticks: None,
             inherited_ticks: Vec::new(),
             routed_ticks: Vec::new(),
             pending_fluid: Vec::new(),
@@ -201,8 +226,64 @@ impl ProtoChunk {
         ChunkEdit(self)
     }
 
-    fn compact(&mut self) {
+    pub fn compact(&mut self) {
         self.store.compact();
+    }
+
+    pub fn fill_empty(&mut self, blocks: &[BlockId]) {
+        self.store.fill_empty(blocks);
+    }
+
+    pub fn read_cells(&self, out: &mut [BlockId]) {
+        self.store.read_cells(out);
+    }
+
+    pub fn write_cells(&mut self, blocks: &[BlockId]) {
+        self.store.write_cells(blocks);
+    }
+
+    pub fn set_tops(&mut self, tops: &[i16; 256]) {
+        self.tops.copy_from_slice(tops);
+    }
+
+    pub fn contains_y(&self, y: i32) -> bool {
+        (self.min_y..self.min_y + self.height).contains(&y)
+    }
+
+    pub fn cells(&self) -> usize {
+        256 * self.height as usize
+    }
+
+    pub fn index(&self, x: i32, y: i32, z: i32) -> usize {
+        ((x * 16 + z) as usize) * self.height as usize + (y - self.min_y) as usize
+    }
+
+    pub fn get_at(&self, index: usize) -> BlockId {
+        let (x, y, z) = self.coordinates(index);
+        self.store.get(x, y, z)
+    }
+
+    pub fn set_at(&mut self, index: usize, block: BlockId) {
+        let (x, y, z) = self.coordinates(index);
+        self.set(x, y, z, block);
+    }
+
+    pub fn cells_vec(&self) -> Vec<BlockId> {
+        self.store.columns_vec()
+    }
+
+    pub fn column_tops_below(&self, limit: i32) -> [i32; 256] {
+        self.store.column_tops_below(limit)
+    }
+
+    pub fn section_palette(&self, section: usize) -> Option<&[i32]> {
+        self.store.section_palette(section)
+    }
+
+    fn coordinates(&self, index: usize) -> (i32, i32, i32) {
+        let height = self.height as usize;
+        let column = index / height;
+        ((column / 16) as i32, self.min_y + (index % height) as i32, (column % 16) as i32)
     }
 
     pub fn discard_dense(&mut self) {
@@ -222,10 +303,13 @@ impl ProtoChunk {
     }
 
     pub fn set(&mut self, x: i32, y: i32, z: i32, block: BlockId) {
-        if !(self.min_y..self.min_y + self.height).contains(&y) {
-            return;
-        }
         self.store.set(x, y, z, block);
+        if !self.tops.is_empty() && self.contains_y(y) {
+            self.track_top(x, y, z, block);
+        }
+    }
+
+    fn track_top(&mut self, x: i32, y: i32, z: i32, block: BlockId) {
         let column = ((z << 4) | x) as usize;
         if block != self.air {
             self.tops[column] = self.tops[column].max(y as i16 + 1);
@@ -247,15 +331,19 @@ impl ProtoChunk {
                 [surface as i16, floor as i16]
             })
             .collect();
-        self.worldgen_heights = Arc::new(heights);
+        self.worldgen_heights = Some(Arc::new(heights));
     }
 
     pub fn worldgen_height(&self, ocean_floor: bool, x: i32, z: i32) -> Option<i32> {
-        self.worldgen_heights.get(((z << 4) | x) as usize).map(|heights| heights[ocean_floor as usize] as i32)
+        self.worldgen_heights.as_ref()?.get(((z << 4) | x) as usize).map(|heights| heights[ocean_floor as usize] as i32)
     }
 
     pub fn top(&self, x: i32, z: i32) -> i32 {
         self.tops[((z << 4) | x) as usize] as i32
+    }
+
+    pub fn highest_block_y(&self) -> Option<i32> {
+        self.tops.iter().max().map(|&top| top as i32 - 1)
     }
 
     pub fn mark_post_process(&mut self, x: u8, y: i16, z: u8) {
@@ -269,7 +357,7 @@ impl ProtoChunk {
     }
 
     pub fn set_fluid_ticks(&mut self, ticks: Vec<FluidTick>) {
-        self.fluid_ticks = Arc::new(ticks);
+        self.fluid_ticks = Some(Arc::new(ticks));
     }
 
     pub fn set_inherited_ticks(&mut self, ticks: Vec<RoutedTick>) {
@@ -301,7 +389,7 @@ impl ProtoChunk {
     }
 
     pub fn fluid_ticks(&self) -> &[FluidTick] {
-        &self.fluid_ticks
+        self.fluid_ticks.as_deref().map_or(&[], Vec::as_slice)
     }
 
     pub fn structure_spills(&self) -> &[(i32, i32, i32, BlockId)] {
@@ -346,51 +434,77 @@ impl ProtoChunk {
         self.top(x, z) - 1
     }
 
+    fn volume(&self) -> &BiomeVolume {
+        self.volume.as_deref().expect("a chunk generated with biomes")
+    }
+
     pub fn biomes(&self) -> impl Iterator<Item = Biome> + '_ {
-        (0..self.height / 4).flat_map(move |qy| (0..4).flat_map(move |qz| (0..4).map(move |qx| self.volume.get(qx << 2, self.min_y + (qy << 2), qz << 2))))
+        (0..self.height / 4).flat_map(move |qy| (0..4).flat_map(move |qz| (0..4).map(move |qx| self.volume().get(qx << 2, self.min_y + (qy << 2), qz << 2))))
     }
 
     pub fn biome_at(&self, x: i32, y: i32, z: i32) -> Biome {
-        self.volume.get(x, y, z)
+        self.volume().get(x, y, z)
     }
 
     pub fn biome_id_at(&self, x: i32, y: i32, z: i32) -> i32 {
-        self.volume.id_at(x, y, z)
+        self.volume().id_at(x, y, z)
     }
 
     pub fn uniform_biome_at(&self, y: i32) -> Option<Biome> {
-        self.volume.uniform_biome_at(y)
+        self.volume().uniform_biome_at(y)
+    }
+
+    pub fn biome_palette_len_at(&self, y: i32) -> usize {
+        self.volume().palette_len_at(y)
+    }
+
+    pub fn biome_section_ids_at(&self, y: i32) -> [i32; 4096] {
+        self.volume().section_ids_at(y)
     }
 
     pub fn uniform_biome_id_at(&self, y: i32) -> Option<i32> {
-        self.volume.uniform_id_at(y)
+        self.volume().uniform_id_at(y)
     }
 
     pub fn into_chunk(self, blocks: &Blocks) -> Chunk {
         let air = blocks.runtime(AIR);
         let water = blocks.runtime(self.water);
         let top_block_section = self.top_block_section();
-        let sub_chunks = (0..self.height / 16)
-            .map(|section| {
-                let mut layer = [air; 4096];
-                let mut extra = [air; 4096];
-                let mut waterlogged = false;
-                let mut biomes = [0; 4096];
-                let section_blocks = self.section_array(section as usize).map(|block| block as BlockId);
-                let section_biomes = self.volume.section_ids((section as usize).min(top_block_section));
-                for (local, (&block, &biome)) in section_blocks.iter().zip(&section_biomes).enumerate() {
-                    let index = SubChunk::index((local & 15) as u8, (local >> 8) as u8, ((local >> 4) & 15) as u8);
-                    let entry = blocks.entry(block);
-                    layer[index] = entry.runtime;
-                    if entry.flooded {
-                        extra[index] = water;
-                        waterlogged = true;
-                    }
-                    biomes[index] = biome;
+        let build = |section: usize| {
+            let mut layer = [air; 4096];
+            let mut extra = [air; 4096];
+            let mut waterlogged = false;
+            let mut biomes = [0; 4096];
+            let section_blocks = self.section_array(section).map(|block| block as BlockId);
+            let section_biomes = self.volume().section_ids(section.min(top_block_section));
+            for (local, (&block, &biome)) in section_blocks.iter().zip(&section_biomes).enumerate() {
+                let index = SubChunk::index((local & 15) as u8, (local >> 8) as u8, ((local >> 4) & 15) as u8);
+                let entry = blocks.entry(block);
+                layer[index] = entry.runtime;
+                if entry.flooded {
+                    extra[index] = water;
+                    waterlogged = true;
                 }
-                SubChunk::from_layers(&layer, waterlogged.then_some(&extra), &biomes, air)
-            })
-            .collect();
+                biomes[index] = biome;
+            }
+            SubChunk::from_layers(&layer, waterlogged.then_some(&extra), &biomes, air)
+        };
+        let sections = (self.height / 16) as usize;
+        let mut sub_chunks = Vec::with_capacity(sections);
+        let mut sky: Option<SubChunk> = None;
+        for section in 0..sections {
+            if section > top_block_section {
+                if let Some(sky) = &sky {
+                    sub_chunks.push(sky.clone());
+                    continue;
+                }
+                let built = build(section);
+                sky = Some(built.clone());
+                sub_chunks.push(built);
+            } else {
+                sub_chunks.push(build(section));
+            }
+        }
         let entities = self
             .entities
             .iter()
@@ -439,5 +553,38 @@ impl QuartBiomes {
             .iter()
             .enumerate()
             .map(move |(i, &level)| (((chunk_x << 4) + (i as i32 % 4) * 4, (chunk_z << 4) + (i as i32 / 4) * 4), level))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const NETHER: DimensionDefinition = DimensionDefinition::NETHER;
+
+    #[test]
+    fn indexed_access_matches_coordinate_access() {
+        let mut chunk = ProtoChunk::empty(NETHER);
+        chunk.set(3, 77, 12, 9);
+        assert_eq!(chunk.get_at(chunk.index(3, 77, 12)), 9);
+        chunk.set_at(chunk.index(15, 0, 15), 4);
+        assert_eq!(chunk.get(15, 0, 15), 4);
+
+        let mut chunk = ProtoChunk::empty(NETHER);
+        chunk.set(1, 2, 3, 7);
+        let cells = chunk.cells_vec();
+        assert_eq!(cells.len(), chunk.cells());
+        assert_eq!(cells[chunk.index(1, 2, 3)], 7);
+        assert_eq!(cells.iter().filter(|&&block| block != AIR).count(), 1);
+    }
+
+    #[test]
+    fn a_bare_chunk_tracks_no_tops_and_holds_no_side_tables() {
+        let chunk = ProtoChunk::empty(NETHER);
+        assert!(chunk.tops.is_empty());
+        assert!(chunk.volume.is_none());
+        assert!(chunk.worldgen_heights.is_none());
+        assert!(chunk.fluid_ticks.is_none());
+        assert_eq!(chunk.entities.capacity() + chunk.post_process.capacity() + chunk.routed_ticks.capacity(), 0);
     }
 }

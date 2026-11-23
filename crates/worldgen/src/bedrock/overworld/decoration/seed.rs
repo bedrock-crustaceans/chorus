@@ -6,13 +6,15 @@ const HASH_COMBINE_RIGHT: u32 = 2;
 const NEXT_INT_SHIFT: u32 = 1;
 
 pub fn large_feature_multipliers(level_seed: u32) -> (u32, u32) {
-    let mut random = MersenneTwister::new(level_seed);
-    let mut odd_next_int = || random.next_u32() >> NEXT_INT_SHIFT | 1;
-    (odd_next_int(), odd_next_int())
+    let [x_multiplier, z_multiplier] = MersenneTwister::leading_words::<2>(level_seed).map(|word| word >> NEXT_INT_SHIFT | 1);
+    (x_multiplier, z_multiplier)
 }
 
 pub fn decoration_seed(level_seed: u32, chunk_x: i32, chunk_z: i32) -> u32 {
-    let (x_multiplier, z_multiplier) = large_feature_multipliers(level_seed);
+    decoration_seed_with(level_seed, large_feature_multipliers(level_seed), chunk_x, chunk_z)
+}
+
+pub fn decoration_seed_with(level_seed: u32, (x_multiplier, z_multiplier): (u32, u32), chunk_x: i32, chunk_z: i32) -> u32 {
     level_seed ^ (chunk_z as u32).wrapping_mul(z_multiplier).wrapping_add((chunk_x as u32).wrapping_mul(x_multiplier))
 }
 

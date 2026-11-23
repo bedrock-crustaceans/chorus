@@ -1,7 +1,7 @@
 use glam::IVec3;
 
 use super::flow;
-use super::{FluidRules, Grid};
+use super::{FluidRules, Grid, PendingUpdate};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ScheduledUpdate {
@@ -41,80 +41,15 @@ impl Order {
     }
 }
 
-#[derive(Default)]
-struct GenerationHeap(Vec<ScheduledUpdate>);
-
-impl GenerationHeap {
-    fn later(first: &ScheduledUpdate, second: &ScheduledUpdate) -> bool {
-        first.due > second.due
-    }
-
-    fn push(&mut self, update: ScheduledUpdate) {
-        self.0.push(update);
-        let mut hole = self.0.len() - 1;
-        while hole > 0 {
-            let parent = (hole - 1) / 2;
-            if !Self::later(&self.0[parent], &update) {
-                break;
-            }
-            self.0[hole] = self.0[parent];
-            hole = parent;
-        }
-        self.0[hole] = update;
-    }
-
-    fn pop(&mut self) -> Option<ScheduledUpdate> {
-        let first = *self.0.first()?;
-        let last = self.0.pop()?;
-        let count = self.0.len();
-        if count == 0 {
-            return Some(first);
-        }
-        let last_parent = (count - 1) / 2;
-        let mut hole = 0;
-        while hole < last_parent {
-            let mut child = 2 * hole + 2;
-            if Self::later(&self.0[child], &self.0[child - 1]) {
-                child -= 1;
-            }
-            self.0[hole] = self.0[child];
-            hole = child;
-        }
-        if hole == last_parent && count.is_multiple_of(2) {
-            self.0[hole] = self.0[count - 1];
-            hole = count - 1;
-        }
-        while hole > 0 {
-            let parent = (hole - 1) / 2;
-            if !Self::later(&self.0[parent], &last) {
-                break;
-            }
-            self.0[hole] = self.0[parent];
-            hole = parent;
-        }
-        self.0[hole] = last;
-        Some(first)
-    }
-
-    fn peek(&self) -> Option<&ScheduledUpdate> {
-        self.0.first()
-    }
-}
-
-enum Pending {
-    Game(std::collections::BinaryHeap<std::cmp::Reverse<Order>>),
-    Generation(GenerationHeap),
-}
-
 type Key = (IVec3, bool, u64);
 
 pub struct FluidTicks {
     now: u64,
     sequence: u64,
-    pending: Pending,
+    pending: std::collections::BinaryHeap<std::cmp::Reverse<Order>>,
     scheduled: rustc_hash::FxHashMap<Key, u32>,
     due: Vec<ScheduledUpdate>,
-    deferred: Vec<ScheduledUpdate>,
+    parked: rustc_hash::FxHashMap<(i32, i32), Vec<ScheduledUpdate>>,
 }
 
 impl Default for FluidTicks {
@@ -128,21 +63,10 @@ impl FluidTicks {
         Self {
             now: 0,
             sequence: 0,
-            pending: Pending::Game(std::collections::BinaryHeap::new()),
+            pending: std::collections::BinaryHeap::new(),
             scheduled: rustc_hash::FxHashMap::default(),
             due: Vec::new(),
-            deferred: Vec::new(),
-        }
-    }
-
-    pub fn generation_clock(clock: u64) -> Self {
-        Self {
-            now: clock,
-            sequence: 0,
-            pending: Pending::Generation(GenerationHeap::default()),
-            scheduled: rustc_hash::FxHashMap::default(),
-            due: Vec::new(),
-            deferred: Vec::new(),
+            parked: rustc_hash::FxHashMap::default(),
         }
     }
 
@@ -151,17 +75,48 @@ impl FluidTicks {
     }
 
     pub fn is_empty(&self) -> bool {
-        match &self.pending {
-            Pending::Game(heap) => heap.is_empty(),
-            Pending::Generation(heap) => heap.0.is_empty(),
-        }
+        self.pending.is_empty() && self.parked.is_empty()
     }
 
     pub fn len(&self) -> usize {
-        match &self.pending {
-            Pending::Game(heap) => heap.len(),
-            Pending::Generation(heap) => heap.0.len(),
+        self.pending.len() + self.parked.values().map(Vec::len).sum::<usize>()
+    }
+
+    pub fn peek_chunk(&self, chunk: (i32, i32)) -> Vec<PendingUpdate> {
+        let remaining = |due: u64| due.saturating_sub(self.now);
+        let mut updates: Vec<PendingUpdate> = self
+            .pending
+            .iter()
+            .map(|entry| entry.0)
+            .filter(|order| (order.x >> 4, order.z >> 4) == chunk)
+            .map(|order| PendingUpdate {
+                pos: IVec3::new(order.x, order.y, order.z),
+                lava: order.lava,
+                delay: remaining(order.due),
+            })
+            .collect();
+        if let Some(parked) = self.parked.get(&chunk) {
+            updates.extend(parked.iter().map(|update| PendingUpdate {
+                pos: update.pos,
+                lava: update.lava,
+                delay: remaining(update.due),
+            }));
         }
+        updates
+    }
+
+    pub fn drop_chunk(&mut self, chunk: (i32, i32)) {
+        self.parked.remove(&chunk);
+        let entries = std::mem::take(&mut self.pending).into_vec();
+        let mut kept = Vec::with_capacity(entries.len());
+        for entry in entries {
+            if (entry.0.x >> 4, entry.0.z >> 4) == chunk {
+                self.release(entry.0.update());
+            } else {
+                kept.push(entry);
+            }
+        }
+        self.pending = std::collections::BinaryHeap::from(kept);
     }
 
     pub fn add(&mut self, pos: IVec3, lava: bool, delay: u64) {
@@ -178,13 +133,8 @@ impl FluidTicks {
 
     fn push(&mut self, update: ScheduledUpdate) {
         *self.scheduled.entry((update.pos, update.lava, update.due)).or_default() += 1;
-        match &mut self.pending {
-            Pending::Game(heap) => {
-                self.sequence += 1;
-                heap.push(std::cmp::Reverse(Order::of(update, self.sequence)));
-            }
-            Pending::Generation(heap) => heap.push(update),
-        }
+        self.sequence += 1;
+        self.pending.push(std::cmp::Reverse(Order::of(update, self.sequence)));
     }
 
     fn release(&mut self, update: ScheduledUpdate) {
@@ -198,29 +148,20 @@ impl FluidTicks {
     }
 
     fn take_next(&mut self) -> Option<ScheduledUpdate> {
-        let update = match &mut self.pending {
-            Pending::Game(heap) => heap.pop().map(|entry| entry.0.update()),
-            Pending::Generation(heap) => heap.pop(),
-        }?;
+        let update = self.pending.pop().map(|entry| entry.0.update())?;
         self.release(update);
         Some(update)
-    }
-
-    pub fn absorb(&mut self, mut other: FluidTicks) {
-        while let Some(update) = other.take_next() {
-            self.push(update);
-        }
     }
 
     pub fn advance<G: Grid>(&mut self, grid: &mut G, rules: &FluidRules) {
         self.now += 1;
         self.due.clear();
-        self.deferred.clear();
+        self.release_parked(grid);
         while let Some(update) = self.next_due(self.now) {
-            if !grid.can_tick(update.pos) {
-                self.deferred.push(update);
-            } else {
+            if grid.can_tick(update.pos) {
                 self.due.push(update);
+            } else if grid.is_loaded(update.pos) {
+                self.parked.entry((update.pos.x >> 4, update.pos.z >> 4)).or_default().push(update);
             }
         }
         self.due.sort_unstable_by_key(|update| (update.pos.x, update.pos.y, update.pos.z, update.lava));
@@ -228,44 +169,29 @@ impl FluidTicks {
             let update = self.due[index];
             flow::step(grid, rules, self, update);
         }
-        for index in 0..self.deferred.len() {
-            let update = self.deferred[index];
-            self.push(update);
+    }
+
+    fn release_parked<G: Grid>(&mut self, grid: &G) {
+        if self.parked.is_empty() {
+            return;
         }
+        let due = &mut self.due;
+        self.parked.retain(|_, updates| {
+            let Some(first) = updates.first() else { return false };
+            if !grid.is_loaded(first.pos) {
+                return false;
+            }
+            if grid.can_tick(first.pos) {
+                due.append(updates);
+                return false;
+            }
+            true
+        });
     }
 
     fn next_due(&mut self, now: u64) -> Option<ScheduledUpdate> {
-        let due = match &self.pending {
-            Pending::Game(heap) => heap.peek().map(|entry| entry.0.due)?,
-            Pending::Generation(heap) => heap.peek()?.due,
-        };
+        let due = self.pending.peek().map(|entry| entry.0.due)?;
         if due <= now { self.take_next() } else { None }
-    }
-
-    pub fn advance_generation<G: Grid>(&mut self, grid: &mut G, rules: &FluidRules) {
-        self.now = u64::MAX;
-        let mut active = GenerationHeap::default();
-        while let Some(update) = self.take_next() {
-            active.push(update);
-        }
-        while let Some(update) = active.pop() {
-            if grid.can_tick(update.pos) {
-                flow::step(grid, rules, self, update);
-            } else {
-                self.add(update.pos, update.lava, 0);
-            }
-        }
-    }
-
-    pub fn take_pending(&mut self) -> Vec<ScheduledUpdate> {
-        self.scheduled.clear();
-        let mut pending = Vec::with_capacity(self.len());
-        match &mut self.pending {
-            Pending::Game(heap) => pending.extend(heap.drain().map(|entry| entry.0.update())),
-            Pending::Generation(heap) => pending.append(&mut heap.0),
-        }
-        pending.sort_unstable_by_key(|update| (update.due, update.pos.x, update.pos.y, update.pos.z, update.lava));
-        pending
     }
 }
 
@@ -392,6 +318,10 @@ mod tests {
             true
         }
 
+        fn is_loaded(&self, pos: IVec3) -> bool {
+            self.loaded.contains(&(pos.x >> 4, pos.z >> 4))
+        }
+
         fn can_tick(&self, pos: IVec3) -> bool {
             if self.read(pos).is_none() {
                 return false;
@@ -410,6 +340,25 @@ mod tests {
     }
 
     #[test]
+    fn generated_ticks_that_cannot_change_anything_are_dropped() {
+        let rules = rules();
+        let mut chunk = crate::chunk::Chunk::new(0, 0, -4, 24, AIR, 1);
+        let enclosed = IVec3::new(5, 0, 5);
+        for offset in [IVec3::X, IVec3::NEG_X, IVec3::Y, IVec3::NEG_Y, IVec3::Z, IVec3::NEG_Z] {
+            let at = enclosed + offset;
+            chunk.set_block(at.x as u8, at.y, at.z as u8, 0, STONE);
+        }
+        chunk.set_block(5, 0, 5, 0, WATER);
+        let open = IVec3::new(10, 0, 10);
+        chunk.set_block(10, 0, 10, 0, WATER);
+        let border = IVec3::new(0, 0, 3);
+        chunk.set_block(0, 0, 3, 0, WATER);
+        let update = |pos| crate::fluid::PendingUpdate { pos, lava: false, delay: 1 };
+        let kept = crate::fluid::retain_active(&chunk, &rules, vec![update(enclosed), update(open), update(border)]);
+        assert_eq!(kept.iter().map(|update| update.pos).collect::<Vec<_>>(), vec![open, border]);
+    }
+
+    #[test]
     fn an_update_fires_only_once_its_delay_has_passed() {
         let rules = rules();
         let (mut grid, mut ticks) = source_in_the_air();
@@ -423,22 +372,19 @@ mod tests {
     }
 
     #[test]
-    fn updates_of_an_unloaded_chunk_wait_until_it_loads() {
+    fn updates_of_an_unloaded_chunk_are_dropped() {
         let rules = rules();
         let (mut grid, mut ticks) = source_in_the_air();
         grid.loaded.remove(&(0, 0));
         for _ in 0..WATER_DELAY + 2 {
             ticks.advance(&mut grid, &rules);
         }
-        assert_eq!(ticks.len(), 1);
+        assert!(ticks.is_empty());
         assert!(grid.writes.is_empty());
-        grid.loaded.insert((0, 0));
-        ticks.advance(&mut grid, &rules);
-        assert_eq!(grid.writes, vec![IVec3::new(5, -1, 5)]);
     }
 
     #[test]
-    fn a_grid_of_unloaded_neighbours_defers_the_update_instead_of_dropping_it() {
+    fn updates_wait_for_the_neighbouring_chunks_and_do_not_cost_anything_meanwhile() {
         let rules = rules();
         let (mut grid, mut ticks) = source_in_the_air();
         grid.loaded.remove(&(1, 0));
@@ -447,6 +393,23 @@ mod tests {
         }
         assert_eq!(ticks.len(), 1);
         assert!(grid.writes.is_empty());
+        grid.loaded.insert((1, 0));
+        ticks.advance(&mut grid, &rules);
+        assert_eq!(grid.writes, vec![IVec3::new(5, -1, 5)]);
+    }
+
+    #[test]
+    fn parked_updates_are_dropped_when_their_chunk_unloads() {
+        let rules = rules();
+        let (mut grid, mut ticks) = source_in_the_air();
+        grid.loaded.remove(&(1, 0));
+        for _ in 0..WATER_DELAY + 2 {
+            ticks.advance(&mut grid, &rules);
+        }
+        assert_eq!(ticks.len(), 1);
+        grid.loaded.remove(&(0, 0));
+        ticks.advance(&mut grid, &rules);
+        assert!(ticks.is_empty());
     }
 
     #[test]
@@ -461,19 +424,6 @@ mod tests {
         ticks.advance(&mut grid, &rules);
         assert!(grid.writes.contains(&IVec3::new(16, 0, 5)));
         assert_eq!(grid.blocks[&IVec3::new(16, 0, 5)], WATER);
-    }
-
-    #[test]
-    fn a_generation_runs_due_updates_in_time_order() {
-        let rules = rules();
-        let mut grid = TestGrid::around();
-        grid.blocks.insert(IVec3::new(1, 0, 1), WATER);
-        grid.blocks.insert(IVec3::new(2, 0, 1), WATER);
-        let mut ticks = FluidTicks::generation_clock(1);
-        ticks.add(IVec3::new(1, 0, 1), false, 5);
-        ticks.add(IVec3::new(2, 0, 1), false, 1);
-        ticks.advance_generation(&mut grid, &rules);
-        assert_eq!(grid.writes, vec![IVec3::new(2, -1, 1), IVec3::new(1, -1, 1)]);
     }
 
     #[test]

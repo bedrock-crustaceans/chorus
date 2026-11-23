@@ -20,7 +20,7 @@ use chorus_level::generator::dimension::Generator;
 use chorus_level::generator::engine::LocateJob;
 
 use super::phases::ChunkPhase;
-use super::{CHUNK_WIDTH, NetherChunk, biome, carver, decorate, feature, rules, structure, surface, terrain};
+use super::{NetherChunk, biome, carver, decorate, feature, rules, structure, surface, terrain};
 use crate::shared::chunk::dense;
 use chorus_level::dimension_definition::{DefinitionError, DimensionDefinition};
 
@@ -110,6 +110,7 @@ pub struct NetherGenerator {
     pub(super) data: Option<Arc<StructureData>>,
     pub palette: Option<PaletteBlocks>,
     pub definition: DimensionDefinition,
+    fluid_rules: std::sync::OnceLock<FluidRules>,
 }
 
 impl NetherGenerator {
@@ -214,11 +215,18 @@ impl NetherGenerator {
             data,
             palette,
             definition,
+            fluid_rules: std::sync::OnceLock::new(),
         })
     }
 
     pub fn blocks(&self) -> &Blocks {
         &self.blocks
+    }
+
+    pub(crate) fn active_fluid_ticks(&self, chunk: &mut chorus_level::chunk::Chunk) {
+        let rules = self.fluid_rules.get_or_init(|| self.fluid_rules());
+        let updates = chunk.take_fluid_updates();
+        chunk.set_fluid_updates(chorus_level::fluid::retain_active(chunk, rules, updates));
     }
 
     pub fn fluid_rules(&self) -> FluidRules {
@@ -285,10 +293,9 @@ impl NetherGenerator {
 }
 
 impl NetherGenerator {
-    pub(super) fn dense_chunk(&self, chunk_x: i32, chunk_z: i32, dense: &NetherChunk) -> Chunk {
-        let origin = (chunk_x * CHUNK_WIDTH, chunk_z * CHUNK_WIDTH);
+    pub(super) fn dense_chunk(&self, chunk_x: i32, chunk_z: i32, dense: &NetherChunk, biomes: &[i32; 256]) -> Chunk {
         let cells = dense.cells_vec();
-        dense::from_dense((chunk_x, chunk_z), self.definition, &cells, self.blocks(), |x, z| self.biome_at(origin.0 + x, origin.1 + z))
+        dense::from_dense((chunk_x, chunk_z), self.definition, &cells, self.blocks(), |x, z| biomes[(x * 16 + z) as usize])
     }
 }
 

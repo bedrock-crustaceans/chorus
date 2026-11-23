@@ -25,5 +25,5 @@ pub(crate) use decoration::filter::Filter;
 pub(crate) use decoration::ore;
 pub(crate) use decoration::rules as feature_rules;
 pub(crate) use decoration::scatter;
-pub(crate) use decoration::seed::decoration_seed;
 pub(crate) use decoration::seed::rule_seed;
+pub(crate) use decoration::seed::{decoration_seed, decoration_seed_with, large_feature_multipliers};

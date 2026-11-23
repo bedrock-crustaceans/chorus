@@ -1,6 +1,7 @@
 use crate::core::config::NetworkConfig;
 use crate::network::network::Network;
 use crate::registry::Registry;
+use crate::schedule::GameSet;
 use crate::utils::rolling_avg::RollingAvg;
 use crate::{Tick, TickClock, TickSet};
 use bevy_app::{App, Plugin, PostStartup};
@@ -130,7 +131,14 @@ impl Plugin for Server {
             .add_systems(PostStartup, (Server::start, Server::restart_clock).chain())
             .add_systems(Tick, Server::start_tick.in_set(TickSet::First))
             .add_systems(Tick, pregen::Pregen::run.in_set(TickSet::First).after(Server::start_tick))
-            .add_systems(Tick, chorus_level::level::Level::tick_fluids.in_set(TickSet::Update))
+            .add_systems(
+                Tick,
+                (
+                    crate::world::tick_area::update_tick_areas.before(chorus_level::level::Level::tick_fluids),
+                    chorus_level::level::Level::tick_fluids,
+                )
+                    .in_set(GameSet::Fluids),
+            )
             .add_systems(Tick, Server::end_tick.in_set(TickSet::Last))
             .add_plugins(Registry)
             .add_plugins(profile::ProfilePlugin)

@@ -9,12 +9,13 @@ use chorus_level::generator::dimension::Generator;
 use chorus_level::generator::engine::LocateJob;
 
 use super::phases::ChunkPhase;
+use super::terrain::{EndNoises, IslandSource};
 use super::{AIR, EndChunk, Spike, cities, decorate, spikes, terrain};
 use crate::bedrock::overworld::decoration_seed;
 use crate::shared::biome::pack_ids::THE_END;
 use crate::shared::blocks::{self, BlockId, BlockTable, Blocks};
 use crate::shared::chunk::dense;
-use crate::shared::decoration_window::{SLOTS, Writes, assemble, window_chunks};
+use crate::shared::decoration_window::{SLOTS, SourceChanges, assemble, window_chunks};
 use crate::shared::rng::mersenne::MersenneTwister;
 use crate::shared::structure::{PaletteBlocks, StructureData};
 use chorus_level::dimension_definition::{DefinitionError, DimensionDefinition};
@@ -34,7 +35,7 @@ pub struct EndBlocks {
     pub frames: [BlockId; 4],
 }
 
-pub type EndWrites = Writes;
+pub type EndWrites = SourceChanges;
 
 pub struct EndGenerator {
     pub(super) seed: u32,
@@ -105,10 +106,14 @@ impl EndGenerator {
         self.noises.island_height(chunk_x, chunk_z, 1, 1)
     }
 
-    pub(super) fn fill_terrain(&self, chunk_x: i32, chunk_z: i32) -> EndChunk {
+    pub(super) fn island_sources(&self, cell: (i32, i32)) -> Vec<IslandSource> {
+        self.noises.island_sources(cell.0, cell.1)
+    }
+
+    pub(super) fn fill_terrain(&self, chunk_x: i32, chunk_z: i32, sources: &[IslandSource]) -> EndChunk {
         let mut chunk = EndChunk::empty(self.definition);
         let end_stone = self.ids.end_stone;
-        let cells = self.noises.cells(chunk_x, chunk_z);
+        let cells = self.noises.cells(chunk_x, chunk_z, sources);
         terrain::fill_stone(&cells, |x: usize, y: i32, z: usize| chunk.set(x as i32, y, z as i32, end_stone));
         chunk
     }
@@ -138,12 +143,13 @@ impl EndGenerator {
         }
         let (data, _) = (self.data.as_ref()?, self.palette.as_ref()?);
         let library = data.library.as_ref()?;
-        let island = self.noises.island_height(start.0, start.1, 1, 1);
+        let sources = self.noises.island_sources(start.0, start.1);
+        let island = EndNoises::island_height_from(&sources, start.0, start.1, 1, 1);
         if (island.floor() as i16) < 0 {
             return None;
         }
         let rotation = cities::rotation(start);
-        let cells = self.noises.cells(start.0, start.1);
+        let cells = self.noises.cells(start.0, start.1, &sources);
         let height = cities::start_height(&|x, z| terrain::column_top(&cells, x, z), rotation);
         cities::is_start(start, island, height).then(|| Arc::new(cities::generate(&mut random, start, height, library)))
     }
@@ -166,19 +172,26 @@ impl EndGenerator {
         chunk
     }
 
-    pub(super) fn decorate_source(&self, source: (i32, i32), loaded: &[Arc<EndChunk>; SLOTS], terrain: &[Arc<EndChunk>; SLOTS], earlier: &[((i32, i32), &EndWrites)]) -> EndWrites {
+    pub(super) fn decorate_source(
+        &self,
+        source: (i32, i32),
+        loaded: &[Arc<EndChunk>; SLOTS],
+        terrain: &[Arc<EndChunk>; SLOTS],
+        islands: &[IslandSource],
+        earlier: &[((i32, i32), &EndWrites)],
+    ) -> EndWrites {
         let mut chunks = window_chunks(source, earlier.iter().copied(), |slot| (*loaded[slot]).clone());
         let tops: [[i32; 256]; SLOTS] = std::array::from_fn(|slot| terrain[slot].column_tops());
         let mut random = MersenneTwister::new(decoration_seed(self.seed, source.0, source.1));
         random.skip(RULE_DRAWS);
         let mut view = decorate::View::new(&mut chunks, &tops, source);
-        let island = |x: i32, z: i32| self.noises.island_height(x, z, 1, 1);
+        let island = |x: i32, z: i32| EndNoises::island_height_from(islands, x, z, 1, 1);
         decorate::decorate(&mut random, source, &mut view, &self.spikes, &self.ids, island);
-        view.take_writes()
+        view.take_changes()
     }
 
     pub(super) fn assemble(&self, cell: (i32, i32), loaded: &EndChunk, around: &[Arc<EndWrites>; SLOTS]) -> EndChunk {
-        assemble(cell, loaded.clone(), |index| &*around[index])
+        assemble(cell, loaded.clone(), |index| &around[index])
     }
 }
 

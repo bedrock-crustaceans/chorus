@@ -174,29 +174,31 @@ impl PoolEntry {
     }
 
     pub fn jigsaws<'d>(&'d self, library: &TemplateLibrary, origin: (i32, i32, i32), rotation: Rotation) -> Vec<Connector<'d>> {
+        let mut connectors = Vec::new();
+        self.jigsaws_into(library, origin, rotation, &mut connectors);
+        connectors
+    }
+
+    pub fn jigsaws_into<'d>(&'d self, library: &TemplateLibrary, origin: (i32, i32, i32), rotation: Rotation, out: &mut Vec<Connector<'d>>) {
+        out.clear();
         match &self.kind {
-            EntryKind::Template { template, prepared, .. } => template
-                .jigsaws
-                .iter()
-                .zip(prepared.iter())
-                .map(|(layout, prepared)| {
-                    let block = template.blocks[layout.block];
-                    let (dx, dy, dz) = rotation.apply((block.x as i32, block.y as i32, block.z as i32));
-                    Connector {
-                        pos: (origin.0 + dx, origin.1 + dy, origin.2 + dz),
-                        front: prepared.front.rotate(rotation),
-                        top: prepared.top.rotate(rotation),
-                        name: &layout.name,
-                        target: &layout.target,
-                        pool: &prepared.pool,
-                        aligned: prepared.aligned,
-                        final_state: library.rotated(layout.final_state, rotation as usize),
-                        selection_priority: layout.selection_priority,
-                        placement_priority: layout.placement_priority,
-                    }
-                })
-                .collect(),
-            EntryKind::Feature(_) => vec![Connector {
+            EntryKind::Template { template, prepared, .. } => out.extend(template.jigsaws.iter().zip(prepared.iter()).map(|(layout, prepared)| {
+                let block = template.blocks[layout.block];
+                let (dx, dy, dz) = rotation.apply((block.x as i32, block.y as i32, block.z as i32));
+                Connector {
+                    pos: (origin.0 + dx, origin.1 + dy, origin.2 + dz),
+                    front: prepared.front.rotate(rotation),
+                    top: prepared.top.rotate(rotation),
+                    name: &layout.name,
+                    target: &layout.target,
+                    pool: &prepared.pool,
+                    aligned: prepared.aligned,
+                    final_state: library.rotated(layout.final_state, rotation as usize),
+                    selection_priority: layout.selection_priority,
+                    placement_priority: layout.placement_priority,
+                }
+            })),
+            EntryKind::Feature(_) => out.push(Connector {
                 pos: origin,
                 front: Dir::Down,
                 top: Dir::South,
@@ -207,8 +209,8 @@ impl PoolEntry {
                 final_state: 0,
                 selection_priority: 0,
                 placement_priority: 0,
-            }],
-            EntryKind::Missing | EntryKind::Empty => Vec::new(),
+            }),
+            EntryKind::Missing | EntryKind::Empty => {}
         }
     }
 }

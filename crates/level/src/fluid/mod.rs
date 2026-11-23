@@ -1,6 +1,8 @@
 mod flow;
 mod ticks;
 
+use crate::chunk::Chunk;
+
 pub use ticks::{FluidTicks, ScheduledUpdate};
 
 pub const DEPTHS: usize = 16;
@@ -106,7 +108,64 @@ pub trait Grid {
 
     fn can_tick(&self, pos: glam::IVec3) -> bool;
 
-    fn route(&mut self, _pos: glam::IVec3, _lava: bool, _delay: u64) -> bool {
-        false
+    fn is_loaded(&self, _pos: glam::IVec3) -> bool {
+        true
     }
+}
+
+struct ChunkProbe<'a> {
+    chunk: &'a Chunk,
+    wrote: bool,
+}
+
+impl Grid for ChunkProbe<'_> {
+    fn read(&self, pos: glam::IVec3) -> Option<i32> {
+        if (pos.x >> 4, pos.z >> 4) != (self.chunk.x, self.chunk.z) {
+            return None;
+        }
+        self.chunk.get_block((pos.x & 15) as u8, pos.y, (pos.z & 15) as u8, 0)
+    }
+
+    fn write(&mut self, _pos: glam::IVec3, _block: i32) -> bool {
+        self.wrote = true;
+        true
+    }
+
+    fn can_tick(&self, _pos: glam::IVec3) -> bool {
+        true
+    }
+}
+
+pub fn retain_active(chunk: &Chunk, rules: &FluidRules, updates: Vec<PendingUpdate>) -> Vec<PendingUpdate> {
+    let mut probe = ChunkProbe { chunk, wrote: false };
+    let mut scratch = FluidTicks::game();
+    updates
+        .into_iter()
+        .filter(|update| {
+            let (local_x, local_z) = (update.pos.x & 15, update.pos.z & 15);
+            if !(1..=14).contains(&local_x) || !(1..=14).contains(&local_z) {
+                return true;
+            }
+            let here = probe.read(update.pos).unwrap_or(rules.blocks().air);
+            if rules.cell(here).magma {
+                return true;
+            }
+            probe.wrote = false;
+            flow::step(
+                &mut probe,
+                rules,
+                &mut scratch,
+                ScheduledUpdate {
+                    pos: update.pos,
+                    lava: update.lava,
+                    due: 0,
+                },
+            );
+            let active = probe.wrote || !scratch.is_empty();
+            if !scratch.is_empty() {
+                scratch = FluidTicks::game();
+            }
+            active
+        })
+        .collect()
 }

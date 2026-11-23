@@ -119,6 +119,7 @@ pub struct LevelConfig {
     pub seed: LevelSeed,
     pub chunk_saving: ChunkSaving,
     pub max_view_distance: i32,
+    pub tick_distance: i32,
     /// How many generated pieces of each kind to keep per player for neighbouring chunks, as a multiple of the chunks in the player's view.
     pub retention_budget: f64,
     /// How many chunks beyond the loaded area a player is assumed to be able to walk before the generator has to be ready, which is how far outside
@@ -138,6 +139,7 @@ impl Default for LevelConfig {
             seed: LevelSeed::default(),
             chunk_saving: ChunkSaving::default(),
             max_view_distance: 32,
+            tick_distance: 4,
             retention_budget: 8.0,
             lookahead: 0,
             chunk_cache: 0.5,

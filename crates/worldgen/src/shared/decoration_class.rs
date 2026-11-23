@@ -18,7 +18,7 @@ pub fn is_class<const CLASS: u8>(cell: IVec2) -> bool {
     class_of((cell.x, cell.y)) == CLASS
 }
 
-pub fn earlier_offsets(reader: u8, earlier: u8) -> &'static [(i32, i32)] {
+fn wide_earlier_offsets(reader: u8, earlier: u8) -> &'static [(i32, i32)] {
     match (reader, earlier) {
         (1, 0) => &[(-1, -2), (-1, 0), (-1, 2), (1, -2), (1, 0), (1, 2)],
         (2, 0) => &[(-1, -1), (-1, 1), (1, -1), (1, 1)],
@@ -30,10 +30,37 @@ pub fn earlier_offsets(reader: u8, earlier: u8) -> &'static [(i32, i32)] {
     }
 }
 
+fn adjacent_earlier_offsets(reader: u8, earlier: u8) -> &'static [(i32, i32)] {
+    match (reader, earlier) {
+        (1, 0) => &[(-1, 0), (1, 0)],
+        (2, 0) => &[(-1, -1), (-1, 1), (1, -1), (1, 1)],
+        (2, 1) => &[(0, -1), (0, 1)],
+        (3, 0) => &[(0, -1), (0, 1)],
+        (3, 1) => &[(-1, -1), (-1, 1), (1, -1), (1, 1)],
+        (3, 2) => &[(-1, 0), (1, 0)],
+        _ => &[],
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum Reach {
+    Adjacent,
+    Wide,
+}
+
+pub fn earlier_offsets(reach: Reach, reader: u8, earlier: u8) -> &'static [(i32, i32)] {
+    match reach {
+        Reach::Adjacent => adjacent_earlier_offsets(reader, earlier),
+        Reach::Wide => wide_earlier_offsets(reader, earlier),
+    }
+}
+
 pub trait Decorates: Generator {
     type Decoration: Send + Sync + 'static;
 
     const RETAIN: usize;
+
+    const REACH: Reach = Reach::Wide;
 
     fn inputs() -> Vec<Dependency<Self>>;
 
@@ -50,13 +77,13 @@ impl<G: Decorates, const CLASS: u8> Phase<G> for DecoratePhase<G, CLASS> {
     fn dependencies() -> Vec<Dependency<G>> {
         let mut dependencies = G::inputs();
         if CLASS > 0 {
-            dependencies.push(Dependency::on::<DecoratePhase<G, 0>>(earlier_offsets(CLASS, 0)));
+            dependencies.push(Dependency::on::<DecoratePhase<G, 0>>(earlier_offsets(G::REACH, CLASS, 0)));
         }
         if CLASS > 1 {
-            dependencies.push(Dependency::on::<DecoratePhase<G, 1>>(earlier_offsets(CLASS, 1)));
+            dependencies.push(Dependency::on::<DecoratePhase<G, 1>>(earlier_offsets(G::REACH, CLASS, 1)));
         }
         if CLASS > 2 {
-            dependencies.push(Dependency::on::<DecoratePhase<G, 2>>(earlier_offsets(CLASS, 2)));
+            dependencies.push(Dependency::on::<DecoratePhase<G, 2>>(earlier_offsets(G::REACH, CLASS, 2)));
         }
         dependencies
     }
@@ -79,7 +106,7 @@ impl<G: Decorates, const CLASS: u8> Phase<G> for DecoratePhase<G, CLASS> {
 }
 
 fn gather_earlier<G: Decorates, const CLASS: u8, const EARLIER: u8>(context: &PhaseContext<G>, cell: IVec2, found: &mut Vec<((i32, i32), Arc<G::Decoration>)>) -> Result<(), PhaseError> {
-    for &(dx, dz) in earlier_offsets(CLASS, EARLIER) {
+    for &(dx, dz) in earlier_offsets(G::REACH, CLASS, EARLIER) {
         let at = cell + IVec2::new(dx, dz);
         found.push(((at.x, at.y), (*context.get::<DecoratePhase<G, EARLIER>>(at)?).clone()));
     }
@@ -135,10 +162,20 @@ mod tests {
                     if class_of((x, z)) != reader {
                         continue;
                     }
-                    for &(dx, dz) in earlier_offsets(reader, earlier) {
+                    for &(dx, dz) in wide_earlier_offsets(reader, earlier).iter().chain(adjacent_earlier_offsets(reader, earlier)) {
                         assert_eq!(class_of((x + dx, z + dz)), earlier, "reader {reader} at ({x}, {z}) offset ({dx}, {dz})");
                     }
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn adjacent_offsets_are_the_wide_offsets_within_one_cell() {
+        for reader in 0..4 {
+            for earlier in 0..4 {
+                let adjacent: Vec<_> = wide_earlier_offsets(reader, earlier).iter().copied().filter(|(dx, dz)| dx.abs().max(dz.abs()) <= 1).collect();
+                assert_eq!(adjacent_earlier_offsets(reader, earlier), adjacent.as_slice());
             }
         }
     }

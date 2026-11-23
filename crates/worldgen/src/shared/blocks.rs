@@ -97,27 +97,60 @@ pub struct Blocks {
     entries: Vec<Entry>,
 }
 
-fn single_difference(from: &[State], to: &[State]) -> Option<State> {
-    let changed = |states: &[State], other: &[State]| {
-        states
-            .iter()
-            .filter(|(k, v)| other.iter().find(|(ok, _)| ok == k).is_none_or(|(_, ov)| ov != v))
-            .cloned()
-            .collect::<Vec<State>>()
-    };
-    let added = changed(to, from);
-    let removed = changed(from, to);
-    match (added.as_slice(), removed.as_slice()) {
-        ([change], []) => Some(change.clone()),
-        ([change], [gone]) if gone.0 == change.0 => Some(change.clone()),
-        _ => None,
-    }
-}
-
 fn index_key(name: &str, states: &[State], flooded: bool) -> String {
     let mut sorted: Vec<_> = states.iter().map(|(k, v)| format!("{k}={v:?}")).collect();
     sorted.sort();
     format!("{name}[{}]{}", sorted.join(","), if flooded { "~" } else { "" })
+}
+
+fn without<'e>(states: &[&'e State], skip: usize) -> Vec<(&'e str, &'e BlockState)> {
+    states.iter().enumerate().filter(|(i, _)| *i != skip).map(|(_, state)| (state.0.as_ref(), &state.1)).collect()
+}
+
+type Variant = (CowArc<'static, str>, BlockState, BlockId);
+
+fn keyed_variants(entries: &[Entry], members: &[usize]) -> Vec<Vec<Variant>> {
+    let sorted: Vec<Vec<&State>> = members
+        .iter()
+        .map(|&id| {
+            let mut states: Vec<&State> = entries[id].states.iter().collect();
+            states.sort_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()));
+            states
+        })
+        .collect();
+    let mut neighbours: HashMap<Vec<(&str, &BlockState)>, Vec<(usize, usize)>> = HashMap::new();
+    for (member, states) in sorted.iter().enumerate() {
+        for skip in 0..states.len() {
+            neighbours.entry(without(states, skip)).or_default().push((member, skip));
+        }
+    }
+    sorted
+        .iter()
+        .enumerate()
+        .map(|(from, states)| {
+            let mut found: Vec<(usize, usize)> = Vec::new();
+            let full = without(states, usize::MAX);
+            if let Some(extended) = neighbours.get(&full) {
+                found.extend(extended.iter().copied());
+            }
+            for skip in 0..states.len() {
+                let Some(siblings) = neighbours.get(&without(states, skip)) else { continue };
+                for &(to, at) in siblings {
+                    if to != from && sorted[to][at].0 == states[skip].0 && sorted[to][at].1 != states[skip].1 {
+                        found.push((to, at));
+                    }
+                }
+            }
+            found.sort_by_key(|&(to, _)| to);
+            found
+                .into_iter()
+                .map(|(to, at)| {
+                    let (k, v) = sorted[to][at];
+                    (k.clone(), v.clone(), members[to] as BlockId)
+                })
+                .collect()
+        })
+        .collect()
 }
 
 impl<'a> BlockTable<'a> {
@@ -266,11 +299,8 @@ impl<'a> BlockTable<'a> {
             groups.entry((entry.name.clone(), entry.flooded)).or_default().push(id);
         }
         for members in groups.values() {
-            for &from in members {
-                let variants: Vec<_> = members
-                    .iter()
-                    .filter_map(|&to| single_difference(&self.entries[from].states, &self.entries[to].states).map(|(k, v)| (k, v, to as BlockId)))
-                    .collect();
+            let keyed = keyed_variants(&self.entries, members);
+            for (&from, variants) in members.iter().zip(keyed) {
                 self.entries[from].variants = variants;
             }
         }

@@ -68,6 +68,9 @@ pub trait Cells {
     fn is_air(&self, block: BlockId) -> bool;
     fn min_y(&self) -> i32;
     fn max_y(&self) -> i32;
+    fn top_block_y(&mut self) -> i32 {
+        i32::MAX
+    }
 }
 
 pub struct RegionCells<'a, 'b>(pub &'a mut Region<'b>);
@@ -99,6 +102,10 @@ impl Cells for RegionCells<'_, '_> {
 
     fn max_y(&self) -> i32 {
         self.0.max_y()
+    }
+
+    fn top_block_y(&mut self) -> i32 {
+        self.0.top_block_y()
     }
 }
 
@@ -237,26 +244,43 @@ impl Ore {
                 widest = sphere.radius_squared;
             }
         }
+        if low[1] > world.top_block_y() {
+            return false;
+        }
         let mut near: Vec<&Sphere> = Vec::with_capacity(spheres.len());
+        let mut in_row: Vec<&Sphere> = Vec::with_capacity(spheres.len());
         let mut placed = false;
         for x in low[0]..=high[0] {
+            let cell_x = x as f32 + CELL_CENTRE;
+            in_row.clear();
+            in_row.extend(
+                spheres
+                    .iter()
+                    .zip(kept)
+                    .filter(|(sphere, kept)| **kept && axis_reach(cell_x, sphere.centre[0]) < sphere.radius_squared)
+                    .map(|(sphere, _)| sphere),
+            );
+            if in_row.is_empty() {
+                continue;
+            }
             for z in low[2]..=high[2] {
-                let (cell_x, cell_z) = (x as f32 + CELL_CENTRE, z as f32 + CELL_CENTRE);
+                let cell_z = z as f32 + CELL_CENTRE;
                 if !axis.column_near(cell_x, cell_z, widest) {
                     continue;
                 }
                 near.clear();
-                near.extend(
-                    spheres
-                        .iter()
-                        .zip(kept)
-                        .filter(|(sphere, kept)| **kept && axis_reach(cell_x, sphere.centre[0]) < sphere.radius_squared && axis_reach(cell_z, sphere.centre[2]) < sphere.radius_squared)
-                        .map(|(sphere, _)| sphere),
-                );
+                near.extend(in_row.iter().copied().filter(|sphere| axis_reach(cell_z, sphere.centre[2]) < sphere.radius_squared));
                 if near.is_empty() {
                     continue;
                 }
-                for y in low[1].max(world.min_y())..=high[1].min(world.max_y()) {
+                let (mut reach_low, mut reach_high) = (i32::MAX, i32::MIN);
+                for sphere in &near {
+                    let flat = axis_reach(cell_x, sphere.centre[0]) + axis_reach(cell_z, sphere.centre[2]);
+                    let height = (sphere.radius_squared - flat).max(0.0).sqrt();
+                    reach_low = reach_low.min((sphere.centre[1] - height).floor() as i32 - 1);
+                    reach_high = reach_high.max((sphere.centre[1] + height).floor() as i32 + 1);
+                }
+                for y in low[1].max(world.min_y()).max(reach_low)..=high[1].min(world.max_y()).min(reach_high) {
                     let cell = [cell_x, y as f32 + CELL_CENTRE, cell_z];
                     if axis.cell_near(cell, widest) && near.iter().any(|sphere| distance_squared(cell, sphere.centre) < sphere.radius_squared) {
                         placed |= self.replace(world, random, IVec3::new(x, y, z));

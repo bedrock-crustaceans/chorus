@@ -20,25 +20,27 @@ struct Data {
 #[derive(Clone)]
 pub struct SectionStore(Arc<Data>);
 
-type Spare = (Vec<Meta>, Vec<i32>, Vec<u32>);
+type Spare = (Vec<Meta>, Vec<i32>, Vec<u32>, Vec<u16>);
 
 thread_local! {
-    static SPARE: RefCell<Spare> = const { RefCell::new((Vec::new(), Vec::new(), Vec::new())) };
+    static SPARE: RefCell<Spare> = const { RefCell::new((Vec::new(), Vec::new(), Vec::new(), Vec::new())) };
 }
 
 pub struct SectionStoreBuilder {
     meta: Vec<Meta>,
     values: Vec<i32>,
     words: Vec<u32>,
+    indices: Vec<u16>,
 }
 
 impl Default for SectionStoreBuilder {
     fn default() -> Self {
-        let (mut meta, mut values, mut words) = SPARE.try_with(|spare| std::mem::take(&mut *spare.borrow_mut())).unwrap_or_default();
+        let (mut meta, mut values, mut words, mut indices) = SPARE.try_with(|spare| std::mem::take(&mut *spare.borrow_mut())).unwrap_or_default();
         meta.clear();
         values.clear();
         words.clear();
-        Self { meta, values, words }
+        indices.resize(4096, 0);
+        Self { meta, values, words, indices }
     }
 }
 
@@ -70,21 +72,57 @@ impl SectionStoreBuilder {
     }
 
     pub fn push_blocks(&mut self, blocks: &[i32; 4096]) {
-        let mut values = [0i32; 4096];
-        let mut indices = [0u16; 4096];
-        values[0] = blocks[0];
-        let mut count = 1usize;
+        let values_at = self.values.len();
+        let words_at = self.words.len() as u32;
+        if blocks.iter().all(|&value| value == blocks[0]) {
+            self.values.push(blocks[0]);
+            self.meta.push(Meta {
+                bits: 0,
+                values_at: values_at as u32,
+                values_len: 1,
+                words_at,
+            });
+            return;
+        }
+
+        let second = blocks.iter().position(|&value| value != blocks[0]).map_or(blocks[0], |at| blocks[at]);
+        let words_start = self.words.len();
+        let mut only_two = true;
+        for group in blocks.as_chunks::<32>().0.iter() {
+            let mut word = 0u32;
+            let mut covered = true;
+            for (slot, &value) in group.iter().enumerate() {
+                let high = value == second;
+                covered &= high | (value == blocks[0]);
+                word |= (high as u32) << slot;
+            }
+            only_two &= covered;
+            self.words.push(word);
+        }
+        if only_two {
+            self.values.push(blocks[0]);
+            self.values.push(second);
+            self.meta.push(Meta {
+                bits: 1,
+                values_at: values_at as u32,
+                values_len: 2,
+                words_at,
+            });
+            return;
+        }
+        self.words.truncate(words_start);
+
+        self.values.push(blocks[0]);
         let mut last = (blocks[0], 0usize);
-        for (slot, &value) in indices.iter_mut().zip(blocks) {
+        for (slot, &value) in self.indices.iter_mut().zip(blocks) {
             let index = if value == last.0 {
                 last.1
             } else {
-                let index = match values[..count].iter().position(|&known| known == value) {
+                let index = match self.values[values_at..].iter().position(|&known| known == value) {
                     Some(index) => index,
                     None => {
-                        values[count] = value;
-                        count += 1;
-                        count - 1
+                        self.values.push(value);
+                        self.values.len() - values_at - 1
                     }
                 };
                 last = (value, index);
@@ -93,20 +131,20 @@ impl SectionStoreBuilder {
             *slot = index as u16;
         }
 
-        let values_at = self.values.len() as u32;
-        self.values.extend_from_slice(&values[..count]);
-        let words_at = self.words.len() as u32;
+        let count = self.values.len() - values_at;
         let bits = if count == 1 { 0 } else { BitArray::<4096>::bits_for((count - 1) as u16) };
         if bits != 0 {
             let per_word = (32 / bits as u32) as usize;
-            for group in indices.chunks(per_word) {
-                self.words
-                    .push(group.iter().enumerate().fold(0u32, |word, (slot, &index)| word | (index as u32) << (slot as u32 * bits as u32)));
-            }
+            let bits = bits as u32;
+            self.words.extend(
+                self.indices
+                    .chunks(per_word)
+                    .map(|group| group.iter().enumerate().fold(0u32, |word, (slot, &index)| word | (index as u32) << (slot as u32 * bits))),
+            );
         }
         self.meta.push(Meta {
             bits,
-            values_at,
+            values_at: values_at as u32,
             values_len: count as u16,
             words_at,
         });
@@ -118,7 +156,7 @@ impl SectionStoreBuilder {
             values: self.values.as_slice().into(),
             words: self.words.as_slice().into(),
         };
-        let _ = SPARE.try_with(|spare| *spare.borrow_mut() = (self.meta, self.values, self.words));
+        let _ = SPARE.try_with(|spare| *spare.borrow_mut() = (self.meta, self.values, self.words, self.indices));
         SectionStore(Arc::new(data))
     }
 }
@@ -167,6 +205,30 @@ impl SectionStore {
     pub fn uniform_value(&self, section: usize) -> Option<i32> {
         let meta = self.0.meta[section];
         (meta.bits == 0).then(|| self.0.values[meta.values_at as usize])
+    }
+
+    pub fn palette(&self, section: usize) -> &[i32] {
+        let meta = self.0.meta[section];
+        let start = meta.values_at as usize;
+        &self.0.values[start..start + meta.values_len as usize]
+    }
+
+    pub fn decode_into<T: Copy>(&self, section: usize, out: &mut [T; 4096], convert: impl Fn(i32) -> T) {
+        let meta = self.0.meta[section];
+        let values = &self.0.values[meta.values_at as usize..meta.values_at as usize + meta.values_len as usize];
+        if meta.bits == 0 {
+            out.fill(convert(values[0]));
+            return;
+        }
+        let table: Vec<T> = values.iter().map(|&value| convert(value)).collect();
+        let bits = meta.bits as u32;
+        let per_word = (32 / bits) as usize;
+        let mask = (1u32 << bits) - 1;
+        for (chunk, &word) in out.chunks_mut(per_word).zip(self.words_of(section)) {
+            for (slot, value) in chunk.iter_mut().enumerate() {
+                *value = table[((word >> (slot as u32 * bits)) & mask) as usize];
+            }
+        }
     }
 
     pub fn to_array(&self, section: usize) -> [i32; 4096] {

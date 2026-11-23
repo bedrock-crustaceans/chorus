@@ -108,6 +108,7 @@ pub struct Engine<G: Generator> {
     pub located: Vec<(u64, Option<Located>)>,
     pub next_locate: u64,
     pub discarded: Vec<Outcome>,
+    producers: FxHashMap<(PhaseId, IVec2, u32), TaskKey>,
     pub to_release: Vec<TaskKey>,
     pub revision: u64,
 }
@@ -157,6 +158,7 @@ impl<G: Generator> Engine<G> {
             located: Vec::new(),
             next_locate: 0,
             discarded: Vec::new(),
+            producers: FxHashMap::default(),
             to_release: Vec::new(),
             revision: 0,
         }

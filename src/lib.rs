@@ -249,6 +249,7 @@ impl Plugin for ChorusPlugin {
                 schedule::GameSet::Connection,
                 schedule::GameSet::Input,
                 schedule::GameSet::World,
+                schedule::GameSet::Fluids,
                 schedule::GameSet::Actors,
                 schedule::GameSet::Chat,
                 schedule::GameSet::Chunks,

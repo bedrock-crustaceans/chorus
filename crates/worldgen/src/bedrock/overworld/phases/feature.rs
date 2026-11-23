@@ -4,19 +4,13 @@ use super::structure::{structured, structured_baseline};
 use crate::shared::blocks::Blocks;
 use crate::shared::chunk::proto::ProtoChunk;
 use crate::shared::chunk::region::{Changes, merge};
-use crate::shared::decoration_class::{class_of, is_class};
+use crate::shared::decoration_class::{Reach, class_of, earlier_offsets, is_class};
 use crate::shared::{CHUNK_NEIGHBORHOOD, into_array};
 use chorus_level::generator::error::PhaseError;
 use chorus_level::generator::phase::{Dependency, Mailing, Phase, PhaseContext, Request};
 use glam::IVec2;
 
 pub(super) const OWNERS: &[(i32, i32)] = &[(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
-
-const ORTHOGONAL_X: &[(i32, i32)] = &[(-1, 0), (1, 0)];
-
-const ORTHOGONAL_Z: &[(i32, i32)] = &[(0, -1), (0, 1)];
-
-const DIAGONALS: &[(i32, i32)] = &[(-1, -1), (-1, 1), (1, -1), (1, 1)];
 
 trait Earlier: Mailing<OverworldGenerator, Mail = Changes> {
     fn earlier(context: &PhaseContext<OverworldGenerator>, target: IVec2) -> Vec<(IVec2, &Changes)>;
@@ -28,18 +22,15 @@ fn decorate_class<P: Earlier>(generator: &OverworldGenerator, cell: IVec2, conte
         let source = cell + IVec2::new(dx, dz);
         let baseline = structured_baseline(context, source)?;
         let mut chunk = (*baseline).clone();
-        {
-            let mut edit = chunk.edit();
-            let mut inherited = Vec::new();
-            let mail: Vec<(IVec2, &Changes)> = P::earlier(context, source);
-            for (_, changes) in &mail {
-                if (dx, dz) == (0, 0) {
-                    inherited.extend_from_slice(&changes.routed_ticks);
-                }
+        let mut inherited = Vec::new();
+        let mail: Vec<(IVec2, &Changes)> = P::earlier(context, source);
+        for (_, changes) in &mail {
+            if (dx, dz) == (0, 0) {
+                inherited.extend_from_slice(&changes.routed_ticks);
             }
-            merge_phases(&mail, &generator.blocks, &mut edit);
-            edit.set_inherited_ticks(inherited);
         }
+        merge_phases(&mail, &generator.blocks, &mut chunk);
+        chunk.set_inherited_ticks(inherited);
         chunks.push(chunk);
     }
     let chunks: [ProtoChunk; 9] = into_array(chunks);
@@ -96,7 +87,7 @@ impl Phase<OverworldGenerator> for FeaturePhase1 {
     fn dependencies() -> Vec<Dependency<OverworldGenerator>> {
         vec![
             structured(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<1>),
-            chain::<FeaturePhase0>(ORTHOGONAL_X).with_mail(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<1>),
+            chain::<FeaturePhase0>(earlier_offsets(Reach::Adjacent, 1, 0)).with_mail(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<1>),
         ]
     }
 
@@ -135,8 +126,8 @@ impl Phase<OverworldGenerator> for FeaturePhase2 {
     fn dependencies() -> Vec<Dependency<OverworldGenerator>> {
         vec![
             structured(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<2>),
-            chain::<FeaturePhase0>(DIAGONALS).with_mail(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<2>),
-            chain::<FeaturePhase1>(ORTHOGONAL_Z).with_mail(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<2>),
+            chain::<FeaturePhase0>(earlier_offsets(Reach::Adjacent, 2, 0)).with_mail(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<2>),
+            chain::<FeaturePhase1>(earlier_offsets(Reach::Adjacent, 2, 1)).with_mail(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<2>),
         ]
     }
 
@@ -177,9 +168,9 @@ impl Phase<OverworldGenerator> for FeaturePhase3 {
     fn dependencies() -> Vec<Dependency<OverworldGenerator>> {
         vec![
             structured(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<3>),
-            chain::<FeaturePhase0>(ORTHOGONAL_Z).with_mail(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<3>),
-            chain::<FeaturePhase1>(DIAGONALS).with_mail(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<3>),
-            chain::<FeaturePhase2>(ORTHOGONAL_X).with_mail(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<3>),
+            chain::<FeaturePhase0>(earlier_offsets(Reach::Adjacent, 3, 0)).with_mail(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<3>),
+            chain::<FeaturePhase1>(earlier_offsets(Reach::Adjacent, 3, 1)).with_mail(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<3>),
+            chain::<FeaturePhase2>(earlier_offsets(Reach::Adjacent, 3, 2)).with_mail(CHUNK_NEIGHBORHOOD).if_dependent(is_class::<3>),
         ]
     }
 

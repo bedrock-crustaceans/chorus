@@ -154,6 +154,20 @@ mod tests {
     }
 
     #[test]
+    fn the_tick_distance_defaults_to_four_chunks_and_is_read_from_the_config() {
+        assert_eq!(Config::default().get::<LevelConfig>().tick_distance, 4);
+        assert_eq!(
+            config(
+                "[level]
+tick_distance = 2"
+            )
+            .get::<LevelConfig>()
+            .tick_distance,
+            2
+        );
+    }
+
+    #[test]
     fn the_chunk_cache_defaults_to_half_a_view_and_is_read_from_the_config() {
         assert_eq!(Config::default().get::<LevelConfig>().chunk_cache, 0.5);
         assert_eq!(config("[level]\nchunk_cache = 0").get::<LevelConfig>().chunk_cache, 0.0);

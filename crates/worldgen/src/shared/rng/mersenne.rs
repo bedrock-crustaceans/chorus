@@ -7,12 +7,15 @@ const LOWER_MASK: u32 = 0x7FFF_FFFF;
 const TEMPER_B: u32 = 0x9D2C_5680;
 const TEMPER_C: u32 = 0xEFC6_0000;
 const UNSEEDED_SEED: u32 = 5489;
+const LAZY_BLOCK: usize = 4;
 const UNIT_32: f64 = 2.3283064365386963e-10;
 
 #[derive(Clone)]
 pub struct MersenneTwister {
     seed: u32,
     state: [u32; STATE_SIZE],
+    seeded: usize,
+    ready: usize,
     index: usize,
     spare_gaussian: Option<f32>,
 }
@@ -27,16 +30,42 @@ impl MersenneTwister {
     pub fn new(seed: u32) -> Self {
         let mut state = [0u32; STATE_SIZE];
         state[0] = seed;
-        for i in 1..STATE_SIZE {
-            let previous = state[i - 1];
-            state[i] = INIT_MULTIPLIER.wrapping_mul(previous ^ (previous >> 30)).wrapping_add(i as u32);
-        }
         Self {
             seed,
             state,
-            index: STATE_SIZE,
+            seeded: 1,
+            ready: 0,
+            index: 0,
             spare_gaussian: None,
         }
+    }
+
+    fn seed_to(&mut self, count: usize) {
+        for i in self.seeded..count {
+            let previous = self.state[i - 1];
+            self.state[i] = INIT_MULTIPLIER.wrapping_mul(previous ^ (previous >> 30)).wrapping_add(i as u32);
+        }
+        self.seeded = self.seeded.max(count);
+    }
+
+    fn twist_partial(&mut self) {
+        let end = (self.ready + LAZY_BLOCK).min(STATE_SIZE);
+        let shifted = STATE_SIZE - SHIFT_SIZE;
+        let mut needed = if self.ready < shifted { end.min(shifted) + SHIFT_SIZE } else { 0 };
+        if end > shifted {
+            needed = needed.max(end + 1);
+        }
+        self.seed_to(needed.min(STATE_SIZE));
+        for k in self.ready..end {
+            self.twist_word(k);
+        }
+        self.ready = end;
+    }
+
+    fn twist_word(&mut self, k: usize) {
+        let y = (self.state[k] & UPPER_MASK) | (self.state[(k + 1) % STATE_SIZE] & LOWER_MASK);
+        let mag = if y & 1 == 1 { MATRIX_A } else { 0 };
+        self.state[k] = self.state[(k + SHIFT_SIZE) % STATE_SIZE] ^ (y >> 1) ^ mag;
     }
 
     pub fn seed(&self) -> u32 {
@@ -81,18 +110,21 @@ impl MersenneTwister {
         }
     }
 
-    fn twist(&mut self) {
-        for k in 0..STATE_SIZE {
-            let y = (self.state[k] & UPPER_MASK) | (self.state[(k + 1) % STATE_SIZE] & LOWER_MASK);
-            let mag = if y & 1 == 1 { MATRIX_A } else { 0 };
-            self.state[k] = self.state[(k + SHIFT_SIZE) % STATE_SIZE] ^ (y >> 1) ^ mag;
+    #[cold]
+    fn refill(&mut self) {
+        if self.ready < STATE_SIZE {
+            self.twist_partial();
+        } else {
+            for k in 0..STATE_SIZE {
+                self.twist_word(k);
+            }
+            self.index = 0;
         }
-        self.index = 0;
     }
 
     pub fn next_u32(&mut self) -> u32 {
-        if self.index >= STATE_SIZE {
-            self.twist();
+        if self.index >= self.ready {
+            self.refill();
         }
         let y = self.state[self.index];
         self.index += 1;
@@ -149,6 +181,34 @@ mod tests {
         default.skip(9999);
         assert_eq!(default.next_u32(), 4123659995);
         assert_eq!(MersenneTwister::new(1).next_u32(), 1791095845);
+    }
+
+    #[test]
+    fn lazy_generation_matches_eager_for_every_draw_count() {
+        fn eager(seed: u32) -> Vec<u32> {
+            let mut state = [0u32; STATE_SIZE];
+            state[0] = seed;
+            for i in 1..STATE_SIZE {
+                let previous = state[i - 1];
+                state[i] = INIT_MULTIPLIER.wrapping_mul(previous ^ (previous >> 30)).wrapping_add(i as u32);
+            }
+            let mut out = Vec::new();
+            for _ in 0..3 {
+                for k in 0..STATE_SIZE {
+                    let y = (state[k] & UPPER_MASK) | (state[(k + 1) % STATE_SIZE] & LOWER_MASK);
+                    let mag = if y & 1 == 1 { MATRIX_A } else { 0 };
+                    state[k] = state[(k + SHIFT_SIZE) % STATE_SIZE] ^ (y >> 1) ^ mag;
+                }
+                out.extend(state.iter().map(|&word| MersenneTwister::temper(word)));
+            }
+            out
+        }
+        for seed in [0, 1, 5489, 0xDEAD_BEEF, u32::MAX] {
+            let expected = eager(seed);
+            let mut random = MersenneTwister::new(seed);
+            let drawn: Vec<u32> = (0..expected.len()).map(|_| random.next_u32()).collect();
+            assert_eq!(drawn, expected, "{seed}");
+        }
     }
 
     #[test]

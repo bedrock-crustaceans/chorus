@@ -48,12 +48,6 @@ fn put<G: Grid>(grid: &mut G, rules: &FluidRules, pos: IVec3, block: i32) {
     grid.write(pos, block);
 }
 
-fn schedule<G: Grid>(grid: &mut G, ticks: &mut FluidTicks, pos: IVec3, lava: bool, delay: u64) {
-    if !grid.route(pos, lava, delay) {
-        ticks.add(pos, lava, delay);
-    }
-}
-
 pub fn step<G: Grid>(grid: &mut G, rules: &FluidRules, ticks: &mut FluidTicks, update: ScheduledUpdate) {
     let here = read(grid, rules, update.pos);
     if rules.cell(here).magma {
@@ -80,7 +74,7 @@ fn wake_neighbours<G: Grid>(grid: &mut G, rules: &FluidRules, ticks: &mut FluidT
         }
         let delay = delay_of(rules, found.lava);
         if liquid_depth(grid, rules, neighbour, found.lava).is_some() && !ticks.is_scheduled(neighbour, found.lava, delay) {
-            schedule(grid, ticks, neighbour, found.lava, delay);
+            ticks.add(neighbour, found.lava, delay);
         }
     }
 }
@@ -144,7 +138,7 @@ fn settle_depth<G: Grid>(grid: &mut G, rules: &FluidRules, ticks: &mut FluidTick
     } else {
         put(grid, rules, pos, rules.liquid_block(lava, target as u8));
         wake_neighbours(grid, rules, ticks, pos);
-        schedule(grid, ticks, pos, lava, delay_of(rules, lava));
+        ticks.add(pos, lava, delay_of(rules, lava));
     }
     target
 }
@@ -211,5 +205,5 @@ fn spread_to<G: Grid>(grid: &mut G, rules: &FluidRules, ticks: &mut FluidTicks, 
     }
     put(grid, rules, pos, rules.liquid_block(lava, depth as u8));
     wake_neighbours(grid, rules, ticks, pos);
-    schedule(grid, ticks, pos, lava, delay_of(rules, lava));
+    ticks.add(pos, lava, delay_of(rules, lava));
 }

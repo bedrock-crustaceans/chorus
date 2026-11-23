@@ -66,6 +66,7 @@ pub struct Assembly<'a> {
     rooms: Vec<Room>,
     queue: BinaryHeap<(i32, Reverse<usize>, usize, usize)>,
     queued: usize,
+    options: Vec<Connector<'a>>,
 }
 
 impl StartSpec<'_> {
@@ -142,6 +143,7 @@ impl<'a> Assembly<'a> {
             rooms: Vec::new(),
             queue: BinaryHeap::new(),
             queued: 0,
+            options: Vec::new(),
         }
     }
 
@@ -215,7 +217,8 @@ impl<'a> Assembly<'a> {
             let mut rotations = Rotation::ALL;
             shuffle(self.random, &mut rotations);
             for rotation in rotations {
-                let mut options = entry.jigsaws(self.library, (0, 0, 0), rotation);
+                let mut options = std::mem::take(&mut self.options);
+                entry.jigsaws_into(self.library, (0, 0, 0), rotation, &mut options);
                 shuffle(self.random, &mut options);
                 options.sort_by_key(|option| Reverse(option.selection_priority));
                 for candidate in &options {
@@ -251,8 +254,12 @@ impl<'a> Assembly<'a> {
                     let at = self.pieces.len();
                     self.pieces.push(child);
                     self.enqueue(jigsaw.placement_priority, at, room);
+                    options.clear();
+                    self.options = options;
                     return Ok(());
                 }
+                options.clear();
+                self.options = options;
             }
         }
         Ok(())

@@ -1,42 +1,29 @@
 use super::blocks::{AIR, BlockId};
-use super::chunk::column::ColumnChunk;
+use super::chunk::proto::{ProtoChunk, RoutedTick};
+use super::chunk::region::{Changes, Write, replay_ordered};
 use super::decoration_class::class_of;
 use super::{CHUNK_MASK, CHUNK_SHIFT};
 
 pub const SIDE: i32 = 3;
 pub const SLOTS: usize = 9;
 
-pub struct Write {
-    pub dx: i32,
-    pub dz: i32,
-    pub index: u32,
-    pub seen: BlockId,
-    pub block: BlockId,
-}
-
-pub struct Writes {
-    cells: Vec<Write>,
-}
-
-impl Writes {
-    pub fn apply(&self, chunk: &mut ColumnChunk, offset: (i32, i32)) {
-        for cell in &self.cells {
-            if cell.dx == offset.0 && cell.dz == offset.1 && chunk.get_at(cell.index as usize) == cell.seen {
-                chunk.set_at(cell.index as usize, cell.block);
-            }
-        }
-    }
-}
+pub type SourceChanges = [Changes; SLOTS];
 
 pub struct Window<'a> {
-    chunks: &'a mut [ColumnChunk; SLOTS],
+    chunks: &'a mut [ProtoChunk; SLOTS],
     source: (i32, i32),
-    writes: Vec<Write>,
+    writes: [Vec<Write>; SLOTS],
+    routed: [Vec<RoutedTick>; SLOTS],
 }
 
 impl<'a> Window<'a> {
-    pub fn new(chunks: &'a mut [ColumnChunk; SLOTS], source: (i32, i32)) -> Self {
-        Self { chunks, source, writes: Vec::new() }
+    pub fn new(chunks: &'a mut [ProtoChunk; SLOTS], source: (i32, i32)) -> Self {
+        Self {
+            chunks,
+            source,
+            writes: Default::default(),
+            routed: Default::default(),
+        }
     }
 
     #[inline]
@@ -74,59 +61,71 @@ impl<'a> Window<'a> {
         if skip_unchanged && seen == block {
             return false;
         }
-        self.writes.push(Write {
-            dx: (x >> CHUNK_SHIFT) - self.source.0,
-            dz: (z >> CHUNK_SHIFT) - self.source.1,
-            index: self.chunks[slot].index(local_x, y, local_z) as u32,
-            seen,
-            block,
-        });
-        self.chunks[slot].set(local_x, y, local_z, block);
+        if seen != block {
+            self.writes[slot].push(Write {
+                x: local_x as u8,
+                y: y as i16,
+                z: local_z as u8,
+                block,
+                seen,
+                rule: 0,
+            });
+            self.chunks[slot].set(local_x, y, local_z, block);
+        }
         true
     }
 
-    pub fn has_block(&self, x: i32, y: i32, z: i32) -> bool {
-        self.chunks[0].contains_y(y) && self.slot(x, z).is_some()
+    pub fn route_tick(&mut self, tick: RoutedTick) {
+        if let Some(slot) = self.slot(tick.pos.x, tick.pos.z) {
+            self.routed[slot].push(tick);
+        }
     }
 
     pub fn min_y(&self) -> i32 {
-        self.chunks[0].min_y()
+        self.chunks[0].min_y
     }
 
     pub fn max_y(&self) -> i32 {
         self.chunks[0].max_y()
     }
 
-    pub fn take_writes(&mut self) -> Writes {
-        Writes {
-            cells: std::mem::take(&mut self.writes),
-        }
+    pub fn take_changes(&mut self) -> SourceChanges {
+        let writes = std::mem::take(&mut self.writes);
+        let routed = std::mem::take(&mut self.routed);
+        let mut routed = routed.into_iter();
+        writes.map(|writes| Changes::from_writes(&writes, routed.next().unwrap_or_default()))
     }
 }
 
-pub fn slot_of(x: i32, z: i32, source: (i32, i32)) -> Option<usize> {
-    let (dx, dz) = ((x >> CHUNK_SHIFT) - source.0, (z >> CHUNK_SHIFT) - source.1);
+pub fn slot_at(dx: i32, dz: i32) -> Option<usize> {
     (dx.abs() < 2 && dz.abs() < 2).then(|| ((dx + 1) * SIDE + (dz + 1)) as usize)
 }
 
-pub fn window_chunks<'w>(source: (i32, i32), earlier: impl Iterator<Item = ((i32, i32), &'w Writes)> + Clone, base: impl Fn(usize) -> ColumnChunk) -> [ColumnChunk; SLOTS] {
+pub fn slot_of(x: i32, z: i32, source: (i32, i32)) -> Option<usize> {
+    slot_at((x >> CHUNK_SHIFT) - source.0, (z >> CHUNK_SHIFT) - source.1)
+}
+
+pub fn offset_slot(from: (i32, i32), to: (i32, i32)) -> usize {
+    ((to.0 - from.0 + 1) * SIDE + (to.1 - from.1 + 1)) as usize
+}
+
+pub fn window_chunks<'w>(source: (i32, i32), earlier: impl Iterator<Item = ((i32, i32), &'w SourceChanges)> + Clone, base: impl Fn(usize) -> ProtoChunk) -> [ProtoChunk; SLOTS] {
     std::array::from_fn(|slot| {
         let target = (source.0 + slot as i32 / SIDE - 1, source.1 + slot as i32 % SIDE - 1);
         let mut chunk = base(slot);
-        for (cell, writes) in earlier.clone() {
-            if (cell.0 - target.0).abs() <= 1 && (cell.1 - target.1).abs() <= 1 {
-                writes.apply(&mut chunk, (target.0 - cell.0, target.1 - cell.1));
-            }
-        }
+        let mail: Vec<&Changes> = earlier
+            .clone()
+            .filter(|(cell, _)| (cell.0 - target.0).abs() <= 1 && (cell.1 - target.1).abs() <= 1)
+            .map(|(cell, changes)| &changes[offset_slot(cell, target)])
+            .collect();
+        replay_ordered(&mut chunk, &mail);
         chunk
     })
 }
 
-pub fn assemble<'w>(cell: (i32, i32), mut chunk: ColumnChunk, around: impl Fn(usize) -> &'w Writes) -> ColumnChunk {
-    for source in sources_near(cell) {
-        let index = ((source.0 - cell.0 + 1) * SIDE + (source.1 - cell.1 + 1)) as usize;
-        around(index).apply(&mut chunk, (cell.0 - source.0, cell.1 - source.1));
-    }
+pub fn assemble<'w>(cell: (i32, i32), mut chunk: ProtoChunk, around: impl Fn(usize) -> &'w SourceChanges) -> ProtoChunk {
+    let mail: Vec<&Changes> = sources_near(cell).into_iter().map(|source| &around(offset_slot(cell, source))[offset_slot(source, cell)]).collect();
+    replay_ordered(&mut chunk, &mail);
     chunk
 }
 

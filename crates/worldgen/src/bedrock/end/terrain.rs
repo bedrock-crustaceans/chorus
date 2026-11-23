@@ -43,6 +43,12 @@ pub struct EndNoises {
     island: SimplexNoise,
 }
 
+pub struct IslandSource {
+    step_x: i32,
+    step_z: i32,
+    factor: f32,
+}
+
 impl EndNoises {
     pub fn new(seed: u32) -> Self {
         let mut random = MersenneTwister::new(seed);
@@ -59,12 +65,13 @@ impl EndNoises {
     }
 
     pub fn island_height(&self, chunk_x: i32, chunk_z: i32, cell_x: i32, cell_z: i32) -> f32 {
-        let clamp = |height: f32| height.clamp(HEIGHT_MIN, HEIGHT_MAX);
-        let (x, z) = ((cell_x + chunk_x * 2) as f32, (cell_z + chunk_z * 2) as f32);
-        let mut height = clamp((z * z + x * x).sqrt() * -ISLAND_RING + ISLAND_RAISE);
+        Self::island_height_from(&self.island_sources(chunk_x, chunk_z), chunk_x, chunk_z, cell_x, cell_z)
+    }
+
+    pub fn island_sources(&self, chunk_x: i32, chunk_z: i32) -> Vec<IslandSource> {
+        let mut sources = Vec::new();
         for step_x in -ISLAND_SCAN..=ISLAND_SCAN {
             let column_x = chunk_x + step_x;
-            let local_x = (cell_x + step_x * -2) as f32;
             for step_z in -ISLAND_SCAN..=ISLAND_SCAN {
                 let column_z = chunk_z + step_z;
                 if i64::from(column_z) * i64::from(column_z) + i64::from(column_x) * i64::from(column_x) <= ISLAND_GRID_FROM
@@ -73,24 +80,35 @@ impl EndNoises {
                     continue;
                 }
                 let factor = ((column_z.unsigned_abs().wrapping_mul(ISLAND_STEP_A)).wrapping_add(column_x.unsigned_abs().wrapping_mul(ISLAND_STEP_B)) % ISLAND_STEPS + ISLAND_STEP_BASE) as f32;
-                let local_z = (cell_z - step_z * 2) as f32;
-                let outer = clamp(ISLAND_OUTER_FACTOR - (local_z * local_z + local_x * local_x).sqrt() * factor);
-                if outer > height {
-                    height = outer;
-                }
+                sources.push(IslandSource { step_x, step_z, factor });
+            }
+        }
+        sources
+    }
+
+    pub fn island_height_from(sources: &[IslandSource], chunk_x: i32, chunk_z: i32, cell_x: i32, cell_z: i32) -> f32 {
+        let clamp = |height: f32| height.clamp(HEIGHT_MIN, HEIGHT_MAX);
+        let (x, z) = ((cell_x + chunk_x * 2) as f32, (cell_z + chunk_z * 2) as f32);
+        let mut height = clamp((z * z + x * x).sqrt() * -ISLAND_RING + ISLAND_RAISE);
+        for source in sources {
+            let local_x = (cell_x + source.step_x * -2) as f32;
+            let local_z = (cell_z - source.step_z * 2) as f32;
+            let outer = clamp(ISLAND_OUTER_FACTOR - (local_z * local_z + local_x * local_x).sqrt() * source.factor);
+            if outer > height {
+                height = outer;
             }
         }
         height
     }
 
-    pub fn cells(&self, chunk_x: i32, chunk_z: i32) -> Vec<f32> {
+    pub fn cells(&self, chunk_x: i32, chunk_z: i32, sources: &[IslandSource]) -> Vec<f32> {
         let origin = [(chunk_x * 2) as f32, 0.0, (chunk_z * 2) as f32];
         let main = fill_cells(&self.main, origin, MAIN_SCALE);
         let lower = fill_cells(&self.lower_limit, origin, LIMIT_SCALE);
         let upper = fill_cells(&self.upper_limit, origin, LIMIT_SCALE);
         let mut result = vec![0.0f32; COLUMNS * ROWS];
         for column in 0..COLUMNS {
-            let height = self.island_height(chunk_x, chunk_z, (column / CELLS) as i32, (column % CELLS) as i32);
+            let height = Self::island_height_from(sources, chunk_x, chunk_z, (column / CELLS) as i32, (column % CELLS) as i32);
             for row in 0..ROWS {
                 let index = column * ROWS + row;
                 let low = lower[index] * LIMIT_VALUE_SCALE;

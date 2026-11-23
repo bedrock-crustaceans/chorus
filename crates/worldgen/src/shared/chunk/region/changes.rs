@@ -1,9 +1,14 @@
+use super::radix::sort_stable_by_key;
 use super::rules::RuleKind;
 use super::{CENTER, Region, SPARE_DIRTY};
 use crate::shared::blocks::BlockId;
 use crate::shared::chunk::packed::Packed;
 use crate::shared::chunk::proto::{PlacedEntity, ProtoChunk, RoutedTick};
 use std::sync::Arc;
+
+thread_local! {
+    static DIRTY_BUFFER: std::cell::RefCell<Vec<(u8, i16, u8)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
 
 pub(super) fn section_position(x: u8, y: i16, z: u8) -> (i8, u16) {
     (y.div_euclid(16) as i8, ((y.rem_euclid(16) as u16) << 8) | ((z as u16) << 4) | x as u16)
@@ -17,7 +22,12 @@ pub(super) struct Sectioned {
 
 impl Sectioned {
     fn new(dirty: &mut Vec<(u8, i16, u8)>) -> Self {
-        dirty.sort_unstable_by_key(|&(x, y, z)| section_position(x, y, z));
+        DIRTY_BUFFER.with(|buffer| {
+            sort_stable_by_key(dirty, &mut buffer.borrow_mut(), |&(x, y, z)| {
+                let (section, position) = section_position(x, y, z);
+                ((section as i32 + 128) as u32) << 12 | position as u32
+            })
+        });
         dirty.dedup();
         let mut sections: Vec<(i8, u16)> = Vec::new();
         let mut positions = Vec::with_capacity(dirty.len());
@@ -47,13 +57,13 @@ impl Sectioned {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct Write {
-    pub(super) x: u8,
-    pub(super) y: i16,
-    pub(super) z: u8,
-    pub(super) block: BlockId,
-    pub(super) seen: BlockId,
-    pub(super) rule: u16,
+pub struct Write {
+    pub x: u8,
+    pub y: i16,
+    pub z: u8,
+    pub block: BlockId,
+    pub seen: BlockId,
+    pub rule: u16,
 }
 
 #[derive(Clone)]
@@ -72,7 +82,7 @@ pub struct Changes {
     indices: Packed,
     pub(super) marks: Sectioned,
     pub(super) replay: Option<Replay>,
-    pub(super) rules: Arc<[(Box<[u16]>, RuleKind)]>,
+    pub(super) rules: Option<Arc<[(Box<[u16]>, RuleKind)]>>,
     pub entities: Vec<PlacedEntity>,
     pub routed_ticks: Vec<RoutedTick>,
     pub consumed_ticks: Vec<RoutedTick>,
@@ -115,7 +125,7 @@ struct Taken {
 }
 
 impl Changes {
-    fn new(dirty: &mut Vec<(u8, i16, u8)>, chunk: &ProtoChunk, taken: Taken, rules: Arc<[(Box<[u16]>, RuleKind)]>) -> Self {
+    fn new(dirty: &mut Vec<(u8, i16, u8)>, chunk: &ProtoChunk, taken: Taken, rules: Option<Arc<[(Box<[u16]>, RuleKind)]>>) -> Self {
         let Taken {
             entities,
             mut marks,
@@ -151,8 +161,23 @@ impl Changes {
         }
     }
 
+    pub fn from_writes(writes: &[Write], routed_ticks: Vec<RoutedTick>) -> Self {
+        Self {
+            positions: Sectioned::new(&mut Vec::new()),
+            palette: Box::default(),
+            indices: Packed::new(0, &[]),
+            marks: Sectioned::new(&mut Vec::new()),
+            replay: (!writes.is_empty()).then(|| Replay::new(writes)),
+            rules: None,
+            entities: Vec::new(),
+            routed_ticks,
+            consumed_ticks: Vec::new(),
+            pending_fluid: Vec::new(),
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
-        self.positions.positions.is_empty() && self.marks.positions.is_empty() && self.entities.is_empty() && self.routed_ticks.is_empty()
+        self.positions.positions.is_empty() && self.marks.positions.is_empty() && self.entities.is_empty() && self.routed_ticks.is_empty() && self.replay.is_none()
     }
 
     pub fn changes(&self) -> impl Iterator<Item = (u8, i16, u8, BlockId)> + '_ {
@@ -174,7 +199,7 @@ impl Changes {
 
 impl Region<'_> {
     pub fn into_changes(mut self) -> [Changes; 9] {
-        let rules: Arc<[(Box<[u16]>, RuleKind)]> = std::mem::take(&mut self.rules).into();
+        let rules: Option<Arc<[(Box<[u16]>, RuleKind)]>> = (!self.rules.is_empty()).then(|| std::mem::take(&mut self.rules).into());
         let chunks = std::array::from_fn(|slot| {
             let consumed = if slot == CENTER { self.chunks[slot].inherited_ticks().to_vec() } else { Vec::new() };
             let pending = if slot == CENTER { self.chunks[slot].take_pending_fluid() } else { Vec::new() };
@@ -189,7 +214,7 @@ impl Region<'_> {
                     pending_fluid: pending,
                     writes: std::mem::take(&mut self.writes[slot]),
                 },
-                Arc::clone(&rules),
+                rules.clone(),
             )
         });
         for chunk in &mut self.chunks {

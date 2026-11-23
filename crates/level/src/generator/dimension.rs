@@ -81,6 +81,7 @@ struct Fluids {
 
 struct ChunkGrid<'a> {
     chunks: &'a mut HashMap<(i32, i32), Arc<Chunk>>,
+    ticking: Option<&'a HashSet<(i32, i32)>>,
     changed: &'a mut Vec<(glam::IVec3, i32)>,
 }
 
@@ -101,11 +102,18 @@ impl Grid for ChunkGrid<'_> {
         changed
     }
 
+    fn is_loaded(&self, pos: glam::IVec3) -> bool {
+        self.chunks.contains_key(&(pos.x >> 4, pos.z >> 4))
+    }
+
     fn can_tick(&self, pos: glam::IVec3) -> bool {
         if !self.chunks.contains_key(&(pos.x >> 4, pos.z >> 4)) {
             return false;
         }
         let (cx, cz) = (pos.x >> 4, pos.z >> 4);
+        if self.ticking.is_some_and(|ticking| !ticking.contains(&(cx, cz))) {
+            return false;
+        }
         (-1..=1).all(|dx| (-1..=1).all(|dz| self.chunks.contains_key(&(cx + dx, cz + dz))))
     }
 }
@@ -119,6 +127,7 @@ pub struct Dimension {
     chunks: HashMap<(i32, i32), Arc<Chunk>>,
     fluids: Option<Fluids>,
     fluid_changes: Vec<(glam::IVec3, i32)>,
+    ticking: Option<HashSet<(i32, i32)>>,
     storage: Option<Arc<LevelStorage>>,
     chunk_saving: ChunkSaving,
     persist: HashSet<(i32, i32)>,
@@ -151,6 +160,7 @@ impl Dimension {
             chunks: HashMap::new(),
             fluids,
             fluid_changes: Vec::new(),
+            ticking: None,
             storage: None,
             chunk_saving: ChunkSaving::default(),
             persist: HashSet::new(),
@@ -266,7 +276,17 @@ impl Dimension {
         saved
     }
 
+    fn snapshot_fluid_ticks(&mut self, position: (i32, i32)) {
+        let (Some(fluids), Some(chunk)) = (&self.fluids, self.chunks.get_mut(&position)) else { return };
+        let updates = fluids.ticks.peek_chunk(position);
+        if updates.is_empty() && chunk.fluid_updates().is_empty() {
+            return;
+        }
+        Arc::make_mut(chunk).set_fluid_updates(updates);
+    }
+
     fn save_chunk(&mut self, position: (i32, i32)) -> bool {
+        self.snapshot_fluid_ticks(position);
         let (Some(storage), Some(chunk)) = (&self.storage, self.chunks.get_mut(&position)) else {
             return false;
         };
@@ -352,7 +372,12 @@ impl Dimension {
             self.loading.remove(&(x, z));
             let cancelled = self.cancelled.remove(&(x, z));
             match result {
-                Ok(Some(chunk)) => {
+                Ok(Some(mut chunk)) => {
+                    if let Some(fluids) = &mut self.fluids {
+                        for update in chunk.take_fluid_updates() {
+                            fluids.ticks.add(update.pos, update.lava, update.delay);
+                        }
+                    }
                     self.chunks.entry((x, z)).or_insert_with(|| Arc::new(chunk));
                     self.persist.remove(&(x, z));
                     generated.push((x, z));
@@ -403,6 +428,7 @@ impl Dimension {
         let mut unloaded = 0;
         let mut staged = false;
         for position in unloading {
+            self.snapshot_fluid_ticks(position);
             if self.chunks[&position].is_dirty() {
                 if !self.save_chunk(position) {
                     continue;
@@ -411,6 +437,9 @@ impl Dimension {
             }
             if let Some(chunk) = self.chunks.remove(&position) {
                 self.keep_cold(position, chunk);
+            }
+            if let Some(fluids) = &mut self.fluids {
+                fluids.ticks.drop_chunk(position);
             }
             self.unloaded.push(position);
             unloaded += 1;
@@ -456,12 +485,41 @@ impl Dimension {
 
     pub fn tick_fluids(&mut self) -> &[(glam::IVec3, i32)] {
         self.fluid_changes.clear();
-        let Self { fluids, chunks, fluid_changes, .. } = self;
+        let Self {
+            fluids,
+            chunks,
+            fluid_changes,
+            ticking,
+            ..
+        } = self;
         if let Some(fluids) = fluids {
-            let mut grid = ChunkGrid { chunks, changed: fluid_changes };
+            let mut grid = ChunkGrid {
+                chunks,
+                ticking: ticking.as_ref(),
+                changed: fluid_changes,
+            };
             fluids.ticks.advance(&mut grid, &fluids.rules);
         }
         &self.fluid_changes
+    }
+
+    pub fn set_tick_area(&mut self, centres: &[(i32, i32)], distance: i32) {
+        let distance = distance.max(0);
+        let mut area = HashSet::with_capacity(centres.len() * ((2 * distance + 1) * (2 * distance + 1)) as usize);
+        if distance > 0 {
+            for &(cx, cz) in centres {
+                for dx in -distance..=distance {
+                    for dz in -distance..=distance {
+                        area.insert((cx + dx, cz + dz));
+                    }
+                }
+            }
+        }
+        self.ticking = Some(area);
+    }
+
+    pub fn pending_fluid_ticks(&self) -> usize {
+        self.fluids.as_ref().map_or(0, |fluids| fluids.ticks.len())
     }
 
     pub fn settle_fluids(&mut self, ticks: usize) {

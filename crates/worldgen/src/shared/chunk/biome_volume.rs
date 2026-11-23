@@ -129,6 +129,16 @@ impl BiomeVolume {
         self.sections.to_array(section)
     }
 
+    pub fn palette_len_at(&self, y: i32) -> usize {
+        let ry = (y - self.min_y).clamp(0, self.sections.len() as i32 * SECTION_SIZE - 1);
+        self.sections.palette((ry >> 4) as usize).len()
+    }
+
+    pub fn section_ids_at(&self, y: i32) -> [i32; SECTION_BLOCKS] {
+        let ry = (y - self.min_y).clamp(0, self.sections.len() as i32 * SECTION_SIZE - 1);
+        self.section_ids((ry >> 4) as usize)
+    }
+
     pub fn uniform_id_at(&self, y: i32) -> Option<i32> {
         let ry = (y - self.min_y).clamp(0, self.sections.len() as i32 * SECTION_SIZE - 1);
         self.sections.uniform_value((ry >> 4) as usize)

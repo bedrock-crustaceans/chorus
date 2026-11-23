@@ -14,7 +14,20 @@ const MAIN_SCALE_Y: f32 = 4.277575;
 const FREQUENCY_STEP: f32 = 0.5;
 const TERRAIN_NAME: &str = "minecraft:terrain";
 
-pub const GRID_COLUMNS: usize = 5;
+pub const GRID_COLUMNS: usize = 4;
+
+struct Row {
+    y: i32,
+    fade_t: f32,
+    special: bool,
+    gy: f32,
+    first: [i32; 2],
+    second: [i32; 2],
+}
+
+thread_local! {
+    static ROWS: std::cell::RefCell<Vec<Row>> = const { std::cell::RefCell::new(Vec::new()) };
+}
 
 struct PerlinLevel {
     origin: [f32; 3],
@@ -46,47 +59,59 @@ impl PerlinLevel {
         let mut cached_y = -1i32;
         let mut cache = [0.0f32; 4];
         let mut index = 0;
+        let mut rows = ROWS.try_with(|rows| std::mem::take(&mut *rows.borrow_mut())).unwrap_or_default();
         for i in 0..GRID_COLUMNS {
             let fx = (i as f32 + position[0]) * scale[0] + self.origin[0];
             let floor_x = fx.floor();
             let x = floor_x as i32 & 255;
             let u = fx - floor_x;
             let fu = fade(u);
+            rows.clear();
+            for j in 0..grid_levels {
+                let fy = (j as f32 + position[1]) * scale[1] + self.origin[1];
+                let floor_y = fy.floor();
+                let y = floor_y as i32 & 255;
+                let t = fy - floor_y;
+                let special = y_start as i32 == fy as i32;
+                let gy = if special { y_start - (y_start as i32) as f32 } else { t - (t / scale[1]).floor() * scale[1] };
+                let a = p[x as usize] + y;
+                let b = p[x as usize + 1] + y;
+                rows.push(Row {
+                    y,
+                    fade_t: fade(t),
+                    special,
+                    gy,
+                    first: [hash(a) as i32, hash(b) as i32],
+                    second: [hash(a + 1) as i32, hash(b + 1) as i32],
+                });
+            }
             for k in 0..GRID_COLUMNS {
                 let fz = (k as f32 + position[2]) * scale[2] + self.origin[2];
                 let floor_z = fz.floor();
                 let z = floor_z as i32 & 255;
                 let w = fz - floor_z;
-                for j in 0..grid_levels {
-                    let fy = (j as f32 + position[1]) * scale[1] + self.origin[1];
-                    let floor_y = fy.floor();
-                    let y = floor_y as i32 & 255;
-                    let t = fy - floor_y;
-                    let special = y_start as i32 == fy as i32;
-                    if special || y != cached_y {
-                        let gy = if special { y_start - (y_start as i32) as f32 } else { t - (t / scale[1]).floor() * scale[1] };
-                        let a = p[x as usize] + y;
-                        let b = p[x as usize + 1] + y;
+                let fade_w = fade(w);
+                for row in &rows {
+                    if row.special || row.y != cached_y {
+                        let gy = row.gy;
+                        let [ha, hb] = row.first;
+                        let [ha1, hb1] = row.second;
                         cache = [
-                            lerp(fu, gradient(hash(hash(a) as i32 + z), u, gy, w), gradient(hash(hash(b) as i32 + z), u - 1.0, gy, w)),
-                            lerp(fu, gradient(hash(hash(a + 1) as i32 + z), u, gy - 1.0, w), gradient(hash(hash(b + 1) as i32 + z), u - 1.0, gy - 1.0, w)),
-                            lerp(fu, gradient(hash(hash(a) as i32 + z + 1), u, gy, w - 1.0), gradient(hash(hash(b) as i32 + z + 1), u - 1.0, gy, w - 1.0)),
-                            lerp(
-                                fu,
-                                gradient(hash(hash(a + 1) as i32 + z + 1), u, gy - 1.0, w - 1.0),
-                                gradient(hash(hash(b + 1) as i32 + z + 1), u - 1.0, gy - 1.0, w - 1.0),
-                            ),
+                            lerp(fu, gradient(hash(ha + z), u, gy, w), gradient(hash(hb + z), u - 1.0, gy, w)),
+                            lerp(fu, gradient(hash(ha1 + z), u, gy - 1.0, w), gradient(hash(hb1 + z), u - 1.0, gy - 1.0, w)),
+                            lerp(fu, gradient(hash(ha + z + 1), u, gy, w - 1.0), gradient(hash(hb + z + 1), u - 1.0, gy, w - 1.0)),
+                            lerp(fu, gradient(hash(ha1 + z + 1), u, gy - 1.0, w - 1.0), gradient(hash(hb1 + z + 1), u - 1.0, gy - 1.0, w - 1.0)),
                         ];
-                        cached_y = y;
+                        cached_y = row.y;
                     }
-                    let ft = fade(t);
-                    let v0 = lerp(ft, cache[0], cache[1]);
-                    let v1 = lerp(ft, cache[2], cache[3]);
-                    out[index] += lerp(fade(w), v0, v1) * inverse;
+                    let v0 = lerp(row.fade_t, cache[0], cache[1]);
+                    let v1 = lerp(row.fade_t, cache[2], cache[3]);
+                    out[index] += lerp(fade_w, v0, v1) * inverse;
                     index += 1;
                 }
             }
         }
+        let _ = ROWS.try_with(|slot| *slot.borrow_mut() = rows);
     }
 }
 

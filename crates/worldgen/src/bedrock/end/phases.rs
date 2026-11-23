@@ -5,35 +5,36 @@ use chorus_level::generator::error::PhaseError;
 use chorus_level::generator::phase::{Dependency, Phase, PhaseContext, SAME_CELL};
 
 use super::cities::{self, City};
+use super::terrain::IslandSource;
 use super::{EndChunk, EndGenerator, EndWrites};
 use crate::shared::CHUNK_NEIGHBORHOOD;
-use crate::shared::decoration_class::{self, Decorates, decorations_around, neighborhood, on_decorations};
+use crate::shared::cell_phase::{CellOutput, CellPhase};
+use crate::shared::decoration_class::{self, Decorates, Reach, decorations_around, neighborhood, on_decorations};
+use crate::shared::footprint;
 use crate::shared::structure::BoundingBox;
 use glam::IVec2;
 
-const REACH_SIDE: usize = (cities::REACH * 2 + 1) as usize;
-const REACH_CELLS: usize = REACH_SIDE * REACH_SIDE;
-const REACH_OFFSETS: [(i32, i32); REACH_CELLS] = reach_offsets();
-
-const fn reach_offsets() -> [(i32, i32); REACH_CELLS] {
-    let mut offsets = [(0, 0); REACH_CELLS];
-    let mut x = -cities::REACH;
-    let mut index = 0;
-    while x <= cities::REACH {
-        let mut z = -cities::REACH;
-        while z <= cities::REACH {
-            offsets[index] = (x, z);
-            index += 1;
-            z += 1;
-        }
-        x += 1;
-    }
-    offsets
-}
+const REACH_OFFSETS: [(i32, i32); footprint::cells(cities::REACH)] = footprint::square(cities::REACH);
 
 fn city_candidate(cell: IVec2) -> bool {
     super::generator::may_start_city(cell.x, cell.y)
 }
+
+pub struct IslandCells;
+
+impl CellOutput<EndGenerator> for IslandCells {
+    type Value = Vec<IslandSource>;
+
+    const NAME: &'static str = "IslandPhase";
+
+    const RETAIN: usize = 512;
+
+    fn compute(generator: &EndGenerator, cell: IVec2) -> Vec<IslandSource> {
+        generator.island_sources((cell.x, cell.y))
+    }
+}
+
+pub type IslandPhase = CellPhase<IslandCells>;
 
 pub struct TerrainPhase;
 
@@ -42,8 +43,13 @@ impl Phase<EndGenerator> for TerrainPhase {
 
     const RETAIN: usize = 512;
 
-    fn run(generator: &EndGenerator, cell: IVec2, _inputs: &mut PhaseContext<EndGenerator>) -> Result<Arc<EndChunk>, PhaseError> {
-        let mut chunk = generator.fill_terrain(cell.x, cell.y);
+    fn dependencies() -> Vec<Dependency<EndGenerator>> {
+        vec![Dependency::on::<IslandPhase>(SAME_CELL)]
+    }
+
+    fn run(generator: &EndGenerator, cell: IVec2, context: &mut PhaseContext<EndGenerator>) -> Result<Arc<EndChunk>, PhaseError> {
+        let islands = context.get::<IslandPhase>(cell)?;
+        let mut chunk = generator.fill_terrain(cell.x, cell.y, &islands);
         chunk.compact();
         Ok(Arc::new(chunk))
     }
@@ -99,14 +105,21 @@ impl Decorates for EndGenerator {
 
     const RETAIN: usize = 512;
 
+    const REACH: Reach = Reach::Adjacent;
+
     fn inputs() -> Vec<Dependency<EndGenerator>> {
-        vec![Dependency::on::<StructurePhase>(CHUNK_NEIGHBORHOOD), Dependency::on::<TerrainPhase>(CHUNK_NEIGHBORHOOD)]
+        vec![
+            Dependency::on::<StructurePhase>(CHUNK_NEIGHBORHOOD),
+            Dependency::on::<TerrainPhase>(CHUNK_NEIGHBORHOOD),
+            Dependency::on::<IslandPhase>(SAME_CELL),
+        ]
     }
 
     fn decorate(&self, cell: IVec2, context: &PhaseContext<EndGenerator>, earlier: &[((i32, i32), &EndWrites)]) -> Result<EndWrites, PhaseError> {
         let loaded = neighborhood::<EndGenerator, StructurePhase>(context, cell)?;
         let terrain = neighborhood::<EndGenerator, TerrainPhase>(context, cell)?;
-        Ok(self.decorate_source((cell.x, cell.y), &loaded, &terrain, earlier))
+        let islands = context.get::<IslandPhase>(cell)?;
+        Ok(self.decorate_source((cell.x, cell.y), &loaded, &terrain, &islands, earlier))
     }
 }
 

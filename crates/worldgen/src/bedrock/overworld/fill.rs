@@ -1,8 +1,9 @@
 use super::aquifer::{Aquifer, AquiferNoises, AquiferSampler, FluidTick, SurfaceWindow};
 use super::noise::NormalNoise;
 use super::terrain::BedrockTerrain;
-use crate::shared::blocks::{BlockId, BlockTable};
+use crate::shared::blocks::{AIR, BlockId, BlockTable};
 use crate::shared::chunk::proto::ProtoChunk;
+use crate::shared::chunk::store::{give_scratch, take_scratch};
 use crate::shared::math::compare::{not_greater, not_less, not_less_or_equal};
 use crate::shared::rng::random::RandomSource;
 use crate::shared::rng::xoroshiro::PositionalFactory;
@@ -37,6 +38,19 @@ const GAP_FLOOR: f32 = -1.0;
 const GAP_CEILING: f32 = 1.0;
 const GAP_THRESHOLD: f32 = -0.3;
 const RAW_BLOCK_CHANCE: f32 = 0.02;
+const DENSITY_MARGIN: f32 = 0.01;
+const NOODLE_MARGIN: f32 = 0.01;
+const VEIN_SAFE_STRENGTH: f32 = 0.39;
+const NOODLE_RIDGE_SAFE: f32 = 0.07;
+const VEIN_RIDGE_SAFE: f32 = 0.085;
+const CELLS: i32 = 16 / CELL_WIDTH;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CellKind {
+    Air,
+    Solid,
+    Mixed,
+}
 
 #[derive(Clone, Copy)]
 pub struct Fluids {
@@ -113,6 +127,62 @@ fn lazy(slot: &mut Option<Lane>, cell: &Cell, field: fn(&Corner) -> f32, fx: f32
 
 const VEIN_MIN_Y: i32 = -60;
 const VEIN_MAX_Y: i32 = 50;
+
+struct Range {
+    low: f32,
+    high: f32,
+}
+
+impl Range {
+    const EMPTY: Self = Self {
+        low: f32::INFINITY,
+        high: f32::NEG_INFINITY,
+    };
+
+    fn add(&mut self, value: f32) {
+        self.low = self.low.min(value);
+        self.high = self.high.max(value);
+    }
+
+    fn keeps_clear_of_zero(&self, distance: f32) -> bool {
+        self.low > distance || self.high < -distance
+    }
+}
+
+fn classify(noise: &NoiseChunk, cx: i32, cy: i32, cz: i32, y_low: i32, veins: bool) -> CellKind {
+    let (mut main, mut noodle, mut ridge_a, mut ridge_b) = (Range::EMPTY, Range::EMPTY, Range::EMPTY, Range::EMPTY);
+    let (mut vein_strength, mut vein_a, mut vein_b) = (0.0f32, Range::EMPTY, Range::EMPTY);
+    for a in 0..2 {
+        for b in 0..2 {
+            for c in 0..2 {
+                let corner = noise.corner(cx + a, cy + b, cz + c);
+                main.add(corner.main);
+                noodle.add(corner.noodle);
+                ridge_a.add(corner.noodle_ridge_a);
+                ridge_b.add(corner.noodle_ridge_b);
+                vein_strength = vein_strength.max(corner.vein_toggle.abs());
+                vein_a.add(corner.vein_a);
+                vein_b.add(corner.vein_b);
+            }
+        }
+    }
+    if main.high < -DENSITY_MARGIN {
+        return CellKind::Air;
+    }
+    if not_greater(main.low, DENSITY_MARGIN) {
+        return CellKind::Mixed;
+    }
+    let noodle_absent = noodle.high < -NOODLE_MARGIN || ridge_a.keeps_clear_of_zero(NOODLE_RIDGE_SAFE) || ridge_b.keeps_clear_of_zero(NOODLE_RIDGE_SAFE);
+    if !noodle_absent {
+        return CellKind::Mixed;
+    }
+    let y_high = y_low + CELL_HEIGHT - 1;
+    let vein_absent = vein_strength < VEIN_SAFE_STRENGTH || vein_a.keeps_clear_of_zero(VEIN_RIDGE_SAFE) || vein_b.keeps_clear_of_zero(VEIN_RIDGE_SAFE);
+    if veins && y_high >= VEIN_MIN_Y && y_low <= VEIN_MAX_Y && !vein_absent {
+        return CellKind::Mixed;
+    }
+    CellKind::Solid
+}
 
 fn squeeze(density: f32) -> f32 {
     let t = (density * SQUEEZE_SCALE).clamp(-1.0, 1.0);
@@ -203,8 +273,22 @@ impl TerrainFill {
         let veins = terrain.ore_veins_enabled();
         let (min_y, noise_cells) = (terrain.min_y(), terrain.noise_levels() as i32 - 1);
         let mut sampler = AquiferSampler::new(&self.aquifer, terrain, window.clone(), chunk_x, chunk_z);
+        let dry_above = sampler.dry_above();
+        let kinds: Vec<CellKind> = (0..CELLS * CELLS)
+            .flat_map(|index| (0..noise_cells).map(move |cy| (index, cy)))
+            .map(|(index, cy)| classify(noise, index % CELLS, cy, index / CELLS, min_y + cy * CELL_HEIGHT, veins))
+            .collect();
         let mut result = Aquifer { scheduled_ticks: Vec::new(), window };
         let mut chunk = chunk.edit();
+        let mut blocks = take_scratch(chunk.height as usize * 256, AIR);
+        let mut tops = [min_y as i16; 256];
+        let mut put = |lx: i32, y: i32, lz: i32, block: BlockId| {
+            let column = ((lz << 4) | lx) as usize;
+            blocks[(y - min_y) as usize * 256 + column] = block;
+            if block != AIR {
+                tops[column] = tops[column].max(y as i16 + 1);
+            }
+        };
         for lz in 0..16 {
             for lx in 0..16 {
                 let (cx, cz) = (lx / CELL_WIDTH, lz / CELL_WIDTH);
@@ -212,7 +296,22 @@ impl TerrainFill {
                 let fz = (lz % CELL_WIDTH) as f32 * WIDTH_RECIPROCAL;
                 let (x, z) = (chunk.min_x() + lx, chunk.min_z() + lz);
                 let column = adjustments.column(lx, lz);
+                let adjusted = !column.is_empty();
                 for cy in 0..noise_cells {
+                    if !adjusted {
+                        let y_low = min_y + cy * CELL_HEIGHT;
+                        match kinds[((cz * CELLS + cx) * noise_cells + cy) as usize] {
+                            CellKind::Air if y_low >= dry_above => continue,
+                            CellKind::Solid => {
+                                for ly in 0..CELL_HEIGHT {
+                                    let y = y_low + ly;
+                                    put(lx, y, lz, self.default_block(x, y, z));
+                                }
+                                continue;
+                            }
+                            _ => {}
+                        }
+                    }
                     let cell = Cell(std::array::from_fn(|a| {
                         std::array::from_fn(|b| std::array::from_fn(|c| noise.corner(cx + a as i32, cy + b as i32, cz + c as i32)))
                     }));
@@ -264,9 +363,9 @@ impl TerrainFill {
                             } else {
                                 default
                             };
-                            chunk.set(lx, y, lz, block);
+                            put(lx, y, lz, block);
                         } else if let Some(found) = substance.filter(|found| y < found.level) {
-                            chunk.set(lx, y, lz, if found.lava { fluids.lava } else { fluids.water });
+                            put(lx, y, lz, if found.lava { fluids.lava } else { fluids.water });
                             if found.schedule_tick {
                                 result.scheduled_ticks.push(FluidTick {
                                     x: lx as u8,
@@ -280,6 +379,9 @@ impl TerrainFill {
                 }
             }
         }
+        chunk.fill_empty(&blocks);
+        chunk.set_tops(&tops);
+        give_scratch(blocks);
         result
     }
 }

@@ -66,7 +66,7 @@ impl Rule {
     }
 }
 
-fn biome_order(region: &Region, owner_x: i32, owner_z: i32) -> Vec<i32> {
+fn biome_order(region: &Region, _owner_x: i32, _owner_z: i32) -> Vec<i32> {
     let mut order: Vec<i32> = Vec::new();
     let mut section = region.min_y();
     while section <= region.max_y() {
@@ -77,12 +77,20 @@ fn biome_order(region: &Region, owner_x: i32, owner_z: i32) -> Vec<i32> {
             section += SECTION_SIZE;
             continue;
         }
-        for x in 0..SECTION_SIZE {
-            for z in 0..SECTION_SIZE {
-                for y in section..section + SECTION_SIZE {
-                    let biome = region.biome_id(IVec3::new((owner_x << 4) + x, y, (owner_z << 4) + z));
-                    if !order.contains(&biome) {
-                        order.push(biome);
+        let (palette_len, ids) = region.owner_biome_section(section);
+        let mut found: Vec<i32> = Vec::with_capacity(palette_len);
+        'scan: for x in 0..SECTION_SIZE as usize {
+            for z in 0..SECTION_SIZE as usize {
+                for y in 0..SECTION_SIZE as usize {
+                    let biome = ids[(y << 8) | (z << 4) | x];
+                    if !found.contains(&biome) {
+                        found.push(biome);
+                        if !order.contains(&biome) {
+                            order.push(biome);
+                        }
+                        if found.len() == palette_len {
+                            break 'scan;
+                        }
                     }
                 }
             }

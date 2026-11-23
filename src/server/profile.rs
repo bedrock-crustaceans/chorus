@@ -18,9 +18,18 @@ pub const MAX_PROFILE_SECONDS: u32 = 600;
 
 const MAX_PROFILE_SAMPLES: usize = TICK_RATE as usize * MAX_PROFILE_SECONDS as usize;
 const SLOW_PERCENTILES: [(f64, &str); 2] = [(0.95, "95th percentile"), (0.99, "99th percentile")];
-const GAME_SETS: [GameSet; 7] = [GameSet::Connection, GameSet::Input, GameSet::World, GameSet::Actors, GameSet::Chat, GameSet::Chunks, GameSet::Broadcast];
+const GAME_SETS: [GameSet; 8] = [
+    GameSet::Connection,
+    GameSet::Input,
+    GameSet::World,
+    GameSet::Fluids,
+    GameSet::Actors,
+    GameSet::Chat,
+    GameSet::Chunks,
+    GameSet::Broadcast,
+];
 const PHASE_COUNT: usize = GAME_SETS.len() + 2;
-const PHASE_NAMES: [&str; PHASE_COUNT] = ["Start", "Connection", "Input", "World", "Actors", "Chat", "Chunks", "Broadcast", "Finish"];
+const PHASE_NAMES: [&str; PHASE_COUNT] = ["Start", "Connection", "Input", "World", "Fluids", "Actors", "Chat", "Chunks", "Broadcast", "Finish"];
 const MARK_COUNT: usize = PHASE_COUNT - 1;
 
 pub fn profile_seconds(seconds: u32) -> u32 {
@@ -348,7 +357,16 @@ mod tests {
         app.configure_sets(Tick, (TickSet::First, TickSet::Update, TickSet::Last).chain());
         app.configure_sets(
             Tick,
-            (GameSet::Connection, GameSet::Input, GameSet::World, GameSet::Actors, GameSet::Chat, GameSet::Chunks, GameSet::Broadcast)
+            (
+                GameSet::Connection,
+                GameSet::Input,
+                GameSet::World,
+                GameSet::Fluids,
+                GameSet::Actors,
+                GameSet::Chat,
+                GameSet::Chunks,
+                GameSet::Broadcast,
+            )
                 .chain()
                 .in_set(TickSet::Update),
         );

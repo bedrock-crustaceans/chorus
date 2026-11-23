@@ -27,6 +27,8 @@ pub trait Phase<G: Generator>: 'static {
 
     const RETAIN: usize = 0;
 
+    const NAME: &'static str = "";
+
     fn dependencies() -> Vec<Dependency<G>> {
         Vec::new()
     }
@@ -131,7 +133,7 @@ impl<G: Generator> PhaseHandle<G> {
     pub fn of<P: Phase<G>>() -> Self {
         Self {
             phase: PhaseId::of::<P>(),
-            name: short_type_name::<P>(),
+            name: if P::NAME.is_empty() { short_type_name::<P>() } else { P::NAME },
             retain: P::RETAIN,
             dependencies: P::dependencies,
             resolve: P::resolve,

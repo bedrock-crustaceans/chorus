@@ -265,6 +265,12 @@ impl Level {
         self.dimensions.get(&id)
     }
 
+    pub fn set_tick_areas(&mut self, centres: &HashMap<i32, Vec<(i32, i32)>>, distance: i32) {
+        for dimension in self.dimensions.values_mut() {
+            dimension.set_tick_area(centres.get(&dimension.id()).map_or(&[], Vec::as_slice), distance);
+        }
+    }
+
     pub fn dimension_mut(&mut self, id: i32) -> Option<&mut Dimension> {
         self.dimensions.get_mut(&id)
     }

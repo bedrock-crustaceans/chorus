@@ -118,11 +118,22 @@ pub struct Aquifer {
     pub window: SurfaceWindow,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 struct GridPoint {
     x: i32,
     y: i32,
     z: i32,
+}
+
+const NEIGHBOURS: usize = 12;
+
+#[derive(Default)]
+struct Neighbourhood {
+    key: Option<(i32, i32, i32)>,
+    column: Option<(i32, i32)>,
+    slots: [usize; NEIGHBOURS],
+    points: [GridPoint; NEIGHBOURS],
+    horizontal: [i64; NEIGHBOURS],
 }
 
 #[derive(Clone, Copy)]
@@ -159,6 +170,7 @@ pub struct AquiferSampler<'a> {
     ceiling: Option<i32>,
     grid_min_level: i32,
     grid_levels: i32,
+    neighbourhood: Neighbourhood,
 }
 
 fn similarity(first: u64, second: u64) -> f32 {
@@ -220,6 +232,7 @@ impl<'a> AquiferSampler<'a> {
             ceiling: None,
             grid_min_level,
             grid_levels,
+            neighbourhood: Neighbourhood::default(),
         }
     }
 
@@ -332,6 +345,10 @@ impl<'a> AquiferSampler<'a> {
         FluidStatus { level: level.min(min_surface), lava }
     }
 
+    pub fn dry_above(&mut self) -> i32 {
+        (self.terrain.sea_level() + DRY_ABOVE_LEVEL).max(self.ceiling() + DRY_ABOVE_LEVEL)
+    }
+
     pub fn substance(&mut self, x: i32, y: i32, z: i32) -> Substance {
         if y <= SHORTCUT_TOP {
             return Substance {
@@ -360,26 +377,45 @@ impl<'a> AquiferSampler<'a> {
         let grid_x = (x - SEARCH_SHIFT).div_euclid(CELL_XZ);
         let grid_y = (y + 1).div_euclid(CELL_Y);
         let grid_z = (z - SEARCH_SHIFT).div_euclid(CELL_XZ);
-        let mut closest = [(u64::MAX, 0usize); 3];
-        for step_x in 0..2 {
-            for step_y in -1..=1 {
-                for step_z in 0..2 {
-                    let (gx, gy, gz) = (grid_x + step_x, grid_y + step_y, grid_z + step_z);
-                    let slot = self.slot(gx, gy, gz);
-                    let point = self.point(slot, gx, gy, gz);
-                    let (dx, dy, dz) = ((point.x - x) as i64, (point.y - y) as i64, (point.z - z) as i64);
-                    let distance = (dx * dx + dy * dy + dz * dz) as u64;
-                    if closest[0].0 >= distance {
-                        closest[2] = closest[1];
-                        closest[1] = closest[0];
-                        closest[0] = (distance, slot);
-                    } else if closest[1].0 >= distance {
-                        closest[2] = closest[1];
-                        closest[1] = (distance, slot);
-                    } else if closest[2].0 >= distance {
-                        closest[2] = (distance, slot);
+        let key = (grid_x, grid_y, grid_z);
+        if self.neighbourhood.key != Some(key) {
+            let mut index = 0;
+            for step_x in 0..2 {
+                for step_y in -1..=1 {
+                    for step_z in 0..2 {
+                        let (gx, gy, gz) = (grid_x + step_x, grid_y + step_y, grid_z + step_z);
+                        let slot = self.slot(gx, gy, gz);
+                        self.neighbourhood.points[index] = self.point(slot, gx, gy, gz);
+                        self.neighbourhood.slots[index] = slot;
+                        index += 1;
                     }
                 }
+            }
+            self.neighbourhood.key = Some(key);
+            self.neighbourhood.column = None;
+        }
+        if self.neighbourhood.column != Some((x, z)) {
+            for index in 0..NEIGHBOURS {
+                let point = self.neighbourhood.points[index];
+                let (dx, dz) = ((point.x - x) as i64, (point.z - z) as i64);
+                self.neighbourhood.horizontal[index] = dx * dx + dz * dz;
+            }
+            self.neighbourhood.column = Some((x, z));
+        }
+        let mut closest = [(u64::MAX, 0usize); 3];
+        for index in 0..NEIGHBOURS {
+            let dy = (self.neighbourhood.points[index].y - y) as i64;
+            let distance = (self.neighbourhood.horizontal[index] + dy * dy) as u64;
+            let slot = self.neighbourhood.slots[index];
+            if closest[0].0 >= distance {
+                closest[2] = closest[1];
+                closest[1] = closest[0];
+                closest[0] = (distance, slot);
+            } else if closest[1].0 >= distance {
+                closest[2] = closest[1];
+                closest[1] = (distance, slot);
+            } else if closest[2].0 >= distance {
+                closest[2] = (distance, slot);
             }
         }
         let [(d1, k1), (d2, k2), (d3, k3)] = closest;

@@ -1,8 +1,12 @@
 use super::biome_tree::{BiomeTree, BiomeTreeError};
 use super::terrain::BedrockTerrain;
 use crate::shared::biome::Biome;
-use crate::shared::chunk::biome_volume::{BiomeVolume, SAMPLE_COLUMNS, SAMPLE_SPACING, sample_count, sample_index, sample_levels, sample_origin};
+use crate::shared::chunk::biome_volume::{BiomeVolume, SAMPLE_COLUMNS, SAMPLE_SPACING, sample_count, sample_index, sample_levels};
 use crate::shared::terrain::BiomeSource;
+use std::sync::Arc;
+
+const OWN_COLUMNS: usize = 2;
+const SAMPLE_OWNERS: [(i32, usize); SAMPLE_COLUMNS] = [(-1, 1), (0, 0), (0, 1), (1, 0)];
 
 pub struct BiomeSampler {
     tree: BiomeTree,
@@ -19,30 +23,42 @@ impl BiomeSampler {
         })
     }
 
-    pub fn samples(&self, terrain: &BedrockTerrain, chunk_x: i32, chunk_z: i32, min_y: i32, height: i32) -> Vec<i32> {
-        let levels = sample_levels(height);
-        let (origin_x, origin_y, origin_z) = sample_origin(chunk_x, chunk_z, min_y);
-        let mut samples = vec![Biome::PLAINS.bedrock_id(); sample_count(height)];
-        for xi in 0..SAMPLE_COLUMNS {
-            for zi in 0..SAMPLE_COLUMNS {
-                let (x, z) = (origin_x + xi as i32 * SAMPLE_SPACING, origin_z + zi as i32 * SAMPLE_SPACING);
-                match &self.source {
-                    BiomeSource::MultiNoise => {
-                        let column = terrain.climate_column(x, z);
-                        let mut previous = None;
-                        for yi in 0..levels {
-                            let nearest = self.tree.find(&column.point(origin_y + yi as i32 * SAMPLE_SPACING), previous);
-                            samples[sample_index(xi, zi, yi, levels)] = self.tree.biome_id(nearest);
-                            previous = Some(nearest);
-                        }
-                    }
-                    flat => {
-                        let biome = Self::flat_biome(flat, x, z).bedrock_id();
-                        for yi in 0..levels {
-                            samples[sample_index(xi, zi, yi, levels)] = biome;
-                        }
-                    }
+    fn fill_column(&self, terrain: &BedrockTerrain, x: i32, z: i32, origin_y: i32, out: &mut [i32]) {
+        match &self.source {
+            BiomeSource::MultiNoise => {
+                let column = terrain.climate_column(x, z);
+                let mut previous = None;
+                for (yi, slot) in out.iter_mut().enumerate() {
+                    let nearest = self.tree.find(&column.point(origin_y + yi as i32 * SAMPLE_SPACING), previous);
+                    *slot = self.tree.biome_id(nearest);
+                    previous = Some(nearest);
                 }
+            }
+            flat => out.fill(Self::flat_biome(flat, x, z).bedrock_id()),
+        }
+    }
+
+    pub fn own_columns(&self, terrain: &BedrockTerrain, chunk_x: i32, chunk_z: i32, min_y: i32, height: i32) -> Vec<i32> {
+        let levels = sample_levels(height);
+        let origin_y = min_y - SAMPLE_SPACING;
+        let mut columns = vec![0; OWN_COLUMNS * OWN_COLUMNS * levels];
+        for a in 0..OWN_COLUMNS {
+            for b in 0..OWN_COLUMNS {
+                let (x, z) = ((chunk_x << 4) + a as i32 * SAMPLE_SPACING, (chunk_z << 4) + b as i32 * SAMPLE_SPACING);
+                self.fill_column(terrain, x, z, origin_y, &mut columns[(a * OWN_COLUMNS + b) * levels..][..levels]);
+            }
+        }
+        columns
+    }
+
+    pub fn assemble_samples(neighbours: impl Fn(i32, i32) -> Arc<Vec<i32>>, height: i32) -> Vec<i32> {
+        let levels = sample_levels(height);
+        let mut samples = vec![0; sample_count(height)];
+        for (xi, &(dx, a)) in SAMPLE_OWNERS.iter().enumerate() {
+            for (zi, &(dz, b)) in SAMPLE_OWNERS.iter().enumerate() {
+                let owner = neighbours(dx, dz);
+                let source = &owner[(a * OWN_COLUMNS + b) * levels..][..levels];
+                samples[sample_index(xi, zi, 0, levels)..][..levels].copy_from_slice(source);
             }
         }
         samples

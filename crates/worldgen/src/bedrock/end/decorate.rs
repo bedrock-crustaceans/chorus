@@ -1,6 +1,6 @@
 use super::spikes::{COUNT, Spike};
 use super::{AIR, BlockId, CHUNK_MASK, EndBlocks, EndChunk};
-use crate::shared::decoration_window::{SLOTS, Window, Writes};
+use crate::shared::decoration_window::{SLOTS, SourceChanges, Window};
 use crate::shared::rng::mersenne::MersenneTwister;
 
 const CHORUS_REACH: u32 = 8;
@@ -49,8 +49,8 @@ impl<'a> View<'a> {
         self.tops[slot][((z & CHUNK_MASK) * 16 + (x & CHUNK_MASK)) as usize]
     }
 
-    pub(super) fn take_writes(&mut self) -> Writes {
-        self.window.take_writes()
+    pub(super) fn take_changes(&mut self) -> SourceChanges {
+        self.window.take_changes()
     }
 }
 

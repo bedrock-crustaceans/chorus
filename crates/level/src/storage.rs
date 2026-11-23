@@ -1,6 +1,7 @@
 use crate::chunk::{BlockEntity, Chunk};
 use crate::dimension_definition::DimensionDefinition;
 use crate::dimension_type::DimensionType;
+use crate::fluid::PendingUpdate;
 use crate::sub_chunk::SubChunk;
 use bedrock::level::db::{CompactionMode, Database, OpenOptions, WriteBatch};
 use chorus_block::block_permutation::BlockPermutation;
@@ -31,6 +32,7 @@ const TAG_DATA_3D: u8 = 0x2b;
 const TAG_VERSION: u8 = 0x2c;
 const TAG_SUB_CHUNK: u8 = 0x2f;
 const TAG_BLOCK_ENTITY: u8 = 0x31;
+const TAG_PENDING_TICKS: u8 = 0x33;
 const TAG_FINALIZED_STATE: u8 = 0x36;
 
 #[derive(Debug)]
@@ -476,8 +478,36 @@ impl LevelStorage {
             self.put(entities_key, entities);
         }
 
+        let ticks_key = key(id, x, z, TAG_PENDING_TICKS, None);
+        if chunk.fluid_updates().is_empty() {
+            self.remove(ticks_key);
+        } else {
+            self.put(ticks_key, self.encode_pending_ticks(chunk)?);
+        }
+
         self.put(key(id, x, z, TAG_FINALIZED_STATE, None), FINALIZED.to_le_bytes().to_vec());
         Ok(())
+    }
+
+    fn encode_pending_ticks(&self, chunk: &Chunk) -> StorageResult<Vec<u8>> {
+        let mut ticks = Vec::with_capacity(chunk.fluid_updates().len());
+        for update in chunk.fluid_updates() {
+            let block = chunk.get_block((update.pos.x & 15) as u8, update.pos.y, (update.pos.z & 15) as u8, 0).unwrap_or(self.air_id);
+            let id = if self.permutations.contains_key(&block) { block } else { self.air_id };
+            let mut tick = nbtx::Compound::new();
+            tick.insert("blockState".into(), self.permutations.get(&id).expect("air is registered").to_nbt());
+            tick.insert("time".into(), nbtx::Value::Long(update.delay as i64));
+            tick.insert("x".into(), nbtx::Value::Int(update.pos.x));
+            tick.insert("y".into(), nbtx::Value::Int(update.pos.y));
+            tick.insert("z".into(), nbtx::Value::Int(update.pos.z));
+            ticks.push(tick);
+        }
+        let mut root = nbtx::Compound::new();
+        root.insert("currentTick".into(), nbtx::Value::Int(0));
+        root.insert("tickList".into(), nbtx::Value::List(nbtx::ValueList::Compound(ticks)));
+        let mut bytes = Vec::new();
+        nbtx::to_le_bytes_in(&mut bytes, &nbtx::Value::Compound(root))?;
+        Ok(bytes)
     }
 
     fn encode_sub_chunk(&self, sub_chunk: &SubChunk, index: i8) -> StorageResult<Vec<u8>> {
@@ -574,7 +604,13 @@ impl LevelStorage {
             }
         }
 
-        Ok(Some(Chunk::from_sub_chunks(x, z, min, sub_chunks, block_entities)))
+        let fluid_updates = match self.get(&key(id, x, z, TAG_PENDING_TICKS, None))? {
+            Some(data) => decode_pending_ticks(&data),
+            None => Vec::new(),
+        };
+        let mut chunk = Chunk::from_sub_chunks(x, z, min, sub_chunks, block_entities);
+        chunk.set_fluid_updates(fluid_updates);
+        Ok(Some(chunk))
     }
 
     fn decode_sub_chunk(&self, data: &[u8]) -> StorageResult<Vec<[i32; 4096]>> {
@@ -681,6 +717,45 @@ impl LevelStorage {
         let candidate = HashUtils::hash_block_permutation(name, &resolved);
         self.permutations.contains_key(&candidate).then_some(candidate)
     }
+}
+
+fn decode_pending_ticks(data: &[u8]) -> Vec<PendingUpdate> {
+    let mut reader = data;
+    let Ok(nbtx::Value::Compound(root)) = nbtx::from_le_bytes::<nbtx::Value>(&mut reader) else {
+        return Vec::new();
+    };
+    let current = match root.get("currentTick".as_bytes()) {
+        Some(nbtx::Value::Int(tick)) => i64::from(*tick),
+        _ => 0,
+    };
+    let Some(nbtx::Value::List(nbtx::ValueList::Compound(ticks))) = root.get("tickList".as_bytes()) else {
+        return Vec::new();
+    };
+    let int = |tick: &nbtx::Compound, name: &str| match tick.get(name.as_bytes()) {
+        Some(nbtx::Value::Int(value)) => Some(*value),
+        _ => None,
+    };
+    ticks
+        .iter()
+        .filter_map(|tick| {
+            let time = match tick.get("time".as_bytes()) {
+                Some(nbtx::Value::Long(time)) => *time,
+                _ => return None,
+            };
+            let lava = match tick.get("blockState".as_bytes()) {
+                Some(nbtx::Value::Compound(state)) => match state.get("name".as_bytes()) {
+                    Some(nbtx::Value::String(name)) => String::from_utf8_lossy(name.as_ref()).contains("lava"),
+                    _ => false,
+                },
+                _ => false,
+            };
+            Some(PendingUpdate {
+                pos: glam::IVec3::new(int(tick, "x")?, int(tick, "y")?, int(tick, "z")?),
+                lava,
+                delay: (time - current).max(0) as u64,
+            })
+        })
+        .collect()
 }
 
 fn digp_key(dimension: i32, x: i32, z: i32) -> Vec<u8> {
@@ -942,6 +1017,56 @@ mod tests {
             assert_same(&loaded, original);
             assert!(!loaded.is_dirty());
         }
+    }
+
+    #[test]
+    fn pending_fluid_ticks_survive_a_save_and_load_in_the_vanilla_format() {
+        let world = TempWorld::new("pending-ticks");
+        let registry = registry();
+        let air = registry.get_block_id("minecraft:air").unwrap();
+        let water = registry.get_block_id("minecraft:water").unwrap();
+        let lava = registry.get_block_id("minecraft:lava").unwrap();
+        let storage = LevelStorage::open(&world.0, &registry, 4).unwrap();
+        let mut chunk = Chunk::new(2, -3, -4, 24, air, 1);
+        let (water_at, lava_at) = (IVec3::new(35, 20, -40), IVec3::new(37, -50, -41));
+        chunk.set_block(3, 20, 8, 0, water);
+        chunk.set_block(5, -50, 7, 0, lava);
+        chunk.set_fluid_updates(vec![
+            crate::fluid::PendingUpdate { pos: water_at, lava: false, delay: 5 },
+            crate::fluid::PendingUpdate { pos: lava_at, lava: true, delay: 30 },
+        ]);
+        storage.save_chunk(DimensionType::Overworld, &chunk).unwrap();
+        storage.flush_blocking().unwrap();
+
+        let raw = storage.get(&key(0, 2, -3, TAG_PENDING_TICKS, None)).unwrap().expect("the ticks are stored under the vanilla key");
+        let mut reader = raw.as_slice();
+        let nbtx::Value::Compound(root) = nbtx::from_le_bytes::<nbtx::Value>(&mut reader).unwrap() else {
+            panic!("a compound")
+        };
+        assert!(matches!(root.get("currentTick".as_bytes()), Some(nbtx::Value::Int(_))));
+        let Some(nbtx::Value::List(nbtx::ValueList::Compound(list))) = root.get("tickList".as_bytes()) else {
+            panic!("a tick list")
+        };
+        assert_eq!(list.len(), 2);
+        let Some(nbtx::Value::Compound(state)) = list[0].get("blockState".as_bytes()) else {
+            panic!("a block state")
+        };
+        assert!(matches!(state.get("name".as_bytes()), Some(nbtx::Value::String(name)) if name.as_slice() == b"minecraft:water"));
+
+        let mut loaded = storage
+            .load_chunk(DimensionType::Overworld, DimensionType::Overworld.definition(), 2, -3)
+            .unwrap()
+            .expect("chunk was saved");
+        let mut updates = loaded.take_fluid_updates();
+        updates.sort_by_key(|update| update.delay);
+        assert_eq!(updates.len(), 2);
+        assert_eq!((updates[0].pos, updates[0].lava, updates[0].delay), (water_at, false, 5));
+        assert_eq!((updates[1].pos, updates[1].lava, updates[1].delay), (lava_at, true, 30));
+
+        chunk.set_fluid_updates(Vec::new());
+        storage.save_chunk(DimensionType::Overworld, &chunk).unwrap();
+        storage.flush_blocking().unwrap();
+        assert!(storage.get(&key(0, 2, -3, TAG_PENDING_TICKS, None)).unwrap().is_none());
     }
 
     #[test]

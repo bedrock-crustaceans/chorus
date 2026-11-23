@@ -192,6 +192,8 @@ impl Phase<OverworldGenerator> for ChunkPhase {
     }
 
     fn run(generator: &OverworldGenerator, cell: IVec2, context: &mut PhaseContext<OverworldGenerator>) -> Result<Chunk, PhaseError> {
-        Ok(context.take::<PostProcessPhase>(cell)?.into_chunk(&generator.blocks))
+        let mut chunk = context.take::<PostProcessPhase>(cell)?.into_chunk(&generator.blocks);
+        generator.active_fluid_ticks(&mut chunk);
+        Ok(chunk)
     }
 }

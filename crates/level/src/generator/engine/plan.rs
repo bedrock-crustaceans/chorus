@@ -226,10 +226,11 @@ impl<G: Generator> Engine<G> {
         Ok(Some((handle, cell, context)))
     }
 
-    pub(super) fn context(&self, key: TaskKey, handle: PhaseHandle<G>, cell: IVec2, hop: u32) -> Result<PhaseContext<G>, Arc<PhaseFailure>> {
+    pub(super) fn context(&mut self, key: TaskKey, handle: PhaseHandle<G>, cell: IVec2, hop: u32) -> Result<PhaseContext<G>, Arc<PhaseFailure>> {
+        let mut producers = std::mem::take(&mut self.producers);
+        producers.clear();
         let task = &self.graph.tasks[key];
         let mut resolved = Vec::with_capacity(task.deps.len());
-        let mut producers = FxHashMap::default();
         let mut failed = None;
         for dependency_key in &task.deps {
             let dependency = &self.graph.tasks[*dependency_key];
@@ -247,15 +248,18 @@ impl<G: Generator> Engine<G> {
         }
 
         if let Some(failure) = failed {
+            self.producers = producers;
             let error = PhaseError::DependencyFailed(failure);
             return Err(Arc::new(PhaseFailure { phase: handle.name, cell, error }));
         }
 
+        let inbox = self.collect_mail(handle.phase, cell, hop, &producers);
+        self.producers = producers;
         Ok(PhaseContext {
             resolved,
             generator: PhantomData,
             phase: handle.phase,
-            inbox: self.collect_mail(handle.phase, cell, hop, &producers),
+            inbox,
             outbox: Vec::new(),
         })
     }

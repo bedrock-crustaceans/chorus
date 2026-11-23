@@ -20,7 +20,10 @@ impl<G: Generator> Engine<G> {
             && let TaskStatus::Done(outcome) = task.status
             && self.graph.phases.id_at(task.phase) != self.terminal
         {
-            self.discarded.push(outcome);
+            let shared = matches!(&outcome, Ok(output) if Arc::strong_count(output) > 1);
+            if !shared {
+                self.discarded.push(outcome);
+            }
         }
     }
 

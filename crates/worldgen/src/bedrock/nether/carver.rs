@@ -1,7 +1,8 @@
 use std::f32::consts::{FRAC_PI_2, PI};
+use std::sync::OnceLock;
 
 use super::{NetherBlocks, NetherChunk, TERRAIN_HEIGHT};
-use crate::bedrock::overworld::decoration_seed;
+use crate::bedrock::overworld::{decoration_seed_with, large_feature_multipliers};
 use crate::shared::CHUNK_WIDTH;
 use crate::shared::math::sine;
 use crate::shared::rng::mersenne::MersenneTwister;
@@ -30,8 +31,26 @@ const ROOM_BRANCH_Y_SCALE: f32 = 1.0;
 const BRANCH_PITCH_DIVISOR: f32 = 3.0;
 const RIM_GROWTH: i32 = 2;
 
+const CACHE_SIDE: usize = 64;
+
 pub struct NetherCarver {
     seed: u32,
+    multipliers: (u32, u32),
+    plans: Box<[OnceLock<((i32, i32), Vec<Walk>)>]>,
+}
+
+struct Step {
+    at: [f32; 3],
+    radius: f32,
+    left: f32,
+}
+
+struct Walk {
+    room: bool,
+    y_scale: f32,
+    reach: f32,
+    steps: Vec<Step>,
+    children: Option<Box<[Walk; 2]>>,
 }
 
 #[derive(Clone, Copy)]
@@ -52,7 +71,12 @@ struct Target<'a> {
 
 impl NetherCarver {
     pub fn new(seed: i64) -> Self {
-        Self { seed: seed as u32 }
+        let seed = seed as u32;
+        Self {
+            seed,
+            multipliers: large_feature_multipliers(seed),
+            plans: (0..CACHE_SIDE * CACHE_SIDE).map(|_| OnceLock::new()).collect(),
+        }
     }
 
     pub fn carve(&self, chunk: &mut NetherChunk, chunk_x: i32, chunk_z: i32, ids: &NetherBlocks) {
@@ -63,20 +87,42 @@ impl NetherCarver {
         };
         for x in chunk_x - SOURCE_CHUNKS..=chunk_x + SOURCE_CHUNKS {
             for z in chunk_z - SOURCE_CHUNKS..=chunk_z + SOURCE_CHUNKS {
-                let mut random = MersenneTwister::new(decoration_seed(self.seed, x, z));
-                add_feature(&mut random, (x, z), &mut target);
+                self.with_plan((x, z), |walks| {
+                    for walk in walks {
+                        replay(walk, &mut target);
+                    }
+                });
             }
         }
     }
+
+    fn with_plan(&self, source: (i32, i32), apply: impl FnOnce(&[Walk])) {
+        let slot = &self.plans[(source.0 as usize & (CACHE_SIDE - 1)) | ((source.1 as usize & (CACHE_SIDE - 1)) * CACHE_SIDE)];
+        let cached = slot.get_or_init(|| (source, self.plan(source)));
+        if cached.0 == source {
+            apply(&cached.1);
+        } else {
+            apply(&self.plan(source));
+        }
+    }
+
+    fn plan(&self, source: (i32, i32)) -> Vec<Walk> {
+        plan_feature(decoration_seed_with(self.seed, self.multipliers, source.0, source.1), source)
+    }
 }
 
-fn add_feature(random: &mut MersenneTwister, source: (i32, i32), target: &mut Target) {
-    let bound = random.next_int_bounded(CAVE_BOUND);
-    let bound = random.next_int_bounded(bound + 1);
-    let count = random.next_int_bounded(bound + 1);
-    if random.next_int_bounded(SKIP_CARVE_CHANCE) != 0 || count <= 0 {
-        return;
+fn plan_feature(seed: u32, source: (i32, i32)) -> Vec<Walk> {
+    let [first, second, third, fourth] = MersenneTwister::leading_words::<4>(seed);
+    let bound = (first % CAVE_BOUND as u32) as i32;
+    let bound = (second % (bound + 1) as u32) as i32;
+    let count = (third % (bound + 1) as u32) as i32;
+    let mut walks = Vec::new();
+    if fourth % SKIP_CARVE_CHANCE as u32 != 0 || count <= 0 {
+        return walks;
     }
+    let mut random = MersenneTwister::new(seed);
+    random.skip(4);
+    let random = &mut random;
     for _ in 0..count {
         let z = random.next_int_bounded(CHUNK_WIDTH) + source.1 * CHUNK_WIDTH;
         let y = random.next_int_bounded(TERRAIN_HEIGHT);
@@ -92,7 +138,7 @@ fn add_feature(random: &mut MersenneTwister, source: (i32, i32), target: &mut Ta
                 length: -1,
                 y_scale: ROOM_Y_SCALE,
             };
-            add_tunnel(random, origin, room, target);
+            walks.push(plan_tunnel(random, origin, room));
             tunnels = random.next_int_bounded(EXTRA_TUNNELS) + 1;
         }
         for _ in 0..tunnels {
@@ -108,12 +154,13 @@ fn add_feature(random: &mut MersenneTwister, source: (i32, i32), target: &mut Ta
                 length: 0,
                 y_scale: TUNNEL_Y_SCALE,
             };
-            add_tunnel(random, origin, tunnel, target);
+            walks.push(plan_tunnel(random, origin, tunnel));
         }
     }
+    walks
 }
 
-fn add_tunnel(parent: &mut MersenneTwister, mut at: [f32; 3], mut tunnel: Tunnel, target: &mut Target) {
+fn plan_tunnel(parent: &mut MersenneTwister, mut at: [f32; 3], mut tunnel: Tunnel) -> Walk {
     let mut random = MersenneTwister::new(parent.next_int() as u32);
     if tunnel.length <= 0 {
         tunnel.length = LENGTH_BASE - (random.next_u32() % LENGTH_SPREAD) as i32;
@@ -124,14 +171,19 @@ fn add_tunnel(parent: &mut MersenneTwister, mut at: [f32; 3], mut tunnel: Tunnel
     }
     let mut branch = if tunnel.length != 1 { (random.next_u32() % (tunnel.length as u32 >> 1)) as i32 } else { 0 };
     let decay = if !random.next_u32().is_multiple_of(STEEP_CHANCE) { 0.7 } else { 0.92 };
+    let mut walk = Walk {
+        room,
+        y_scale: tunnel.y_scale,
+        reach: 0.0,
+        steps: Vec::new(),
+        children: None,
+    };
     if tunnel.step >= tunnel.length {
-        return;
+        return walk;
     }
     branch += tunnel.length >> 2;
     let reach = (2.0 + tunnel.thickness) + REACH_EXTRA;
-    let reach = reach * reach;
-    let (chunk_x, chunk_z) = target.position;
-    let centre = [((chunk_x * 16) | 8) as f32, ((chunk_z * 16) | 8) as f32];
+    walk.reach = reach * reach;
     let (mut pitch_change, mut yaw_change) = (0.0f32, 0.0f32);
     while tunnel.step < tunnel.length {
         let sine = sine::sin(tunnel.step as f32 * PI / tunnel.length as f32);
@@ -149,7 +201,7 @@ fn add_tunnel(parent: &mut MersenneTwister, mut at: [f32; 3], mut tunnel: Tunnel
         yaw_change = draws[5] * (draws[3] - draws[4]) * 4.0 + decayed_yaw_change;
         if !room {
             if tunnel.thickness > 1.0 && tunnel.step == branch {
-                for side in [-FRAC_PI_2, FRAC_PI_2] {
+                let children = [-FRAC_PI_2, FRAC_PI_2].map(|side| {
                     let thickness = random.next_float() * THICKNESS_SCALE + THICKNESS_SCALE;
                     let child = Tunnel {
                         thickness,
@@ -159,26 +211,45 @@ fn add_tunnel(parent: &mut MersenneTwister, mut at: [f32; 3], mut tunnel: Tunnel
                         length: tunnel.length,
                         y_scale: ROOM_BRANCH_Y_SCALE,
                     };
-                    add_tunnel(&mut random, at, child, target);
-                }
-                return;
+                    plan_tunnel(&mut random, at, child)
+                });
+                walk.children = Some(Box::new(children));
+                return walk;
             }
             if random.next_u32().is_multiple_of(SKIP_SEGMENT_CHANCE) {
                 tunnel.step += 1;
                 continue;
             }
         }
-        let (dx, dz) = (at[0] - centre[0], at[2] - centre[1]);
-        let left = (tunnel.length - tunnel.step) as f32;
-        if dz * dz + dx * dx - left * left > reach {
-            return;
-        }
-        let width = radius + radius;
-        let outside = (centre[0] - 16.0) - width > at[0] || (centre[1] - 16.0) - width > at[2] || at[0] > (centre[0] + 16.0) + width || at[2] > width + (centre[1] + 16.0);
-        if !outside && carve(target, at, radius, radius * tunnel.y_scale) && room {
-            return;
-        }
+        walk.steps.push(Step {
+            at,
+            radius,
+            left: (tunnel.length - tunnel.step) as f32,
+        });
         tunnel.step += 1;
+    }
+    walk
+}
+
+fn replay(walk: &Walk, target: &mut Target) {
+    let (chunk_x, chunk_z) = target.position;
+    let centre = [((chunk_x * 16) | 8) as f32, ((chunk_z * 16) | 8) as f32];
+    for step in &walk.steps {
+        let at = step.at;
+        let (dx, dz) = (at[0] - centre[0], at[2] - centre[1]);
+        if dz * dz + dx * dx - step.left * step.left > walk.reach {
+            return;
+        }
+        let width = step.radius + step.radius;
+        let outside = (centre[0] - 16.0) - width > at[0] || (centre[1] - 16.0) - width > at[2] || at[0] > (centre[0] + 16.0) + width || at[2] > width + (centre[1] + 16.0);
+        if !outside && carve(target, at, step.radius, step.radius * walk.y_scale) && walk.room {
+            return;
+        }
+    }
+    if let Some(children) = &walk.children {
+        for child in children.iter() {
+            replay(child, target);
+        }
     }
 }
 
