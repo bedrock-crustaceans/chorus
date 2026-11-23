@@ -118,7 +118,8 @@ pub struct LevelConfig {
     pub name: String,
     pub seed: LevelSeed,
     pub chunk_saving: ChunkSaving,
-    pub max_view_distance: i32,
+    #[serde(alias = "max_view_distance")]
+    pub view_distance: i32,
     pub tick_distance: i32,
     /// How many generated pieces of each kind to keep per player for neighbouring chunks, as a multiple of the chunks in the player's view.
     pub retention_budget: f64,
@@ -138,7 +139,7 @@ impl Default for LevelConfig {
             name: String::from("world"),
             seed: LevelSeed::default(),
             chunk_saving: ChunkSaving::default(),
-            max_view_distance: 32,
+            view_distance: 32,
             tick_distance: 4,
             retention_budget: 8.0,
             lookahead: 0,

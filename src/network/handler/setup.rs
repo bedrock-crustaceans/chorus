@@ -249,8 +249,8 @@ pub fn handle_setup(
     }
 }
 
-fn clamp_chunk_radius(requested: i32, max_view_distance: i32) -> i32 {
-    requested.clamp(1, max_view_distance.max(1))
+fn clamp_chunk_radius(requested: i32, view_distance: i32) -> i32 {
+    requested.clamp(1, view_distance.max(1))
 }
 
 fn handle_request_chunk_radius(
@@ -261,7 +261,7 @@ fn handle_request_chunk_radius(
     items: &ItemRegistry,
     properties: Option<&ActorPropertyRegistry>,
 ) {
-    let radius = clamp_chunk_radius(packet.chunk_radius, level.max_view_distance);
+    let radius = clamp_chunk_radius(packet.chunk_radius, level.view_distance);
     debug!("RequestChunkRadius: requested={}, capped={}", packet.chunk_radius, radius);
 
     // the queue itself is filled by update_chunk_order, which also keeps it following the player
